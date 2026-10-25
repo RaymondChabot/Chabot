@@ -652,15 +652,43 @@
     // (clientèle complète toute l'année), puis les revenus et les dépenses évoluent
     // selon le scénario.
     R.gmfuType = S.revenu.annee === "premiere" ? C.revenuGmfu({ ...S.revenu, annee: "type" }) : R.gmfu;
-    const impType = avec(C.impotParticulier({ ...base, revenu: R.gmfuType[mode].total }))[0];
-    R.travailMoiType = (impType.net - S.impot.depensesPro - R.primeMoi) / 12;
     R.scenario = SCENARIOS[S.scenarios.choisi] ? S.scenarios.choisi : "realiste";
     R.hyp = S.scenarios[R.scenario];
     // Surplus de l'année a (0 = cette année), qui va sur les dettes.
+    /* Année a (0 = cette année), en dollars de l'année a. Les revenus augmentent selon
+       le scénario ; les paliers d'impôt, les crédits, les seuils des allocations et la
+       prime d'assurance médicaments suivent l'inflation : on calcule donc l'impôt en
+       dollars d'aujourd'hui, puis on le ramène en dollars de l'année. Les enfants
+       vieillissent : allocations selon l'âge, cotisations REEE jusqu'à 17 ans. */
+    const cacheAnnee = new Map();
+    R.annee = (h, a) => {
+      const cle = `${h.hausseRevenus}|${h.inflation}|${a}`;
+      if (cacheAnnee.has(cle)) return cacheAnnee.get(cle);
+      const I = Math.pow(1 + h.inflation / 100, a), reel = Math.pow(1 + h.hausseRevenus / 100, a) / I;
+      let res;
+      if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, epargne: R.epargneMoi * 12 };
+      else {
+        const conj = R.couple ? C.impotSalarie({ salaire: S.conjointe.salaire * reel, rpa: S.conjointe.rpa, syndicat: S.conjointe.syndicat, autresRevenus: S.conjointe.autresRevenus * reel }) : null;
+        let moi = C.impotParticulier({ ...base, revenu: R.gmfuType[mode].total * reel });
+        if (R.couple) moi = C.transfertsConjoints(moi, conj)[0];
+        const ages = S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x < 18);
+        const nf = moi.revenuNetFed + (conj ? conj.revenuNetFed : 0), nq = moi.revenuNetQc + (conj ? conj.revenuNetQc : 0);
+        const prime = S.famille.medicamentsPublicMoi ? C.primeMedicaments({ revenuNetQc: nq, couple: R.couple, ages, adultesCouverts: 1 }).parAdulte : 0;
+        const alloc = S.famille.calculAuto ? C.prestationsFamille({ revenuNetFed: nf, revenuNetQc: nq, ages, couple: R.couple }).total * I : S.menage.allocationsAnnuelles;
+        const enf = S.epargne.reee.enfants.filter(x => +x.age + a < 17).length;
+        res = {
+          travail: (moi.net - S.impot.depensesPro - prime) * I,
+          alloc: !R.couple || S.famille.versementA !== "conjointe" ? alloc : 0,
+          epargne: enf * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle,
+        };
+      }
+      cacheAnnee.set(cle, res);
+      return res;
+    };
     const surplusAnnee = h => a => {
       if (S.strategie.extraMode === "manuel") return S.strategie.extraManuel;
-      const travail = a === 0 ? R.travailMoi : R.travailMoiType * Math.pow(1 + h.hausseRevenus / 100, a);
-      return travail + R.allocMoi - R.depMoi * Math.pow(1 + h.inflation / 100, a) - R.dettesMoi - R.epargneMoi;
+      const x = R.annee(h, a);
+      return (x.travail + x.alloc - x.epargne) / 12 - R.depMoi * Math.pow(1 + h.inflation / 100, a) - R.dettesMoi;
     };
     R.surplusAnnee = surplusAnnee(R.hyp);
 
@@ -1334,6 +1362,19 @@
         sauver(); tout(); feuilleDette(S.dettes.length - 1);
       } },
     ]);
+
+    // Votre surplus au fil des ans : il va sur les dettes, puis il est placé.
+    const nAns = Math.min(R.annees, 20), an0 = +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear();
+    const surplus = Array.from({ length: nAns + 1 }, (_, a) => R.surplusAnnee(a));
+    graphiqueLignes(document.getElementById("bu-surplus-graph"), null, [{ nom: "Surplus mensuel", couleur: SERIES[0], valeurs: surplus }],
+      surplus.map((_, a) => String(an0 + a)), { titre: "Votre surplus mensuel par année", aire: true, hauteur: 170, titreX: i => `${an0 + i}` });
+    rangees("bu-surplus", [0, 1, 5, 10].filter(a => a <= nAns).map(a => ({
+      titre: a === 0 ? "Cette année" : a === 1 ? "L'an prochain" : `Dans ${a} ans`, sous: String(an0 + a),
+      valeur: $(surplus[a]), valeurSous: a === 0 ? (S.revenu.annee === "premiere" ? "Première année de pratique" : undefined) : signe(surplus[a] - surplus[0]),
+    })));
+    document.getElementById("bu-surplus-note").textContent = S.strategie.extraMode === "manuel"
+      ? `Montant fixe de ${$(S.strategie.extraManuel)} par mois (Plan de remboursement, Modifier).`
+      : `Scénario ${SCENARIOS[R.scenario].toLowerCase()} : revenus ${signePct(R.hyp.hausseRevenus)} et dépenses ${signePct(R.hyp.inflation)} par année, paliers d'impôt indexés. ${S.revenu.annee === "premiere" ? "Après la première année, la clientèle est complète toute l'année. " : ""}Les allocations suivent l'âge des enfants et les cotisations REEE cessent à 17 ans.`;
 
     const sim = R.sim;
     const res = document.getElementById("de-resume"); res.textContent = "";
