@@ -54,12 +54,14 @@
   ];
   const PRISE_EN_CHARGE = { nonVuln: [64.50, 74.75], vuln: [72.65, 82.90] };
   /* Tarifs de départ, tous modifiables dans les données (revenu.tarifs). Sans rendez-vous :
-     visites ponctuelles (urgences mineures), souvent de patients d'autres médecins ; départ
-     au tarif du suivi (mineure) et du suivi vulnérable (complexe), à vérifier dans l'onglet B. */
+     visites ponctuelles (urgences mineures), souvent de patients d'autres médecins, payées
+     moins qu'un suivi. Estimées d'après le rapport des tarifs au cabinet, patient non
+     vulnérable de moins de 80 ans : mineure (15765, 15766) environ 48 % du suivi (15803,
+     15804), complexe (15773, 15774) environ 95 %. À vérifier dans l'onglet B. */
   const TARIFS_DEFAUT = {
     ...Object.fromEntries(VISITES.map(v => [v.cle, v.tarifs])),
     pecNonVuln: PRISE_EN_CHARGE.nonVuln, pecVuln: PRISE_EN_CHARGE.vuln,
-    srvMineure: [32.25, 36.95], srvComplexe: [40.50, 45.20],
+    srvMineure: [15.35, 17.70], srvComplexe: [30.70, 35.35],
   };
   const tarifsDe = r => ({ ...TARIFS_DEFAUT, ...(r.tarifs || {}) });
 
@@ -169,14 +171,11 @@
       // Prime d'inscription individuelle d'une entente ponctuelle, par nouveau patient (0 si aucune).
       supplements += (r.nouveauxGuichet + r.nouveauxSansMedecin) * (r.primeInscription || 0);
     }
-    // Supplément GMF par demi-journée de sans rendez-vous, selon le nombre de patients (codes 19928, 19929).
-    const suppSRVdj = patientsSRV >= 20 ? (r.suppSRV20 || 0) : patientsSRV >= 10 ? (r.suppSRV10 || 0) : 0;
-    const supplementsSRV = W * SRV * suppSRVdj;
     const perDiem = W * T * (resid * r.perDiemResident + ext * (r.perDiemExterne || 0)) * maj;
     const detailActivites = (r.activites || []).map(a => revenuActivite(a, W));
     const activites = detailActivites.reduce((t, x) => t + x.total, 0) * maj, autres = r.autresRevenus || 0;
-    const commun = forfaitInscription + forfaitVulnerable + supplements + supplementsSRV + perDiem + activites + autres;
-    const base = { perDiem, forfaitInscription, forfaitVulnerable, supplements, supplementsSRV, activites, autres };
+    const commun = forfaitInscription + forfaitVulnerable + supplements + perDiem + activites + autres;
+    const base = { perDiem, forfaitInscription, forfaitVulnerable, supplements, activites, autres };
 
     const heures = W * (N + SRV) * H;
     const horaire = { heures: heures * r.tarifHoraire * maj, ...base };
@@ -216,7 +215,10 @@
     const netVisite = parVisiteActe * (1 - (r.fraisCabinetPct || 0) / 100) / (r.fraisCabinetTousModes ? 1 - (r.fraisCabinetPct || 0) / 100 : 1);
     const seuilActe = netVisite > 0 ? r.tarifHoraire * maj * H / netVisite : null;
 
-    return { heures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, semainesPalierHaut, activites, detailActivites, visitesApprenants: W * T * visitesApprenants,
+    // Revenu moyen par patient, à 100 % du tarif, au palier de fin d'année : rendez-vous et sans rendez-vous.
+    const palierFin = inscritsFin >= 499.999 ? 1 : 0;
+    const tarifMoyenRdv = tarifVisite(r.mix, palierFin, TF) * maj, tarifMoyenSrv = tarifSrv(palierFin) * maj;
+    return { heures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, semainesPalierHaut, activites, detailActivites, visitesApprenants: W * T * visitesApprenants, tarifMoyenRdv, tarifMoyenSrv,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
   }
 

@@ -41,8 +41,9 @@ Revenu affiche tous les détails.
 - **Revenu** : pratique principale en GMF ou clinique privée (à l'acte,
   frais de cabinet), en GMF-U ou en CLSC (taux horaire, mode mixte ou à
   l'acte), avec les tarifs de la RAMQ : demi-journées de rendez-vous et de
-  sans rendez-vous (tarifs à part : visites ponctuelles mineures et
-  complexes, suppléments GMF par demi-journée), patients, prise en charge
+  sans rendez-vous (au mixte et à l'acte, chaque patient est payé au tarif
+  de la visite ponctuelle, mineure ou complexe, plus bas qu'un suivi),
+  patients, prise en charge
   de nouveaux patients, patients vulnérables et très vulnérables. En GMF-U :
   résidents (4 à 5 patients par demi-journée) et externes (2 à 3),
   supervision facturée à l'acte de supervision ou aux visites des
@@ -108,9 +109,11 @@ dossier racine.
 - Tarif horaire, mode mixte et supervision : EP 42 et annexe XXIII ; les
   montants par défaut sont les derniers publiés trouvés et doivent être
   confirmés.
-- Forfaits et suppléments d'inscription : EP 40. Suppléments du sans
-  rendez-vous (codes 19928 et 19929) et des patients très vulnérables
-  (code 19960) : à inscrire selon les montants en vigueur.
+- Forfaits et suppléments d'inscription : EP 40. Supplément des patients
+  très vulnérables (code 19960) : à confirmer selon le montant en vigueur.
+- Sans rendez-vous : visites ponctuelles mineures (15765 à 15772) et
+  complexes (15773 à 15780) ; tarifs de départ estimés d'après leur rapport
+  au tarif du suivi au cabinet (environ 48 % et 95 %), à vérifier.
 - Dépenses professionnelles : grille tarifaire 2026-2027 du Collège des
   médecins ; cotisations 2027 de l'ACPM au Québec.
 - CELIAPP : 8 000 $ par année, 40 000 $ à vie (Agence du revenu du Canada).

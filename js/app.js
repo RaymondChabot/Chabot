@@ -36,7 +36,7 @@
       // Activités en établissement, en plus de la pratique principale.
       partTresVulnerable: 0, forfaitTresVulnerable: 55, suppTresVulnerable: 124.50, primeInscription: 0,
       externes: 0, patientsParResident: 4.5, patientsParExterne: 2.5, supervisionFacturation: "acte", perDiemExterne: 0,
-      pctSrvComplexe: 0, suppSRV10: 0, suppSRV20: 0, majorationPct: 0,
+      pctSrvComplexe: 50, majorationPct: 0,
       tarifs: JSON.parse(JSON.stringify(C.TARIFS_DEFAUT)),
       // Autres revenus : une ligne par source (voir CATALOGUE_REVENUS) ; montants à 0 au départ.
       lignes: [],
@@ -281,6 +281,13 @@
       d.revenu.demiJourneesSRV ??= 0; d.revenu.patientsSRV ??= 0; d.revenu.activites ??= [];
       if (!d.revenu.lignes && d.revenu.autresRevenus > 0) d.revenu.lignes = [{ k: "ramq", montant: d.revenu.autresRevenus, periode: "an" }];
       if (d.revenu.lignes) d.revenu.autresRevenus = 0;
+      // Sans rendez-vous : plus de supplément par demi-journée ; tarifs de départ d'avant octobre 2026 remplacés.
+      delete d.revenu.suppSRV10; delete d.revenu.suppSRV20;
+      const t = d.revenu.tarifs;
+      if (t && String(t.srvMineure) === "32.25,36.95" && String(t.srvComplexe) === "40.5,45.2") {
+        t.srvMineure = [...C.TARIFS_DEFAUT.srvMineure]; t.srvComplexe = [...C.TARIFS_DEFAUT.srvComplexe];
+        if (!d.revenu.pctSrvComplexe) d.revenu.pctSrvComplexe = 50;
+      }
     }
     if (d.actifs && !d.actifs.logement) d.actifs.logement = d.actifs.maison && d.actifs.maison.valeur > 0 ? "proprietaire" : "locataire";
     return d;
@@ -358,7 +365,7 @@
       { g: "Vos demi-journées" },
       { p: "revenu.demiJournees", l: "Demi-journées de rendez-vous par semaine", u: "d.-j.", h: "Vos propres patients. En GMF-U, enseignement compris." },
       { p: "revenu.patientsParDJ", l: "Patients par demi-journée de rendez-vous", u: "pat.", s: 0.5 },
-      { p: "revenu.demiJourneesSRV", l: "Demi-journées de sans rendez-vous (SRV)", u: "d.-j.", h: "Urgences mineures, souvent des patients d'autres médecins : tarifs à part." },
+      { p: "revenu.demiJourneesSRV", l: "Demi-journées de sans rendez-vous (SRV)", u: "d.-j.", h: "Urgences mineures, souvent des patients d'autres médecins. Au mixte et à l'acte, chaque patient est payé au tarif de la visite ponctuelle, plus bas en moyenne qu'un suivi ; au taux horaire, à l'heure." },
       { p: "revenu.patientsSRV", l: "Patients par demi-journée de SRV", u: "pat.", s: 0.5, si: "revenu.demiJourneesSRV" },
       { p: "revenu.heuresParDJ", l: "Heures par demi-journée", u: "h", s: 0.25, si: "details" },
       { g: "Enseignement et apprenants", si: SI_GMFU },
@@ -392,9 +399,7 @@
       { p: "revenu.mix.pedia", l: "Visites périodiques pédiatriques", u: "%" },
       { p: "revenu.mix.gross", l: "Suivis de grossesse", u: "%" },
       { g: "Sans rendez-vous : détails", si: "details&revenu.demiJourneesSRV" },
-      { p: "revenu.pctSrvComplexe", l: "Visites ponctuelles complexes", u: "%", h: "Le reste : visites ponctuelles mineures." },
-      { p: "revenu.suppSRV10", l: "Supplément GMF, demi-journée de 10 patients et plus", u: "$", s: 0.01, h: "Code 19928. Inscrivez le montant en vigueur ; 0 hors GMF." },
-      { p: "revenu.suppSRV20", l: "Supplément GMF, demi-journée de 20 patients et plus", u: "$", s: 0.01, h: "Code 19929." },
+      { p: "revenu.pctSrvComplexe", l: "Visites ponctuelles complexes", u: "%", h: "Environ 95 % du tarif d'un suivi. Le reste : visites ponctuelles mineures, environ la moitié d'un suivi. Tarifs dans « Tarifs des visites »." },
       { g: "Tarifs des visites (onglet B)", si: "details" },
       ...[["suivi", "Suivi"], ["suiviV", "Suivi, patient vulnérable"], ["perioV", "Visite périodique, patient vulnérable"], ["pedia", "Visite périodique pédiatrique"], ["gross", "Suivi de grossesse"],
         ["pecNonVuln", "Prise en charge, patient non vulnérable"], ["pecVuln", "Prise en charge, patient vulnérable"], ["srvMineure", "Sans rendez-vous : visite ponctuelle mineure"], ["srvComplexe", "Sans rendez-vous : visite ponctuelle complexe"]]
@@ -1486,6 +1491,8 @@
     rangees("rv-faits", [
       { titre: "Heures en clinique", valeur: nb(g.heures, 0) + " h" },
       { titre: "Visites en clinique", sous: srv ? `Dont ${nb(srv, 0)} en sans rendez-vous` : null, valeur: nb(g.nbVisites, 0) },
+      { titre: "Tarif moyen d'une visite de rendez-vous", sous: "À l'acte, à 100 % du tarif", valeur: $2(g.tarifMoyenRdv) },
+      srv ? { titre: "Tarif moyen d'un patient au sans rendez-vous", sous: `Visite ponctuelle : ${nb(S.revenu.pctSrvComplexe || 0)} % complexes`, valeur: $2(g.tarifMoyenSrv) } : null,
       { titre: "Visites de prise en charge", valeur: nb(g.nbPriseEnCharge, 0) },
       { titre: "Patients inscrits", sous: "Du début à la fin de l'année", valeur: `${nb(g.inscritsDepart, 0)} → ${nb(g.inscritsFin, 0)}` },
       { titre: "Semaines au tarif de 500 patients et plus", valeur: `${g.semainesPalierHaut} sur ${S.revenu.semaines}` },
@@ -2162,7 +2169,7 @@
     revenus: { titre: "Vos revenus", etapes: () => [
       { cle: "pratique", titre: "Votre pratique", intro: "Votre milieu détermine les modes de rémunération possibles. En première année, la clientèle se bâtit au fil des mois.",
         construire: c => construireChamps(c, essentiels("Votre pratique", "Pour le budget")) },
-      { cle: "semaine", titre: "Votre semaine", intro: "Rendez-vous : vos propres patients. Sans rendez-vous (SRV) : surtout des urgences mineures, souvent des patients d'autres médecins, payées à des tarifs à part.",
+      { cle: "semaine", titre: "Votre semaine", intro: "Rendez-vous : vos propres patients. Sans rendez-vous (SRV) : surtout des urgences mineures, souvent des patients d'autres médecins. Au mixte et à l'acte, chaque patient du SRV rapporte moins en moyenne : il est payé au tarif de la visite ponctuelle.",
         construire: c => construireChamps(c, essentiels("Vos demi-journées")) },
       S.revenu.milieu === "gmfu" && { cle: "apprenants", titre: "Enseignement et apprenants", intro: "Un résident voit en moyenne 4 à 5 patients par demi-journée ; un externe, 2 à 3. Indiquez aussi comment la supervision est facturée.",
         construire: c => construireChamps(c, essentiels("Enseignement et apprenants")) },
@@ -2345,6 +2352,8 @@
     if (R && !sansRendu) tout();   // les graphiques prennent la largeur de la page visible
   }
   window.addEventListener("hashchange", () => ouvrir(location.hash.slice(1)));
+  // Le logo mène à l'accueil, même si on y est déjà (retour en haut).
+  document.querySelectorAll("a.marque").forEach(a => a.addEventListener("click", e => { e.preventDefault(); ouvrir("apercu"); }));
 
   /* Import et export */
   const message = t => { document.getElementById("donnees-message").textContent = t; };

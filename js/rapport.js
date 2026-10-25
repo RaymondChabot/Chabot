@@ -139,7 +139,7 @@
     const M = R.modes, plusieurs = R.plusieursModes;
     const parts = [["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire ?? 0], ["Visites", x => x.visites || 0], ["Acte de supervision", x => x.supervision || 0],
       ["Demi-per diem des apprenants", x => x.perDiem], ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable], ["Suppléments à l'inscription", x => x.supplements],
-      ["Suppléments du sans rendez-vous", x => x.supplementsSRV || 0], ["Activités en établissement", x => x.activites || 0], ["Autres revenus professionnels", x => x.autres]];
+      ["Activités en établissement", x => x.activites || 0], ["Autres revenus professionnels", x => x.autres]];
     const partsUtiles = parts.map((pt, i) => [...pt, i]).filter(([, f]) => M.some(m => f(g[m]) > 0));
     const maxMode = Math.max(...M.map(m => g[m].total), 1);
     const dj = S.revenu.demiJournees, ens = R.milieu === "gmfu" ? S.revenu.enseignement : 0, srv = S.revenu.demiJourneesSRV;

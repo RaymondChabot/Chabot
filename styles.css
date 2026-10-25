@@ -134,7 +134,7 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 /* ---------- Marque, barre du haut ---------- */
 /* Le logo vit dans un sprite (en haut de index.html) : symboles teints par la couleur du texte. */
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
-.marque { display: inline-flex; align-items: center; gap: 9px; color: var(--marque); }
+.marque { display: inline-flex; align-items: center; gap: 9px; color: var(--marque); text-decoration: none; border-radius: 12px; }
 .marque-ico { width: 38px; height: 38px; flex: none; }
 .marque-nom { width: 149px; height: 10px; flex: none; }
 .barre-haut { gap: 10px; }
@@ -521,6 +521,10 @@ a.tuile:hover { border-color: var(--trait); }
   }
   .nav-marque { display: flex !important; justify-content: center; padding: 2px 0 26px; }
   .nav-sceau { width: 150px; height: 150px; }
+  /* Le sceau est un lien vers l'accueil : sans le style des onglets. */
+  .nav a.nav-marque { flex: none; align-self: center; padding: 2px 0 26px; color: var(--marque); background: none; box-shadow: none; }
+  .nav a.nav-marque svg { width: 150px; height: 150px; fill: initial; stroke: initial; stroke-width: initial; }
+  .nav a.nav-marque:hover { background: none; opacity: 0.85; }
   .nav a { flex: none; flex-direction: row; gap: 12px; padding: 11px 12px; font-size: 0.95rem; color: var(--encre-2); }
   .nav a svg { width: 21px; height: 21px; }
   .nav a:hover { background: var(--surface-2); }
