@@ -2,8 +2,8 @@
 
 Votre boussole financière.
 
-Application web statique pour estimer le revenu d'un médecin enseignant en
-GMF-U (taux horaire ou mode mixte), l'impôt, le budget du ménage, le
+Application web statique pour estimer le revenu d'un médecin en GMF-U
+(taux horaire, mode mixte ou à l'acte), l'impôt, le budget du ménage, le
 remboursement des dettes et la valeur nette.
 
 ## Confidentialité
@@ -20,10 +20,15 @@ remboursement des dettes et la valeur nette.
 
 ## Ce qu'elle calcule
 
-- **Revenu GMF-U** : taux horaire ou mode mixte, selon les demi-journées,
-  les patients, la supervision et la prise en charge de nouveaux patients.
+Pour tout médecin de famille en GMF-U au Québec : seul ou en couple,
+travail autonome ou pratique incorporée.
+
+- **Revenu GMF-U** : taux horaire, mode mixte ou à l'acte, selon les
+  demi-journées, les patients, la supervision et la prise en charge de
+  nouveaux patients.
 - **Impôt 2026** : fédéral et Québec, RRQ, RQAP, Fonds des services de
-  santé, conjointe salariée et transferts de crédits, allocations
+  santé ; société et dividendes ; partenaire salarié ou à son compte et
+  transferts de crédits ; allocations
   familiales, prime d'assurance médicaments, REER, société.
 - **Budget et dettes** : une case par dépense récurrente ; avalanche,
   hybride ou boule de neige ; hypothèques à intérêt composé deux fois par
