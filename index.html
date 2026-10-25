@@ -29,9 +29,12 @@
 <!-- Barre du haut (téléphone) -->
 <header class="barre-haut">
   <span class="marque"><svg class="marque-ico" viewBox="0 0 24 24" aria-hidden="true"><rect class="m-fond" width="24" height="24" rx="6.5"/><g transform="rotate(42 12 12)"><path class="m-n1" d="M12 4.2 10.1 12H12Z"/><path class="m-n2" d="M12 4.2 13.9 12H12Z"/><path class="m-s1" d="M12 19.8 10.1 12H12Z"/><path class="m-s2" d="M12 19.8 13.9 12H12Z"/></g><circle class="m-fond" cx="12" cy="12" r="0.95"/></svg><span class="marque-nom">Wealthnord</span></span>
+  <div class="barre-actions">
+  <button type="button" class="bouton-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer</span></button>
   <a class="bouton-icone" href="#donnees" data-onglet="donnees" aria-label="Données et confidentialité">
     <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg>
   </a>
+  </div>
 </header>
 
 <div class="app">
@@ -43,6 +46,7 @@
     <a href="#impot" data-onglet="impot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4Z"/><path d="M9.5 9.5h.01M14.5 14.5h.01M15 9l-6 6"/></svg><span>Impôt</span></a>
     <a href="#budget" data-onglet="budget"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16.5" height="11.5" rx="2.5"/><path d="M16 13.75h.01"/></svg><span>Budget</span></a>
     <a href="#avenir" data-onglet="avenir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 17.5 9 12l3.5 3.5 8-8"/><path d="M15 7.5h5.5V13"/></svg><span>Avenir</span></a>
+    <button type="button" class="nav-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer l'app</span></button>
     <a href="#donnees" data-onglet="donnees" class="nav-donnees"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg><span>Données</span></a>
   </nav>
 
@@ -238,8 +242,8 @@
       </div>
       <div class="carte" id="carte-installer">
         <div class="carte-tete"><h2>Installer l'application</h2></div>
-        <p class="aide" id="installer-texte">Sur iPhone : dans Safari, touchez Partager, puis « Sur l'écran d'accueil ». Sur Android ou ordinateur : menu du navigateur, puis « Installer l'application ». Elle s'ouvre alors en plein écran et fonctionne sans connexion.</p>
-        <div class="actions"><button type="button" class="bouton" id="installer" hidden>Installer Wealthnord</button></div>
+        <p class="aide">Wealthnord s'installe sur l'écran d'accueil comme une application : icône, plein écran, et fonctionne sans connexion. Rien à télécharger d'un magasin d'applications.</p>
+        <div class="actions"><button type="button" class="bouton" data-installer>Installer Wealthnord</button></div>
         <p class="aide">Sur iPhone, l'application installée garde ses propres données, séparées de Safari : importez votre fichier une fois dans l'application.</p>
       </div>
       <div class="carte">

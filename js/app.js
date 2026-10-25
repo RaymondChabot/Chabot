@@ -1797,11 +1797,46 @@
   /* Application installable (PWA) : fonctionne hors ligne. */
   if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname)))
     navigator.serviceWorker.register("sw.js").catch(() => { /* le site fonctionne quand même */ });
+  /* Installer l'application : invite du navigateur (Chrome, Edge, Android) ;
+     sinon, les étapes selon l'appareil (iPhone, iPad, Mac, Firefox). */
   let invite = null;
-  const boutonInstaller = document.getElementById("installer");
-  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); invite = e; boutonInstaller.hidden = false; });
-  boutonInstaller.addEventListener("click", async () => { if (!invite) return; invite.prompt(); await invite.userChoice; invite = null; boutonInstaller.hidden = true; });
-  if (window.matchMedia("(display-mode: standalone)").matches || navigator.standalone) document.getElementById("carte-installer").hidden = true;
+  const installee = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const boutonsInstaller = () => document.querySelectorAll("[data-installer]");
+  function majInstaller() {
+    const deja = installee();
+    boutonsInstaller().forEach(b => { b.hidden = deja; });
+    document.getElementById("carte-installer").hidden = deja;
+  }
+  function etapesInstallation() {
+    const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const android = /Android/.test(ua), firefox = /Firefox|FxiOS/.test(ua), safariMac = !ios && /Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|Edg/.test(ua);
+    if (ios) return { titre: "Sur iPhone ou iPad", etapes: ["Ouvrez cette page dans Safari.", "Touchez le bouton Partager (le carré avec une flèche vers le haut), en bas de l'écran.", "Faites défiler et touchez « Sur l'écran d'accueil ».", "Touchez « Ajouter » : l'icône Wealthnord apparaît sur votre écran d'accueil."],
+      note: "L'application installée garde ses propres données, séparées de Safari : ouvrez-la, puis importez votre fichier de données une fois (Données, Importer)." };
+    if (android) return { titre: "Sur Android", etapes: ["Ouvrez cette page dans Chrome.", "Touchez le menu ⋮, en haut à droite.", "Touchez « Installer l'application » ou « Ajouter à l'écran d'accueil ».", "Confirmez : l'icône Wealthnord apparaît avec vos applications."] };
+    if (safariMac) return { titre: "Sur Mac, avec Safari", etapes: ["Dans le menu Fichier, choisissez « Ajouter au Dock ».", "Confirmez : Wealthnord s'ouvre dans sa propre fenêtre, depuis le Dock."] };
+    if (firefox) return { titre: "Avec Firefox", etapes: ["Firefox n'installe pas les applications web.", "Ouvrez cette page dans Chrome, Edge ou Safari, puis touchez « Installer » de nouveau.", "Ou ajoutez la page à vos favoris : elle fonctionne aussi sans connexion après une première visite."] };
+    return { titre: "Sur ordinateur", etapes: ["Dans la barre d'adresse, cliquez sur l'icône d'installation (un écran avec une flèche), à droite.", "Ou ouvrez le menu du navigateur, puis « Installer Wealthnord » (Chrome) ou « Applications », « Installer ce site » (Edge).", "Wealthnord s'ouvre alors dans sa propre fenêtre."] };
+  }
+  async function installer() {
+    if (invite) {
+      invite.prompt();
+      const choix = await invite.userChoice;
+      invite = null;
+      if (choix && choix.outcome === "accepted") return;
+    }
+    const e = etapesInstallation();
+    ouvrirFeuille("Installer l'application", c => {
+      c.appendChild(el("p", "resume feuille-intro", "Wealthnord s'installe sur l'écran d'accueil comme une vraie application : icône, plein écran, et elle fonctionne sans connexion. Aucun magasin d'applications, aucun compte."));
+      const g = el("div", "groupe"); g.appendChild(el("h3", null, e.titre));
+      const ol = el("ol", "etapes"); e.etapes.forEach(x => ol.appendChild(el("li", null, x))); g.appendChild(ol); c.appendChild(g);
+      if (e.note) c.appendChild(el("p", "aide", e.note));
+      c.appendChild(el("p", "aide", "Vos données restent sur l'appareil. Pour les retrouver dans l'application installée ou sur un autre appareil : Données, Exporter, puis Importer."));
+    });
+  }
+  window.addEventListener("beforeinstallprompt", ev => { ev.preventDefault(); invite = ev; majInstaller(); });
+  window.addEventListener("appinstalled", () => { invite = null; majInstaller(); toast("Wealthnord est installée."); });
+  boutonsInstaller().forEach(b => b.addEventListener("click", installer));
+  majInstaller();
 
   ouvrir((location.hash || "#apercu").slice(1), true);
   tout();

@@ -687,3 +687,22 @@ a.tuile:hover { border-color: var(--trait); }
 .rp-gros { font: 650 22pt "Inter", sans-serif; margin: 2px 0 0; letter-spacing: -0.02em; }
 .rp-sources { font-size: 8.4pt; padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 3px; }
 .rp-avis { font-size: 8pt; margin: 8px 0 0; font-weight: 600; }
+
+/* Installer l'application */
+.barre-actions { display: flex; align-items: center; gap: 8px; }
+.bouton-installer {
+  display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px 0 11px; border-radius: 999px; cursor: pointer;
+  border: 0; background: var(--action); color: var(--sur-action); font: 600 0.88rem var(--police);
+}
+.bouton-installer svg, .nav-installer svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nav-installer { display: none !important; }
+.etapes { margin: 6px 0 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 10px; font-size: 0.97rem; line-height: 1.45; }
+.etapes li::marker { font-weight: 650; }
+@media (min-width: 960px) {
+  .nav-installer:not([hidden]) {
+    display: flex !important; align-items: center; gap: 12px; margin-top: auto; padding: 11px 12px; border-radius: 12px; cursor: pointer;
+    border: 1px solid var(--trait); background: var(--surface); color: var(--encre); font: 600 0.92rem var(--police); text-align: left;
+  }
+  .nav-installer:not([hidden]) ~ .nav-donnees { margin-top: 6px; }
+}
+@media print { .bouton-installer, .nav-installer { display: none !important; } }
