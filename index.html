@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3f5f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111314" media="(prefers-color-scheme: dark)">
+<title>Boussole</title>
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="entete">
+  <div class="entete-haut">
+    <div>
+      <h1>Boussole</h1>
+      <p class="sous-titre">Revenu, impôt, dettes et épargne du ménage</p>
+    </div>
+    <button type="button" class="fiabilite" id="fiabilite" title="Valeurs marquées comme confirmées"></button>
+  </div>
+  <nav class="onglets" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="t-apercu" data-onglet="apercu">Aperçu</button>
+    <button type="button" role="tab" id="t-revenu" data-onglet="revenu">Revenu GMF-U</button>
+    <button type="button" role="tab" id="t-impot" data-onglet="impot">Impôt</button>
+    <button type="button" role="tab" id="t-budget" data-onglet="budget">Budget et dettes</button>
+    <button type="button" role="tab" id="t-epargne" data-onglet="epargne">Épargne et valeur nette</button>
+    <button type="button" role="tab" id="t-donnees" data-onglet="donnees">Données</button>
+  </nav>
+</header>
+
+<div class="bandeau-exemple" id="bandeau-exemple" hidden>
+  Ces chiffres sont un <strong>exemple</strong>. Importez votre fichier de données dans l'onglet <button type="button" class="lien" data-aller="donnees">Données</button>, ou remplacez les valeurs.
+</div>
+
+<main>
+  <!-- ============ APERÇU ============ -->
+  <section class="vue" id="v-apercu" role="tabpanel" aria-labelledby="t-apercu">
+    <div class="tuiles" id="ap-tuiles"></div>
+    <div class="carte">
+      <h2>À faire</h2>
+      <ul class="a-faire" id="ap-actions"></ul>
+    </div>
+    <div class="carte">
+      <h2>Dettes du ménage</h2>
+      <div class="legende" id="ap-legende-dettes"></div>
+      <div class="graphique" id="ap-graph-dettes"></div>
+    </div>
+  </section>
+
+  <!-- ============ REVENU GMF-U ============ -->
+  <section class="vue" id="v-revenu" role="tabpanel" aria-labelledby="t-revenu" hidden>
+    <div class="deux-colonnes">
+      <div class="colonne-saisie" id="f-revenu"></div>
+      <div class="colonne-resultats">
+        <div class="carte">
+          <h2>Revenu brut de l'année</h2>
+          <div class="comparaison" id="rv-comparaison"></div>
+          <p class="note" id="rv-seuil"></p>
+        </div>
+        <div class="carte">
+          <h2>D'où vient le revenu</h2>
+          <div class="legende" id="rv-legende"></div>
+          <div id="rv-barres"></div>
+          <div class="tableau-defile"><table class="tableau" id="rv-detail"></table></div>
+        </div>
+        <div class="carte">
+          <h2>Votre année en chiffres</h2>
+          <dl class="faits" id="rv-faits"></dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ IMPÔT ============ -->
+  <section class="vue" id="v-impot" role="tabpanel" aria-labelledby="t-impot" hidden>
+    <div class="deux-colonnes">
+      <div class="colonne-saisie" id="f-impot"></div>
+      <div class="colonne-resultats">
+        <div class="carte">
+          <h2>Impôt 2026, particulier</h2>
+          <div class="tableau-defile"><table class="tableau" id="im-tableau"></table></div>
+          <p class="note">Travailleur autonome non incorporé : impôt fédéral (après l'abattement du Québec), impôt du Québec, RRQ des deux parts, RQAP et Fonds des services de santé. Crédits de base, crédit pour les intérêts d'un prêt de l'aide financière aux études, déduction REER et dépenses professionnelles.</p>
+        </div>
+        <div class="carte">
+          <h2>Mettre de côté et payer</h2>
+          <div id="im-acomptes"></div>
+        </div>
+        <div class="carte">
+          <h2>Et avec une société ?</h2>
+          <div id="im-societe"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BUDGET ET DETTES ============ -->
+  <section class="vue" id="v-budget" role="tabpanel" aria-labelledby="t-budget" hidden>
+    <div class="deux-colonnes">
+      <div class="colonne-saisie">
+        <div id="f-menage"></div>
+        <div class="groupe">
+          <h3>Dépenses</h3>
+          <p class="aide">Indiquez qui paie : vous, en commun (selon votre part ci-dessus) ou l'autre parent. Les paiements de dettes et l'épargne s'ajoutent automatiquement.</p>
+          <div id="liste-budget"></div>
+          <button type="button" class="bouton secondaire" id="ajout-budget">Ajouter une dépense</button>
+        </div>
+        <div class="groupe">
+          <h3>Dettes</h3>
+          <div id="liste-dettes"></div>
+          <button type="button" class="bouton secondaire" id="ajout-dette">Ajouter une dette</button>
+        </div>
+        <div id="f-strategie"></div>
+      </div>
+      <div class="colonne-resultats">
+        <div class="carte">
+          <h2>Budget mensuel</h2>
+          <div class="tableau-defile"><table class="tableau" id="bu-tableau"></table></div>
+        </div>
+        <div class="carte">
+          <h2>Plan de remboursement</h2>
+          <p class="resume" id="de-resume"></p>
+          <div class="legende" id="de-legende"></div>
+          <div class="graphique" id="de-graph"></div>
+          <div class="tableau-defile"><table class="tableau" id="de-tableau"></table></div>
+        </div>
+        <div class="carte">
+          <h2>Comparer les méthodes</h2>
+          <div class="tableau-defile"><table class="tableau" id="de-methodes"></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ÉPARGNE ET VALEUR NETTE ============ -->
+  <section class="vue" id="v-epargne" role="tabpanel" aria-labelledby="t-epargne" hidden>
+    <div class="deux-colonnes">
+      <div class="colonne-saisie">
+        <div id="f-epargne"></div>
+        <div class="groupe">
+          <h3>Enfants (REEE)</h3>
+          <div id="liste-enfants"></div>
+          <button type="button" class="bouton secondaire" id="ajout-enfant">Ajouter un enfant</button>
+        </div>
+      </div>
+      <div class="colonne-resultats">
+        <div class="carte">
+          <h2>Valeur nette</h2>
+          <div class="tuiles petites" id="vn-tuiles"></div>
+          <div class="legende" id="vn-legende"></div>
+          <div class="graphique" id="vn-graph"></div>
+          <p class="note" id="vn-note"></p>
+        </div>
+        <div class="carte">
+          <h2>REEE à 17 ans</h2>
+          <div class="tableau-defile"><table class="tableau" id="ep-reee"></table></div>
+        </div>
+        <div class="carte">
+          <h2>REER</h2>
+          <div id="ep-reer"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DONNÉES ============ -->
+  <section class="vue" id="v-donnees" role="tabpanel" aria-labelledby="t-donnees" hidden>
+    <div class="carte etroite">
+      <h2>Vos données restent ici</h2>
+      <p>Tout est gardé dans ce navigateur, sur cet appareil. Rien n'est envoyé à un serveur : la page ne charge aucune ressource externe. Vider les données du navigateur efface tout ; exportez un fichier pour garder une copie ou passer à un autre appareil.</p>
+      <div class="actions">
+        <button type="button" class="bouton" id="exporter">Exporter un fichier</button>
+        <label class="bouton secondaire" for="importer">Importer un fichier</label>
+        <input type="file" id="importer" accept="application/json,.json" hidden>
+      </div>
+      <p class="message" id="donnees-message" role="status"></p>
+      <p class="aide" id="donnees-maj"></p>
+    </div>
+    <div class="carte etroite">
+      <h2>Valeurs confirmées</h2>
+      <p>Cochez <span class="puce-conf" aria-hidden="true">✓</span> à côté d'une valeur quand elle vient d'un document fiable : état de compte RAMQ, relevé de prêt, avis de cotisation. La fiabilité en haut de la page compte ces valeurs.</p>
+      <ul class="liste-fiabilite" id="liste-a-confirmer"></ul>
+    </div>
+    <div class="carte etroite">
+      <h2>Recommencer</h2>
+      <p>Remplace toutes vos valeurs par l'exemple. Exportez d'abord si vous voulez les garder.</p>
+      <div class="actions">
+        <button type="button" class="bouton danger" id="reinitialiser">Revenir à l'exemple</button>
+        <button type="button" class="bouton secondaire" id="confirmer-reinit" hidden>Oui, tout remplacer</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="pied">
+  Estimations seulement : ni avis fiscal, ni avis financier. Tarifs RAMQ de l'onglet B (août 2026) et paramètres fiscaux 2026.
+</footer>
+
+<script src="js/calc.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

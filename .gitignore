@@ -1,0 +1,4 @@
+# Fichiers de données personnelles : ne jamais les verser.
+*donnees*.json
+*.backup.json
+.DS_Store
