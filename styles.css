@@ -836,3 +836,19 @@ button.as-option:hover { border-color: var(--encre); }
 .mois-barres .b { width: 100%; max-width: 26px; border-radius: 4px 4px 0 0; background: var(--s3); }
 .mois-barres .l { font-size: 0.68rem; color: var(--discret); }
 .mois-barres .col.courant .l { color: var(--encre); font-weight: 650; }
+/* Flux de l'année (Sankey) */
+.flux svg { display: block; width: 100%; height: auto; overflow: visible; }
+.flux-bande { opacity: 0.26; }
+.flux-etiquette, .flux-montant { font: 600 11px var(--police); fill: var(--encre); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.flux-montant { font-weight: 500; fill: var(--encre-2); font-variant-numeric: tabular-nums; }
+@media print { .flux-etiquette, .flux-montant { stroke: #fff; } }
+/* Plans comparés, indépendance, dossier */
+.bandeau-plan { position: sticky; top: 8px; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 4px; padding: 10px 12px 10px 16px; border-radius: var(--rayon); background: var(--attention-lavis); border: 1px solid var(--attention); font-size: 0.9rem; }
+.bandeau-plan[hidden] { display: none; }
+.sous-titre { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--discret); padding-top: 6px; }
+.plan-changements { margin: 0; padding-left: 1.1rem; font-size: 0.9rem; color: var(--encre-2); display: flex; flex-direction: column; gap: 3px; }
+#pa-independance .jauge span { background: var(--marque); }
+.saisie textarea { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--encre); font: 500 16px var(--police); padding: 9px 4px 9px 12px; resize: vertical; }
+.saisie textarea:focus-visible { outline: none; }
+@media print { .bandeau-plan { display: none !important; } }

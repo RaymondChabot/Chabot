@@ -114,7 +114,7 @@
         <svg class="rp-sceau" aria-hidden="true"><use href="#wm-sceau-i"/></svg>
         <div class="rp-marque"><svg class="rp-nom" aria-hidden="true"><use href="#wm-nom"/></svg></div>
         <h1>Rapport financier</h1>
-        <p class="rp-sous">Médecin de famille · ${esc(libelleRevenu())}${soc ? " · pratique incorporée" : ""}${R.couple ? " · en couple" : ""}</p>
+        <p class="rp-sous">Médecin de famille · ${esc(libelleRevenu())}${soc ? " · pratique incorporée" : ""}${R.couple ? " · en couple" : ""}${W.plan() ? ` · ${esc(W.plan())}` : ""}</p>
         <p class="rp-date">${esc(date)} · scénario ${esc(scen)} · méthode ${esc(meth)}</p>
       </div>
       <div class="rp-kpis rp-kpis-4">
@@ -285,6 +285,33 @@
         </div>
         <div class="rp-carte"><h2>Vos jalons</h2><ul class="rp-jalons">${jal.map(j => `<li><b>${esc(j.jalon.mois ? `${j.jalon.mois} ${j.jalon.annee}` : j.jalon.annee)}</b><span>${esc(j.titre)}</span></li>`).join("")}</ul></div>
       </div>`));
+
+    /* Dossier pour mes proches : une page, s'il est rempli. */
+    const A = O.analyseDossier(R), D = A.D, oui = v => v ? "Oui" : "Non";
+    if (Object.values(D).some(v => v !== "" && v !== 0 && v !== false && v != null)) {
+      const txt = v => String(v || "").trim() || "—";   // les cellules du tableau sont échappées
+      pages.push(page("Dossier pour mes proches", "Ce que vos proches doivent savoir si vous devenez inapte ou décédez. À ranger avec vos documents importants.", `
+      <div class="rp-deux">
+        <div class="rp-carte"><h2>Assurances</h2>${tableau(["", ""], [
+          { c: ["Assurance vie", (+D.vieCouverture || 0) > 0 ? $(+D.vieCouverture) : "—"] }, { c: ["Assureur et police", txt(D.vieAssureur)] }, { c: ["Bénéficiaires", txt(D.vieBeneficiaires)] },
+          { c: ["Assurance invalidité", (+D.invaliditeMensuelle || 0) > 0 ? `${$(+D.invaliditeMensuelle)} par mois` : "—"] }, { c: ["Délai de carence", D.invaliditeCarence ? `${nb(D.invaliditeCarence)} jours` : "—"] },
+          { c: ["Assureur et police", txt(D.invaliditeAssureur)] }, { c: ["Maladies graves", (+D.maladiesGraves || 0) > 0 ? $(+D.maladiesGraves) : "—"] },
+        ], "compact")}
+          <p class="rp-note">Besoin d'assurance vie estimé : ${$(A.besoin)}${A.charge ? " (dettes, dix ans de dépenses, frais au décès, moins les placements)" : " (dettes et frais au décès, moins les placements)"}. Ordre de grandeur seulement.</p></div>
+        <div class="rp-carte"><h2>Documents et personnes-ressources</h2>${tableau(["", ""], [
+          { c: ["Testament à jour", oui(D.testament)] }, { c: ["Mandat de protection", oui(D.mandat)] }, { c: ["Procuration bancaire", oui(D.procuration)] },
+          { c: ["Où trouver les documents", txt(D.documents)] }, { c: ["Notaire", txt(D.notaire)] }, { c: ["Comptable", txt(D.comptable)] }, { c: ["Conseiller financier", txt(D.conseiller)] },
+        ], "compact")}</div>
+      </div>
+      ${(D.notes || "").trim() ? `<div class="rp-carte"><h2>Autres consignes</h2><p>${esc(txt(D.notes))}</p></div>` : ""}
+      <div class="rp-carte"><h2>Ce que vous possédez et devez</h2>${tableau(["Compte ou bien", "Valeur"], [
+        { c: ["Comptes et encaisse", $(S.epargne.encaisse)] }, { c: ["REER", $(S.epargne.reer.solde)] }, { c: ["CELI", $(S.epargne.celi.solde)] },
+        ...((S.epargne.celiapp || {}).solde ? [{ c: ["CELIAPP", $(S.epargne.celiapp.solde)] }] : []),
+        ...(R.locataire ? [] : [{ c: ["Maison, votre part", $(p[0].maisonMoi)] }]),
+        ...(S.actifs.autres || []).map(x => ({ c: [x.nom || "Actif", $((+x.valeur || 0) * (x.partMoi ?? 100) / 100)] })),
+        ...S.dettes.map(d => ({ c: [d.nom, moins(d.solde * (d.partMoi ?? 100) / 100)] })),
+        { cls: "total", c: ["Valeur nette", $(p[0].moi)] }], "compact")}</div>`));
+    }
 
     /* 7. Hypothèses et sources */
     const H = ["prudent", "realiste", "optimiste"].map(k => S.scenarios[k]);

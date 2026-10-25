@@ -73,6 +73,18 @@ Revenu affiche tous les détails.
   référence ; objectifs d'épargne datés (fonds d'urgence, mise de fonds,
   auto, congé) ; où mettre le prochain 1 000 $ (REER, CELI, CELIAPP, REEE
   ou dettes).
+- **Plans comparés** : un plan B, copie de votre plan, se modifie dans
+  toute l'app sans toucher au vôtre ; comparaison du revenu net, du surplus,
+  des dettes et de la valeur nette, liste de ce qui change ; on peut
+  l'adopter.
+- **Indépendance financière et jalons** : placements visés (25 fois les
+  dépenses), année atteinte et âge ; jalons personnels avec la valeur nette
+  projetée. **Frais de gestion** : leur coût sur l'horizon.
+- **Dossier pour mes proches** : assurances (besoin d'assurance vie
+  estimé, part du revenu remplacée en invalidité), testament, mandat,
+  documents et personnes-ressources ; une page du rapport PDF.
+- **L'année en un coup d'œil** : diagramme de flux, des revenus aux impôts
+  et frais, puis aux dépenses, aux dettes, à l'épargne et au surplus.
 - **Dépenses annuelles** : le mois de chaque dépense annuelle, le montant à
   mettre de côté chaque mois et les échéances à venir.
 

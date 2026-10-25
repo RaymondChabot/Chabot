@@ -81,12 +81,19 @@
       celiapp: { solde: 0, cotisationAnnuelle: 0 },
       // Taux d'imposition prévu au retrait du REER, pour le comparer au CELI.
       tauxRetrait: 35,
+      // Frais de gestion des placements (RFG), en % ; 0 : non précisé.
+      frais: 0,
     },
     // Catégories du budget où l'on inscrit un seul total plutôt que le détail.
     budgetTotaux: {},
     // Objectifs d'épargne (montant et date) ; relevés de la valeur nette et plan de référence.
     objectifs: [],
     suivi: { reference: null, instantanes: [] },
+    // Indépendance financière, jalons personnels, dossier pour les proches, plans de comparaison.
+    independance: { multiple: 25, depenses: 0, anneeNaissance: 0 },
+    jalonsPerso: [],
+    dossier: {},
+    plans: [],
     // Logement : propriétaire (maison et hypothèque) ou locataire (loyer au budget, pas de maison).
     actifs: { logement: "locataire", maison: { valeur: 0, part: 0, croissance: 3 }, voiture: { valeur: 0, depreciation: 15, remplacementAns: 0, prixNeuf: 40000 }, actifsConjoint: 0, autres: [] },
   };
@@ -306,15 +313,19 @@
     s.budget = normaliserBudget(s.budget);
     s.revenu.lignes = normaliserLignes(s.revenu.lignes);
     s.impot.depensesProDetail = normaliserPro(s.impot.depensesProDetail);
+    s.plans = (s.plans || []).map(pl => ({ ...pl, donnees: normaliser(fusion(clone(EXEMPLE), migrer(pl.donnees))) }));
     return s;
   }
   let S = normaliser(charger());
+  // En modifiant un plan B, S est ce plan ; « principal » garde votre plan, enregistré avec ses plans.
+  let principal = null, planActif = null;
   function sauver() {
-    S.meta.misAJour = new Date().toISOString();
-    try { localStorage.setItem(CLE, JSON.stringify(S)); } catch (e) { /* le calcul fonctionne quand même */ }
+    const r = principal || S;
+    S.meta.misAJour = r.meta.misAJour = new Date().toISOString();
+    try { localStorage.setItem(CLE, JSON.stringify(r)); } catch (e) { /* le calcul fonctionne quand même */ }
   }
   const lire = p => p.split(".").reduce((o, k) => (o == null ? o : o[k]), S);
-  const ecrire = (p, v) => { const k = p.split("."); let o = S; for (let i = 0; i < k.length - 1; i++) o = o[k[i]]; o[k[k.length - 1]] = v; };
+  const ecrire = (p, v) => { const k = p.split("."); let o = S; for (let i = 0; i < k.length - 1; i++) o = o[k[i]] ?? (o[k[i]] = {}); o[k[k.length - 1]] = v; };
   const nouvelId = p => p + Math.random().toString(36).slice(2, 8);
 
   /* ---------- Formats ---------- */
@@ -496,6 +507,7 @@
       { p: "epargne.celiapp.solde", l: "Solde CELIAPP", u: "$", s: 100, h: "Compte d'épargne libre d'impôt pour l'achat d'une première propriété." },
       { p: "epargne.celiapp.cotisationAnnuelle", l: "Cotisation CELIAPP par année", u: "$/an", s: 100, h: "8 000 $ par année au plus, 40 000 $ à vie ; déductible comme un REER ; retrait sans impôt pour acheter une première propriété." },
       { p: "epargne.encaisse", l: "Comptes et encaisse", u: "$", s: 100 },
+      { p: "epargne.frais", l: "Frais de gestion de vos placements (RFG)", u: "%", s: 0.05, h: "Sur vos relevés ou le document « Aperçu du fonds ». 0 : non précisé." },
       { p: "epargne.tauxRetrait", l: "Taux d'imposition prévu au retrait du REER", u: "%", s: 1, h: "Pour comparer le REER au CELI : s'il est plus bas que votre taux marginal d'aujourd'hui, le REER rapporte plus." },
       { g: "Biens" },
       { p: "actifs.logement", l: "Votre logement", t: "select", o: [["proprietaire", "Propriétaire"], ["locataire", "Locataire"]], h: "Locataire : le loyer va au budget (Logement) ; aucune maison dans la valeur nette." },
@@ -591,7 +603,8 @@
   // Champ d'une liste (dépense, dette, enfant) : lié par data-l, data-i et data-k.
   const lierListe = (liste, i, k) => inp => { inp.dataset.l = liste; inp.dataset.i = i; inp.dataset.k = k; };
   const tableau = nom => nom === "enfants" ? S.epargne.reee.enfants : nom === "activites" ? S.revenu.activites : nom === "lignes" ? S.revenu.lignes
-    : nom === "depensesPro" ? S.impot.depensesProDetail : nom === "actifsAutres" ? (S.actifs.autres = S.actifs.autres || []) : nom === "objectifs" ? (S.objectifs = S.objectifs || []) : S[nom];
+    : nom === "depensesPro" ? S.impot.depensesProDetail : nom === "actifsAutres" ? (S.actifs.autres = S.actifs.autres || []) : nom === "objectifs" ? (S.objectifs = S.objectifs || [])
+    : nom === "jalonsPerso" ? (S.jalonsPerso = S.jalonsPerso || []) : nom === "plans" ? (racine().plans = racine().plans || []) : S[nom];
   // Essentiel ou tous les détails (Optimiser) : préférence de cet appareil.
   const detailsAffiches = () => { try { return localStorage.getItem("wm.details") === "1"; } catch (e) { return false; } };
   function boutonDetails(c) {
@@ -1050,6 +1063,7 @@
       R.libres[k] = sim.libre;
     }
     R.projection = R.projections[R.scenario];
+    R.projeterAvec = rendement => projeter({ ...R.hyp, rendement }, R.sim);
     // Dollars d'aujourd'hui : on retire l'inflation du scénario choisi.
     R.deflateur = a => S.scenarios.dollarsAujourdhui ? Math.pow(1 + R.hyp.inflation / 100, a) : 1;
     R.reee = C.projeterReee({ enfants: S.epargne.reee.enfants, cotisationAnnuelle: S.epargne.reee.cotisationAnnuelle }, R.hyp.rendement / 100);
@@ -1444,6 +1458,12 @@
       const i = p.findIndex(x => x.moi >= seuil);
       if (i > 0) l.push({ t: new Date(p[i].annee, 0, 1), jalon: { annee: p[i].annee }, titre: seuil === 0 ? "Valeur nette positive" : `Valeur nette de ${seuil >= 1e6 ? nb(seuil / 1e6, 0) + " M$" : nb(seuil / 1000, 0) + " k$"}`, sous: `Scénario ${SCENARIOS[R.scenario].toLowerCase()}` });
     }
+    const F = independance(R, false);
+    if (F.annee) l.push({ t: new Date(F.annee, 0, 2), jalon: { annee: F.annee }, titre: "Indépendance financière", sous: `Placements de ${nb(F.mult)} fois vos dépenses de l'année${F.age ? ` · à ${F.age} ans` : ""}`, cls: "fort" });
+    (S.jalonsPerso || []).filter(x => x.annee >= p[0].annee).forEach(x => {
+      const k = Math.min(p.length - 1, x.annee - p[0].annee);
+      l.push({ t: new Date(x.annee, 0, 3), jalon: { annee: x.annee }, titre: x.nom || "Jalon", sous: `Valeur nette projetée : ${$(p[k].moi / R.deflateur(k))}` });
+    });
     return l.sort((a, b) => a.t - b.t).slice(0, 8);
   }
 
@@ -1899,7 +1919,7 @@
       V.autres > 0 && { titre: "Autres revenus", valeur: $(V.autres) },
       { titre: "Total", cls: "total", valeur: $(V.rev) },
     ]);
-    rendreAnnuelles();
+    rendreAnnuelles(); rendreFlux(R);
     // Dépenses : une rangée par catégorie ; toucher ouvre ses cases.
     const cats = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
     rangees("bu-depenses", [
@@ -2070,6 +2090,7 @@
     }));
 
     rendreBilan(R, couple); rendreReel(R, couple); rendreObjectifs(R); rendreProchain(R);
+    rendreIndependance(R, couple); rendreFrais(R); rendrePlans(R); rendreDossier(R);
     rangees("ep-reee", [
       ...R.reee.map((x, i) => {
         const e = S.epargne.reee.enfants[i];
@@ -2114,6 +2135,331 @@
     R = calculer();
     rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
     if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
+  }
+
+  /* ============================================================
+     FLUX DE L'ANNÉE (diagramme de Sankey) : des revenus aux impôts et frais,
+     puis du revenu disponible aux dépenses, aux dettes, à l'épargne et au surplus.
+     Votre part, par année.
+     ============================================================ */
+  function fluxAnnee(R) {
+    const g = R.rev, soc = R.societeActive, x = R.impot.societe, part = S.menage.partCommunMoi / 100;
+    const act = g.activites || 0, autresPro = R.autresPro + (S.revenu.autresRevenus || 0), deficit = Math.max(0, -R.surplusMoi * 12);
+    const sources = [
+      ["Pratique principale", R.brut - act - autresPro], ["Activités en établissement", act], ["Autres revenus professionnels", autresPro],
+      ["Location et placements", R.autresNonPro], ["Allocations familiales", R.allocMoi * 12], ["Manque à combler", deficit],
+    ].filter(([, v]) => v > 0.5);
+    const T = sources.reduce((t, [, v]) => t + v, 0), net = R.netMoi * 12 + deficit;
+    const sorties = soc
+      ? [["Dépenses de la société", x.depenses + x.frais, SERIES[5]], ["Laissé dans la société", x.retenu, SERIES[3]]]
+      : [[g[R.mode].fraisCabinet ? "Frais et dépenses pro" : "Dépenses pro", R.dproPerso, SERIES[5]]];
+    const impot = T - net - sorties.reduce((t, [, v]) => t + v, 0);
+    const milieu = [["Impôt et cotisations", impot, SERIES[4]], ...sorties, [deficit ? "Disponible" : "Revenu disponible", net, "var(--marque)"]].filter(([, v]) => v > 0.5);
+    // Dépenses par catégorie (votre part), les quatre plus grandes, puis le reste.
+    const qui = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0, parCat = new Map();
+    for (const b of depensesEffectives()) parCat.set(categorie(b), (parCat.get(categorie(b)) || 0) + mensuel(b) * qui(b) * 12);
+    const cats = [...parCat].filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
+    const grandes = cats.slice(0, 4), reste = cats.slice(4).reduce((t, [, v]) => t + v, 0);
+    const fin = [...grandes.map(([n, v]) => [n, v, SERIES[0]]), ["Autres dépenses", reste, SERIES[0]],
+      ["Paiements de dettes", R.dettesMoi * 12, SERIES[1]], ["Épargne", R.epargneMoi * 12, SERIES[2]], ["Surplus", Math.max(0, R.surplusMoi * 12), SERIES[3]]].filter(([, v]) => v > 0.5);
+    return { sources, T, milieu, net, fin };
+  }
+  function rendreFlux(R) {
+    const boite = document.getElementById("bu-flux"); if (!boite) return;
+    const F = fluxAnnee(R);
+    if (F.T <= 0) { boite.textContent = ""; return; }
+    const W = Math.max(300, boite.clientWidth || 600), H = W < 520 ? 360 : 330, nw = 12, gap = 10;
+    const x1 = 0, x2 = Math.round(W * (W < 520 ? 0.4 : 0.42)), x3 = W - nw;
+    const nM = F.milieu.length, nF = F.fin.length;
+    const k = Math.min((H - (nM - 1) * gap) / F.T, (H - (nF - 1) * gap) / Math.max(1, F.net));
+    // Colonne du milieu, du haut vers le bas ; la dernière (revenu disponible) alimente la colonne de droite.
+    let y = 0; const M = F.milieu.map(([n, v, c]) => { const o = { n, v, c, y, h: v * k }; y += o.h + gap; return o; });
+    const dispo = M[M.length - 1];
+    const hF = F.fin.reduce((t, [, v]) => t + v * k, 0) + (nF - 1) * gap;
+    let yf = Math.max(0, Math.min(H - hF, dispo.y + dispo.h / 2 - hF / 2));
+    const D = F.fin.map(([n, v, c]) => { const o = { n, v, c, y: yf, h: v * k }; yf += o.h + gap; return o; });
+    const yTot = (nM - 1) * gap / 2;   // la colonne de gauche, centrée sur celle du milieu
+    const bande = (xa, ya, xb, yb, h, c) => { const xm = (xa + xb) / 2;
+      return `<path class="flux-bande" d="M${xa},${ya}C${xm},${ya} ${xm},${yb} ${xb},${yb}L${xb},${yb + h}C${xm},${yb + h} ${xm},${ya + h} ${xa},${ya + h}Z" style="fill:${c}"/>`; };
+    const k$c = v => Math.abs(v) >= 1e6 ? nb(v / 1e6, 2) + " M$" : Math.abs(v) >= 1e4 ? nb(v / 1000, 0) + " k$" : $(v);
+    const etiquette = (xe, o, ancre) => {
+      const cy = o.y + o.h / 2, deux = o.h >= 26;
+      return `<text class="flux-etiquette" x="${xe}" y="${cy}" text-anchor="${ancre}" dy="${deux ? "-0.25em" : "0.35em"}">${o.n}${deux ? "" : ` · ${k$c(o.v)}`}</text>` +
+        (deux ? `<text class="flux-montant" x="${xe}" y="${cy}" text-anchor="${ancre}" dy="1.05em">${k$c(o.v)}</text>` : "");
+    };
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Flux de l'année : ${[...F.milieu, ...F.fin].map(([n, v]) => `${n} ${$(v)}`).join(", ")}">`;
+    let yo = yTot;
+    for (const o of M) { s += bande(x1 + nw, yo, x2, o.y, o.h, o.c); yo += o.h; }
+    yo = dispo.y;
+    for (const o of D) { s += bande(x2 + nw, yo, x3, o.y, o.h, o.c); yo += o.h; }
+    s += `<rect class="flux-noeud" x="${x1}" y="${yTot}" width="${nw}" height="${F.T * k}" rx="3" style="fill:var(--encre-2)"/>`;
+    for (const o of [...M, ...D]) s += `<rect class="flux-noeud" x="${o === dispo || M.includes(o) ? x2 : x3}" y="${o.y}" width="${nw}" height="${Math.max(1.5, o.h)}" rx="3" style="fill:${o.c}"/>`;
+    for (const o of M) s += etiquette(x2 - 6, o, "end");
+    for (const o of D) s += etiquette(x3 - 6, o, "end");
+    s += "</svg>";
+    boite.innerHTML = s;
+    const src = document.getElementById("bu-flux-sources");
+    src.textContent = `Revenus de l'année : ${$(F.T)}${F.sources.length > 1 ? ` (${F.sources.map(([n, v]) => `${n.toLowerCase()} ${k$c(v)}`).join(", ")})` : ""}.`;
+  }
+
+  /* ============================================================
+     COMPARER DEUX PLANS : une copie de votre plan (plan B) qu'on modifie dans
+     toute l'app, puis qu'on compare à votre plan ; on peut l'adopter.
+     ============================================================ */
+  const racine = () => principal || S;
+  function copiePlan(s) {
+    const d = clone(s); delete d.plans;
+    d.suivi = { reference: null, instantanes: [] };
+    return d;
+  }
+  // Résultats d'un autre état (votre plan ou un plan B), sans toucher à l'affichage.
+  function calculerAvec(donnees) { const sauf = S; S = donnees; try { return calculer(); } finally { S = sauf; } }
+  function entrerPlan(i) {
+    if (planActif !== null) sortirPlan(true);
+    principal = S; planActif = i; S = principal.plans[i].donnees;
+    majBandeauPlan(); tout();
+    toast(`Vous modifiez « ${principal.plans[i].nom} ». Votre plan n'est pas touché.`);
+  }
+  function sortirPlan(silence) {
+    if (planActif === null) return;
+    S = principal; principal = null; planActif = null;
+    if (feuille.open) feuille.close();
+    majBandeauPlan();
+    if (!silence) { tout(); toast("De retour à votre plan."); }
+  }
+  function majBandeauPlan() {
+    const b = document.getElementById("bandeau-plan");
+    b.hidden = planActif === null;
+    if (planActif !== null) document.getElementById("bandeau-plan-nom").textContent = principal.plans[planActif].nom;
+    document.documentElement.classList.toggle("mode-plan", planActif !== null);
+  }
+  function creerPlan() {
+    const r = racine(); r.plans = r.plans || [];
+    r.plans.push({ id: nouvelId("p"), nom: r.plans.length ? `Plan ${String.fromCharCode(66 + r.plans.length)}` : "Plan B", donnees: copiePlan(r) });
+    sauver();
+    entrerPlan(r.plans.length - 1);
+  }
+  function feuillePlan(i) {
+    ouvrirFeuille("Nom du plan", c => {
+      champsElement(c, "plans", i, [{ k: "nom", l: "Nom", t: "text", ph: "Plan B, Société en 2027…" }]);
+    });
+  }
+  function adopterPlan(i) {
+    const r = racine(), plan = r.plans[i], ancien = copiePlan(r);
+    const nouveau = { ...clone(plan.donnees), meta: { ...r.meta, exemple: false }, suivi: r.suivi,
+      plans: r.plans.filter((_, j) => j !== i).concat({ id: nouvelId("p"), nom: "Ancien plan", donnees: ancien }) };
+    sortirPlan(true);
+    const avant = S; S = normaliser(nouveau); sauver(); tout();
+    toast(`« ${plan.nom} » est maintenant votre plan ; l'ancien est gardé comme plan de comparaison.`, () => { S = avant; sauver(); tout(); });
+  }
+  // Ce qui change d'un plan à l'autre, en mots.
+  const DEF_CHAMPS = new Map(Object.values(CHAMPS).flat().filter(c => c.p).map(c => [c.p, c]));
+  const SECTIONS_PLAN = { budget: "le budget", budgetTotaux: "le budget", dettes: "les dettes", objectifs: "les objectifs", "revenu.activites": "les activités en établissement",
+    "revenu.lignes": "les autres revenus", "revenu.tarifs": "les tarifs", "impot.depensesProDetail": "les dépenses professionnelles", "epargne.reee": "le REEE", "actifs.autres": "les autres actifs", conjointe: "le ou la partenaire" };
+  function differences(a, b, chemin = "", out = []) {
+    if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+      for (const k of new Set([...Object.keys(a), ...Object.keys(b)]))
+        if (!["meta", "suivi", "plans", "confirmes", "dossier"].includes(k)) differences(a[k], b[k], chemin ? `${chemin}.${k}` : k, out);
+    } else if (JSON.stringify(a ?? null) !== JSON.stringify(b ?? null)) out.push([chemin, a, b]);
+    return out;
+  }
+  function changementsPlan(a, b) {
+    const valeurTexte = (c, v) => c.t === "select" ? texteDe((c.o.find(([k]) => String(k) === String(v)) || [, v])[1]) : c.t === "check" ? (v ? "oui" : "non") : typeof v === "number" ? nb(v) : String(v ?? "—");
+    const champs = [], autres = new Set();
+    for (const [p, va, vb] of differences(a, b)) {
+      const c = DEF_CHAMPS.get(p);
+      if (c) champs.push(`${texteDe(c.l)} : ${valeurTexte(c, va)} → ${valeurTexte(c, vb)}`);
+      else { const s = Object.keys(SECTIONS_PLAN).find(k => p === k || p.startsWith(k + ".")); if (s) autres.add(SECTIONS_PLAN[s]); }
+    }
+    return { champs, autres: [...autres] };
+  }
+  function rendrePlans(R) {
+    const z = document.getElementById("pa-plans"); if (!z) return; z.textContent = "";
+    const r = racine(), plans = r.plans || [];
+    const bouton = (texte, cls, f) => { const b = el("button", "bouton " + cls, texte); b.type = "button"; b.addEventListener("click", f); return b; };
+    if (!plans.length) {
+      z.appendChild(el("p", "aide", "Copiez votre plan, changez quelques choix (vous incorporer, acheter une maison en 2028, passer à 4 jours, une autre méthode de remboursement), puis comparez les deux valeurs nettes."));
+      const a = el("div", "actions"); a.appendChild(bouton("Créer un plan B", "", creerPlan)); z.appendChild(a); return;
+    }
+    if (document.getElementById("v-avenir").hidden) return;   // calcul fait quand la page est ouverte
+    const i = planActif ?? 0, plan = plans[i];
+    const Rp = planActif === null ? R : calculerAvec(principal), Rb = planActif === null ? calculerAvec(plan.donnees) : R;
+    const n = Math.min(Rp.projection.length, Rb.projection.length);
+    const leg = el("div", "legende"), g = el("div", "graphique"); z.append(leg, g);
+    graphiqueLignes(g, leg, [
+      { nom: "Votre plan", couleur: SERIES[0], valeurs: Rp.projection.slice(0, n).map(x => x.moi) },
+      { nom: plan.nom, couleur: SERIES[3], valeurs: Rb.projection.slice(0, n).map(x => x.moi) },
+    ], Rp.projection.slice(0, n).map(x => String(x.annee)), { titre: "Valeur nette : votre plan et " + plan.nom, hauteur: 200 });
+    const dix = Math.min(10, n - 1), fin = n - 1;
+    const t = el("table", "tableau"); const td = el("div", "tableau-defile"); td.appendChild(t); z.appendChild(td);
+    // Sur téléphone, montants abrégés (k$, M$) pour que les quatre colonnes tiennent.
+    const court = (z.clientWidth || 600) < 520, m$ = v => !court ? $(v) : Math.abs(v) >= 1e6 ? nb(v / 1e6, 2) + " M$" : Math.abs(v) >= 1e4 ? nb(v / 1000, 0) + " k$" : $(v);
+    const ecart = (a, b) => { const d = b - a; return Math.abs(d) < 0.5 ? "=" : (d > 0 ? "+" : "−") + m$(Math.abs(d)); };
+    const libre = r => r.sim.libre ? (court ? r.sim.libre.toLocaleDateString("fr-CA", { month: "short", year: "numeric" }) : moisAn(r.sim.libre)) : "jamais";
+    lignes(t, ["", "Votre plan", plan.nom, "Écart"], [
+      { cellules: ["Net par mois", m$(Rp.netMoi), m$(Rb.netMoi), ecart(Rp.netMoi, Rb.netMoi)] },
+      { cellules: ["Surplus par mois", m$(Rp.surplusMoi), m$(Rb.surplusMoi), ecart(Rp.surplusMoi, Rb.surplusMoi)] },
+      { cellules: ["Sans dettes", libre(Rp), libre(Rb), ""] },
+      { cellules: [`Valeur nette ${Rp.projection[dix].annee}`, m$(Rp.projection[dix].moi), m$(Rb.projection[dix].moi), ecart(Rp.projection[dix].moi, Rb.projection[dix].moi)] },
+      { cls: "total", cellules: [`Valeur nette ${Rp.projection[fin].annee}`, m$(Rp.projection[fin].moi), m$(Rb.projection[fin].moi), ecart(Rp.projection[fin].moi, Rb.projection[fin].moi)] },
+    ]);
+    const ch = changementsPlan(planActif === null ? r : principal, plan.donnees);
+    const liste = el("ul", "plan-changements");
+    if (!ch.champs.length && !ch.autres.length) liste.appendChild(el("li", null, `Aucun changement pour l'instant : touchez « Modifier ${plan.nom} », puis changez ce que vous voulez dans les pages.`));
+    ch.champs.slice(0, 6).forEach(x => liste.appendChild(el("li", null, x)));
+    if (ch.champs.length > 6) liste.appendChild(el("li", null, `Et ${ch.champs.length - 6} autre${ch.champs.length > 7 ? "s" : ""} réglage${ch.champs.length > 7 ? "s" : ""}.`));
+    if (ch.autres.length) liste.appendChild(el("li", null, `Modifié aussi : ${ch.autres.join(", ")}.`));
+    z.append(el("h3", "sous-titre", `Ce qui change dans ${plan.nom}`), liste);
+    const a = el("div", "actions");
+    if (planActif === null) a.append(bouton(`Modifier ${plan.nom}`, "", () => entrerPlan(i)), bouton("Adopter ce plan", "secondaire", () => adopterPlan(i)),
+      bouton("Renommer", "secondaire", () => feuillePlan(i)));
+    else a.append(bouton("Revenir à mon plan", "", () => sortirPlan()));
+    if (planActif === null) { const x = el("button", "bouton danger", "Supprimer"); x.type = "button"; x.dataset.suppr = "plans"; x.dataset.i = i; a.appendChild(x); }
+    z.appendChild(a);
+  }
+
+  /* ============================================================
+     INDÉPENDANCE FINANCIÈRE ET JALONS PERSONNELS
+     ============================================================ */
+  // Indépendance : placements (REER, CELI, CELIAPP, comptes, société) égaux à N fois les dépenses
+  // de l'année (25 fois : la règle du 4 %), en dollars de chaque année.
+  function independance(R, couple) {
+    const I = S.independance || {}, mult = +I.multiple || 25, h = R.hyp;
+    const depenses = (+I.depenses || 0) > 0 ? +I.depenses : (couple ? R.depMenage : R.depMoi) * 12;
+    const placements = x => x.placements + x.societe + (couple ? x.conjointe : 0);
+    const cible = a => mult * depenses * Math.pow(1 + h.inflation / 100, a);
+    const p = R.projection, i = p.findIndex((x, a) => placements(x) >= cible(a));
+    const naissance = +I.anneeNaissance || 0;
+    return { mult, depenses, cible0: cible(0), placements0: placements(p[0]), progression: Math.min(1, placements(p[0]) / Math.max(1, cible(0))),
+      annee: i >= 0 ? p[i].annee : null, age: i >= 0 && naissance ? p[i].annee - naissance : null, fin: p[p.length - 1].annee, naissance };
+  }
+  const CHAMPS_INDEPENDANCE = [
+    { p: "independance.multiple", l: "Placements visés, en années de dépenses", u: "fois", s: 1, h: "25 fois les dépenses de l'année : on peut en retirer environ 4 % par année (règle du 4 %). 30 fois pour plus de prudence." },
+    { p: "independance.depenses", l: "Dépenses visées par année", u: "$/an", s: 1000, h: "0 : votre budget actuel, sans les paiements de dettes. En dollars d'aujourd'hui." },
+    { p: "independance.anneeNaissance", l: "Votre année de naissance", u: "", s: 1, h: "Facultatif : pour afficher votre âge à chaque jalon." },
+  ];
+  const CHAMPS_JALON = [
+    { k: "nom", l: "Jalon", t: "text", ph: "Chalet, passer à 3 jours, sabbatique…" },
+    { k: "annee", l: "Année", u: "", s: 1 },
+  ];
+  function feuilleIndependance() {
+    ouvrirFeuille("Indépendance financière", c => construireChamps(c, CHAMPS_INDEPENDANCE));
+  }
+  function feuilleJalon(i) {
+    ouvrirFeuille(S.jalonsPerso[i].nom || "Jalon", c => { champsElement(c, "jalonsPerso", i, CHAMPS_JALON); boutonRetirer(c, "jalonsPerso", i, "Retirer ce jalon"); });
+  }
+  function ajouterJalon() {
+    S.jalonsPerso = S.jalonsPerso || [];
+    S.jalonsPerso.push({ id: nouvelId("j"), nom: "", annee: new Date().getFullYear() + 5 });
+    S.meta.exemple = false; sauver(); tout(); feuilleJalon(S.jalonsPerso.length - 1);
+  }
+  function rendreIndependance(R, couple) {
+    const z = document.getElementById("pa-independance"); z.textContent = "";
+    const F = independance(R, couple), age = a => F.naissance ? ` (à ${a - F.naissance} ans)` : "";
+    const res = el("p", "resume");
+    res.append(document.createTextNode(F.annee ? "Indépendance financière vers " : "Pas d'indépendance financière avant "), el("strong", null, F.annee ? `${F.annee}${age(F.annee)}` : String(F.fin)),
+      document.createTextNode(F.annee ? ` : vos placements atteindraient ${nb(F.mult)} fois vos dépenses de l'année, assez pour vivre de leurs rendements (scénario ${SCENARIOS[R.scenario].toLowerCase()}).` : ` au rythme actuel (scénario ${SCENARIOS[R.scenario].toLowerCase()}).`));
+    z.appendChild(res);
+    const j = el("div", "jauge"), sp = el("span"); sp.style.width = `${Math.round(F.progression * 100)}%`; j.appendChild(sp); z.appendChild(j);
+    z.appendChild(rangees(el("div"), [
+      { titre: "Cible aujourd'hui", sous: `${nb(F.mult)} fois ${$(F.depenses)} de dépenses par année`, valeur: $(F.cible0), action: feuilleIndependance },
+      { titre: "Vos placements aujourd'hui", sous: "REER, CELI, CELIAPP, comptes" + (R.societeActive ? ", société" : ""), valeur: $(F.placements0), valeurSous: `${pct(F.progression, 0)} de la cible` },
+    ]));
+    z.appendChild(el("h3", "sous-titre", "Vos jalons personnels"));
+    const p = R.projection, cle = couple ? "menage" : "moi";
+    z.appendChild(rangees(el("div"), [
+      ...(S.jalonsPerso || []).map((x, i) => { const k = Math.max(0, Math.min(p.length - 1, (+x.annee || 0) - p[0].annee));
+        return { titre: x.nom || "Jalon sans nom", sous: `En ${x.annee}${age(+x.annee)}`, valeur: $(p[k][cle] / R.deflateur(k)), valeurSous: "valeur nette projetée", action: () => feuilleJalon(i) }; }),
+      { titre: "Ajouter un jalon", sous: "Chalet, passer à 3 jours, sabbatique, retraite…", ico: "plus", cls: "ajout", action: ajouterJalon },
+    ]));
+  }
+
+  /* ============================================================
+     FRAIS DE GESTION DES PLACEMENTS : ce qu'ils coûtent sur l'horizon.
+     ============================================================ */
+  function rendreFrais(R) {
+    const z = document.getElementById("pa-frais"); z.textContent = "";
+    const f = +S.epargne.frais || 0, bas = 0.25, p = R.projection, fin = p.length - 1;
+    if (!f) {
+      z.appendChild(el("p", "aide", "Inscrivez les frais de gestion de vos placements (RFG), bouton Modifier : les fonds communs coûtent souvent de 1,5 à 2,5 % par année ; les fonds indiciels négociés en bourse (FNB), de 0,1 à 0,5 %."));
+      return;
+    }
+    const cetteAnnee = (p[0].placements - p[0].encaisse) * f / 100;
+    const res = el("p", "resume");
+    if (f > bas) {
+      const avec = R.projeterAvec(R.hyp.rendement + f - bas), gain = (avec[fin].placements - p[fin].placements) / R.deflateur(fin);
+      res.append(document.createTextNode(`À ${nb(f, 2)} % de frais, vos placements vous coûtent environ ${$(cetteAnnee)} cette année. Avec des FNB à ${nb(bas, 2)} %, vous auriez `),
+        el("strong", null, `${$(gain)} de plus en ${p[fin].annee}`), document.createTextNode("."));
+    } else res.append(document.createTextNode(`À ${nb(f, 2)} %, vos frais sont déjà bas : environ ${$(cetteAnnee)} cette année.`));
+    z.appendChild(res);
+    z.appendChild(el("p", "aide", "Le rendement des scénarios est après frais : on y ajoute la différence de frais. Un conseiller peut valoir ses frais (planification, discipline) : comparez ce qu'il vous offre à ce qu'il coûte."));
+  }
+
+  /* ============================================================
+     DOSSIER POUR MES PROCHES : assurances, testament, documents, personnes-ressources.
+     ============================================================ */
+  const CHAMPS_DOSSIER = [
+    { g: "Assurance vie" },
+    { p: "dossier.vieCouverture", l: "Montant de la couverture", u: "$", s: 10000 },
+    { p: "dossier.vieAssureur", l: "Assureur et numéro de police", t: "texte" },
+    { p: "dossier.vieBeneficiaires", l: "Bénéficiaires", t: "texte" },
+    { g: "Assurance invalidité" },
+    { p: "dossier.invaliditeMensuelle", l: "Rente mensuelle", u: "$/mois", s: 100, h: "Une rente d'assurance invalidité individuelle, payée par vous, n'est généralement pas imposable." },
+    { p: "dossier.invaliditeCarence", l: "Délai de carence", u: "jours", s: 15 },
+    { p: "dossier.invaliditeAssureur", l: "Assureur et numéro de police", t: "texte" },
+    { g: "Autres protections" },
+    { p: "dossier.maladiesGraves", l: "Assurance maladies graves", u: "$", s: 5000 },
+    { p: "dossier.testament", l: "Testament à jour", t: "check" },
+    { p: "dossier.mandat", l: "Mandat de protection (inaptitude)", t: "check" },
+    { p: "dossier.procuration", l: "Procuration bancaire", t: "check" },
+    { g: "Où trouver quoi" },
+    { p: "dossier.documents", l: "Documents : testament, polices, relevés", t: "texte", long: true, ph: "Coffre-fort, notaire, dossier numérique…" },
+    { p: "dossier.notaire", l: "Notaire", t: "texte" },
+    { p: "dossier.comptable", l: "Comptable", t: "texte" },
+    { p: "dossier.conseiller", l: "Conseiller financier", t: "texte" },
+    { p: "dossier.notes", l: "Autres consignes", t: "texte", long: true },
+  ];
+  function champTexte(c, def) {
+    const id = "c-" + def.p.replace(/\./g, "-"), ligne = el("div", "champ large"), lab = el("label", null, def.l); lab.htmlFor = id;
+    const boite = el("div", "saisie"), inp = el(def.long ? "textarea" : "input"); inp.id = id; inp.dataset.p = def.p;
+    if (!def.long) inp.type = "text"; else inp.rows = 3;
+    if (def.ph) inp.placeholder = def.ph;
+    boite.appendChild(inp); ligne.append(lab, boite, el("span")); c.appendChild(ligne);
+  }
+  function feuilleDossier() {
+    ouvrirFeuille("Dossier pour mes proches", c => {
+      c.appendChild(el("p", "aide feuille-intro", "Ce que vos proches doivent savoir si vous devenez inapte ou décédez. Reste sur cet appareil ; le rapport PDF en fait une page à ranger avec vos documents."));
+      let groupe = c;
+      for (const d of CHAMPS_DOSSIER) {
+        if (d.g) { groupe = el("div", "groupe"); groupe.appendChild(el("h3", null, d.g)); c.appendChild(groupe); continue; }
+        if (d.t === "texte") champTexte(groupe, d);
+        else groupe.appendChild(creerChamp(d, "c-" + d.p.replace(/\./g, "-"), inp => { inp.dataset.p = d.p; }, false));
+      }
+    });
+  }
+  // Besoin d'assurance vie, ordre de grandeur : dettes, dix ans de dépenses s'il y a des personnes
+  // à charge, frais au décès ; moins les placements (le REER, après l'impôt au décès).
+  function analyseDossier(R) {
+    const D = S.dossier || {}, e = S.epargne, charge = R.couple || S.epargne.reee.enfants.length > 0;
+    const dettes = S.dettes.reduce((t, d) => t + d.solde * (d.partMoi ?? 100) / 100, 0);
+    const avoirs = e.encaisse + e.celi.solde + ((e.celiapp || {}).solde || 0) + e.reer.solde * 0.5;
+    const besoin = Math.max(0, dettes + (charge ? 10 * (R.depMoi + R.dettesMoi) * 12 : 0) + 15000 - avoirs);
+    const remplacement = (+D.invaliditeMensuelle || 0) / Math.max(1, R.netMoi);
+    const elements = [["Assurance vie", (+D.vieCouverture || 0) > 0], ["Assurance invalidité", (+D.invaliditeMensuelle || 0) > 0], ["Testament à jour", !!D.testament],
+      ["Mandat de protection", !!D.mandat], ["Où trouver les documents", !!(D.documents || "").trim()]];
+    return { D, besoin, charge, remplacement, elements, faits: elements.filter(([, v]) => v).length };
+  }
+  function rendreDossier(R) {
+    const z = document.getElementById("pa-dossier"); z.textContent = "";
+    const A = analyseDossier(R), D = A.D;
+    z.appendChild(rangees(el("div"), [
+      { titre: "Assurance vie", sous: `Besoin estimé : ${$(A.besoin)}${A.charge ? " (dettes, 10 ans de dépenses, frais)" : " (dettes et frais)"}`,
+        valeur: (+D.vieCouverture || 0) > 0 ? $(+D.vieCouverture) : "—", valeurSous: (+D.vieCouverture || 0) > 0 ? ((+D.vieCouverture >= A.besoin) ? "suffisante" : `il manque ${$(A.besoin - D.vieCouverture)}`) : "à inscrire", action: feuilleDossier },
+      { titre: "Assurance invalidité", sous: `Votre revenu net : ${$(R.netMoi)} par mois`, valeur: (+D.invaliditeMensuelle || 0) > 0 ? `${$(+D.invaliditeMensuelle)} / mois` : "—",
+        valeurSous: (+D.invaliditeMensuelle || 0) > 0 ? `${pct(A.remplacement, 0)} de votre revenu net` : "à inscrire", action: feuilleDossier },
+      { titre: "Testament, mandat, documents", sous: A.elements.filter(([, v]) => !v).map(([n]) => n).join(", ") || "Tout est en place", valeur: `${A.faits} sur ${A.elements.length}`, action: feuilleDossier },
+    ]));
+    const a = el("div", "actions"), b = el("button", "bouton secondaire", "Remplir le dossier"); b.type = "button"; b.addEventListener("click", feuilleDossier); a.appendChild(b); z.appendChild(a);
   }
 
   /* ============================================================
@@ -2612,6 +2958,8 @@
     document.getElementById("ap-portrait-suite").onclick = suite ? suite.action : null;
   }
   document.getElementById("bu-annuelles-modifier").addEventListener("click", feuilleAnnuelles);
+  document.getElementById("bandeau-plan-sortir").addEventListener("click", () => sortirPlan());
+  document.getElementById("pa-independance-modifier").addEventListener("click", feuilleIndependance);
   document.getElementById("ap-portrait-masquer").addEventListener("click", () => {
     try { sessionStorage.setItem("wm.portrait", "masque"); } catch (e) { /* rien à garder */ }
     rendrePortrait(); toast("Carte masquée jusqu'à la prochaine ouverture de l'app.");
@@ -2640,7 +2988,7 @@
       const v = valeur(inp); if (v === null) return;
       const item = tableau(inp.dataset.l)[+inp.dataset.i];
       item[inp.dataset.k] = v; S.meta.exemple = false;
-      if (inp.dataset.k === "nom" && ["dettes", "enfants", "activites", "actifsAutres", "objectifs"].includes(inp.dataset.l) && feuilleCourante && !parcours) { feuilleCourante.titre = inp.dataset.l === "activites" ? nomActivite(item) : v || "Sans nom"; titreFeuille.textContent = feuilleCourante.titre; }
+      if (inp.dataset.k === "nom" && ["dettes", "enfants", "activites", "actifsAutres", "objectifs", "jalonsPerso"].includes(inp.dataset.l) && feuilleCourante && !parcours) { feuilleCourante.titre = inp.dataset.l === "activites" ? nomActivite(item) : v || "Sans nom"; titreFeuille.textContent = feuilleCourante.titre; }
       if (inp.dataset.bool) item[inp.dataset.k] = v === "true";
       if (["budget", "lignes", "depensesPro"].includes(inp.dataset.l) && inp.dataset.k === "montant") inp.closest(".ligne-depense").classList.toggle("remplie", v > 0);
       if (inp.dataset.l === "dettes" && (inp.dataset.k === "type" || inp.dataset.k === "interetsSeulement")) { sauver(); reconstruireFeuille(); tout(); return; }
@@ -2716,7 +3064,7 @@
   /* Import et export */
   const message = t => { document.getElementById("donnees-message").textContent = t; };
   document.getElementById("exporter").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(racine(), null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `wealthmorand-donnees-${new Date().toISOString().slice(0, 10)}.json`;
@@ -2732,7 +3080,7 @@
       try {
         const d = JSON.parse(lecteur.result);
         if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
-        S = normaliser(fusion(clone(EXEMPLE), migrer(d))); S.meta.exemple = false; sauver();
+        sortirPlan(true); S = normaliser(fusion(clone(EXEMPLE), migrer(d))); S.meta.exemple = false; sauver();
         tout(); message(`Données importées : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`);
         if (boiteAssistant.open) { fermerAssistant(); ouvrir("apercu"); toast("Données importées."); }
       } catch (err) { message("Ce fichier n'est pas un fichier de données WealthMorand (ou Wealthnord, Boussole). Rien n'a été changé."); }
@@ -2741,7 +3089,7 @@
   });
   const reinit = document.getElementById("reinitialiser"), confirmer = document.getElementById("confirmer-reinit");
   reinit.addEventListener("click", () => { confirmer.hidden = false; confirmer.focus(); });
-  confirmer.addEventListener("click", () => { S = normaliser(clone(EXEMPLE)); sauver(); tout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
+  confirmer.addEventListener("click", () => { sortirPlan(true); S = normaliser(clone(EXEMPLE)); sauver(); tout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
 
   /* Apparence : automatique (selon l'appareil), claire ou sombre. */
   // Bouton lune / soleil, en haut à droite : passe du clair au sombre et l'inverse.
@@ -2798,13 +3146,13 @@
 
   /* Outils pour le rapport PDF (js/rapport.js). */
   window.Wealthnord = {
-    etat: () => S, resultats: () => R,
+    etat: () => S, resultats: () => R, plan: () => planActif === null ? null : principal.plans[planActif].nom,
     verification: () => {
       let total = 0, egaux = 0, pire = 0;
       VERIFICATION.forEach(v => { const b = casCalcul(v); CHAMPS_VERIF.forEach(([k]) => { const e = Math.abs(Math.round(b[k]) - v.officiel[k]); total++; if (e <= 1) egaux++; pire = Math.max(pire, e); }); });
       return { total, egaux, pire, cas: VERIFICATION.length };
     },
-    outils: { depensesEffectives, annuelLigne, nomLigne, estPro, ITEMS_PRO, $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, ACTIVITES, nomActivite, frequenceTexte, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
+    outils: { depensesEffectives, annuelLigne, nomLigne, estPro, ITEMS_PRO, analyseDossier, independance, $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, ACTIVITES, nomActivite, frequenceTexte, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
   };
 
   /* Application installable (PWA) : fonctionne hors ligne. */
@@ -3067,7 +3415,7 @@
   }
   // Fin de l'assistant : le portrait est créé ; on propose les parcours pas à pas (facultatifs).
   function terminerAssistant() {
-    S = portraitDepuis(A); sauver();
+    sortirPlan(true); S = portraitDepuis(A); sauver();
     ouvrir("apercu"); tout();
     asCorps.textContent = ""; asRetour.hidden = true; asSuivant.hidden = true;
     document.querySelectorAll("#as-points li").forEach(li => li.classList.add("fait"));
