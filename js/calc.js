@@ -1,4 +1,4 @@
-/* Wealthnord — moteur de calcul.
+/* WealthMorand — moteur de calcul.
    Fonctions pures, sans accès à la page : elles reçoivent l'état et
    rendent des nombres. Chargé tel quel par la page et par Node pour les
    vérifications. */

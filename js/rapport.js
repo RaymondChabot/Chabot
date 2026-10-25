@@ -1,4 +1,4 @@
-/* Wealthnord — rapport PDF. Construit, à la demande, un rapport mis en page pour
+/* WealthMorand — rapport PDF. Construit, à la demande, un rapport mis en page pour
    l'impression (format Lettre), avec graphiques en couleurs, puis ouvre la boîte
    d'impression du navigateur : « Enregistrer en PDF ». Rien ne quitte l'appareil. */
 (function () {
@@ -80,9 +80,9 @@
   const kpi = (titre, valeur, sous, cls) => `<div class="rp-kpi ${cls || ""}"><span>${esc(titre)}</span><strong>${esc(valeur)}</strong>${sous ? `<em>${esc(sous)}</em>` : ""}</div>`;
   const tableau = (entetes, rangs, cls) => `<table class="rp-table ${cls || ""}"><thead><tr>${entetes.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${
     rangs.map(r => `<tr class="${r.cls || ""}">${r.c.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
-  const marque = `<svg class="rp-logo" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6.5" fill="#121211"/><g transform="rotate(42 12 12)"><path d="M12 4.2 10.1 12H12Z" fill="#e8cf9c"/><path d="M12 4.2 13.9 12H12Z" fill="#b58d55"/><path d="M12 19.8 10.1 12H12Z" fill="#f5f4f0"/><path d="M12 19.8 13.9 12H12Z" fill="#c9c6bc"/></g><circle cx="12" cy="12" r="0.95" fill="#121211"/></svg>`;
+  const marque = `<svg class="rp-logo" aria-hidden="true"><use href="#wm-arbre-i"/></svg>`;
   const page = (titre, intro, contenu) => `<section class="rp-page">
-    <header class="rp-tete">${marque}<span>Wealthnord</span><span class="rp-tete-titre">${esc(titre)}</span></header>
+    <header class="rp-tete">${marque}<svg class="rp-nom" aria-hidden="true"><use href="#wm-nom"/></svg><span class="rp-tete-titre">${esc(titre)}</span></header>
     <h1>${esc(titre)}</h1>${intro ? `<p class="rp-intro">${esc(intro)}</p>` : ""}${contenu}</section>`;
 
   /* ---------- Le rapport ---------- */
@@ -110,7 +110,8 @@
     ];
     pages.push(`<section class="rp-page rp-couverture">
       <div class="rp-bandeau">
-        <div class="rp-marque">${marque}<span>Wealthnord</span></div>
+        <svg class="rp-sceau" aria-hidden="true"><use href="#wm-sceau-i"/></svg>
+        <div class="rp-marque"><svg class="rp-nom" aria-hidden="true"><use href="#wm-nom"/></svg></div>
         <h1>Rapport financier</h1>
         <p class="rp-sous">Médecin de famille en GMF-U · ${esc(NOM_MODE[mode])}${soc ? " · pratique incorporée" : ""}${R.couple ? " · en couple" : ""}</p>
         <p class="rp-date">${esc(date)} · scénario ${esc(scen)} · méthode ${esc(meth)}</p>
@@ -288,7 +289,7 @@
     let st = document.getElementById("rapport-style");
     if (!st) { st = document.createElement("style"); st.id = "rapport-style"; document.head.appendChild(st); }
     const police = `font-family: "Inter", sans-serif; font-size: 7.5pt; color: #8b8981;`;
-    st.textContent = `@page { @bottom-left { content: "Wealthnord · Rapport du ${date.replace(/"/g, "")} · Estimations seulement"; ${police} } @bottom-right { content: "Page " counter(page) " de " counter(pages); ${police} } }`;
+    st.textContent = `@page { @bottom-left { content: "WealthMorand · Rapport du ${date.replace(/"/g, "")} · Estimations seulement"; ${police} } @bottom-right { content: "Page " counter(page) " de " counter(pages); ${police} } }`;
   }
 
   function imprimer() {

@@ -1,4 +1,4 @@
-/* Tests des calculs de Wealthnord, sans dépendance : node tests/calculs.test.js
+/* Tests des calculs de WealthMorand, sans dépendance : node tests/calculs.test.js
    Vérifie l'impôt contre l'outil officiel du ministère des Finances du Québec,
    les formules hypothécaires canadiennes, la simulation des dettes et la
    projection de la valeur nette. Aucune donnée personnelle : cas fictifs. */

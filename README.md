@@ -1,4 +1,4 @@
-# Wealthnord
+# WealthMorand
 
 Votre boussole financière.
 

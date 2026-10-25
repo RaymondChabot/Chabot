@@ -1,14 +1,14 @@
 {
   "id": "./",
-  "name": "Wealthnord",
-  "short_name": "Wealthnord",
+  "name": "WealthMorand",
+  "short_name": "WealthMorand",
   "description": "Revenu, impôt, dettes et avenir du ménage, calculés sur cet appareil.",
   "lang": "fr-CA",
   "dir": "ltr",
   "start_url": "./#apercu",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f4f0",
+  "background_color": "#ffffff",
   "theme_color": "#f5f4f0",
   "categories": ["finance", "productivity"],
   "icons": [

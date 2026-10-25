@@ -1,4 +1,4 @@
-/* Wealthnord — interface. L'état vit dans le localStorage de ce navigateur ;
+/* WealthMorand — interface. L'état vit dans le localStorage de ce navigateur ;
    aucune donnée ne quitte l'appareil. Les calculs sont dans calc.js. */
 (function () {
   "use strict";
@@ -176,7 +176,7 @@
 
   /* Résultats de l'outil de calcul du revenu disponible du ministère des Finances du
      Québec (version de mai 2026, revenus d'emploi), relevés le 25 octobre 2026.
-     Wealthnord recalcule les mêmes cas à chaque ouverture pour mesurer l'écart. */
+     WealthMorand recalcule les mêmes cas à chaque ouverture pour mesurer l'écart. */
   const VERIFICATION = [{"couple": true, "salaires": [190000, 60000], "ages": [4, 3], "officiel": {"qc": 40789, "fed": 34389, "rrq": 8455, "rqap": 701, "ae": 1676, "af": 2442, "fournitures": 127, "ace": 860, "prime": 1532}}, {"couple": true, "salaires": [100000, 0], "ages": [4, 3], "officiel": {"qc": 10487, "fed": 9131, "rrq": 4895, "rqap": 430, "ae": 896, "af": 4655, "fournitures": 127, "ace": 9378, "prime": 1532}}, {"couple": false, "salaires": [190000], "ages": [], "officiel": {"qc": 35143, "fed": 29962, "rrq": 4895, "rqap": 443, "ae": 896, "af": 0, "fournitures": 0, "ace": 0, "prime": 766}}, {"couple": true, "salaires": [80000, 40000], "ages": [4, 3], "officiel": {"qc": 12070, "fed": 9862, "rrq": 6995, "rqap": 516, "ae": 1416, "af": 3920, "fournitures": 127, "ace": 8248, "prime": 1532}}, {"couple": true, "salaires": [250000, 0], "ages": [4, 3], "officiel": {"qc": 47939, "fed": 42881, "rrq": 4895, "rqap": 443, "ae": 896, "af": 2442, "fournitures": 127, "ace": 828, "prime": 1532}}, {"couple": true, "salaires": [190000, 15000], "ages": [4, 3], "officiel": {"qc": 34447, "fed": 29797, "rrq": 5620, "rqap": 507, "ae": 1091, "af": 2442, "fournitures": 127, "ace": 3400, "prime": 1532}}, {"couple": false, "salaires": [60000], "ages": [], "officiel": {"qc": 5647, "fed": 4427, "rrq": 3560, "rqap": 258, "ae": 780, "af": 0, "fournitures": 0, "ace": 0, "prime": 766}}, {"couple": true, "salaires": [140000, 90000], "ages": [7, 3], "officiel": {"qc": 33507, "fed": 28249, "rrq": 9791, "rqap": 830, "ae": 1791, "af": 2442, "fournitures": 127, "ace": 758, "prime": 1532}}];
 
   /* ---------- État ---------- */
@@ -1373,7 +1373,7 @@
       : "Conjoints au sens de l'impôt : aucun crédit à transférer, chacun utilise ses propres crédits."));
   }
 
-  // Refait les cas de l'outil officiel avec le calcul de Wealthnord et montre les écarts.
+  // Refait les cas de l'outil officiel avec le calcul de WealthMorand et montre les écarts.
   const CHAMPS_VERIF = [["qc", "Impôt du Québec"], ["fed", "Impôt fédéral"], ["rrq", "RRQ"], ["rqap", "RQAP"], ["ae", "Assurance-emploi"],
     ["af", "Allocation famille"], ["fournitures", "Fournitures scolaires"], ["ace", "Allocation canadienne pour enfants"], ["prime", "Prime d'assurance médicaments"]];
   function casCalcul(v) {
@@ -1398,7 +1398,7 @@
     });
     const tete = el("div", "hero-sous");
     tete.append(puce(`${nb(egaux, 0)} sur ${nb(total, 0)} identiques`, "haut", true));
-    z.append(tete, el("p", "resume", `Wealthnord refait ${VERIFICATION.length} cas de l'outil officiel du ministère des Finances du Québec : ${nb(egaux, 0)} montants sur ${nb(total, 0)} sont identiques, à 1 $ près.` +
+    z.append(tete, el("p", "resume", `WealthMorand refait ${VERIFICATION.length} cas de l'outil officiel du ministère des Finances du Québec : ${nb(egaux, 0)} montants sur ${nb(total, 0)} sont identiques, à 1 $ près.` +
       (pire.e ? ` Le plus grand écart est de ${$(Math.abs(pire.e))} (${pire.n.toLowerCase()}, ${pire.cas.charAt(0).toLowerCase() + pire.cas.slice(1)}).` : "")));
     z.appendChild(rangees(el("div"), cas.map(({ v, ecarts }) => {
       const max = ecarts.reduce((m, x) => Math.abs(x.e) > Math.abs(m) ? x.e : m, 0);
@@ -1407,7 +1407,7 @@
     const d = el("details", "plier"); d.appendChild(el("summary", null, "Voir chaque montant"));
     cas.forEach(({ v, ecarts }) => {
       d.appendChild(el("h4", null, nomCas(v)));
-      tableauSimple(d, ["", "Officiel", "Wealthnord", "Écart"], ecarts.map(x => ({ cellules: [x.n, $(x.off), $(x.nous), x.e ? signe(x.e) : "—"] })));
+      tableauSimple(d, ["", "Officiel", "WealthMorand", "Écart"], ecarts.map(x => ({ cellules: [x.n, $(x.off), $(x.nous), x.e ? signe(x.e) : "—"] })));
     });
     z.appendChild(d);
     z.appendChild(el("p", "aide", "Outil de calcul du revenu disponible des familles (version de mai 2026, année 2026), consulté le 25 octobre 2026. L'outil ne traite que des revenus d'emploi : il valide les barèmes, les crédits, les transferts entre conjoints, les allocations et la prime d'assurance médicaments. Votre revenu de travailleur autonome (RRQ des deux parts, Fonds des services de santé) suit les mêmes barèmes, mais ne peut pas y être vérifié."));
@@ -1724,7 +1724,7 @@
     const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `wealthnord-donnees-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `wealthmorand-donnees-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     S.meta.dernierExport = new Date().toISOString(); sauver(); tout();
@@ -1739,7 +1739,7 @@
         if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
         S = fusion(clone(EXEMPLE), d); S.budget = normaliserBudget(S.budget); S.meta.exemple = false; sauver();
         tout(); message(`Données importées : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`);
-      } catch (err) { message("Ce fichier n'est pas un fichier de données Wealthnord (ou Boussole). Rien n'a été changé."); }
+      } catch (err) { message("Ce fichier n'est pas un fichier de données WealthMorand (ou Wealthnord, Boussole). Rien n'a été changé."); }
     };
     lecteur.readAsText(f); e.target.value = "";
   });
@@ -1774,7 +1774,7 @@
     const blob = new Blob(["\ufeff" + lignesCsv.join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `wealthnord-plan-${NOMS_METHODES[R.methode].toLowerCase().replace(/\s+/g, "-")}-${R.scenario}.csv`;
+    a.download = `wealthmorand-plan-${NOMS_METHODES[R.methode].toLowerCase().replace(/\s+/g, "-")}-${R.scenario}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     toast("Plan de remboursement exporté (CSV).");
@@ -1810,12 +1810,12 @@
   function etapesInstallation() {
     const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const android = /Android/.test(ua), firefox = /Firefox|FxiOS/.test(ua), safariMac = !ios && /Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|Edg/.test(ua);
-    if (ios) return { titre: "Sur iPhone ou iPad", etapes: ["Ouvrez cette page dans Safari.", "Touchez le bouton Partager (le carré avec une flèche vers le haut), en bas de l'écran.", "Faites défiler et touchez « Sur l'écran d'accueil ».", "Touchez « Ajouter » : l'icône Wealthnord apparaît sur votre écran d'accueil."],
+    if (ios) return { titre: "Sur iPhone ou iPad", etapes: ["Ouvrez cette page dans Safari.", "Touchez le bouton Partager (le carré avec une flèche vers le haut), en bas de l'écran.", "Faites défiler et touchez « Sur l'écran d'accueil ».", "Touchez « Ajouter » : l'icône WealthMorand apparaît sur votre écran d'accueil."],
       note: "L'application installée garde ses propres données, séparées de Safari : ouvrez-la, puis importez votre fichier de données une fois (Données, Importer)." };
-    if (android) return { titre: "Sur Android", etapes: ["Ouvrez cette page dans Chrome.", "Touchez le menu ⋮, en haut à droite.", "Touchez « Installer l'application » ou « Ajouter à l'écran d'accueil ».", "Confirmez : l'icône Wealthnord apparaît avec vos applications."] };
-    if (safariMac) return { titre: "Sur Mac, avec Safari", etapes: ["Dans le menu Fichier, choisissez « Ajouter au Dock ».", "Confirmez : Wealthnord s'ouvre dans sa propre fenêtre, depuis le Dock."] };
+    if (android) return { titre: "Sur Android", etapes: ["Ouvrez cette page dans Chrome.", "Touchez le menu ⋮, en haut à droite.", "Touchez « Installer l'application » ou « Ajouter à l'écran d'accueil ».", "Confirmez : l'icône WealthMorand apparaît avec vos applications."] };
+    if (safariMac) return { titre: "Sur Mac, avec Safari", etapes: ["Dans le menu Fichier, choisissez « Ajouter au Dock ».", "Confirmez : WealthMorand s'ouvre dans sa propre fenêtre, depuis le Dock."] };
     if (firefox) return { titre: "Avec Firefox", etapes: ["Firefox n'installe pas les applications web.", "Ouvrez cette page dans Chrome, Edge ou Safari, puis touchez « Installer » de nouveau.", "Ou ajoutez la page à vos favoris : elle fonctionne aussi sans connexion après une première visite."] };
-    return { titre: "Sur ordinateur", etapes: ["Dans la barre d'adresse, cliquez sur l'icône d'installation (un écran avec une flèche), à droite.", "Ou ouvrez le menu du navigateur, puis « Installer Wealthnord » (Chrome) ou « Applications », « Installer ce site » (Edge).", "Wealthnord s'ouvre alors dans sa propre fenêtre."] };
+    return { titre: "Sur ordinateur", etapes: ["Dans la barre d'adresse, cliquez sur l'icône d'installation (un écran avec une flèche), à droite.", "Ou ouvrez le menu du navigateur, puis « Installer WealthMorand » (Chrome) ou « Applications », « Installer ce site » (Edge).", "WealthMorand s'ouvre alors dans sa propre fenêtre."] };
   }
   async function installer() {
     if (invite) {
@@ -1826,7 +1826,7 @@
     }
     const e = etapesInstallation();
     ouvrirFeuille("Installer l'application", c => {
-      c.appendChild(el("p", "resume feuille-intro", "Wealthnord s'installe sur l'écran d'accueil comme une vraie application : icône, plein écran, et elle fonctionne sans connexion. Aucun magasin d'applications, aucun compte."));
+      c.appendChild(el("p", "resume feuille-intro", "WealthMorand s'installe sur l'écran d'accueil comme une vraie application : icône, plein écran, et elle fonctionne sans connexion. Aucun magasin d'applications, aucun compte."));
       const g = el("div", "groupe"); g.appendChild(el("h3", null, e.titre));
       const ol = el("ol", "etapes"); e.etapes.forEach(x => ol.appendChild(el("li", null, x))); g.appendChild(ol); c.appendChild(g);
       if (e.note) c.appendChild(el("p", "aide", e.note));
@@ -1834,7 +1834,7 @@
     });
   }
   window.addEventListener("beforeinstallprompt", ev => { ev.preventDefault(); invite = ev; majInstaller(); });
-  window.addEventListener("appinstalled", () => { invite = null; majInstaller(); toast("Wealthnord est installée."); });
+  window.addEventListener("appinstalled", () => { invite = null; majInstaller(); toast("WealthMorand est installée."); });
   boutonsInstaller().forEach(b => b.addEventListener("click", installer));
   majInstaller();
 

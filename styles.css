@@ -1,4 +1,4 @@
-/* Wealthnord — style inspiré des applications financières sobres : fond chaud,
+/* WealthMorand — style inspiré des applications financières sobres : fond chaud,
    cartes blanches arrondies, gros chiffres, une seule couleur d'action.
    Téléphone d'abord : barre de navigation en bas, panneaux qui glissent du bas.
    Polices hébergées ici (aucune ressource externe). */
@@ -15,6 +15,7 @@
 
 :root {
   --fond: #f5f4f0;
+  --marque: #b48a4a;
   --surface: #ffffff;
   --surface-2: #efeee9;
   --surface-3: #e6e4dd;
@@ -50,6 +51,7 @@
 @media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --fond: #0e0e0d;
+    --marque: #d6b57a;
     --surface: #1a1a19;
     --surface-2: #242422;
     --surface-3: #2e2e2b;
@@ -79,6 +81,7 @@
 @media screen {
   :root[data-theme="dark"] {
     --fond: #0e0e0d;
+    --marque: #d6b57a;
     --surface: #1a1a19;
     --surface-2: #242422;
     --surface-3: #2e2e2b;
@@ -129,14 +132,29 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 .saut:focus { left: 12px; }
 
 /* ---------- Marque, barre du haut ---------- */
-.marque { display: inline-flex; align-items: center; gap: 10px; color: var(--encre); }
-.marque-nom { font: 500 1.32rem/1 var(--police-titre); letter-spacing: -0.012em; }
-.marque-ico { width: 28px; height: 28px; flex: none; }
-.marque-ico .m-fond { fill: var(--encre); }
-.marque-ico .m-n1 { fill: #e8cf9c; }
-.marque-ico .m-n2 { fill: #b58d55; }
-.marque-ico .m-s1 { fill: var(--fond); }
-.marque-ico .m-s2 { fill: var(--fond); opacity: 0.72; }
+/* Le logo vit dans un sprite (en haut de index.html) : symboles teints par la couleur du texte. */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.marque { display: inline-flex; align-items: center; gap: 9px; color: var(--marque); }
+.marque-ico { width: 38px; height: 38px; flex: none; }
+.marque-nom { width: 149px; height: 10px; flex: none; }
+.barre-haut { gap: 10px; }
+@media (max-width: 400px) {
+  .marque { gap: 8px; }
+  .marque-ico { width: 34px; height: 34px; }
+  .marque-nom { width: 122px; height: 8.2px; }
+}
+
+/* Écran d'ouverture : le sceau apparaît, puis s'efface (une fois par session, sans bloquer les clics). */
+.ouverture { display: none; }
+.avec-ouverture .ouverture {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  background: var(--fond); color: var(--marque); pointer-events: none;
+  animation: ouverture-fin 0.45s ease 1s forwards;
+}
+.ouverture-sceau { width: min(56vw, 230px); height: min(56vw, 230px); animation: ouverture-sceau 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes ouverture-fin { to { opacity: 0; visibility: hidden; } }
+@keyframes ouverture-sceau { from { opacity: 0; transform: scale(0.94); } }
+@media (prefers-reduced-motion: reduce) { .ouverture-sceau { animation: none; } }
 .barre-haut {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;
@@ -494,7 +512,8 @@ a.tuile:hover { border-color: var(--trait); }
     padding: 24px 14px; border-top: 0; border-right: 1px solid var(--ligne); background: var(--fond);
     -webkit-backdrop-filter: none; backdrop-filter: none;
   }
-  .nav-marque { display: inline-flex !important; padding: 0 12px 22px; }
+  .nav-marque { display: flex !important; justify-content: center; padding: 2px 0 26px; }
+  .nav-sceau { width: 150px; height: 150px; }
   .nav a { flex: none; flex-direction: row; gap: 12px; padding: 11px 12px; font-size: 0.95rem; color: var(--encre-2); }
   .nav a svg { width: 21px; height: 21px; }
   .nav a:hover { background: var(--surface-2); }
@@ -560,7 +579,10 @@ a.tuile:hover { border-color: var(--trait); }
   .carte-tete, .carte h3, .carte h4 { break-after: avoid; }
   .tuiles { grid-template-columns: repeat(4, 1fr); }
   .entete-impression { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #d9d7cf; padding-bottom: 8px; margin-bottom: 10px; font-size: 9pt; color: #6f6d66; }
-  .entete-impression .marque-nom { font-size: 14pt; color: #121211; }
+  .ouverture { display: none !important; }
+  .marque-imp { display: flex; align-items: center; gap: 8px; color: #b48a4a; }
+  .imp-arbre { width: 20px; height: 24px; }
+  .imp-nom { width: 134px; height: 9px; }
   .pied { margin-top: 12px; }
 }
 
@@ -595,7 +617,7 @@ a.tuile:hover { border-color: var(--trait); }
 #rapport { display: none; }
 @page { size: letter; margin: 13mm 13mm 15mm; }
 @media print {
-  body.impression-rapport > *:not(#rapport) { display: none !important; }
+  body.impression-rapport > *:not(#rapport):not(.sprite) { display: none !important; }
   body.impression-rapport #rapport { display: block; }
   body.impression-rapport { background: #fff; }
 }
@@ -608,7 +630,8 @@ a.tuile:hover { border-color: var(--trait); }
 .rp-page:last-child { break-after: auto; }
 .rp-tete { display: flex; align-items: center; gap: 7px; font: 500 10.5pt "Newsreader", Georgia, serif; border-bottom: 1px solid #e6e4dd; padding-bottom: 6px; }
 .rp-tete-titre { margin-left: auto; font: 600 7.5pt "Inter", sans-serif; color: #6f6d66; text-transform: uppercase; letter-spacing: 0.09em; }
-.rp-logo { width: 17px; height: 17px; flex: none; }
+.rp-logo { width: 15px; height: 18px; flex: none; color: #b48a4a; }
+.rp-nom { width: 119px; height: 8px; flex: none; color: #b48a4a; }
 .rp-page > h1 { font: 450 23pt/1.1 "Newsreader", Georgia, serif; letter-spacing: -0.01em; margin: 4px 0 0; }
 .rp-intro { color: #45443f; font-size: 9pt; margin: 0; max-width: 92%; }
 .rp-carte { border: 1px solid #e6e4dd; border-radius: 12px; padding: 10px 12px; break-inside: avoid; background: #fff; }
@@ -630,10 +653,10 @@ a.tuile:hover { border-color: var(--trait); }
 
 /* Couverture */
 .rp-couverture { gap: 11px; }
-.rp-bandeau { background: #121211; color: #f5f4f0; border-radius: 16px; padding: 22px 26px 22px; }
-.rp-marque { display: flex; align-items: center; gap: 9px; font: 500 13pt "Newsreader", Georgia, serif; }
-.rp-marque .rp-logo { width: 26px; height: 26px; }
-.rp-bandeau .rp-logo rect { fill: #2c2c29; }
+.rp-bandeau { position: relative; --logo-sep: #121211; background: #121211; color: #f5f4f0; border-radius: 16px; padding: 22px 180px 22px 26px; }
+.rp-sceau { position: absolute; right: 24px; top: calc(50% - 68px); width: 136px; height: 136px; color: #d6b57a; }
+.rp-marque { display: flex; align-items: center; }
+.rp-marque .rp-nom { width: 164px; height: 11px; color: #d6b57a; }
 .rp-bandeau h1 { font: 450 34pt/1.05 "Newsreader", Georgia, serif; color: #fff; margin: 30px 0 8px; letter-spacing: -0.015em; }
 .rp-sous { color: #e8cf9c; font-size: 11pt; margin: 0; }
 .rp-date { color: #9c9a91; font-size: 8.5pt; margin: 4px 0 0; }
