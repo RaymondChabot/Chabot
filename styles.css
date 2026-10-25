@@ -794,27 +794,14 @@ a.tuile:hover { border-color: var(--trait); }
 @media print { .bouton-installer, .nav-installer { display: none !important; } }
 
 /* ============================================================
-   PARCOURS PAS À PAS ET CARTE « VOTRE PORTRAIT »
+   CARTE « VOTRE PORTRAIT »
    ============================================================ */
-.feuille-pied { display: flex; gap: 10px; flex: none; padding: 12px 18px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--ligne); background: var(--surface); }
-.feuille-pied[hidden] { display: none; }
-.feuille-pied .parcours-suivant { margin-left: auto; }
-.parcours-tete { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
-.parcours-tete .jauge { height: 4px; }
-.parcours-tete .jauge span, .portrait .jauge span { background: var(--marque); }
-.parcours-intro { font-size: 0.95rem; line-height: 1.5; color: var(--encre-2); }
+.portrait .jauge span { background: var(--marque); }
 .bouton-retirer { align-self: flex-start; margin-top: 10px; }
 .rangee.fait .rangee-ico { background: var(--bon-lavis); color: var(--bon); }
 .rangee.fait .rangee-titre { color: var(--encre-2); }
 .portrait .actions { display: flex; }
-button.as-option { text-align: left; font: inherit; color: inherit; width: 100%; }
-button.as-option:hover { border-color: var(--encre); }
-.guide { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px 12px 16px; border-radius: var(--rayon); background: var(--info-lavis); }
-.guide p { font-size: 0.88rem; line-height: 1.4; color: var(--encre-2); }
-.guide .bouton { flex: none; }
-.guide.fait { background: transparent; border: 1px solid var(--ligne); }
-.guide.fait .bouton { background: transparent; color: var(--encre); border-color: var(--trait); }
-@media print { .guide, .portrait, .feuille-pied { display: none !important; } }
+@media print { .portrait { display: none !important; } }
 
 /* ============================================================
    PATRIMOINE : bilan, réel comparé au plan, objectifs ; dépenses annuelles

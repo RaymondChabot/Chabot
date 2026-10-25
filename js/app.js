@@ -618,11 +618,9 @@
      PANNEAU « MODIFIER » : glisse du bas (téléphone) ou de la droite
      ============================================================ */
   const feuille = document.getElementById("feuille"), corps = document.getElementById("feuille-corps"), titreFeuille = document.getElementById("feuille-titre");
-  const piedFeuille = document.getElementById("feuille-pied"), boutonFermer = document.getElementById("feuille-fermer");
-  let feuilleCourante = null, parcours = null;   // parcours : écran du parcours pas à pas ouvert, s'il y a lieu
+  let feuilleCourante = null;
   function ouvrirFeuille(titre, construire) {
-    feuilleCourante = { titre, construire, maj: null }; parcours = null;
-    piedFeuille.hidden = true; piedFeuille.textContent = ""; boutonFermer.textContent = "Terminé";
+    feuilleCourante = { titre, construire, maj: null };
     titreFeuille.textContent = titre; corps.textContent = "";
     construire(corps); remplirChamps();
     if (!feuille.open) feuille.showModal();
@@ -635,7 +633,10 @@
     corps.textContent = ""; feuilleCourante.construire(corps); remplirChamps();
     corps.scrollTop = y;
   }
-  feuille.addEventListener("close", () => { feuilleCourante = null; corps.textContent = ""; tout(); });
+  feuille.addEventListener("close", () => {
+    feuilleCourante = null; corps.textContent = ""; tout();
+    if (boiteToast.parentNode !== document.body) document.body.appendChild(boiteToast);
+  });
   feuille.addEventListener("click", e => { if (e.target === feuille) feuille.close(); });
   document.getElementById("feuille-fermer").addEventListener("click", () => feuille.close());
 
@@ -649,6 +650,7 @@
   };
   function ouvrirSection(nom) {
     const [titre, champs] = FEUILLES[nom];
+    if (nom === "revenu") voir("revenu");
     ouvrirFeuille(titre, c => {
       if (nom === "revenu") {
         c.appendChild(el("p", "aide feuille-intro", "L'essentiel suffit pour commencer. Pour optimiser, affichez tous les détails : tarifs, forfaits, suppléments, apprenants, majoration selon le territoire."));
@@ -1362,7 +1364,7 @@
     else action("important", `Mettez ${pct(R.impot.total / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$(R.impot.total / 12)} par mois.`);
     // Après l'assistant : ce qu'il reste à entrer.
     if (S.meta.assistant) {
-      if (depensesEffectives().filter(b => b.montant > 0 && b.k !== "loyer").length < 3) action("important", "Entrez vos dépenses du mois (page Budget, « Remplir pas à pas ») : épicerie, électricité, assurances, transport… Sans elles, le surplus est surestimé.");
+      if (depensesEffectives().filter(b => b.montant > 0 && b.k !== "loyer").length < 3) action("important", "Entrez vos dépenses du mois (page Budget) : épicerie, électricité, assurances, transport… Sans elles, le surplus est surestimé.");
       if ((S.revenu.activites || []).some(x => x.calcul !== "patients" && ACTIVITES[x.type] && x.parJour === ACTIVITES[x.type].parJour))
         action("info", "Vérifiez le revenu par jour de vos activités en établissement (page Revenu) : les valeurs de départ sont indicatives.");
       if (!S.epargne.encaisse && !S.epargne.reer.solde && !S.epargne.celi.solde && !S.epargne.reer.droits) action("info", "Ajoutez votre épargne et vos droits REER (page Patrimoine, bouton Modifier).");
@@ -2771,170 +2773,26 @@
   }
 
   /* ============================================================
-     PARCOURS PAS À PAS : les revenus, puis le budget, un écran à la fois dans
-     le panneau. Chaque écran se passe ; « Suivant » le marque comme fait, et la
-     carte « Votre portrait » de l'aperçu en suit la progression.
+     CARTE « VOTRE PORTRAIT » : ce qui est rempli, et la suite proposée.
      ============================================================ */
-  const faits = nom => { S.meta.parcours = S.meta.parcours || {}; return (S.meta.parcours[nom] = S.meta.parcours[nom] || []); };
-  const estFait = (nom, cle) => ((S.meta.parcours || {})[nom] || []).includes(cle);
-  function marquer(nom, cle) { const l = faits(nom); if (!l.includes(cle)) { l.push(cle); sauver(); } }
-
-  // Champs de base de ces groupes du Revenu, sans les détails d'Optimiser ; la condition du groupe passe aux champs.
-  function essentiels(...groupes) {
-    const out = []; let g = null;
-    for (const c of CHAMPS.revenu) {
-      if (c.g) { g = groupes.includes(c.g) ? c : null; continue; }
-      if (!g || (c.si || "").includes("details")) continue;
-      out.push(g.si ? { ...c, si: c.si ? `${g.si}&${c.si}` : g.si } : c);
-    }
-    return out;
-  }
-  // Activités en établissement : toutes sur un écran, ajout et retrait sur place.
-  function construireActivites(c) {
-    const liste = S.revenu.activites || [];
-    const total = el("div", "feuille-total"); c.appendChild(total);
-    feuilleCourante.maj = () => { total.textContent = ""; total.append(el("span", null, "Total par année"), el("strong", null, $(R ? R.rev.activites : 0))); };
-    feuilleCourante.maj();
-    liste.forEach((a, i) => {
-      const g = el("div", "groupe"); g.appendChild(el("h3", null, nomActivite(a))); c.appendChild(g);
-      champsActivite(g, i);
-      const x = el("button", "bouton secondaire petit bouton-retirer", "Retirer cette activité"); x.type = "button"; x.dataset.suppr = "activites"; x.dataset.i = i;
-      g.appendChild(x);
-    });
-    if (!liste.length) c.appendChild(el("p", "aide", "Aucune activité pour l'instant. Si vous n'en faites pas, passez à l'écran suivant."));
-    const ac = el("div", "feuille-actions"), b = el("button", "bouton secondaire large", "Ajouter une activité"); b.type = "button";
-    b.addEventListener("click", () => {
-      const d = ACTIVITES.urgence;
-      S.revenu.activites = liste;
-      liste.push({ id: nouvelId("a"), type: "urgence", nom: "", nombre: 4, frequence: "mois", cycle: 6, calcul: "jour", parJour: d.parJour, patients: d.patients, parPatient: d.parPatient });
-      S.meta.exemple = false; sauver(); reconstruireFeuille(); tout();
-      const gs = corps.querySelectorAll(".groupe"); if (gs.length) gs[gs.length - 1].scrollIntoView({ block: "start" });
-    });
-    ac.appendChild(b); c.appendChild(ac);
-  }
-  function resumeRevenus(c) {
-    const z = el("div"); c.appendChild(z);
-    feuilleCourante.maj = () => {
-      const act = R.rev.activites, autres = R.autresPro + (S.revenu.autresRevenus || 0), frais = R.rev[R.mode].fraisCabinet || 0;
-      rangees(z, [
-        { titre: "Pratique principale", sous: libelleRevenu(), valeur: $(R.brut - act - autres) },
-        act > 0 && { titre: "Activités en établissement", valeur: $(act) },
-        autres > 0 && { titre: "Autres revenus professionnels", valeur: $(autres) },
-        { titre: "Revenu brut", cls: "total", valeur: $(R.brut) },
-        frais > 0 && { titre: "Frais de cabinet", valeur: "−" + $(frais) },
-        R.depensesPro > 0 && { titre: "Dépenses professionnelles", valeur: "−" + $(R.depensesPro) },
-        R.autresNonPro > 0 && { titre: "Location et placements", sous: "Imposables, sans RRQ ni RQAP", valeur: $(R.autresNonPro) },
-        { titre: "Net après impôt", sous: `${$(R.impot.net / 12)} par mois`, cls: "total", valeur: $(R.impot.net) },
-      ]);
-    };
-    feuilleCourante.maj();
-    c.appendChild(el("p", "aide", "Pour aller plus loin : page Revenu, bouton Modifier, puis « Optimiser » affiche tous les détails (tarifs des visites, forfaits, suppléments, majoration selon le territoire)."));
-  }
-  function resumeBudget(c) {
-    const z = el("div"); c.appendChild(z);
-    feuilleCourante.maj = () => {
-      const cats = categoriesParcours(), n = cats.filter(categorieFaite).length;
-      rangees(z, [
-        { titre: "Catégories remplies", valeur: `${n} sur ${cats.length}` },
-        { titre: "Dépenses", sous: R.couple ? "Votre part" : null, valeur: $(R.depMoi), valeurSous: "par mois" },
-        { titre: "Paiements de dettes", valeur: $(R.dettesMoi), valeurSous: "par mois" },
-        { titre: "Épargne", valeur: $(R.epargneMoi), valeurSous: "par mois" },
-        { titre: "Surplus", cls: "total", valeur: $(R.surplusMoi), valeurSous: "par mois" },
-      ]);
-    };
-    feuilleCourante.maj();
-    c.appendChild(el("p", "aide", "Les dettes se précisent dans la page Budget ; l'épargne (REER, CELI, CELIAPP, REEE) et les objectifs, dans la page Patrimoine."));
-  }
-  const INTRO_CATEGORIE = {
-    "Logement": "Loyer ou taxes, assurance habitation, électricité, chauffage, entretien. L'hypothèque se gère dans les dettes.",
-    "Alimentation": "Épicerie, restaurants, lunchs et cafés. Un bon repère : vos relevés de carte des deux ou trois derniers mois.",
-    "Transport": "Assurance, essence ou recharge, entretien, immatriculation, stationnement. Le paiement d'un prêt auto se gère dans les dettes.",
-    "Enfants": "Garderie, école, activités, vêtements, camps de jour.",
-    "Santé": "Médicaments, dentiste, lunettes, thérapies, assurance santé privée.",
-    "Assurances personnelles": "Invalidité, vie, maladies graves, voyage : les montants sont sur vos avis de prime.",
-    "Télécom et abonnements": "Cellulaires, internet, télé et diffusion en continu, applications. La partie professionnelle va dans les dépenses professionnelles.",
-    "Personnel et loisirs": "Vêtements, soins, sports, sorties, vacances, cadeaux, animaux, dons. Pour une dépense irrégulière, comme les vacances, inscrivez le montant par année.",
-    "Finances": "Frais bancaires, comptable, frais de gestion de placements, pension alimentaire, aide à la famille.",
-    "Imprévus": "Une réserve pour ce qui n'est pas prévu : bris, réparations, dépenses oubliées.",
-    "Autres dépenses": "Ce qui n'entre nulle part ailleurs : ajoutez vos propres lignes.",
-  };
-  // Catégories du parcours : « Enfants » seulement s'il y a des enfants (ou déjà des montants).
-  const categoriesParcours = () => [...CATALOGUE.map(x => x.cat), "Autres dépenses"]
-    .filter(g => g !== "Enfants" || S.epargne.reee.enfants.length || S.budget.some(b => categorie(b) === g && b.montant > 0));
-  const categorieFaite = g => estFait("budget", g) || totalActif(g) || S.budget.some(b => categorie(b) === g && b.montant > 0);
-  const PARCOURS = {
-    revenus: { titre: "Vos revenus", etapes: () => [
-      { cle: "pratique", titre: "Votre pratique", intro: "Votre milieu détermine les modes de rémunération possibles. En première année, la clientèle se bâtit au fil des mois.",
-        construire: c => construireChamps(c, essentiels("Votre pratique", "Pour le budget")) },
-      { cle: "semaine", titre: "Votre semaine", intro: "Rendez-vous : vos propres patients. Sans rendez-vous (SRV) : surtout des urgences mineures, souvent des patients d'autres médecins. Au mixte et à l'acte, chaque patient du SRV rapporte moins en moyenne : il est payé au tarif de la visite ponctuelle.",
-        construire: c => construireChamps(c, essentiels("Vos demi-journées")) },
-      S.revenu.milieu === "gmfu" && { cle: "apprenants", titre: "Enseignement et apprenants", intro: "Un résident voit en moyenne 4 à 5 patients par demi-journée ; un externe, 2 à 3. Indiquez aussi comment la supervision est facturée.",
-        construire: c => construireChamps(c, essentiels("Enseignement et apprenants")) },
-      { cle: "clientele", titre: "Votre clientèle", intro: "La RAMQ verse un forfait annuel pour chaque patient inscrit, plus élevé s'il est vulnérable, et un supplément à l'inscription des nouveaux patients du guichet d'accès.",
-        construire: c => construireChamps(c, essentiels("Votre clientèle")) },
-      { cle: "frais", titre: "Frais de cabinet", intro: "À l'acte, la clinique garde une part de votre facturation pour le loyer, le personnel et l'équipement. Demandez le pourcentage à votre clinique.",
-        construire: c => construireChamps(c, essentiels("Frais de cabinet")) },
-      { cle: "activites", titre: "Activités en établissement", intro: "Urgence, hospitalisation, obstétrique, soins palliatifs, CHSLD, gardes : en plus de la pratique principale. Les revenus par jour de départ sont indicatifs.",
-        construire: construireActivites },
-      { cle: "autres", titre: "Autres revenus", intro: "Formulaires, expertises, activités médico-administratives, enseignement, location, placements. Laissez 0 ce qui ne s'applique pas.",
-        construire: construireAutresRevenus },
-      { cle: "pro", titre: "Dépenses professionnelles", intro: "Collège des médecins, FMOQ, ACPM, formation, équipement : elles réduisent le revenu imposable. Un total suffit pour commencer.",
-        construire: construireDepensesPro },
-      { cle: "resume", titre: "Votre revenu", fin: true, construire: resumeRevenus },
-    ].filter(Boolean) },
-    budget: { titre: "Votre budget", etapes: () => [
-      R && R.couple && { cle: "partage", titre: "Le partage des dépenses", intro: "Pour chaque dépense, vous direz qui la paie : vous, l'autre personne ou les deux. Les dépenses partagées se divisent selon votre part.",
-        construire: c => construireChamps(c, CHAMPS.menage.filter(x => x.p === "menage.partCommunMoi")) },
-      ...categoriesParcours().map(g => ({ cle: g, titre: g, intro: `${INTRO_CATEGORIE[g] || ""} Pas sûr(e) du détail ? Choisissez « Un total estimé ».`.trim(),
-        construire: c => construireCategorie(c, g) })),
-      { cle: "resume", titre: "Votre budget", fin: true, construire: resumeBudget },
-    ].filter(Boolean) },
-  };
-  const etapeFaite = (nom, e) => nom === "budget" && categoriesParcours().includes(e.cle) ? categorieFaite(e.cle) : estFait(nom, e.cle);
-  // Reprendre au premier écran pas encore vu (une catégorie déjà entamée, comme le loyer, se revoit).
-  function premiereEtape(nom) { const i = PARCOURS[nom].etapes().findIndex(e => !e.fin && !estFait(nom, e.cle)); return i < 0 ? 0 : i; }
-  function ouvrirParcours(nom, i = premiereEtape(nom)) {
-    const etapes = PARCOURS[nom].etapes();
-    i = Math.max(0, Math.min(i, etapes.length - 1));
-    const e = etapes[i];
-    ouvrirFeuille(e.titre, c => {
-      const tete = el("div", "parcours-tete");
-      tete.appendChild(el("p", "as-etape", `${PARCOURS[nom].titre} · ${i + 1} sur ${etapes.length}`));
-      const j = el("div", "jauge"), sp = el("span"); sp.style.width = `${Math.round((i + 1) / etapes.length * 100)}%`; j.appendChild(sp); tete.appendChild(j);
-      if (e.intro) tete.appendChild(el("p", "parcours-intro", e.intro));
-      c.appendChild(tete);
-      e.construire(c);
-    });
-    parcours = { nom, i };
-    boutonFermer.textContent = "Plus tard";
-    const bouton = (texte, cls, f) => { const b = el("button", "bouton " + cls, texte); b.type = "button"; b.addEventListener("click", f); piedFeuille.appendChild(b); return b; };
-    // Au résumé des revenus, la suite vers le budget remplace « Retour » (trois boutons ne tiennent pas sur un téléphone).
-    if (i > 0 && !(e.fin && nom === "revenus")) bouton("Retour", "secondaire", () => ouvrirParcours(nom, i - 1));
-    if (!e.fin) {
-      bouton("Passer", "secondaire", () => ouvrirParcours(nom, i + 1));
-      bouton("Suivant", "", () => { marquer(nom, e.cle); ouvrirParcours(nom, i + 1); }).classList.add("parcours-suivant");
-    } else {
-      if (nom === "revenus") bouton("Mon budget, pas à pas", "secondaire", () => { marquer(nom, e.cle); ouvrirParcours("budget"); });
-      bouton("Terminer", "", () => { marquer(nom, e.cle); feuille.close(); toast(nom === "revenus" ? "Vos revenus sont à jour." : "Votre budget est à jour."); }).classList.add("parcours-suivant");
-    }
-    piedFeuille.hidden = false;
-    titreFeuille.tabIndex = -1; titreFeuille.focus();
-  }
-  feuille.addEventListener("close", () => {
-    parcours = null; piedFeuille.hidden = true; piedFeuille.textContent = ""; boutonFermer.textContent = "Terminé";
-    if (boiteToast.parentNode !== document.body) document.body.appendChild(boiteToast);
-  });
+  // Sections déjà ouvertes (revenu, patrimoine), gardées avec les données.
+  const vus = () => (S.meta.vus = S.meta.vus || {});
+  function voir(cle) { if (!vus()[cle]) { vus()[cle] = true; sauver(); } }
+  // Catégories du budget à remplir : « Enfants » seulement s'il y a des enfants (ou déjà des montants).
+  const categoriesBudget = () => CATALOGUE.map(x => x.cat).filter(g => g !== "Enfants" || S.epargne.reee.enfants.length || S.budget.some(b => categorie(b) === g && b.montant > 0));
+  const categorieRemplie = g => totalActif(g) || S.budget.some(b => categorie(b) === g && b.montant > 0);
+  const ancienParcours = nom => (((S.meta.parcours || {})[nom]) || []).length > 0;
 
   // Carte « Votre portrait » de l'aperçu : ce qui est rempli, et la suite proposée.
   function portrait() {
-    const rev = PARCOURS.revenus.etapes().filter(e => !e.fin), cats = categoriesParcours();
-    const nRev = rev.filter(e => estFait("revenus", e.cle)).length, nCat = cats.filter(categorieFaite).length;
-    const ep = S.epargne, epargne = estFait("autres", "epargne") || ep.encaisse > 0 || ep.reer.solde > 0 || ep.reer.droits > 0 || ep.celi.solde > 0;
+    // Budget : six catégories remplies suffisent (certaines ne s'appliquent pas à tout le monde).
+    const cats = categoriesBudget(), nCat = cats.filter(categorieRemplie).length, viseCat = Math.min(6, cats.length);
+    const ep = S.epargne, epargne = vus().patrimoine || ancienParcours("autres") || ep.encaisse > 0 || ep.reer.solde > 0 || ep.reer.droits > 0 || ep.celi.solde > 0;
     const items = [
       { titre: "Votre situation", sous: "Famille, pratique, logement, dettes", f: S.meta.exemple ? 0 : 1, poids: 15, action: ouvrirAssistant },
-      { titre: "Vos revenus, pas à pas", sous: `${nRev} écran${nRev > 1 ? "s" : ""} sur ${rev.length}`, f: nRev / rev.length, poids: 35, action: () => ouvrirParcours("revenus") },
-      { titre: "Votre budget, pas à pas", sous: `${nCat} catégorie${nCat > 1 ? "s" : ""} sur ${cats.length}`, f: nCat / cats.length, poids: 35, action: () => ouvrirParcours("budget") },
-      { titre: "Votre patrimoine", sous: "Épargne, biens et objectifs", f: epargne ? 1 : 0, poids: 10, action: () => { marquer("autres", "epargne"); ouvrir("avenir"); } },
+      { titre: "Vos revenus", sous: "Pratique, clientèle, activités, autres revenus", f: vus().revenu || ancienParcours("revenus") ? 1 : 0, poids: 35, action: () => { ouvrir("revenu"); ouvrirSection("revenu"); } },
+      { titre: "Votre budget", sous: `${nCat} catégorie${nCat > 1 ? "s" : ""} remplie${nCat > 1 ? "s" : ""}`, f: Math.min(1, nCat / viseCat), poids: 35, action: () => ouvrir("budget") },
+      { titre: "Votre patrimoine", sous: "Épargne, biens et objectifs", f: epargne ? 1 : 0, poids: 10, action: () => { voir("patrimoine"); ouvrir("avenir"); } },
       { titre: "Une copie de sauvegarde", sous: "Vos données ne vivent que dans ce navigateur", f: S.meta.dernierExport ? 1 : 0, poids: 5, action: () => ouvrir("donnees") },
     ];
     const total = items.reduce((t, x) => t + x.poids, 0);
@@ -2944,17 +2802,12 @@
   function rendrePortrait() {
     const carte = document.getElementById("ap-portrait"), P = portrait();
     carte.hidden = S.meta.exemple || P.pct >= 100 || portraitMasque();
-    document.querySelectorAll("[data-parcours]").forEach(b => {
-      const nom = b.dataset.parcours, fait = PARCOURS[nom].etapes().every(e => e.fin || etapeFaite(nom, e));
-      b.textContent = fait ? "Revoir pas à pas" : "Remplir pas à pas";
-      b.closest(".guide").classList.toggle("fait", fait);
-    });
     if (carte.hidden) return;
     document.getElementById("ap-portrait-titre").textContent = `Votre portrait : ${P.pct} % complété`;
     const j = carte.querySelector(".jauge"); j.setAttribute("aria-valuenow", P.pct); j.firstElementChild.style.width = P.pct + "%";
     rangees("ap-portrait-liste", P.items.map((x, i) => ({ titre: x.titre, sous: x.sous, ico: x.f >= 1 ? "ok" : String(i + 1), cls: x.f >= 1 ? "fait" : null, action: x.action })));
     const suite = P.items.find(x => x.f < 1);
-    document.getElementById("ap-portrait-suite").textContent = suite ? `Continuer : ${suite.titre.replace(", pas à pas", "").toLowerCase()}` : "Continuer";
+    document.getElementById("ap-portrait-suite").textContent = suite ? `Continuer : ${suite.titre.toLowerCase()}` : "Continuer";
     document.getElementById("ap-portrait-suite").onclick = suite ? suite.action : null;
   }
   document.getElementById("bu-annuelles-modifier").addEventListener("click", feuilleAnnuelles);
@@ -2988,7 +2841,7 @@
       const v = valeur(inp); if (v === null) return;
       const item = tableau(inp.dataset.l)[+inp.dataset.i];
       item[inp.dataset.k] = v; S.meta.exemple = false;
-      if (inp.dataset.k === "nom" && ["dettes", "enfants", "activites", "actifsAutres", "objectifs", "jalonsPerso"].includes(inp.dataset.l) && feuilleCourante && !parcours) { feuilleCourante.titre = inp.dataset.l === "activites" ? nomActivite(item) : v || "Sans nom"; titreFeuille.textContent = feuilleCourante.titre; }
+      if (inp.dataset.k === "nom" && ["dettes", "enfants", "activites", "actifsAutres", "objectifs", "jalonsPerso"].includes(inp.dataset.l) && feuilleCourante) { feuilleCourante.titre = inp.dataset.l === "activites" ? nomActivite(item) : v || "Sans nom"; titreFeuille.textContent = feuilleCourante.titre; }
       if (inp.dataset.bool) item[inp.dataset.k] = v === "true";
       if (["budget", "lignes", "depensesPro"].includes(inp.dataset.l) && inp.dataset.k === "montant") inp.closest(".ligne-depense").classList.toggle("remplie", v > 0);
       if (inp.dataset.l === "dettes" && (inp.dataset.k === "type" || inp.dataset.k === "interetsSeulement")) { sauver(); reconstruireFeuille(); tout(); return; }
@@ -3002,7 +2855,7 @@
         // Nouveau type : ses valeurs de départ, sauf celles déjà modifiées (égales à celles d'un autre type).
         if (inp.dataset.k === "type" && ACTIVITES[v]) for (const k of ["parJour", "patients", "parPatient"])
           if (Object.values(ACTIVITES).some(t => t[k] === item[k])) item[k] = ACTIVITES[v][k];
-        if (feuilleCourante && !parcours) { feuilleCourante.titre = nomActivite(item); titreFeuille.textContent = feuilleCourante.titre; }
+        if (feuilleCourante) { feuilleCourante.titre = nomActivite(item); titreFeuille.textContent = feuilleCourante.titre; }
         sauver(); reconstruireFeuille(); tout(); return;
       }
       plusTard();
@@ -3017,7 +2870,7 @@
       sauver(); rendreFiabilite();
     } else if (b.dataset.suppr) {
       const nomListe = b.dataset.suppr, liste = tableau(nomListe), i = +b.dataset.i, [retire] = liste.splice(i, 1); sauver();
-      const surPlace = nomListe === "budget" || nomListe === "lignes" || !!parcours;
+      const surPlace = nomListe === "budget" || nomListe === "lignes";
       if (surPlace) { reconstruireFeuille(); tout(); } else feuille.close();
       toast(`« ${nomListe === "activites" ? nomActivite(retire) : retire.nom || "Élément"} » supprimé.`, () => {
         tableau(nomListe).splice(i, 0, retire); sauver();
@@ -3025,7 +2878,6 @@
         tout();
       });
     } else if (b.dataset.feuille) ouvrirSection(b.dataset.feuille);
-    else if (b.dataset.parcours) ouvrirParcours(b.dataset.parcours);
   });
 
   /* Message en bas de l'écran ; « Annuler » défait la dernière suppression. */
@@ -3413,24 +3265,10 @@
     s.strategie = { ...s.strategie, debut: `${auj.getFullYear()}-${mm}` };
     return s;
   }
-  // Fin de l'assistant : le portrait est créé ; on propose les parcours pas à pas (facultatifs).
   function terminerAssistant() {
-    sortirPlan(true); S = portraitDepuis(A); sauver();
+    sortirPlan(true); S = portraitDepuis(A); sauver(); fermerAssistant();
     ouvrir("apercu"); tout();
-    asCorps.textContent = ""; asRetour.hidden = true; asSuivant.hidden = true;
-    document.querySelectorAll("#as-points li").forEach(li => li.classList.add("fait"));
-    const h = el("h2", null, "Votre portrait est prêt"); h.id = "as-titre"; h.tabIndex = -1;
-    asCorps.append(h, el("p", "as-intro", "Il part de vos réponses. Pour des chiffres justes, précisez maintenant vos revenus et vos dépenses, un écran à la fois, avec des explications. C'est facultatif : passez ce qui ne s'applique pas, et reprenez quand vous voulez depuis l'aperçu."));
-    const choix = el("div", "as-choix");
-    [["Remplir mes revenus pas à pas", "Pratique, clientèle, activités, autres revenus · environ 3 minutes", () => ouvrirParcours("revenus")],
-     ["Remplir mon budget pas à pas", "Une catégorie de dépenses à la fois · environ 5 minutes", () => ouvrirParcours("budget")],
-     ["Plus tard", "Voir l'aperçu", null]].forEach(([titre, sous, f]) => {
-      const b = el("button", "as-option"); b.type = "button";
-      const t = el("span"); t.append(el("strong", null, titre), el("em", null, sous)); b.appendChild(t);
-      b.addEventListener("click", () => { fermerAssistant(); if (f) f(); });
-      choix.appendChild(b);
-    });
-    asCorps.appendChild(choix); asCorps.scrollTop = 0; h.focus();
+    toast("Votre portrait est prêt. Précisez maintenant vos revenus et vos dépenses du mois.");
   }
 
   ouvrir((location.hash || "#apercu").slice(1), true);

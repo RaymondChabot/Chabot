@@ -57,7 +57,9 @@
      visites ponctuelles (urgences mineures), souvent de patients d'autres médecins, payées
      moins qu'un suivi. Estimées d'après le rapport des tarifs au cabinet, patient non
      vulnérable de moins de 80 ans : mineure (15765, 15766) environ 48 % du suivi (15803,
-     15804), complexe (15773, 15774) environ 95 %. À vérifier dans l'onglet B. */
+     15804), complexe (15773, 15774) environ 95 %. À vérifier dans l'onglet B. Le tableau-synthèse des
+     visites (P.G. 2.2.6 A, 25 juillet 2025) confirme qu'au sans rendez-vous seules les visites ponctuelles
+     se facturent : la visite de suivi est réservée au rendez-vous ou à l'accès adapté. */
   const TARIFS_DEFAUT = {
     ...Object.fromEntries(VISITES.map(v => [v.cle, v.tarifs])),
     pecNonVuln: PRISE_EN_CHARGE.nonVuln, pecVuln: PRISE_EN_CHARGE.vuln,

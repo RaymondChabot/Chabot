@@ -26,12 +26,8 @@ propriétaire ou locataire, travail autonome ou pratique incorporée.
 
 Au premier lancement, un **assistant de départ** pose quelques questions
 (famille, enfants, pratique, logement, dettes) et bâtit le point de départ
-à partir des réponses ; l'exemple fictif reste offert. Il propose ensuite
-deux **parcours pas à pas**, facultatifs : les revenus (pratique, semaine,
-apprenants, clientèle, frais de cabinet, activités, autres revenus,
-dépenses professionnelles) et le budget (une catégorie par écran). Chaque
-écran explique quoi inscrire et se passe. La carte **Votre portrait** de
-l'aperçu montre ce qui est rempli et propose la suite. Des conjoints de
+à partir des réponses ; l'exemple fictif reste offert. La carte **Votre
+portrait** de l'aperçu montre ce qui est rempli et propose la suite. Des conjoints de
 fait ne forment un couple pour l'impôt qu'après 12 mois de vie commune ou
 avec un enfant commun : avant, chacun est imposé seul.
 
@@ -131,8 +127,10 @@ dossier racine.
 - Forfaits et suppléments d'inscription : EP 40. Supplément des patients
   très vulnérables (code 19960) : à confirmer selon le montant en vigueur.
 - Sans rendez-vous : visites ponctuelles mineures (15765 à 15772) et
-  complexes (15773 à 15780) ; tarifs de départ estimés d'après leur rapport
-  au tarif du suivi au cabinet (environ 48 % et 95 %), à vérifier.
+  complexes (15773 à 15780), seules facturables sans rendez-vous d'après
+  le tableau-synthèse des visites (P.G. 2.2.6 A, 25 juillet 2025) ; tarifs
+  de départ estimés d'après leur rapport au tarif du suivi au cabinet
+  (environ 48 % et 95 %), à vérifier.
 - Dépenses professionnelles : grille tarifaire 2026-2027 du Collège des
   médecins ; cotisations 2027 de l'ACPM au Québec.
 - CELIAPP : 8 000 $ par année, 40 000 $ à vie (Agence du revenu du Canada).
