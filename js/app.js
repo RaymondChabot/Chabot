@@ -27,20 +27,20 @@
     },
     impot: { depensesPro: 3000 },
     societe: { tauxSociete: 20.5, fraisSociete: 4000 },
-    menage: { conjointNetMensuel: 4000, allocationsAnnuelles: 2400, autresRevenusMensuels: 0, partCommunMoi: 50 },
+    menage: { conjointNetMensuel: 0, allocationsAnnuelles: 2400, autresRevenusMensuels: 0, partCommunMoi: 100 },
     // Valeurs fictives ; les autres cases du catalogue partent à 0.
     budget: [
-      { id: "epicerie", k: "epicerie", nom: "", montant: 1300, periode: "mois", qui: "commun" },
-      { id: "garderie", k: "garderie", nom: "", montant: 400, periode: "mois", qui: "commun" },
-      { id: "taxesMunicipales", k: "taxesMunicipales", nom: "", montant: 4200, periode: "an", qui: "commun" },
-      { id: "taxesScolaires", k: "taxesScolaires", nom: "", montant: 500, periode: "an", qui: "commun" },
-      { id: "assuranceHabitation", k: "assuranceHabitation", nom: "", montant: 1200, periode: "an", qui: "commun" },
-      { id: "electricite", k: "electricite", nom: "", montant: 150, periode: "mois", qui: "commun" },
+      { id: "epicerie", k: "epicerie", nom: "", montant: 1300, periode: "mois", qui: "moi" },
+      { id: "garderie", k: "garderie", nom: "", montant: 400, periode: "mois", qui: "moi" },
+      { id: "taxesMunicipales", k: "taxesMunicipales", nom: "", montant: 4200, periode: "an", qui: "moi" },
+      { id: "taxesScolaires", k: "taxesScolaires", nom: "", montant: 500, periode: "an", qui: "moi" },
+      { id: "assuranceHabitation", k: "assuranceHabitation", nom: "", montant: 1200, periode: "an", qui: "moi" },
+      { id: "electricite", k: "electricite", nom: "", montant: 150, periode: "mois", qui: "moi" },
       { id: "assuranceAuto", k: "assuranceAuto", nom: "", montant: 100, periode: "mois", qui: "moi" },
       { id: "essence", k: "essence", nom: "", montant: 180, periode: "mois", qui: "moi" },
       { id: "cellulaires", k: "cellulaires", nom: "", montant: 100, periode: "mois", qui: "moi" },
-      { id: "internet", k: "internet", nom: "", montant: 80, periode: "mois", qui: "commun" },
-      { id: "loisirs", k: "loisirs", nom: "", montant: 200, periode: "mois", qui: "commun" },
+      { id: "internet", k: "internet", nom: "", montant: 80, periode: "mois", qui: "moi" },
+      { id: "loisirs", k: "loisirs", nom: "", montant: 200, periode: "mois", qui: "moi" },
     ],
     dettes: [
       { id: "d1", nom: "Marge de crédit", type: "marge", solde: 150000, limite: 200000, taux: 4.5, paiement: 0, frequence: "mois", interetsSeulement: true, finTerme: "", tauxRenouvellement: 0, privilege: 0, creditImpot: 0, partMoi: 100, paiementMoi: 100 },
@@ -64,21 +64,21 @@
      ============================================================ */
   const CATALOGUE = [
     { cat: "Logement", items: [
-      ["taxesMunicipales", "Taxes municipales", "an", "commun"],
-      ["taxesScolaires", "Taxe scolaire", "an", "commun"],
-      ["assuranceHabitation", "Assurance habitation", "an", "commun"],
-      ["electricite", "Électricité", "mois", "commun"],
-      ["chauffage", "Chauffage : gaz, mazout ou bois", "mois", "commun"],
-      ["eau", "Eau et égouts, si facturés à part", "an", "commun"],
-      ["entretienMaison", "Entretien et réparations de la maison", "mois", "commun"],
-      ["deneigement", "Déneigement", "an", "commun"],
-      ["terrain", "Terrain, piscine, paysagement", "an", "commun"],
-      ["alarme", "Système d'alarme", "mois", "commun"],
-      ["meubles", "Meubles et électroménagers", "an", "commun"],
+      ["taxesMunicipales", "Taxes municipales", "an", "moi"],
+      ["taxesScolaires", "Taxe scolaire", "an", "moi"],
+      ["assuranceHabitation", "Assurance habitation", "an", "moi"],
+      ["electricite", "Électricité", "mois", "moi"],
+      ["chauffage", "Chauffage : gaz, mazout ou bois", "mois", "moi"],
+      ["eau", "Eau et égouts, si facturés à part", "an", "moi"],
+      ["entretienMaison", "Entretien et réparations de la maison", "mois", "moi"],
+      ["deneigement", "Déneigement", "an", "moi"],
+      ["terrain", "Terrain, piscine, paysagement", "an", "moi"],
+      ["alarme", "Système d'alarme", "mois", "moi"],
+      ["meubles", "Meubles et électroménagers", "an", "moi"],
     ] },
     { cat: "Alimentation", items: [
-      ["epicerie", "Épicerie", "mois", "commun"],
-      ["restaurants", "Restaurants et commandes", "mois", "commun"],
+      ["epicerie", "Épicerie", "mois", "moi"],
+      ["restaurants", "Restaurants et commandes", "mois", "moi"],
       ["lunchs", "Lunchs et cafés au travail", "mois", "moi"],
     ] },
     { cat: "Transport", items: [
@@ -88,45 +88,43 @@
       ["immatriculation", "Immatriculation et permis de conduire", "an", "moi"],
       ["stationnement", "Stationnement", "mois", "moi"],
       ["transportCommun", "Transport en commun et taxi", "mois", "moi"],
-      ["voitureConjoint", "Voiture de l'autre parent, tous les frais", "mois", "conjoint"],
     ] },
     { cat: "Enfants", items: [
-      ["garderie", "Garderie ou CPE", "mois", "commun"],
-      ["couches", "Couches, lait et soins", "mois", "commun"],
-      ["vetementsEnfants", "Vêtements et chaussures", "mois", "commun"],
-      ["activitesEnfants", "Activités, sports et cours", "mois", "commun"],
-      ["campsJour", "Camps de jour et semaine de relâche", "an", "commun"],
-      ["gardiennage", "Gardiennage", "mois", "commun"],
-      ["jouets", "Jouets, livres, fêtes d'amis", "mois", "commun"],
-      ["ecole", "Fournitures et frais scolaires", "an", "commun"],
+      ["garderie", "Garderie ou CPE", "mois", "moi"],
+      ["couches", "Couches, lait et soins", "mois", "moi"],
+      ["vetementsEnfants", "Vêtements et chaussures", "mois", "moi"],
+      ["activitesEnfants", "Activités, sports et cours", "mois", "moi"],
+      ["campsJour", "Camps de jour et semaine de relâche", "an", "moi"],
+      ["gardiennage", "Gardiennage", "mois", "moi"],
+      ["jouets", "Jouets, livres, fêtes d'amis", "mois", "moi"],
+      ["ecole", "Fournitures et frais scolaires", "an", "moi"],
     ] },
     { cat: "Santé", items: [
       ["assuranceMedicaments", "Assurance médicaments", "an", "moi"],
-      ["medicaments", "Médicaments et pharmacie", "mois", "commun"],
-      ["dentiste", "Dentiste", "an", "commun"],
-      ["lunettes", "Optométriste et lunettes", "an", "commun"],
-      ["therapies", "Physiothérapie, psychologue et autres soins", "an", "commun"],
+      ["medicaments", "Médicaments et pharmacie", "mois", "moi"],
+      ["dentiste", "Dentiste", "an", "moi"],
+      ["lunettes", "Optométriste et lunettes", "an", "moi"],
+      ["therapies", "Physiothérapie, psychologue et autres soins", "an", "moi"],
     ] },
     { cat: "Assurances personnelles", items: [
       ["assuranceInvalidite", "Assurance invalidité", "mois", "moi"],
       ["assuranceVie", "Assurance vie", "mois", "moi"],
       ["maladiesGraves", "Assurance maladies graves", "mois", "moi"],
-      ["assurancesConjoint", "Assurances de l'autre parent", "mois", "conjoint"],
     ] },
     { cat: "Télécom et abonnements", items: [
       ["cellulaires", "Cellulaires", "mois", "moi"],
-      ["internet", "Internet", "mois", "commun"],
-      ["television", "Télévision et diffusion en continu", "mois", "commun"],
+      ["internet", "Internet", "mois", "moi"],
+      ["television", "Télévision et diffusion en continu", "mois", "moi"],
       ["abonnements", "Autres abonnements : applications, journaux", "mois", "moi"],
     ] },
     { cat: "Personnel et loisirs", items: [
-      ["vetementsAdultes", "Vêtements des adultes", "mois", "commun"],
-      ["soinsPersonnels", "Coiffure et soins personnels", "mois", "commun"],
+      ["vetementsAdultes", "Vêtements des adultes", "mois", "moi"],
+      ["soinsPersonnels", "Coiffure et soins personnels", "mois", "moi"],
       ["sport", "Gym et sports", "mois", "moi"],
-      ["loisirs", "Sorties et loisirs", "mois", "commun"],
-      ["vacances", "Vacances et voyages", "an", "commun"],
-      ["cadeaux", "Cadeaux et fêtes", "an", "commun"],
-      ["animaux", "Animaux", "mois", "commun"],
+      ["loisirs", "Sorties et loisirs", "mois", "moi"],
+      ["vacances", "Vacances et voyages", "an", "moi"],
+      ["cadeaux", "Cadeaux et fêtes", "an", "moi"],
+      ["animaux", "Animaux", "mois", "moi"],
       ["dons", "Dons", "an", "moi"],
     ] },
     { cat: "Finances", items: [
@@ -135,7 +133,7 @@
       ["pensionAlimentaire", "Pension alimentaire", "mois", "moi"],
     ] },
     { cat: "Imprévus", items: [
-      ["imprevus", "Imprévus", "mois", "commun"],
+      ["imprevus", "Imprévus", "mois", "moi"],
     ] },
   ];
   const ITEMS = new Map(CATALOGUE.flatMap(c => c.items.map(([k, nom, periode, qui]) => [k, { k, nom, periode, qui, cat: c.cat }])));
@@ -255,10 +253,9 @@
     ],
     menage: [
       { g: "Revenus du ménage" },
-      { p: "menage.conjointNetMensuel", l: "Revenu net de l'autre parent", u: "$/mois", s: 50 },
       { p: "menage.allocationsAnnuelles", l: "Allocations familiales, fédérale et Québec", u: "$/an", s: 50 },
-      { p: "menage.autresRevenusMensuels", l: "Autres revenus nets", u: "$/mois", s: 50 },
-      { p: "menage.partCommunMoi", l: "Votre part des dépenses communes", u: "%" },
+      { p: "menage.autresRevenusMensuels", l: "Autres revenus nets du ménage", u: "$/mois", s: 50 },
+      { p: "menage.partCommunMoi", l: "Votre part des dépenses partagées", u: "%", h: "Seulement si quelqu'un d'autre paie une partie de certaines dépenses. Sinon, laissez 100 %." },
     ],
     strategie: [
       { g: "Stratégie de remboursement" },
@@ -284,7 +281,6 @@
       { p: "actifs.maison.croissance", l: "Hausse annuelle de la valeur", u: "%", s: 0.1 },
       { p: "actifs.voiture.valeur", l: "Valeur de la voiture", u: "$", s: 100 },
       { p: "actifs.voiture.depreciation", l: "Perte de valeur par année", u: "%" },
-      { p: "actifs.actifsConjoint", l: "Épargne de l'autre parent", u: "$", s: 100, h: "Pour la valeur nette du ménage seulement." },
     ],
   };
 
@@ -365,7 +361,7 @@
         if (!b.k) mnt.setAttribute("aria-label", "Montant : " + b.nom);
         const per = el("select", "periode"); [["mois", "/ mois"], ["an", "/ an"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; per.appendChild(o); });
         per.value = b.periode; per.setAttribute("aria-label", "Période : " + nomDepense(b)); per.dataset.l = "budget"; per.dataset.i = i; per.dataset.k = "periode";
-        const qui = el("select", "qui"); [["moi", "Moi"], ["commun", "Commun"], ["conjoint", "L'autre parent"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; qui.appendChild(o); });
+        const qui = el("select", "qui"); [["moi", "Moi"], ["commun", "Partagée"], ["conjoint", "Quelqu'un d'autre"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; qui.appendChild(o); });
         qui.value = b.qui; qui.setAttribute("aria-label", "Qui paie : " + nomDepense(b)); qui.dataset.l = "budget"; qui.dataset.i = i; qui.dataset.k = "qui";
         l.append(nom, mnt, per, qui);
         if (!b.k) { const x = el("button", "supprimer", "×"); x.type = "button"; x.setAttribute("aria-label", "Supprimer : " + b.nom); x.dataset.suppr = "budget"; x.dataset.i = i; l.appendChild(x); }
@@ -374,7 +370,7 @@
       }
       if (g === "Autres dépenses") {
         const b = el("button", "bouton secondaire", "Ajouter une dépense"); b.type = "button"; b.id = "ajout-budget";
-        b.addEventListener("click", () => { S.budget.push({ id: nouvelId("b"), k: null, nom: "Nouvelle dépense", montant: 0, periode: "mois", qui: "commun" }); ouvertes.add("Autres dépenses"); sauver(); listeBudget(); tout(); });
+        b.addEventListener("click", () => { S.budget.push({ id: nouvelId("b"), k: null, nom: "Nouvelle dépense", montant: 0, periode: "mois", qui: "moi" }); ouvertes.add("Autres dépenses"); sauver(); listeBudget(); tout(); });
         det.appendChild(b);
       }
       c.appendChild(det);
@@ -496,7 +492,7 @@
     const enfants = S.epargne.reee.enfants.filter(e => e.age < 17).length;
     R.epargneMoi = (enfants * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle) / 12;
     R.surplusMoi = R.netMoi - R.depMoi - R.dettesMoi - R.epargneMoi;
-    R.revenusMenage = R.netMoi + S.menage.conjointNetMensuel + S.menage.allocationsAnnuelles / 12 + S.menage.autresRevenusMensuels;
+    R.revenusMenage = R.netMoi + S.menage.allocationsAnnuelles / 12 + S.menage.autresRevenusMensuels;
     R.surplusMenage = R.revenusMenage - R.depMenage - R.dettesMenage - R.epargneMoi;
 
     // Dettes
@@ -513,7 +509,7 @@
     R.projection = C.projeterValeurNette({
       annees: 20, anneeDepart: +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear(),
       rendement: S.epargne.rendement, reer: S.epargne.reer, celi: S.epargne.celi, encaisse: S.epargne.encaisse,
-      maison: S.actifs.maison, voiture: S.actifs.voiture, actifsConjoint: S.actifs.actifsConjoint,
+      maison: S.actifs.maison, voiture: S.actifs.voiture, actifsConjoint: 0,
       dettes: S.dettes, extraApresDettes: budgetDettes,
     }, R.sim);
     R.reee = C.projeterReee({ enfants: S.epargne.reee.enfants, cotisationAnnuelle: S.epargne.reee.cotisationAnnuelle }, S.epargne.rendement / 100);
@@ -614,7 +610,7 @@
       tuile("Revenu brut de l'année", $(R.brut), `Au ${nomMode}`),
       tuile("Net après impôt", $(R.impot.net), `${$(R.impot.net / 12)} par mois`),
       tuile("Votre surplus mensuel", $(R.surplusMoi), R.surplusMoi >= 0 ? "Après dépenses, dettes et épargne" : "Vos dépenses dépassent vos revenus"),
-      tuile("Dettes du ménage", $(R.detteTotale), R.sim.libre ? `Remboursées en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
+      tuile("Dettes", $(R.detteTotale), R.sim.libre ? `Remboursées en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
       tuile("Votre valeur nette", $(R.projection[0].moi), `Dans 10 ans : ${$(R.projection[Math.min(10, R.projection.length - 1)].moi)}`),
     );
     const a = document.getElementById("ap-actions"); a.textContent = "";
@@ -727,14 +723,14 @@
       { cls: "sous", cellules: ["Laissé dans la société", "—", $(s.societe.retenu)] },
     ]);
     const w2 = el("div", "tableau-defile"); w2.appendChild(tb2); z.appendChild(w2);
-    z.appendChild(el("p", "note", "Hypothèses : rémunération en dividendes non déterminés seulement, donc pas de RRQ ni de droits REER. Le revenu ne peut pas être fractionné avec l'autre parent sans travail réel dans la société. À valider avec un comptable avant toute décision."));
+    z.appendChild(el("p", "note", "Hypothèses : rémunération en dividendes non déterminés seulement, donc pas de RRQ ni de droits REER. Le revenu ne peut pas être versé à une autre personne sans travail réel de sa part dans la société. À valider avec un comptable avant toute décision."));
   }
 
   function rendreBudget(R) {
     const part = S.menage.partCommunMoi / 100;
     const r = [
       { cellules: ["Votre revenu net (après impôt et dépenses pro)", $(R.netMoi), $(R.netMoi)] },
-      { cellules: ["Revenu de l'autre parent, allocations et autres", "—", $(R.revenusMenage - R.netMoi)] },
+      { cellules: ["Allocations et autres revenus", "—", $(R.revenusMenage - R.netMoi)] },
       { cls: "sous", cellules: ["Revenus", $(R.netMoi), $(R.revenusMenage)] },
       ...[...CATALOGUE.map(x => x.cat), "Autres dépenses"].map(g => {
         const l = S.budget.filter(b => categorie(b) === g);
@@ -773,10 +769,9 @@
   function rendreEpargne(R) {
     const p = R.projection, dix = p[Math.min(10, p.length - 1)], vingt = p[p.length - 1];
     const t = document.getElementById("vn-tuiles"); t.textContent = "";
-    t.append(tuile("Aujourd'hui", $(p[0].moi), `Ménage : ${$(p[0].menage)}`), tuile(`En ${dix.annee}`, $(dix.moi), `Ménage : ${$(dix.menage)}`), tuile(`En ${vingt.annee}`, $(vingt.moi), `Ménage : ${$(vingt.menage)}`));
+    t.append(tuile("Aujourd'hui", $(p[0].moi)), tuile(`En ${dix.annee}`, $(dix.moi)), tuile(`En ${vingt.annee}`, $(vingt.moi)));
     graphiqueLignes(document.getElementById("vn-graph"), document.getElementById("vn-legende"), [
       { nom: "Votre valeur nette", couleur: SERIES[0], valeurs: p.map(x => x.moi) },
-      { nom: "Valeur nette du ménage", couleur: SERIES[1], valeurs: p.map(x => x.menage) },
     ], p.map(x => String(x.annee)), { titre: "Valeur nette projetée" });
     const hyp = S.dettes.filter(d => d.type === "hypotheque");
     const surplusCopro = hyp.reduce((a, d) => a + Math.max(0, ((d.paiementMoi ?? 100) - (d.partMoi ?? 100)) / 100), 0);
