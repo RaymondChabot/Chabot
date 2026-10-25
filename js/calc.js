@@ -387,6 +387,7 @@
           d.tauxCourant = Math.max(0, (d.tauxRenouvellement || d.taux) + ecart);
           // Nouveau paiement : même amortissement restant, au nouveau taux.
           if (isFinite(d.nRestant) && d.nRestant > 0) d.paiementMensuel = paiementPour(d.s, tauxMensuel(d, d.tauxCourant), d.nRestant);
+          if (!d.premierRenouvellement) d.premierRenouvellement = { date, taux: d.tauxCourant, paiement: d.paiementMensuel, solde: d.s };
         }
         const i = d.s * tauxMensuel(d, d.tauxCourant);
         d.interets += i; interetsMois += i;
@@ -406,8 +407,14 @@
       let extra = budget === null ? 0 : Math.max(0, budget - minimumsPayes) + reserve + gain;
       if (budget !== null && o.forfaitsAnnuels && date.getMonth() === (o.moisForfait ?? 3)) extra += o.forfaitsAnnuels;
       // Répartition de l'extra.
+      // Avalanche : taux réel le plus élevé d'abord. Boule de neige : plus petit solde d'abord.
+      // Hybride : d'abord le droit de remboursement anticipé des hypothèques encore disponible
+      // cette année (il se perd au 1er janvier), puis l'avalanche.
+      const privilegeDispo = d => d.type === "hypotheque" && !d.auRenouvellement && d.privilegeRestant > 0.5 ? 1 : 0;
       const ordre = ds.filter(d => d.s > 0.005).sort((a, b) =>
-        o.methode === "boule" ? a.s - b.s : tauxReel(b) - tauxReel(a));
+        o.methode === "boule" ? a.s - b.s
+        : o.methode === "hybride" ? (privilegeDispo(b) - privilegeDispo(a)) || (tauxReel(b) - tauxReel(a))
+        : tauxReel(b) - tauxReel(a));
       for (const d of ordre) {
         if (extra <= 0) break;
         // Au renouvellement, le remboursement anticipé n'a pas de plafond.
@@ -432,7 +439,7 @@
       e.interetsEtudes += x.interetsEtudes;
     }
     const iLibre = mois.findIndex(x => x.total <= 0.005);
-    return { mois, dettes: ds.map(d => ({ id: d.id, nom: d.nom, fin: d.fin, interets: d.interets, interetsNets: d.interetsNets, tauxFinal: d.tauxCourant })),
+    return { mois, dettes: ds.map(d => ({ id: d.id, nom: d.nom, fin: d.fin, interets: d.interets, interetsNets: d.interetsNets, tauxFinal: d.tauxCourant, premierRenouvellement: d.premierRenouvellement || null })),
       interetsTotaux, interetsNetsTotaux, gainsAttente, coutNet: interetsNetsTotaux - gainsAttente,
       libre: iLibre >= 0 ? mois[iLibre].date : null, iLibre, parAn };
   }

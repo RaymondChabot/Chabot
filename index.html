@@ -20,6 +20,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="polices/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
+<script>try { const t = localStorage.getItem("wealthnord.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
 <a class="saut" href="#contenu">Aller au contenu</a>
@@ -45,6 +46,7 @@
   </nav>
 
   <main id="contenu" tabindex="-1">
+    <div class="entete-impression" aria-hidden="true"><span class="marque-nom">Wealthnord</span><span id="impression-info"></span></div>
     <!-- ============ ACCUEIL ============ -->
     <section class="vue" id="v-apercu" aria-labelledby="h-apercu">
       <header class="tete-page"><h1 id="h-apercu">Aperçu</h1></header>
@@ -66,6 +68,10 @@
         <ul class="a-faire" id="ap-actions"></ul>
       </div>
       <div class="carte">
+        <div class="carte-tete"><h2>Prochaines échéances</h2></div>
+        <div class="rangees" id="ap-echeances"></div>
+      </div>
+      <div class="carte">
         <div class="carte-tete"><h2>Total des dettes</h2><a class="lien-carte" href="#budget" data-onglet="budget">Voir le plan</a></div>
         <p class="aide" id="ap-dettes-sous"></p>
         <div class="graphique" id="ap-graph-dettes"></div>
@@ -81,6 +87,15 @@
         <div class="carte-tete"><h2>Horaire ou mixte</h2></div>
         <div id="rv-comparaison"></div>
         <p class="aide" id="rv-seuil"></p>
+      </div>
+      <div class="carte">
+        <div class="carte-tete"><h2>Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>
+        <div class="legende" id="rv-sens-legende"></div>
+        <div class="graphique" id="rv-sens-graph"></div>
+        <div class="tableau-defile"><table class="tableau" id="rv-sens-dj"></table></div>
+        <h3>Selon les patients par demi-journée</h3>
+        <div class="tableau-defile"><table class="tableau" id="rv-sens-pat"></table></div>
+        <p class="aide" id="rv-sens-note"></p>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>D'où vient le revenu</h2></div>
@@ -141,15 +156,14 @@
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>Plan de remboursement</h2><button type="button" class="lien-carte" data-feuille="strategie">Modifier</button></div>
-        <div class="segment petit" id="de-methode"></div>
         <p class="resume" id="de-resume"></p>
         <div class="legende" id="de-legende"></div>
         <div class="graphique" id="de-graph"></div>
         <div class="rangees" id="de-tableau"></div>
       </div>
       <div class="carte">
-        <div class="carte-tete"><h2>Comparer les méthodes</h2></div>
-        <div class="tableau-defile"><table class="tableau" id="de-methodes"></table></div>
+        <div class="carte-tete"><h2>Choisir la méthode</h2><span class="carte-sous">Valeur nette</span></div>
+        <div class="rangees" id="de-methodes"></div>
         <p class="aide" id="de-methodes-note"></p>
       </div>
     </section>
@@ -164,6 +178,7 @@
         <div class="carte-tete"><h2>Valeur nette projetée</h2><div class="segment petit compact" id="vn-vue"></div></div>
         <div class="legende" id="vn-legende"></div>
         <div class="graphique" id="vn-graph"></div>
+        <div class="segment petit compact horizon" id="vn-horizon"></div>
         <p class="aide" id="vn-note"></p>
       </div>
       <div class="carte">
@@ -216,6 +231,12 @@
         </details>
       </div>
       <div class="carte">
+        <div class="carte-tete"><h2>Apparence et rapport</h2></div>
+        <div class="segment" id="theme-choix"></div>
+        <p class="aide">Le rapport imprimable réunit toutes les pages, sans la navigation : imprimez-le ou enregistrez-le en PDF pour votre comptable ou votre planificateur financier.</p>
+        <div class="actions"><button type="button" class="bouton secondaire" id="imprimer">Imprimer un rapport</button></div>
+      </div>
+      <div class="carte">
         <div class="carte-tete"><h2>Recommencer</h2></div>
         <p class="aide">Remplace toutes vos valeurs par l'exemple. Exportez d'abord si vous voulez les garder.</p>
         <div class="actions">
@@ -238,6 +259,8 @@
   </div>
   <div class="feuille-corps" id="feuille-corps"></div>
 </dialog>
+
+<div class="toast" id="toast" role="status" hidden><span id="toast-texte"></span><button type="button" id="toast-annuler">Annuler</button></div>
 
 <script src="js/calc.js"></script>
 <script src="js/app.js"></script>

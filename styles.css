@@ -45,8 +45,39 @@
   --nav-h: 64px;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Sombre : selon l'appareil, sauf si « Clair » est choisi ; ou si « Sombre » est choisi.
+   À l'écran seulement : le rapport imprimé reste clair. */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fond: #0e0e0d;
+    --surface: #1a1a19;
+    --surface-2: #242422;
+    --surface-3: #2e2e2b;
+    --encre: #f2f1ec;
+    --encre-2: #cfcdc5;
+    --discret: #9c9a91;
+    --axe: #858379;
+    --grille: #262624;
+    --trait: #3a3936;
+    --ligne: #2a2a27;
+    --action: #f2f1ec;
+    --sur-action: #121211;
+    --bon: #4cc283;
+    --bon-lavis: rgba(76, 194, 131, 0.14);
+    --attention: #f0b14a;
+    --attention-lavis: rgba(240, 177, 74, 0.14);
+    --danger: #f27a6e;
+    --danger-lavis: rgba(242, 122, 110, 0.14);
+    --info-lavis: rgba(109, 167, 236, 0.14);
+    --info: #8dbcf2;
+    --ombre: none;
+    --ombre-haute: 0 12px 40px rgba(0, 0, 0, 0.5);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9;
+    color-scheme: dark;
+  }
+}
+@media screen {
+  :root[data-theme="dark"] {
     --fond: #0e0e0d;
     --surface: #1a1a19;
     --surface-2: #242422;
@@ -483,3 +514,46 @@ a.tuile:hover { border-color: var(--trait); }
 }
 .tableau tr.choix td { font-weight: 600; }
 .legende.lignes i.zone { height: 10px; width: 14px; opacity: 0.22; border-radius: 2px; }
+
+/* Date d'échéance : jour en gros, mois en petit */
+.rangee-date { flex: none; width: 46px; height: 48px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+.rangee-date .jour { font-size: 1.1rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.rangee-date .mois { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--discret); margin-top: 3px; }
+
+/* Message en bas de l'écran, avec « Annuler » */
+.toast {
+  position: fixed; left: 0; right: 0; margin-inline: auto; width: max-content; z-index: 40;
+  bottom: calc(var(--nav-h) + 18px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 14px; max-width: calc(100% - 32px);
+  background: var(--action); color: var(--sur-action); border-radius: 14px; padding: 10px 10px 10px 16px;
+  box-shadow: var(--ombre-haute); font-size: 0.92rem;
+}
+.toast button { border: 0; background: transparent; color: inherit; font: 650 0.92rem var(--police); padding: 6px 10px; border-radius: 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+@media (min-width: 960px) { .toast { bottom: 28px; left: 248px; } }
+@media (prefers-reduced-motion: no-preference) { .toast:not([hidden]) { animation: monter 220ms ease; } }
+.avertissement { color: var(--attention); font-weight: 600; }
+.horizon { align-self: center; }
+.entete-impression { display: none; }
+
+/* ---------- Rapport imprimé : toutes les pages, sans navigation ---------- */
+@media print {
+  @page { margin: 14mm 12mm; }
+  html, body { background: #fff; }
+  body { font-size: 10.5pt; }
+  .barre-haut, .nav, .feuille, .toast, .saut, .bouton-modifier, .lien-carte, .segment, .carte.exemple, #carte-installer, .bouton, .chevron, .bulle, .graphique .reticule, .graphique .point, .hyp-ligne { display: none !important; }
+  #v-donnees { display: none !important; }
+  .app { display: block; }
+  main { max-width: none; padding: 0; }
+  .vue[hidden] { display: flex !important; }
+  .vue { break-before: page; gap: 10px; }
+  #v-apercu { break-before: auto; }
+  .tete-page h1 { font-size: 22pt; }
+  .hero-valeur { font-size: 26pt; }
+  .carte, .tuile { box-shadow: none; border: 1px solid #d9d7cf; padding: 12px 14px; }
+  .tuile, .hero, .rangee, .tableau tr, .graphique, .a-faire li, .barre-bloc { break-inside: avoid; }
+  .carte-tete, .carte h3, .carte h4 { break-after: avoid; }
+  .tuiles { grid-template-columns: repeat(4, 1fr); }
+  .entete-impression { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #d9d7cf; padding-bottom: 8px; margin-bottom: 10px; font-size: 9pt; color: #6f6d66; }
+  .entete-impression .marque-nom { font-size: 14pt; color: #121211; }
+  .pied { margin-top: 12px; }
+}

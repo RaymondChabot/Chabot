@@ -30,7 +30,7 @@
     // Hypothèses de l'avenir. Le scénario réaliste suit les Normes d'hypothèses de
     // projection 2026 (Institut de planification financière et FP Canada).
     scenarios: {
-      choisi: "realiste", dollarsAujourdhui: false,
+      choisi: "realiste", dollarsAujourdhui: false, horizon: 20,
       prudent: { rendement: 3.5, croissanceMaison: 1.5, depreciationAuto: 20, ecartTaux: 1, inflation: 3, hausseRevenus: 2 },
       realiste: { rendement: 5, croissanceMaison: 3.1, depreciationAuto: 15, ecartTaux: 0, inflation: 2.1, hausseRevenus: 3.1 },
       optimiste: { rendement: 6.5, croissanceMaison: 4.5, depreciationAuto: 12, ecartTaux: -0.5, inflation: 2, hausseRevenus: 3.5 },
@@ -289,7 +289,7 @@
     ],
     strategie: [
       { g: "Stratégie de remboursement" },
-      { p: "strategie.methode", l: "Méthode", t: "select", o: [["avalanche", "Avalanche : taux réel le plus élevé d'abord"], ["boule", "Boule de neige : plus petit solde d'abord"], ["minimum", "Paiements minimums seulement"]] },
+      { p: "strategie.methode", l: "Méthode", t: "select", o: [["avalanche", "Avalanche : taux réel le plus élevé d'abord"], ["hybride", "Hybride : droit annuel des hypothèques, puis avalanche"], ["boule", "Boule de neige : plus petit solde d'abord"], ["minimum", "Paiements minimums seulement"]] },
       { p: "strategie.extraMode", l: "Montant en plus chaque mois", t: "select", o: [["auto", "Votre surplus du budget"], ["manuel", "Un montant fixe"]] },
       { p: "strategie.extraManuel", l: "Montant fixe en plus", u: "$/mois", s: 50 },
       { p: "strategie.reerSurDettes", l: "Verser le remboursement d'impôt du REER sur les dettes chaque avril", t: "check" },
@@ -423,7 +423,20 @@
   };
   function ouvrirSection(nom) {
     const [titre, champs] = FEUILLES[nom];
-    ouvrirFeuille(titre, c => construireChamps(c, champs));
+    ouvrirFeuille(titre, c => {
+      construireChamps(c, champs);
+      if (nom !== "revenu") return;
+      // Total des types de visites, qui doit faire 100 %.
+      const groupe = [...c.querySelectorAll(".groupe")].find(g => g.firstChild.textContent.startsWith("Vos visites"));
+      if (!groupe) return;
+      const total = el("p", "aide"); groupe.appendChild(total);
+      feuilleCourante.maj = () => {
+        const s = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
+        total.textContent = `Total : ${nb(s)} %` + (Math.abs(s - 100) > 0.5 ? " : le calcul le ramène à 100 %." : "");
+        total.classList.toggle("avertissement", Math.abs(s - 100) > 0.5);
+      };
+      feuilleCourante.maj();
+    });
   }
 
   // Une catégorie de dépenses : une ligne par dépense du catalogue.
@@ -494,6 +507,12 @@
       const d = S.dettes[i];
       const nom = el("input", "nom-element"); nom.type = "text"; nom.value = d.nom; nom.setAttribute("aria-label", "Nom de la dette"); lierListe("dettes", i, "nom")(nom);
       const g = el("div", "groupe"); g.appendChild(nom); c.appendChild(g);
+      // Selon votre plan : se met à jour pendant la saisie.
+      const g2 = el("div", "groupe"); g2.appendChild(el("h3", null, "Selon votre plan"));
+      const infos = el("div", "rangees"); g2.appendChild(infos); c.appendChild(g2);
+      feuilleCourante.maj = () => rangees(infos, infosDette(i));
+      feuilleCourante.maj();
+      c.appendChild(el("div", "groupe")).appendChild(el("h3", null, "Conditions"));
       for (const ch of CHAMPS_DETTE) {
         if (ch.seul && d.type !== ch.seul) continue;
         if (ch.sauf && ch.sauf(d)) continue;
@@ -506,6 +525,24 @@
       const x = el("button", "bouton danger large", "Supprimer cette dette"); x.type = "button"; x.dataset.suppr = "dettes"; x.dataset.i = i;
       a.appendChild(x); c.appendChild(a);
     });
+  }
+  const duree = n => !isFinite(n) ? "jamais, au paiement actuel" : `${Math.floor(n / 12)} ans${Math.round(n % 12) ? ` et ${Math.round(n % 12)} mois` : ""}`;
+  function infosDette(i) {
+    const d = S.dettes[i], x = R && R.sim.dettes[i];
+    if (!d || !x) return [];
+    const pm = d.frequence === "2sem" ? d.paiement * 26 / 12 : d.paiement;
+    const l = [];
+    if (d.type === "hypotheque" && !d.interetsSeulement) {
+      l.push({ titre: "Amortissement restant", sous: "Au paiement actuel, sans remboursement anticipé", valeur: duree(C.moisRestants(d.solde, C.tauxMensuel(d, d.taux), pm)) });
+      const r = x.premierRenouvellement;
+      if (r) l.push({ titre: `Renouvellement en ${moisAn(r.date)}`, sous: `À ${nb(r.taux, 2)} %, scénario ${SCENARIOS[R.scenario].toLowerCase()} · solde de ${$(r.solde)}`, valeur: `${$(r.paiement)} / mois`, valeurSous: `aujourd'hui ${$(pm)}` });
+    }
+    if (d.type === "marge") {
+      l.push({ titre: "Intérêts par mois", sous: `À ${nb(d.taux, 2)} %`, valeur: $(d.solde * d.taux / 1200) });
+      if (d.limite > 0) l.push({ titre: "Crédit disponible", valeur: $(Math.max(0, d.limite - d.solde)) });
+    }
+    l.push({ titre: "Remboursée", sous: `Méthode ${NOMS_METHODES[R.methode].toLowerCase()}`, valeur: x.fin ? moisAn(x.fin) : "jamais", valeurSous: `${$(x.interetsNets)} d'intérêts nets` });
+    return l;
   }
   function feuilleEnfant(i) {
     ouvrirFeuille(S.epargne.reee.enfants[i].nom || "Enfant", c => {
@@ -528,8 +565,10 @@
      CALCULS
      ============================================================ */
   const mensuel = b => b.periode === "an" ? b.montant / 12 : b.montant;
-  const ANNEES = 20;
   const SCENARIOS = { prudent: "Prudent", realiste: "Réaliste", optimiste: "Optimiste" };
+  const METHODES = ["avalanche", "hybride", "boule", "minimum"];
+  const NOMS_METHODES = { avalanche: "Avalanche", hybride: "Hybride", boule: "Boule de neige", minimum: "Minimums seulement" };
+  const AVEC_ARTICLE = { avalanche: "l'avalanche", hybride: "l'hybride", boule: "la boule de neige", minimum: "les minimums" };
   const minimumDette = d => d.interetsSeulement ? d.solde * d.taux / 100 / 12 : (d.frequence === "2sem" ? d.paiement * 26 / 12 : d.paiement);
 
   function calculer() {
@@ -550,6 +589,15 @@
     R.impot = R.impots[mode];
     R.conjointe = R.couple ? (mode === "mixte" ? mc : hc) : null;
     R.tauxMarginal = C.tauxMarginal({ ...base, revenu: R.brut });
+    // Revenu net d'impôt pour un autre revenu brut (mêmes déductions, mêmes transferts entre conjoints).
+    R.netPour = rev => avec(C.impotParticulier({ ...base, revenu: rev }))[0].net;
+    const sens = (k, valeurs) => valeurs.map(v => {
+      const g = C.revenuGmfu({ ...S.revenu, [k]: v });
+      return { v, h: g.horaire.total, m: g.mixte.total, hn: R.netPour(g.horaire.total), mn: R.netPour(g.mixte.total) };
+    });
+    const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ;
+    R.sensDJ = sens("demiJournees", [...new Set([4, 5, 6, 7, 8, 9, 10, dj])].filter(n => n >= Math.max(1, S.revenu.enseignement)).sort((a, b) => a - b));
+    R.sensPat = sens("patientsParDJ", [...new Set([3, 4, 5, 6, 7, 8, pat])].sort((a, b) => a - b));
     R.remboursementReer = S.epargne.reer.cotisationAnnuelle > 0
       ? C.impotParticulier({ ...base, reer: 0, revenu: R.brut }).total - C.impotParticulier({ ...base, revenu: R.brut }).total : 0;
 
@@ -612,24 +660,32 @@
     // Dettes : simulation prolongée jusqu'à l'horizon pour suivre l'argent libéré.
     R.extra = Math.max(0, R.surplusAnnee(0));
     const forfaits = S.strategie.reerSurDettes ? R.remboursementReer : 0;
+    const ANNEES = [10, 20, 30].includes(+S.scenarios.horizon) ? +S.scenarios.horizon : 20;
+    R.annees = ANNEES;
     const opt = (h, m) => ({ debut: S.strategie.debut, methode: m, extraParAnnee: surplusAnnee(h), ecartTaux: h.ecartTaux,
       forfaitsAnnuels: forfaits, moisForfait: 3, continuerApres: 12 * ANNEES, moisMax: 12 * Math.max(40, ANNEES) });
     R.sims = {};
-    for (const m of ["avalanche", "boule", "minimum"]) R.sims[m] = C.simulerDettes(S.dettes, opt(R.hyp, m));
+    for (const m of METHODES) R.sims[m] = C.simulerDettes(S.dettes, opt(R.hyp, m));
     const methode = R.sims[S.strategie.methode] ? S.strategie.methode : "avalanche";
+    R.methode = methode;
     R.sim = R.sims[methode];
     R.detteTotale = S.dettes.reduce((a, d) => a + d.solde, 0);
 
     // Valeur nette : maison (sa valeur croît, l'hypothèque payée devient de l'équité), autos, placements.
-    const projeter = (h, sim) => C.projeterValeurNette({
+    const projeter = (h, sim, m = methode) => C.projeterValeurNette({
       annees: ANNEES, anneeDepart: +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear(),
       rendement: h.rendement, reer: S.epargne.reer, celi: S.epargne.celi, encaisse: S.epargne.encaisse,
       maison: { ...S.actifs.maison, croissance: h.croissanceMaison, partMenage: S.actifs.maison.part + (R.couple ? S.conjointe.partMaison : 0) },
       voitures: [{ valeur: S.actifs.voiture.valeur, depreciation: h.depreciationAuto },
         ...(R.couple && S.conjointe.voiture > 0 ? [{ valeur: S.conjointe.voiture, depreciation: h.depreciationAuto, conjointe: true }] : [])],
       actifsConjoint: R.couple ? S.conjointe.epargne : 0, dettes: S.dettes,
-      ajoutMensuel: methode === "minimum" ? surplusAnnee(h) : null,
+      ajoutMensuel: m === "minimum" ? surplusAnnee(h) : null,
     }, sim);
+    // Méthodes comparées sur la valeur nette à l'horizon : elle tient compte des intérêts, de l'argent
+    // en attente d'un renouvellement et des placements faits après la dernière dette.
+    R.vnMethodes = {};
+    for (const m of METHODES) { const pr = projeter(R.hyp, R.sims[m], m); R.vnMethodes[m] = pr[pr.length - 1]; }
+    R.recommandee = METHODES.filter(m => m !== "minimum").reduce((a, m) => R.vnMethodes[m].moi > R.vnMethodes[a].moi ? m : a, "avalanche");
     R.projections = {}; R.libres = {};
     for (const k of Object.keys(SCENARIOS)) {
       const sim = k === R.scenario ? R.sim : C.simulerDettes(S.dettes, opt(S.scenarios[k], methode));
@@ -669,9 +725,26 @@
     return s;
   }
   // Le chiffre principal d'une page, avec une ligne de contexte en dessous.
-  function hero(id, etiquette, valeur, sous) {
+  const mouvement = () => !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function hero(id, etiquette, valeur, sous, nombre) {
     const h = document.getElementById(id); h.textContent = "";
-    h.append(el("div", "hero-etiquette", etiquette), el("div", "hero-valeur", valeur));
+    const v = el("div", "hero-valeur", valeur);
+    h.append(el("div", "hero-etiquette", etiquette), v);
+    // Quand le montant change, il glisse de l'ancienne valeur à la nouvelle (450 ms).
+    if (nombre !== undefined) {
+      const avant = parseFloat(h.dataset.nombre);
+      h.dataset.nombre = nombre;
+      if (isFinite(avant) && Math.abs(avant - nombre) >= 1 && mouvement()) {
+        const t0 = performance.now();
+        const pas = now => {
+          if (!v.isConnected) return;
+          const k = Math.min(1, (now - t0) / 450), e = 1 - Math.pow(1 - k, 3);
+          v.textContent = $(avant + (nombre - avant) * e);
+          if (k < 1) requestAnimationFrame(pas);
+        };
+        requestAnimationFrame(pas);
+      }
+    }
     const s = el("div", "hero-sous");
     (sous || []).filter(Boolean).forEach(x => s.appendChild(typeof x === "string" ? el("span", null, x) : x));
     if (s.childNodes.length) h.appendChild(s);
@@ -688,7 +761,11 @@
   function rangee(o) {
     const r = el(o.action ? "button" : "div", "rangee" + (o.cls ? " " + o.cls : ""));
     if (o.action) { r.type = "button"; r.addEventListener("click", o.action); }
-    if (o.couleur || o.ico) {
+    if (o.date) {
+      const dt = el("span", "rangee-date");
+      dt.append(el("span", "jour", String(o.date.getDate())), el("span", "mois", o.date.toLocaleDateString("fr-CA", { month: "short" }).replace(".", "")));
+      r.appendChild(dt);
+    } else if (o.couleur || o.ico) {
       const i = el("span", "rangee-ico" + (o.couleur ? " couleur" : ""));
       if (o.couleur) { const k = el("i"); k.style.background = o.couleur; i.appendChild(k); }
       else if (ICONES[o.ico]) i.appendChild(icone(o.ico));
@@ -736,7 +813,7 @@
   // Préférence d'affichage enregistrée (mode, méthode) : pas une donnée saisie.
   function changer(p, v) { ecrire(p, v); sauver(); remplirChamps(); tout(); }
   // Vues qui ne changent pas les données : budget de qui, valeur nette de qui.
-  const U = { vueBudget: "moi", vueAvenir: "moi" };
+  const U = { vueBudget: "moi", vueAvenir: "moi", sensVue: "net" };
   function tableauSimple(parent, entetes, lignesT) {
     const t = el("table", "tableau"); lignes(t, entetes, lignesT);
     const w = el("div", "tableau-defile"); w.appendChild(t); parent.appendChild(w); return t;
@@ -769,7 +846,7 @@
     const m = { l: 50, r: 8, t: 10, b: 26 };
     const iw = W - m.l - m.r, ih = H - m.t - m.b, n = etiquettesX.length;
     const tous = series.flatMap(s => s.valeurs).concat(options.bande ? [...options.bande.bas, ...options.bande.haut] : []);
-    let min = Math.min(0, ...tous), max = Math.max(1, ...tous);
+    let min = options.baseLibre ? Math.min(...tous) : Math.min(0, ...tous), max = Math.max(1, ...tous);
     const pas = pasJoli((max - min) / 4);
     min = Math.floor(min / pas) * pas; max = Math.ceil(max / pas) * pas;
     const axe = v => Math.abs(v) < 1e-6 ? "0 $" : Math.abs(v) >= 1e6 ? nb(v / 1e6, 1) + " M$" : pas < 10000 ? nb(v / 1000, 1) + " k$" : k$(v);
@@ -847,7 +924,7 @@
     document.getElementById("ap-exemple").hidden = !S.meta.exemple;
     hero("ap-hero", "Votre surplus mensuel", $(R.surplusMoi), [
       R.surplusMoi >= 0 ? `Sur un revenu net de ${$(R.netMoi)} par mois` : puce("Vos sorties dépassent vos revenus", "bas", false),
-    ]);
+    ], R.surplusMoi);
 
     // Ce mois-ci : où va votre revenu net.
     const flux = document.getElementById("ap-flux"); flux.textContent = "";
@@ -900,14 +977,54 @@
     S.dettes.filter(d => d.type === "marge" && d.limite > 0).forEach(d => action("info", `Disponible sur « ${d.nom} » : ${$(d.limite - d.solde)}. Gardez cet espace comme fonds d'urgence plutôt que de l'argent qui dort.`));
     if (S.epargne.reee.enfants.filter(e => e.age < 17).length > 0 && S.epargne.reee.cotisationAnnuelle < 2500) action("info", "Cotisez 2 500 $ par enfant par année au REEE pour obtenir toutes les subventions (30 %).");
     if (S.epargne.reer.droits > 0 && S.epargne.reer.cotisationAnnuelle === 0) action("info", `Vous avez ${$(S.epargne.reer.droits)} de droits REER. À votre taux marginal de ${pct(R.tauxMarginal, 0)}, chaque 1 000 $ cotisés vous remet environ ${$(R.tauxMarginal * 1000)}.`);
+    if (!S.meta.exemple) {
+      const jours = S.meta.dernierExport ? Math.floor((Date.now() - new Date(S.meta.dernierExport)) / 864e5) : Infinity;
+      if (jours > 30) action("info", jours === Infinity
+        ? "Exportez une copie de vos données (page Données) : elles ne vivent que dans ce navigateur."
+        : `Votre dernière copie de sauvegarde date de ${jours} jours : exportez-en une nouvelle (page Données).`);
+    }
+    const mix = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
+    if (Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
     if (R.surplusMoi < 0) action("important", `Votre budget est négatif de ${$(-R.surplusMoi)} par mois : revoyez les dépenses ou leur partage.`);
     else action("bon", `Votre surplus de ${$(R.surplusMoi)} par mois va sur les dettes, dans l'ordre de la méthode choisie.`);
 
+    rangees("ap-echeances", echeances(R));
     document.getElementById("ap-dettes-sous").textContent = R.sim.libre
       ? `De ${$(R.detteTotale)} aujourd'hui à zéro en ${moisAn(R.sim.libre)}.`
       : "À ce rythme, la marge de crédit n'est jamais remboursée.";
     const sd = seriesDettes(R.sim, true);
     graphiqueLignes(document.getElementById("ap-graph-dettes"), null, sd.series, sd.etiquettes, { titre: "Total des dettes par année", aire: true });
+  }
+
+  // Prochaines échéances : impôt, acomptes, REER, déclarations, renouvellements, REEE.
+  function echeances(R) {
+    const auj = new Date(); auj.setHours(0, 0, 0, 0);
+    const an = auj.getFullYear(), anImpot = (+String(S.strategie.debut).slice(0, 4) || an) + 1;
+    const l = [], premiere = S.revenu.annee === "premiere", t = R.impot.total;
+    const prochaine = (m, j) => { const d = new Date(an, m, j); return d < auj ? new Date(an + 1, m, j) : d; };
+    if (premiere) l.push({ date: new Date(anImpot, 3, 30), titre: "Solde de l'impôt", sous: "Première année : fédéral et Québec", valeur: $(t) });
+    for (const y of [an, an + 1, an + 2]) for (const [m, j] of [[2, 15], [5, 15], [8, 15], [11, 15]]) {
+      if (premiere && y < anImpot) continue;
+      l.push({ date: new Date(y, m, j), titre: "Acompte provisionnel", sous: "Impôt et cotisations", valeur: $(t / 4) });
+    }
+    l.push({ date: prochaine(5, 15), titre: "Déclarations de revenus", sous: "Date limite pour un travailleur autonome ; le solde était dû le 30 avril" });
+    if (S.epargne.reer.droits > 0 || S.epargne.reer.cotisationAnnuelle > 0) {
+      let d = new Date(an, 0, 60); if (d < auj) d = new Date(an + 1, 0, 60);
+      l.push({ date: d, titre: "Limite REER", sous: `Cotisations déductibles pour l'année ${d.getFullYear() - 1}`, valeur: S.epargne.reer.cotisationAnnuelle > 0 ? $(S.epargne.reer.cotisationAnnuelle) : undefined });
+    }
+    S.dettes.filter(d => d.type === "hypotheque" && d.finTerme).forEach((d, k) => {
+      const f = new Date(d.finTerme + "T00:00:00");
+      const x = R.sim.dettes[S.dettes.indexOf(d)], r = x && x.premierRenouvellement;
+      l.push({ date: f, titre: `Renouvellement : ${d.nom}`, sous: r ? `Paiement estimé ${$(r.paiement)} par mois à ${nb(r.taux, 2)} %` : "Comparez les offres ; ne rallongez pas l'amortissement" });
+    });
+    if (S.epargne.reee.enfants.some(e => e.age < 17) && S.epargne.reee.cotisationAnnuelle > 0)
+      l.push({ date: prochaine(11, 31), titre: "Cotisation REEE de l'année", sous: "Pour recevoir les subventions de l'année (30 %)", valeur: $(S.epargne.reee.cotisationAnnuelle * S.epargne.reee.enfants.filter(e => e.age < 17).length) });
+    const jours = d => Math.round((d - auj) / 864e5);
+    return l.filter(x => x.date >= auj).sort((a, b) => a.date - b.date).slice(0, 5).map(x => {
+      const j = jours(x.date);
+      const quand = j === 0 ? "aujourd'hui" : j < 31 ? `dans ${j} jour${j > 1 ? "s" : ""}` : `dans ${Math.round(j / 30.4)} mois`;
+      return { date: x.date, titre: x.titre, sous: `${x.sous} · ${quand}`, valeur: x.valeur, valeurSous: x.date.getFullYear() !== an ? String(x.date.getFullYear()) : undefined };
+    });
   }
 
   function rendreRevenu(R) {
@@ -917,7 +1034,7 @@
     hero("rv-hero", "Revenu brut de l'année", $(g[R.mode].total), [
       `Net après impôt : ${$(R.impots[R.mode].net)}`,
       puce(`${signe(diff)} par rapport au ${NOM_MODE[autre].toLowerCase()}`, diff >= 0 ? "haut" : "bas", diff >= 0),
-    ]);
+    ], g[R.mode].total);
 
     const comp = document.getElementById("rv-comparaison"); comp.textContent = ""; comp.className = "barres";
     const max = Math.max(g.horaire.total, g.mixte.total, 1);
@@ -938,6 +1055,8 @@
     document.getElementById("rv-seuil").textContent = g.seuilPatients != null
       ? `En clinique, le mixte paie plus que l'horaire au-delà de ${nb(g.seuilPatients)} patients par demi-journée. Vous en voyez ${nb(S.revenu.patientsParDJ)}.`
       : "Sans pourcentage sur les visites, le mixte paie toujours moins en clinique.";
+
+    rendreSensibilite(R);
 
     const parts = [
       ["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire],
@@ -973,12 +1092,30 @@
     ]);
   }
 
+  // Selon le nombre de demi-journées et de patients : brut ou net, horaire et mixte.
+  function rendreSensibilite(R) {
+    segment("rv-sens-vue", [["net", "Net"], ["brut", "Brut"]], U.sensVue, v => { U.sensVue = v; tout(); }, "Montants bruts ou nets");
+    const net = U.sensVue === "net", H = x => net ? x.hn : x.h, M = x => net ? x.mn : x.m;
+    const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ;
+    graphiqueLignes(document.getElementById("rv-sens-graph"), document.getElementById("rv-sens-legende"), [
+      { nom: "Taux horaire", couleur: SERIES[0], valeurs: R.sensDJ.map(H) },
+      { nom: "Taux mixte", couleur: SERIES[1], valeurs: R.sensDJ.map(M) },
+    ], R.sensDJ.map(x => String(x.v)), { titre: `Revenu ${net ? "net" : "brut"} selon les demi-journées par semaine`, baseLibre: true, hauteur: 200,
+      titreX: i => `${R.sensDJ[i].v} demi-journées par semaine` });
+    const ligneSens = (x, actuel, nom) => ({ cls: actuel ? "choisi" : null, cellules: [nom, $(H(x)), $(M(x)), signe(M(x) - H(x))] });
+    lignes(document.getElementById("rv-sens-dj"), ["Demi-journées", "Horaire", "Mixte", "Écart"],
+      R.sensDJ.map(x => ligneSens(x, x.v === dj, `${x.v}${x.v === dj ? " (vous)" : ""}`)));
+    lignes(document.getElementById("rv-sens-pat"), ["Patients", "Horaire", "Mixte", "Écart"],
+      R.sensPat.map(x => ligneSens(x, x.v === pat, `${nb(x.v)}${x.v === pat ? " (vous)" : ""}`)));
+    document.getElementById("rv-sens-note").textContent = `${net ? "Après impôt et cotisations, avec vos déductions." : "Avant impôt."} L'enseignement reste à ${nb(S.revenu.enseignement)} demi-journée${S.revenu.enseignement > 1 ? "s" : ""} ; les autres demi-journées sont en clinique, à ${nb(pat)} patients chacune. Au taux horaire, le nombre de patients ne change pas le revenu.`;
+  }
+
   function rendreImpot(R) {
     const h = R.impots.horaire, m = R.impots.mixte, t = R.impot.total;
     choixMode("im-mode");
     hero("im-hero", "Impôt et cotisations de l'année", $(t), [
       puce(`Taux moyen ${pct(R.impot.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`),
-    ]);
+    ], t);
 
     const a = document.getElementById("im-acomptes"); a.textContent = "";
     a.appendChild(el("p", "resume", `Mettez de côté ${pct(t / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$(t / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est ce que coûte chaque dollar de plus, et ce que rapporte chaque dollar cotisé au REER.`));
@@ -1120,7 +1257,7 @@
     hero("bu-hero", nomVue, $(V.surplus), [
       `${$(V.rev)} de revenus, ${$(V.dep + V.dettes + V.epargne)} de sorties`,
       V.surplus < 0 && puce("Budget négatif", "bas", false),
-    ]);
+    ], V.surplus);
     rangees("bu-revenus", [
       { titre: "Revenu net de travail", sous: vue === "conjointe" ? "Salaire après impôt et cotisations" : "Après impôt, prime d'assurance médicaments et dépenses pro", valeur: $(V.travail) },
       (R.allocations > 0 || vue !== "conjointe") && { titre: "Allocations familiales", sous: S.famille.calculAuto ? "Calculées selon vos revenus" : "Montant inscrit", valeur: $(V.alloc) },
@@ -1150,7 +1287,6 @@
       } },
     ]);
 
-    segment("de-methode", [["avalanche", "Avalanche"], ["boule", "Boule de neige"], ["minimum", "Minimums"]], S.strategie.methode, v => changer("strategie.methode", v), "Méthode de remboursement");
     const sim = R.sim;
     const res = document.getElementById("de-resume"); res.textContent = "";
     if (S.strategie.methode === "minimum") res.textContent = sim.libre ? `En payant seulement les minimums, vos dettes sont remboursées en ${moisAn(sim.libre)}.` : "En payant seulement les minimums, la marge de crédit n'est jamais remboursée : ses paiements ne couvrent que les intérêts.";
@@ -1168,19 +1304,32 @@
         sous: `Taux réel ${nb(C.tauxReel(d), 2)} %${renouv ? ` · ${nb(x.tauxFinal, 2)} % ensuite` : ""}`,
         valeur: x.fin ? moisAn(x.fin) : "jamais", valeurSous: `${$(x.interetsNets)} d'intérêts nets` };
     }));
-    const noms = { avalanche: "Avalanche", boule: "Boule de neige", minimum: "Minimums seulement" };
-    const av = R.sims.avalanche, bo = R.sims.boule;
+    // Choisir la méthode : chaque rangée se touche ; la recommandée maximise la valeur nette à l'horizon.
+    const fin = R.vnMethodes[R.recommandee].annee;
+    rangees("de-methodes", METHODES.map(k => {
+      const s = R.sims[k], choisi = k === R.methode;
+      return { titre: NOMS_METHODES[k] + (k === R.recommandee ? " · recommandée" : ""), ico: choisi ? "ok" : " ", cls: choisi ? "choisi" : null,
+        sous: s.libre ? `Sans dettes en ${moisAn(s.libre)} · coût net ${$(s.coutNet)}` : "La marge n'est jamais remboursée",
+        valeur: $(R.vnMethodes[k].moi), valeurSous: `valeur nette en ${fin}`,
+        action: choisi ? null : () => changer("strategie.methode", k) };
+    }));
     const plafond = nb(Math.max(0, ...S.dettes.filter(d => d.type === "hypotheque").map(d => d.privilege || 0)), 0);
-    const ecartCout = bo.coutNet - av.coutNet;
-    document.getElementById("de-methodes-note").textContent = !av.libre || !bo.libre
-      ? "L'avalanche paie d'abord la dette au taux réel le plus élevé, la boule de neige le plus petit solde."
-      : ecartCout < -1
-        ? `Ici, la boule de neige coûte ${$(-ecartCout)} de moins. En réglant d'abord les petits soldes, elle utilise chaque année le droit de remboursement anticipé des hypothèques (${plafond} % par année, perdu s'il n'est pas utilisé). Avec l'avalanche, cet argent attend le renouvellement, placé à court terme à 2,4 %, moins que le taux des hypothèques.`
-        : bo.libre < av.libre
-          ? `L'avalanche coûte ${$(ecartCout)} de moins, mais la boule de neige finit plus tôt : le remboursement anticipé des hypothèques est limité à ${plafond} % par année, et l'argent qui dépasse attend le renouvellement.`
-          : `L'avalanche paie d'abord la dette au taux réel le plus élevé : elle coûte ${$(ecartCout)} de moins.`;
-    lignes(document.getElementById("de-methodes"), ["Méthode", "Sans dettes en", "Coût net"],
-      ["avalanche", "boule", "minimum"].map(k => ({ cls: k === S.strategie.methode ? "choisi" : null, cellules: [noms[k], moisAn(R.sims[k].libre), R.sims[k].libre ? $(R.sims[k].coutNet) : "—"] })));
+    const ecartRec = R.vnMethodes[R.recommandee].moi - R.vnMethodes.avalanche.moi;
+    const placer = R.vnMethodes.minimum.moi > R.vnMethodes[R.recommandee].moi;
+    document.getElementById("de-methodes-note").textContent =
+      (R.recommandee === "hybride"
+        ? `L'hybride utilise d'abord, chaque année, le droit de remboursement anticipé des hypothèques (${plafond} % du solde, perdu au 1er janvier s'il n'est pas utilisé), puis paie la dette au taux réel le plus élevé. Ici, elle ajoute ${$(ecartRec)} à votre valeur nette en ${fin} par rapport à l'avalanche.`
+        : R.recommandee === "boule" ? "Ici, la boule de neige donne la plus grande valeur nette : en réglant d'abord les petits soldes, elle utilise chaque année le droit de remboursement anticipé des hypothèques."
+        : "Ici, l'avalanche donne la plus grande valeur nette : elle paie d'abord la dette au taux réel le plus élevé.") +
+      (() => {
+        const moinsChere = METHODES.filter(m => m !== "minimum").reduce((a, m) => R.sims[m].coutNet < R.sims[a].coutNet ? m : a, "avalanche");
+        const rec = R.sims[R.recommandee], mc = R.sims[moinsChere];
+        return moinsChere !== R.recommandee && rec.libre && mc.libre && rec.libre < mc.libre
+          ? ` ${AVEC_ARTICLE[moinsChere].replace(/^./, c => c.toUpperCase())} coûte ${$(rec.coutNet - mc.coutNet)} de moins en intérêts, mais ${AVEC_ARTICLE[R.recommandee]} finit plus tôt (${moisAn(rec.libre)}) : l'argent libéré est placé plus vite.`
+          : "";
+      })() +
+      " La date « sans dettes » suit les renouvellements : l'argent qui attend est placé à court terme (2,4 %) et compte dans la valeur nette." +
+      (placer ? ` Placer le surplus au lieu de rembourser donnerait plus dans ce scénario (rendement de ${nb(R.hyp.rendement, 1)} %), mais ce rendement n'est pas garanti, contrairement à l'intérêt économisé.` : "");
   }
 
   function rendreAvenir(R) {
@@ -1204,9 +1353,10 @@
       hero("vn-hero", i === 0 ? `${qui} aujourd'hui` : `${qui} en ${p[i].annee}${unite}`, $(val[i]), [
         i === 0 ? puce(`${signe(val[10] - val[0])} d'ici ${p[10].annee}`, val[10] >= val[0] ? "haut" : "bas", val[10] >= val[0]) : puce(`${signe(d)} par rapport à aujourd'hui`, d >= 0 ? "haut" : "bas", d >= 0),
         i === 0 ? null : `Entre ${$(bas[i])} et ${$(haut[i])} selon le scénario`,
-      ]);
+      ], i === 0 ? val[0] : undefined);
     };
     montrer(0);
+    segment("vn-horizon", [["10", "10 ans"], ["20", "20 ans"], ["30", "30 ans"]], String(R.annees), v => changer("scenarios.horizon", +v), "Horizon de la projection");
     // En glissant sur le graphique, le chiffre principal suit l'année touchée.
     graphiqueLignes(document.getElementById("vn-graph"), document.getElementById("vn-legende"), [
       { nom: qui, couleur: SERIES[0], valeurs: val },
@@ -1221,7 +1371,7 @@
       (surplusCopro > 0 && !couple ? ` Vous payez une plus grande part de l'hypothèque que votre part de la maison : le capital que vous remboursez enrichit aussi ${cj ? "votre conjointe" : "l'autre copropriétaire"}, sauf entente écrite ou mariage.` : "");
 
     // De quoi elle est faite : aujourd'hui, dans 10 ans, dans 20 ans.
-    const cols = [0, 10, 20].filter(i => i < p.length);
+    const fin = p.length - 1, cols = [0, Math.round(fin / 2), fin];
     const v = (i, f) => f(p[i]) / def(i);
     const L = couple
       ? [["Maison, part du couple", x => x.maisonMenage], ["Hypothèques", x => -x.hypMenage], ["Équité dans la maison", x => x.equiteMenage, "sous-total"],
@@ -1318,9 +1468,29 @@
       b.setAttribute("aria-pressed", S.confirmes[b.dataset.conf] ? "true" : "false");
       sauver(); rendreFiabilite();
     } else if (b.dataset.suppr) {
-      tableau(b.dataset.suppr).splice(+b.dataset.i, 1); sauver();
-      if (b.dataset.suppr === "budget") { reconstruireFeuille(); tout(); } else feuille.close();
+      const nomListe = b.dataset.suppr, liste = tableau(nomListe), i = +b.dataset.i, [retire] = liste.splice(i, 1); sauver();
+      if (nomListe === "budget") { reconstruireFeuille(); tout(); } else feuille.close();
+      toast(`« ${retire.nom || "Élément"} » supprimé.`, () => {
+        tableau(nomListe).splice(i, 0, retire); sauver();
+        if (nomListe === "budget") reconstruireFeuille();
+        tout();
+      });
     } else if (b.dataset.feuille) ouvrirSection(b.dataset.feuille);
+  });
+
+  /* Message en bas de l'écran ; « Annuler » défait la dernière suppression. */
+  const boiteToast = document.getElementById("toast");
+  let annulerToast = null, minuterieToast = null;
+  function toast(texte, annuler) {
+    document.getElementById("toast-texte").textContent = texte;
+    annulerToast = annuler || null;
+    document.getElementById("toast-annuler").hidden = !annuler;
+    boiteToast.hidden = false;
+    clearTimeout(minuterieToast); minuterieToast = setTimeout(() => { boiteToast.hidden = true; annulerToast = null; }, 6000);
+  }
+  document.getElementById("toast-annuler").addEventListener("click", () => {
+    if (annulerToast) annulerToast();
+    annulerToast = null; boiteToast.hidden = true;
   });
 
   /* Pages, avec la page ouverte dans l'adresse (#revenu, #impot…). */
@@ -1345,6 +1515,7 @@
     a.download = `wealthnord-donnees-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    S.meta.dernierExport = new Date().toISOString(); sauver(); tout();
     message("Fichier exporté. Gardez-le dans un endroit sûr : il contient toutes vos données.");
   });
   document.getElementById("importer").addEventListener("change", e => {
@@ -1363,6 +1534,23 @@
   const reinit = document.getElementById("reinitialiser"), confirmer = document.getElementById("confirmer-reinit");
   reinit.addEventListener("click", () => { confirmer.hidden = false; confirmer.focus(); });
   confirmer.addEventListener("click", () => { S = clone(EXEMPLE); S.budget = normaliserBudget(S.budget); sauver(); tout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
+
+  /* Apparence : automatique (selon l'appareil), claire ou sombre. */
+  const lireTheme = () => { try { return localStorage.getItem("wealthnord.theme") || "auto"; } catch (e) { return "auto"; } };
+  function appliquerTheme(v) {
+    try { if (v === "auto") localStorage.removeItem("wealthnord.theme"); else localStorage.setItem("wealthnord.theme", v); } catch (e) { /* choix non gardé */ }
+    if (v === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = v;
+    // Couleur de la barre du navigateur, assortie au fond.
+    const fond = getComputedStyle(document.documentElement).getPropertyValue("--fond").trim();
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => { if (v === "auto") m.setAttribute("content", m.media.includes("dark") ? "#0e0e0d" : "#f5f4f0"); else m.setAttribute("content", fond); });
+    segment("theme-choix", [["auto", "Automatique"], ["light", "Clair"], ["dark", "Sombre"]], v, appliquerTheme, "Apparence");
+    if (R) tout();
+  }
+  appliquerTheme(lireTheme());
+  document.getElementById("imprimer").addEventListener("click", () => window.print());
+  window.addEventListener("beforeprint", () => {
+    document.getElementById("impression-info").textContent = `Rapport du ${new Date().toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" })} · ${NOM_MODE[R.mode].toLowerCase()} · scénario ${SCENARIOS[R.scenario].toLowerCase()} · méthode ${NOMS_METHODES[R.methode].toLowerCase()}`;
+  });
 
   /* Application installable (PWA) : fonctionne hors ligne. */
   if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname)))
