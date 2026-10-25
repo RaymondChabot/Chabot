@@ -574,14 +574,16 @@
      d'hypothèque réduit la dette : le capital remboursé devient de l'équité
      dans la maison, dont la valeur croît chaque année. */
   function projeterValeurNette(o, simulation) {
-    const ans = o.annees || 20, r = o.rendement / 100, rm = Math.pow(1 + r, 1 / 12) - 1;
+    const ans = o.annees || 20;
+    // Rendement mensuel de l'année a : constant, ou tiré d'une suite de rendements annuels (simulations).
+    const rmDe = a => Math.pow(1 + (o.rendements ? o.rendements[a - 1] : o.rendement) / 100, 1 / 12) - 1;
+    const rmSocDe = a => Math.pow(1 + (o.rendements ? o.rendements[a - 1] : o.rendement) / 100 * (1 - (o.societe && o.societe.impotPlacement != null ? o.societe.impotPlacement : 0.5)), 1 / 12) - 1;
     const voitures = o.voitures || [];
     let reer = o.reer.solde, celi = o.celi.solde, conj = o.actifsConjoint || 0, soc = o.societe ? o.societe.solde || 0 : 0;
     // CELIAPP : cotisations jusqu'au plafond à vie (40 000 $), croissance à l'abri de l'impôt.
     const ca = o.celiapp || { solde: 0, cotisationAnnuelle: 0 };
     let celiapp = ca.solde || 0, cumulCeliapp = ca.solde || 0;
-    // Placements de la société : rendement après l'impôt de la société sur le revenu de placement.
-    const rmSoc = o.societe ? Math.pow(1 + r * (1 - (o.societe.impotPlacement ?? 0.5)), 1 / 12) - 1 : 0;
+    // Placements de la société : rendement après l'impôt de la société sur le revenu de placement (rmSocDe).
     // Autos : chacune perd de la valeur chaque année ; si un remplacement est prévu, une auto
     // neuve est achetée tous les N ans (prix indexé à l'inflation), payée avec l'épargne.
     const autos = voitures.map(v => ({ ...v, valeurCourante: v.valeur, age: 0 }));
@@ -600,6 +602,7 @@
     };
     for (let a = 0; a <= ans; a++) {
       if (a > 0) {
+        const rm = rmDe(a), rmSoc = rmSocDe(a);
         for (let k = (a - 1) * 12; k < a * 12; k++) {
           const libre = simulation.mois[k] ? simulation.mois[k].extraLibre : (simulation.mois.length ? simulation.mois[simulation.mois.length - 1].extraLibre : 0);
           reer = reer * (1 + rm) + o.reer.cotisationAnnuelle / 12;

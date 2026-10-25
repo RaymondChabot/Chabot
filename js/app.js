@@ -51,6 +51,8 @@
     // projection 2026 (Institut de planification financière et FP Canada).
     scenarios: {
       choisi: "realiste", dollarsAujourdhui: false, horizon: 20,
+      // Probabilité de réussite : écart type des rendements annuels (portefeuille équilibré : environ 10 %).
+      volatilite: 10,
       prudent: { rendement: 3.5, croissanceMaison: 1.5, depreciationAuto: 20, ecartTaux: 1, inflation: 3, hausseRevenus: 2 },
       realiste: { rendement: 5, croissanceMaison: 3.1, depreciationAuto: 15, ecartTaux: 0, inflation: 2.1, hausseRevenus: 3.1 },
       optimiste: { rendement: 6.5, croissanceMaison: 4.5, depreciationAuto: 12, ecartTaux: -0.5, inflation: 2, hausseRevenus: 3.5 },
@@ -94,6 +96,8 @@
     jalonsPerso: [],
     dossier: {},
     plans: [],
+    // Bilans du mois : revenu net reçu et dépenses, d'après le relevé.
+    bilans: [],
     // Logement : propriétaire (maison et hypothèque) ou locataire (loyer au budget, pas de maison).
     actifs: { logement: "locataire", maison: { valeur: 0, part: 0, croissance: 3 }, voiture: { valeur: 0, depreciation: 15, remplacementAns: 0, prixNeuf: 40000 }, actifsConjoint: 0, autres: [] },
   };
@@ -529,6 +533,8 @@
         { p: `scenarios.${k}.inflation`, l: "Hausse des dépenses (inflation)", u: "%/an", s: 0.1 },
         { p: `scenarios.${k}.hausseRevenus`, l: "Hausse des revenus", u: "%/an", s: 0.1 },
       ]),
+      { g: "Probabilité de réussite" },
+      { p: "scenarios.volatilite", l: "Variation des rendements d'une année à l'autre (écart type)", u: "%", s: 1, h: "10 % : portefeuille équilibré ; 15 % : surtout des actions ; 5 % : prudent." },
     ],
   };
 
@@ -604,7 +610,7 @@
   const lierListe = (liste, i, k) => inp => { inp.dataset.l = liste; inp.dataset.i = i; inp.dataset.k = k; };
   const tableau = nom => nom === "enfants" ? S.epargne.reee.enfants : nom === "activites" ? S.revenu.activites : nom === "lignes" ? S.revenu.lignes
     : nom === "depensesPro" ? S.impot.depensesProDetail : nom === "actifsAutres" ? (S.actifs.autres = S.actifs.autres || []) : nom === "objectifs" ? (S.objectifs = S.objectifs || [])
-    : nom === "jalonsPerso" ? (S.jalonsPerso = S.jalonsPerso || []) : nom === "plans" ? (racine().plans = racine().plans || []) : S[nom];
+    : nom === "jalonsPerso" ? (S.jalonsPerso = S.jalonsPerso || []) : nom === "plans" ? (racine().plans = racine().plans || []) : nom === "bilans" ? (S.bilans = S.bilans || []) : S[nom];
   // Essentiel ou tous les détails (Optimiser) : préférence de cet appareil.
   const detailsAffiches = () => { try { return localStorage.getItem("wm.details") === "1"; } catch (e) { return false; } };
   function boutonDetails(c) {
@@ -829,6 +835,12 @@
   // Objectifs d'épargne : ce qu'il faut mettre de côté chaque mois pour atteindre la cible à la date visée.
   const COMPTES_OBJECTIF = { dedie: "Un compte à part", celi: "CELI", celiapp: "CELIAPP", encaisse: "Comptes et encaisse", reer: "REER" };
   const moisEntre = (debut, fin) => { const [a, b] = String(debut).split("-").map(Number), [c, d] = String(fin || "").split("-").map(Number); return c && d ? (c - a) * 12 + (d - b) : 0; };
+  // Tirages au hasard reproductibles (mulberry32) et loi normale (Box-Muller).
+  function aleatoire(graine) {
+    let a = graine >>> 0;
+    return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  const normale = alea => () => Math.sqrt(-2 * Math.log(1 - alea())) * Math.cos(2 * Math.PI * alea());
   function calculerObjectifs(R) {
     const e = S.epargne, ca = e.celiapp || { solde: 0 };
     const solde = { celi: e.celi.solde, celiapp: ca.solde || 0, encaisse: e.encaisse, reer: e.reer.solde };
@@ -1038,9 +1050,9 @@
     R.detteTotale = S.dettes.reduce((a, d) => a + d.solde, 0);
 
     // Valeur nette : maison (sa valeur croît, l'hypothèque payée devient de l'équité), autos, placements.
-    const projeter = (h, sim, m = methode) => C.projeterValeurNette({
+    const projeter = (h, sim, m = methode, rendements = null) => C.projeterValeurNette({
       annees: ANNEES, anneeDepart: +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear(),
-      rendement: h.rendement, reer: S.epargne.reer, celi: S.epargne.celi, celiapp: S.epargne.celiapp, encaisse: S.epargne.encaisse,
+      rendement: h.rendement, rendements, reer: S.epargne.reer, celi: S.epargne.celi, celiapp: S.epargne.celiapp, encaisse: S.epargne.encaisse,
       maison: R.locataire ? { valeur: 0, part: 0, croissance: 0, partMenage: 0 }
         : { ...S.actifs.maison, croissance: h.croissanceMaison, partMenage: S.actifs.maison.part + (R.couple ? S.conjointe.partMaison : 0) },
       voitures: [{ valeur: S.actifs.voiture.valeur, depreciation: h.depreciationAuto },
@@ -1066,6 +1078,23 @@
     }
     R.projection = R.projections[R.scenario];
     R.projeterAvec = rendement => projeter({ ...R.hyp, rendement }, R.sim);
+    // Probabilité de réussite : n avenirs où le rendement de chaque année varie autour de celui du
+    // scénario (écart type vol). Graine fixe : les mêmes tirages d'un affichage à l'autre.
+    R.monteCarlo = (n, vol) => {
+      const z = normale(aleatoire(20260425)), runs = [];
+      for (let k = 0; k < n; k++) runs.push(projeter(R.hyp, R.sim, methode, Array.from({ length: ANNEES }, () => Math.max(-60, R.hyp.rendement + vol * z()))));
+      const tries = new Map();
+      const quantile = (cle, i, q) => {
+        const c = cle + i; if (!tries.has(c)) tries.set(c, runs.map(r => r[i][cle]).sort((a, b) => a - b));
+        const v = tries.get(c); return v[Math.min(v.length - 1, Math.floor(q * v.length))];
+      };
+      const atteintes = new Map();
+      const chancesIndependance = (annee, couple) => {
+        if (!atteintes.has(couple)) atteintes.set(couple, runs.map(r => independance(R, couple, r).annee));
+        return atteintes.get(couple).filter(a => a && a <= annee).length / n;
+      };
+      return { quantile, chancesIndependance };
+    };
     // Dollars d'aujourd'hui : on retire l'inflation du scénario choisi.
     R.deflateur = a => S.scenarios.dollarsAujourdhui ? Math.pow(1 + R.hyp.inflation / 100, a) : 1;
     R.reee = C.projeterReee({ enfants: S.epargne.reee.enfants, cotisationAnnuelle: S.epargne.reee.cotisationAnnuelle }, R.hyp.rendement / 100);
@@ -1374,6 +1403,8 @@
       if (derniere === null) action("info", "Notez votre valeur nette d'aujourd'hui (page Patrimoine) : vous pourrez ensuite comparer le réel au plan.");
       else if (derniere > 90) action("info", `Votre dernier relevé de patrimoine date de ${derniere} jours : mettez vos soldes à jour et notez votre situation (page Patrimoine).`);
     }
+    if (!S.meta.exemple && !(S.bilans || []).some(b => b.mois === moisPasse() && (b.recu != null || b.depense != null)))
+      action("info", `Faites le bilan de ${nomMois(moisPasse())} (page Budget) : ce que vous avez reçu et dépensé, comparé au budget.`);
     R.objectifs.filter(o => !o.atteint && !o.mois).forEach(o => action("important", `L'objectif « ${o.nom || "sans nom"} » n'est pas atteint à la date visée : choisissez une nouvelle date (page Patrimoine).`));
     if (S.revenu.annee === "premiere") action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total)} seront à payer d'un coup le 30 avril.`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
@@ -1921,7 +1952,7 @@
       V.autres > 0 && { titre: "Autres revenus", valeur: $(V.autres) },
       { titre: "Total", cls: "total", valeur: $(V.rev) },
     ]);
-    rendreAnnuelles(); rendreFlux(R);
+    rendreAnnuelles(); rendreFlux(R); rendreReste(R); rendreBilanMois(R);
     // Dépenses : une rangée par catégorie ; toucher ouvre ses cases.
     const cats = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
     rangees("bu-depenses", [
@@ -2092,7 +2123,7 @@
     }));
 
     rendreBilan(R, couple); rendreReel(R, couple); rendreObjectifs(R); rendreProchain(R);
-    rendreIndependance(R, couple); rendreFrais(R); rendrePlans(R); rendreDossier(R);
+    rendreIndependance(R, couple); rendreFrais(R); rendrePlans(R); rendreDossier(R); rendreChances(R, couple);
     rangees("ep-reee", [
       ...R.reee.map((x, i) => {
         const e = S.epargne.reee.enfants[i];
@@ -2137,6 +2168,131 @@
     R = calculer();
     rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
     if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
+  }
+
+  /* ============================================================
+     RESTE À DÉPENSER LIBREMENT : le revenu net, moins les dépenses fixes, les
+     dépenses annuelles (par mois), les dettes et l'épargne. Votre part.
+     ============================================================ */
+  const FIXES = new Set(["loyer", "taxesMunicipales", "taxesScolaires", "assuranceHabitation", "electricite", "chauffage", "eau", "deneigement", "alarme", "condo", "entreposage",
+    "assuranceAuto", "immatriculation", "stationnement", "locationAuto", "caa", "garderie", "ecole", "ecolePrivee", "argentPoche", "assuranceMedicaments", "orthodontie", "assuranceSante",
+    "assuranceInvalidite", "assuranceVie", "maladiesGraves", "assuranceVoyage", "cellulaires", "internet", "television", "abonnements", "telephoneFixe", "infonuagique", "sport", "clubs",
+    "fraisBancaires", "comptable", "pensionAlimentaire", "fraisPlacements", "aideFamille"]);
+  const CATS_FIXES = new Set(["Logement", "Assurances personnelles", "Télécom et abonnements", "Finances"]);
+  const estFixe = b => b.k ? FIXES.has(b.k) : CATS_FIXES.has(b.cat);
+  function resteADepenser(R) {
+    const part = S.menage.partCommunMoi / 100, qui = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0;
+    let fixes = 0, annuelles = 0, variables = 0;
+    for (const b of depensesEffectives()) { const m = mensuel(b) * qui(b); if (b.periode === "an") annuelles += m; else if (estFixe(b)) fixes += m; else variables += m; }
+    return { fixes, annuelles, variables, libre: R.netMoi - fixes - annuelles - R.dettesMoi - R.epargneMoi };
+  }
+  function rendreReste(R) {
+    const z = document.getElementById("bu-reste"); z.textContent = "";
+    const x = resteADepenser(R);
+    rangees(z.appendChild(el("div")), [
+      { titre: "Revenu net", valeur: $(R.netMoi) },
+      { titre: "Dépenses fixes", sous: "Loyer, assurances, abonnements, garderie…", valeur: moins(x.fixes) },
+      x.annuelles > 0 && { titre: "Dépenses annuelles, par mois", sous: "À mettre de côté", valeur: moins(x.annuelles) },
+      R.dettesMoi > 0 && { titre: "Paiements de dettes", sous: "Minimums", valeur: moins(R.dettesMoi) },
+      R.epargneMoi > 0 && { titre: "Épargne et objectifs", valeur: moins(R.epargneMoi) },
+      { titre: "Reste à dépenser librement", cls: "total", valeur: $(x.libre) },
+    ]);
+    z.appendChild(el("p", "aide" + (x.libre < 0 ? " avertissement" : ""), x.libre < 0
+      ? "Vos dépenses fixes, vos dettes et votre épargne dépassent votre revenu net : revoyez-les avant tout."
+      : `Vous y avez prévu ${$(x.variables)} de dépenses variables (épicerie, essence, sorties…). Ce que vous ne dépensez pas va aux dettes, puis au placement : c'est votre surplus de ${$(Math.max(0, R.surplusMoi))}.`));
+  }
+
+  /* ============================================================
+     BILAN DU MOIS : ce qui a été reçu et dépensé, comparé au budget.
+     ============================================================ */
+  const moisCle = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const moisPasse = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return moisCle(d); };
+  const nomMois = cle => { const d = dateMois(cle); return d ? d.toLocaleDateString("fr-CA", { month: "long", year: "numeric" }) : cle; };
+  function feuilleBilan(cle) {
+    S.bilans = S.bilans || [];
+    let i = S.bilans.findIndex(b => b.mois === cle);
+    if (i < 0) { S.bilans.push({ id: nouvelId("m"), mois: cle, recu: null, depense: null, note: "" }); S.bilans.sort((a, b) => a.mois < b.mois ? -1 : 1); i = S.bilans.findIndex(b => b.mois === cle); sauver(); }
+    const b = S.bilans[i], nom = nomMois(cle);
+    ouvrirFeuille(`Bilan de ${nom}`, c => {
+      c.appendChild(el("p", "aide feuille-intro", "D'après votre relevé bancaire : le revenu net reçu (paiements de la RAMQ après l'impôt mis de côté, salaire) et les dépenses du mois, sans les paiements de dettes ni l'épargne."));
+      const champ = (k, l, prevu) => { const ligne = creerChamp({ l, u: "$", s: 10, h: `Prévu au budget : ${$(prevu)}` }, `bm-${b.id}-${k}`, lierListe("bilans", i, k), false);
+        const inp = ligne.querySelector("input"); inp.value = b[k] ?? ""; inp.placeholder = String(Math.round(prevu)); c.appendChild(ligne); };
+      champ("recu", "Revenu net reçu", R.netMoi);
+      champ("depense", "Dépenses du mois", R.depMoi);
+      const l = el("div", "champ large"), lab = el("label", null, "Note"), boite = el("div", "saisie"), inp = el("input"); lab.htmlFor = `bm-${b.id}-note`;
+      inp.type = "text"; inp.id = `bm-${b.id}-note`; inp.value = b.note || ""; inp.placeholder = "Vacances, réparation de l'auto…"; lierListe("bilans", i, "note")(inp);
+      boite.appendChild(inp); l.append(lab, boite, el("span")); c.appendChild(l);
+      const ac = el("div", "feuille-actions"), x = el("button", "bouton danger large", "Retirer ce bilan"); x.type = "button"; x.dataset.suppr = "bilans"; x.dataset.i = i; ac.appendChild(x); c.appendChild(ac);
+    });
+  }
+  function rendreBilanMois(R) {
+    const z = document.getElementById("bu-bilan"); z.textContent = "";
+    const l = (S.bilans || []).filter(b => b.recu != null || b.depense != null).slice(-6).reverse(), passe = moisPasse();
+    if (!l.length) z.appendChild(el("p", "aide", "Une fois par mois, deux minutes : ce que vous avez reçu et dépensé, d'après votre relevé. Vous verrez si votre budget tient la route."));
+    else {
+      const d = l[0], ecart = (d.depense ?? 0) - R.depMoi;
+      const res = el("p", "resume");
+      res.append(document.createTextNode(`En ${nomMois(d.mois)}, vous avez dépensé `), el("strong", null, $(d.depense ?? 0)),
+        document.createTextNode(`, soit ${$(Math.abs(ecart))} ${ecart > 0 ? "de plus" : "de moins"} que prévu. Reçu : ${$(d.recu ?? 0)} (prévu ${$(R.netMoi)}).`));
+      z.appendChild(res);
+      z.appendChild(rangees(el("div"), l.map(b => { const e = (b.depense ?? 0) - R.depMoi;
+        return { titre: nomMois(b.mois)[0].toUpperCase() + nomMois(b.mois).slice(1), sous: `Reçu ${$(b.recu ?? 0)}${b.note ? ` · ${b.note}` : ""}`, valeur: $(b.depense ?? 0),
+          valeurSous: `${signe(e)} sur le budget`, action: () => feuilleBilan(b.mois) }; })));
+    }
+    const a = el("div", "actions"), bt = el("button", "bouton secondaire", (S.bilans || []).some(b => b.mois === passe && (b.recu != null || b.depense != null)) ? `Revoir le bilan de ${nomMois(passe)}` : `Faire le bilan de ${nomMois(passe)}`);
+    bt.type = "button"; bt.addEventListener("click", () => feuilleBilan(passe)); a.appendChild(bt); z.appendChild(a);
+  }
+
+  /* ============================================================
+     EXPORT EN TABLEUR (CSV) : résumé, budget, dettes, projection.
+     ============================================================ */
+  function exporterTableur() {
+    const Rr = R, part = S.menage.partCommunMoi / 100, qui = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0;
+    const n = v => (Math.round((+v || 0) * 100) / 100).toFixed(2).replace(".", ",");
+    const t = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const L = [];
+    const ligne = (...c) => L.push(c.join(";"));
+    ligne(t("WealthMorand"), t(`Exporté le ${new Date().toLocaleDateString("fr-CA")}`)); L.push("");
+    ligne(t("Résumé"), t("Montant"));
+    [["Revenu brut de l'année", Rr.brut], ["Net après impôt (année)", Rr.nets[Rr.mode]], ["Impôt et cotisations (année)", Rr.impot.total], ["Revenu net par mois", Rr.netMoi],
+     ["Dépenses par mois (votre part)", Rr.depMoi], ["Paiements de dettes par mois", Rr.dettesMoi], ["Épargne par mois", Rr.epargneMoi], ["Surplus par mois", Rr.surplusMoi],
+     ["Dettes totales", Rr.detteTotale], ["Valeur nette aujourd'hui", Rr.projection[0].moi]].forEach(([a, v]) => ligne(t(a), n(v)));
+    L.push(""); ligne(t("Budget"), t("Catégorie"), t("Dépense"), t("Montant"), t("Période"), t("Qui paie"), t("Par mois, votre part"));
+    depensesEffectives().filter(b => b.montant > 0).forEach(b => ligne(t(""), t(categorie(b)), t(b.k ? nomDepense(b) : b.nom), n(b.montant), t(b.periode === "an" ? "par année" : "par mois"),
+      t({ moi: "Moi", commun: "Partagée", conjoint: "Partenaire" }[b.qui] || b.qui), n(mensuel(b) * qui(b))));
+    L.push(""); ligne(t("Dettes"), t("Nom"), t("Type"), t("Solde"), t("Taux (%)"), t("Paiement minimum par mois"), t("Remboursée en"));
+    S.dettes.forEach((d, i) => { const f = Rr.sim.dettes[i] && Rr.sim.dettes[i].fin; ligne(t(""), t(d.nom), t(d.type), n(d.solde), n(d.taux), n(minimumDette(d)), t(f ? moisAn(f) : "")); });
+    L.push(""); ligne(t("Projection"), t("Année"), t("Valeur nette"), t("Placements"), t("Maison, votre part"), t("Hypothèques, votre part"), t("Autres dettes, votre part"));
+    Rr.projection.forEach(x => ligne(t(""), t(x.annee), n(x.moi), n(x.placements), n(x.maisonMoi), n(x.hypMoi), n(x.autresMoi)));
+    const blob = new Blob(["﻿" + L.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `wealthmorand-tableur-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast("Tableur exporté : ouvrez-le dans Excel, Numbers ou Google Sheets.");
+  }
+
+  /* ============================================================
+     PROBABILITÉ DE RÉUSSITE : des centaines d'avenirs possibles, avec des
+     rendements qui varient chaque année autour de celui du scénario.
+     ============================================================ */
+  function rendreChances(R, couple) {
+    const z = document.getElementById("pa-chances"); z.textContent = "";
+    if (document.getElementById("v-avenir").hidden) return;   // calcul fait quand la page est ouverte
+    const vol = S.scenarios.volatilite ?? 10, M = R.monteCarlo(300, vol), p = R.projection, fin = p.length - 1, cle = couple ? "menage" : "moi";
+    const def = i => R.deflateur(i), q = (k, i) => M.quantile(cle, i, k) / def(i);
+    const res = el("p", "resume");
+    res.append(document.createTextNode(`Dans 8 cas sur 10, ${couple ? "la valeur nette du couple" : "votre valeur nette"} en ${p[fin].annee} se situerait entre `),
+      el("strong", null, `${$(q(0.1, fin))} et ${$(q(0.9, fin))}`), document.createTextNode(` ; la moitié des cas au-dessus de ${$(q(0.5, fin))}.`));
+    z.appendChild(res);
+    const leg = el("div", "legende"), g = el("div", "graphique"); z.append(leg, g);
+    graphiqueLignes(g, leg, [{ nom: "Médiane", couleur: SERIES[0], valeurs: p.map((x, i) => q(0.5, i)) }], p.map(x => String(x.annee)), {
+      titre: "Valeur nette : 8 cas sur 10", hauteur: 190, bande: { bas: p.map((x, i) => q(0.1, i)), haut: p.map((x, i) => q(0.9, i)), couleur: SERIES[0] },
+      legende: [{ nom: "Médiane", couleur: SERIES[0] }, { nom: "8 cas sur 10", couleur: SERIES[0], zone: true }],
+    });
+    const F = independance(R, couple), annees = F.annee ? [F.annee - 3, F.annee, F.annee + 3].filter(a => a > p[0].annee && a <= p[fin].annee) : [p[fin].annee];
+    z.appendChild(el("h3", "sous-titre", "Chances d'atteindre l'indépendance financière"));
+    z.appendChild(rangees(el("div"), annees.map(a => ({ titre: `D'ici ${a}${F.naissance ? ` (à ${a - F.naissance} ans)` : ""}`, valeur: pct(M.chancesIndependance(a, couple), 0) }))));
+    z.appendChild(el("p", "aide", `300 simulations : chaque année, le rendement des placements varie autour de ${nb(R.hyp.rendement, 1)} % (scénario ${SCENARIOS[R.scenario].toLowerCase()}), avec un écart type de ${nb(vol)} %, comme un portefeuille ${vol >= 14 ? "surtout en actions" : vol <= 7 ? "prudent" : "équilibré"}. La maison, les dettes et le revenu suivent le scénario. Le passé ne garantit pas l'avenir.`));
   }
 
   /* ============================================================
@@ -2325,12 +2481,12 @@
      ============================================================ */
   // Indépendance : placements (REER, CELI, CELIAPP, comptes, société) égaux à N fois les dépenses
   // de l'année (25 fois : la règle du 4 %), en dollars de chaque année.
-  function independance(R, couple) {
+  function independance(R, couple, p = R.projection) {
     const I = S.independance || {}, mult = +I.multiple || 25, h = R.hyp;
     const depenses = (+I.depenses || 0) > 0 ? +I.depenses : (couple ? R.depMenage : R.depMoi) * 12;
     const placements = x => x.placements + x.societe + (couple ? x.conjointe : 0);
     const cible = a => mult * depenses * Math.pow(1 + h.inflation / 100, a);
-    const p = R.projection, i = p.findIndex((x, a) => placements(x) >= cible(a));
+    const i = p.findIndex((x, a) => placements(x) >= cible(a));
     const naissance = +I.anneeNaissance || 0;
     return { mult, depenses, cible0: cible(0), placements0: placements(p[0]), progression: Math.min(1, placements(p[0]) / Math.max(1, cible(0))),
       annee: i >= 0 ? p[i].annee : null, age: i >= 0 && naissance ? p[i].annee - naissance : null, fin: p[p.length - 1].annee, naissance };
@@ -2811,6 +2967,8 @@
     document.getElementById("ap-portrait-suite").onclick = suite ? suite.action : null;
   }
   document.getElementById("bu-annuelles-modifier").addEventListener("click", feuilleAnnuelles);
+  document.getElementById("exporter-tableur").addEventListener("click", exporterTableur);
+  document.getElementById("imprimer-fiche").addEventListener("click", () => window.Wealthnord.rapport && window.Wealthnord.rapport.imprimer({ fiche: true }));
   document.getElementById("bandeau-plan-sortir").addEventListener("click", () => sortirPlan());
   document.getElementById("pa-independance-modifier").addEventListener("click", feuilleIndependance);
   document.getElementById("ap-portrait-masquer").addEventListener("click", () => {

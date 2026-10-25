@@ -149,5 +149,9 @@ verifier("autres actifs : votre part, +3 %/an", proche(pA[4].moi - p0[4].moi, 50
 const pG = C.projeterValeurNette({ ...baseVN, objectifs: [{ solde: 500, mensuel: 100, mois: 18, depenser: false }, { solde: 0, mensuel: 200, mois: 12, depenser: true }] }, sim);
 verifier("objectifs : versements jusqu'à la date, puis dépensé ou gardé", proche(pG[1].objectifs, 500 + 1200, 1e-9) && proche(pG[2].objectifs, 500 + 1800, 1e-9) && proche(pG[2].moi - p0[2].moi, 2300, 0.01));
 
+const pR = C.projeterValeurNette({ ...baseVN, reer: { solde: 10000, cotisationAnnuelle: 0 }, rendements: [10, -10, 5, 5, 5] }, sim);
+const pC = C.projeterValeurNette({ ...baseVN, reer: { solde: 10000, cotisationAnnuelle: 0 } }, sim);
+verifier("rendements variables : +10 % puis −10 %", proche(pR[1].reer, 11000, 1e-6) && proche(pR[2].reer, 9900, 1e-6) && proche(pC[1].reer, 10500, 1e-6));
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

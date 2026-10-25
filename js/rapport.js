@@ -86,7 +86,7 @@
     <h1>${esc(titre)}</h1>${intro ? `<p class="rp-intro">${esc(intro)}</p>` : ""}${contenu}</section>`;
 
   /* ---------- Le rapport ---------- */
-  function construire() {
+  function construire(opts = {}) {
     const S = W.etat(), R = W.resultats();
     const p = R.projection, fin = p.length - 1, def = i => R.deflateur(i), dix = Math.min(10, fin);
     const date = new Date().toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" });
@@ -98,6 +98,7 @@
     const haut = p.map((x, i) => Math.max(...Object.keys(SCENARIOS).map(k => R.projections[k][i].moi)) / def(i));
     const meilleurMode = R.modes.reduce((a, m) => R.nets[m] > R.nets[a] ? m : a, mode);
     const pages = [];
+    if (opts.fiche) { pages.push(fiche(S, R, date)); return afficher(pages, date, "Fiche"); }
 
     /* 1. Couverture */
     const points = [
@@ -344,17 +345,63 @@
         <li>Loi sur l'intérêt : intérêt hypothécaire à taux fixe composé deux fois par année.</li>
       </ul><p class="rp-avis">Estimations seulement : ni avis fiscal, ni avis financier. Validez toute décision avec un comptable ou un planificateur financier.</p></div>`));
 
+    afficher(pages, date, "Rapport");
+  }
+  // Met les pages dans la page, avec le pied de page (date et numéro de page).
+  function afficher(pages, date, genre) {
     const boite = document.getElementById("rapport");
     boite.innerHTML = pages.join("");
     // Pied de page : date et numéro de page (navigateurs qui gèrent les marges de page).
     let st = document.getElementById("rapport-style");
     if (!st) { st = document.createElement("style"); st.id = "rapport-style"; document.head.appendChild(st); }
     const police = `font-family: "Inter", sans-serif; font-size: 7.5pt; color: #8b8981;`;
-    st.textContent = `@page { @bottom-left { content: "WealthMorand · Rapport du ${date.replace(/"/g, "")} · Estimations seulement"; ${police} } @bottom-right { content: "Page " counter(page) " de " counter(pages); ${police} } }`;
+    st.textContent = `@page { @bottom-left { content: "WealthMorand · ${genre} du ${date.replace(/"/g, "")} · Estimations seulement"; ${police} } @bottom-right { content: "Page " counter(page) " de " counter(pages); ${police} } }`;
   }
 
-  function imprimer() {
-    construire();
+  /* Fiche d'une page : l'essentiel, pour un ou une partenaire, un comptable ou un conseiller. */
+  function fiche(S, R, date) {
+    const p = R.projection, x = p[0], dix = Math.min(10, p.length - 1), F = O.independance(R, false);
+    const part = S.menage.partCommunMoi / 100, qui = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0;
+    const parCat = new Map();
+    for (const b of O.depensesEffectives()) parCat.set(O.categorie(b), (parCat.get(O.categorie(b)) || 0) + O.mensuel(b) * qui(b));
+    const cats = [...parCat].filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
+    const reste = cats.slice(4).reduce((t, [, v]) => t + v, 0);
+    const actifs = [["Comptes et encaisse", S.epargne.encaisse], ["REER", S.epargne.reer.solde], ["CELI", S.epargne.celi.solde], ["CELIAPP", (S.epargne.celiapp || {}).solde || 0],
+      ["Maison, votre part", x.maisonMoi], ["Auto", x.voitureMoi], ["Placements dans la société", R.societeActive ? x.societe : 0], ["Autres actifs", x.autresActifsMoi || 0], ["Épargne des objectifs", x.objectifs || 0]].filter(([, v]) => Math.abs(v) >= 0.5);
+    const passifs = S.dettes.map(d => [d.nom, d.solde * (d.partMoi ?? 100) / 100]).filter(([, v]) => v >= 0.5);
+    const jal = O.jalons(R).slice(0, 5), objs = (R.objectifs || []).slice(0, 4);
+    return page("Fiche financière", `${date} · ${libelleRevenu()}${R.societeActive ? " · pratique incorporée" : ""}${R.couple ? " · en couple" : ""}${W.plan() ? ` · ${W.plan()}` : ""}. Votre part, scénario ${SCENARIOS[R.scenario].toLowerCase()}.`, `
+      <div class="rp-kpis rp-kpis-4">
+        ${kpi("Revenu brut", $(R.brut), "Par année")}
+        ${kpi("Revenu net", $(R.netMoi), "Par mois")}
+        ${kpi("Surplus", $(R.surplusMoi), "Par mois", R.surplusMoi >= 0 ? "bon" : "mauvais")}
+        ${kpi("Impôt à mettre de côté", $(R.impot.total / 12), "Par mois")}
+        ${kpi("Dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées")}
+        ${kpi("Valeur nette", $(x.moi), "Aujourd'hui")}
+        ${kpi(`Valeur nette en ${p[dix].annee}`, $(p[dix].moi / R.deflateur(dix)), `Scénario ${SCENARIOS[R.scenario].toLowerCase()}`)}
+        ${kpi("Indépendance financière", F.annee ? String(F.annee) : "—", F.annee ? `${nb(F.mult)} fois les dépenses${F.age ? ` · à ${F.age} ans` : ""}` : "Pas sur l'horizon", "fort")}
+      </div>
+      <div class="rp-deux">
+        <div class="rp-carte"><h2>Le mois</h2>${tableau(["", "Par mois"], [
+          { c: ["Revenu net", $(R.netMoi)] },
+          ...cats.slice(0, 4).map(([n, v]) => ({ c: [n, moins(v)] })), ...(reste > 0.5 ? [{ c: ["Autres dépenses", moins(reste)] }] : []),
+          { c: ["Paiements de dettes", moins(R.dettesMoi)] }, { c: ["Épargne et objectifs", moins(R.epargneMoi)] },
+          { cls: "total", c: ["Surplus", $(R.surplusMoi)] }], "compact")}</div>
+        <div class="rp-carte"><h2>Bilan d'aujourd'hui</h2>${tableau(["", "Valeur"], [
+          ...actifs.map(([n, v]) => ({ c: [n, $(v)] })), ...passifs.map(([n, v]) => ({ c: [n, moins(v)] })),
+          { cls: "total", c: ["Valeur nette", $(x.moi)] }], "compact")}</div>
+      </div>
+      <div class="rp-deux">
+        <div class="rp-carte"><h2>Dettes</h2>${S.dettes.length ? tableau(["Dette", "Solde", "Taux", "Sans dette en"], S.dettes.map((d, i) => ({ c: [d.nom, $(d.solde), `${nb(d.taux, 2)}\u00a0%`, R.sim.dettes[i] && R.sim.dettes[i].fin ? R.sim.dettes[i].fin.toLocaleDateString("fr-CA", { month: "short", year: "numeric" }) : "—"] })), "compact") : `<p class="rp-note">Aucune dette.</p>`}</div>
+        <div class="rp-carte"><h2>Objectifs et jalons</h2>
+          ${objs.length ? tableau(["Objectif", "Visé", "Par mois"], objs.map(o => ({ c: [`${o.nom || "Objectif"}${o.date ? ` · ${o.date}` : ""}`, $(+o.cible || 0), o.atteint ? "atteint" : $(o.dedie ? o.mensuel : Math.max(0, o.mensuel - o.prevu))] })), "compact") : ""}
+          <ul class="rp-jalons">${jal.map(j => `<li><b>${esc(j.jalon.mois ? `${j.jalon.mois} ${j.jalon.annee}` : j.jalon.annee)}</b><span>${esc(j.titre)}</span></li>`).join("")}</ul></div>
+      </div>
+      <p class="rp-avis">Estimations seulement : ni avis fiscal, ni avis financier. Rapport complet : page Données de WealthMorand.</p>`);
+  }
+
+  function imprimer(opts = {}) {
+    construire(opts);
     document.body.classList.add("impression-rapport");
     const fin = () => { document.body.classList.remove("impression-rapport"); document.getElementById("rapport").textContent = ""; window.removeEventListener("afterprint", fin); };
     window.addEventListener("afterprint", fin);

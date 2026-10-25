@@ -202,6 +202,14 @@
         <div class="rangees" id="bu-surplus"></div>
         <p class="aide" id="bu-surplus-note"></p>
       </div>
+      <div class="carte demi">
+        <div class="carte-tete"><h2>Reste à dépenser librement</h2><span class="carte-sous">Par mois, votre part</span></div>
+        <div id="bu-reste"></div>
+      </div>
+      <div class="carte demi">
+        <div class="carte-tete"><h2>Bilan du mois</h2><span class="carte-sous">Réel et budget</span></div>
+        <div id="bu-bilan"></div>
+      </div>
       <div class="carte">
         <div class="carte-tete"><h2>L'année en un coup d'œil</h2><span class="carte-sous">Votre part</span></div>
         <div class="flux" id="bu-flux"></div>
@@ -277,6 +285,10 @@
         <div id="pa-frais"></div>
       </div>
       <div class="carte">
+        <div class="carte-tete"><h2>Probabilité de réussite</h2><button type="button" class="lien-carte" data-feuille="hypotheses">Hypothèses</button></div>
+        <div id="pa-chances"></div>
+      </div>
+      <div class="carte">
         <div class="carte-tete"><h2>Comparer deux plans</h2></div>
         <div id="pa-plans"></div>
       </div>
@@ -313,6 +325,7 @@
         <div class="actions">
           <label class="bouton" for="importer">Importer un fichier</label>
           <button type="button" class="bouton secondaire" id="exporter">Exporter un fichier</button>
+          <button type="button" class="bouton secondaire" id="exporter-tableur">Exporter en tableur (CSV)</button>
           <input type="file" id="importer" accept="application/json,.json" hidden>
         </div>
         <p class="message" id="donnees-message" role="status"></p>
@@ -336,8 +349,8 @@
       <div class="carte">
         <div class="carte-tete"><h2>Apparence et rapport</h2></div>
         <div class="segment" id="theme-choix"></div>
-        <p class="aide">Un rapport de 7 pages, mis en page avec graphiques en couleurs : couverture et chiffres clés, revenu, impôt, budget, dettes, avenir, hypothèses et sources. Dans la fenêtre qui s'ouvre, choisissez « Enregistrer en PDF » (sur iPhone : Partager, puis Enregistrer dans Fichiers).</p>
-        <div class="actions"><button type="button" class="bouton" id="imprimer">Créer le rapport PDF</button></div>
+        <p class="aide">Le rapport complet, mis en page avec graphiques en couleurs : couverture et chiffres clés, revenu, impôt, budget, dettes, patrimoine, dossier pour vos proches s'il est rempli, hypothèses et sources. La fiche d'une page résume l'essentiel pour votre partenaire, votre comptable ou votre conseiller. Dans la fenêtre qui s'ouvre, choisissez « Enregistrer en PDF » (sur iPhone : Partager, puis Enregistrer dans Fichiers).</p>
+        <div class="actions"><button type="button" class="bouton" id="imprimer">Créer le rapport PDF</button><button type="button" class="bouton secondaire" id="imprimer-fiche">Fiche d'une page</button></div>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>Recommencer</h2></div>

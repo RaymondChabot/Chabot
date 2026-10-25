@@ -81,12 +81,22 @@ Revenu affiche tous les détails.
   documents et personnes-ressources ; une page du rapport PDF.
 - **L'année en un coup d'œil** : diagramme de flux, des revenus aux impôts
   et frais, puis aux dépenses, aux dettes, à l'épargne et au surplus.
+- **Reste à dépenser librement** : revenu net moins les dépenses fixes, les
+  dépenses annuelles, les dettes et l'épargne. **Bilan du mois** : revenu
+  reçu et dépenses réelles comparés au budget, avec un rappel mensuel.
+- **Probabilité de réussite** : 300 simulations où le rendement varie
+  chaque année ; valeur nette dans 8 cas sur 10 et chances d'atteindre
+  l'indépendance financière.
+- **Fiche d'une page** (PDF) et **export en tableur** (CSV : résumé,
+  budget, dettes, projection) pour un ou une partenaire, un comptable ou
+  un conseiller.
 - **Dépenses annuelles** : le mois de chaque dépense annuelle, le montant à
   mettre de côté chaque mois et les échéances à venir.
 
 - **Rapport PDF** : 7 pages mises en page (couverture et chiffres clés,
-  revenu, impôt, budget, dettes, avenir, hypothèses et sources), avec
-  graphiques en couleurs ; « Enregistrer en PDF » du navigateur.
+  revenu, impôt, budget, dettes, patrimoine, hypothèses et sources), plus
+  le dossier pour les proches s'il est rempli, avec graphiques en
+  couleurs ; « Enregistrer en PDF » du navigateur.
 
 À l'acte : règles d'avant la Loi 2 (le mode composé n'est pas en vigueur),
 avec frais de cabinet (pourcentage de la facturation et montant fixe).
