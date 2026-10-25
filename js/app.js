@@ -354,7 +354,8 @@
   }
   const lire = p => p.split(".").reduce((o, k) => (o == null ? o : o[k]), S);
   const ecrire = (p, v) => { const k = p.split("."); let o = S; for (let i = 0; i < k.length - 1; i++) o = o[k[i]] ?? (o[k[i]] = {}); o[k[k.length - 1]] = v; };
-  const nouvelId = p => p + Math.random().toString(36).slice(2, 8);
+  // Déclarée comme fonction : le chargement s'en sert (lignes sans identifiant) avant d'arriver ici.
+  function nouvelId(p) { return p + Math.random().toString(36).slice(2, 8); }
 
   /* ---------- Formats ---------- */
   const fmt$ = new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 });
