@@ -93,6 +93,7 @@ a, .lien { color: var(--accent); }
 main { max-width: 1240px; margin: 0 auto; padding-block: 18px 40px; }
 .vue { display: flex; flex-direction: column; gap: 16px; }
 .vue[hidden] { display: none; }
+.champ[hidden] { display: none; }
 
 /* ---------- Colonnes ---------- */
 .deux-colonnes { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 18px; align-items: start; }
@@ -263,3 +264,8 @@ main { max-width: 1240px; margin: 0 auto; padding-block: 18px 40px; }
 .categorie > .bouton { margin: 4px 0 10px; }
 .nom-depense { font-size: 0.86rem; }
 .ligne-budget.remplie .nom-depense { font-weight: 600; }
+
+/* Vérification officielle */
+.verif-detail { margin-top: 10px; }
+.verif-detail > summary { cursor: pointer; font-size: 0.85rem; color: var(--discret); }
+.carte h4 { margin: 14px 0 4px; font-size: 0.85rem; font-weight: 600; }
