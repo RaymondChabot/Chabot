@@ -53,6 +53,15 @@
     { cle: "gross",  nom: "Suivi de grossesse",                    tarifs: [37.75, 42.85] },
   ];
   const PRISE_EN_CHARGE = { nonVuln: [64.50, 74.75], vuln: [72.65, 82.90] };
+  /* Tarifs de départ, tous modifiables dans les données (revenu.tarifs). Sans rendez-vous :
+     visites ponctuelles (urgences mineures), souvent de patients d'autres médecins ; départ
+     au tarif du suivi (mineure) et du suivi vulnérable (complexe), à vérifier dans l'onglet B. */
+  const TARIFS_DEFAUT = {
+    ...Object.fromEntries(VISITES.map(v => [v.cle, v.tarifs])),
+    pecNonVuln: PRISE_EN_CHARGE.nonVuln, pecVuln: PRISE_EN_CHARGE.vuln,
+    srvMineure: [32.25, 36.95], srvComplexe: [40.50, 45.20],
+  };
+  const tarifsDe = r => ({ ...TARIFS_DEFAUT, ...(r.tarifs || {}) });
 
   /* ---------- Outils ---------- */
   const parTranches = (revenu, tranches) => {
@@ -67,11 +76,11 @@
 
   /* Tarif moyen d'une visite autre qu'une prise en charge, selon la
      répartition saisie (les proportions sont ramenées à 100 %). */
-  function tarifVisite(mix, palier) {
+  function tarifVisite(mix, palier, tarifs = TARIFS_DEFAUT) {
     let somme = 0, poids = 0;
     for (const v of VISITES) {
       const w = Math.max(0, +mix[v.cle] || 0);
-      somme += w * v.tarifs[palier];
+      somme += w * (+(tarifs[v.cle] || v.tarifs)[palier] || 0);
       poids += w;
     }
     return poids > 0 ? somme / poids : 0;
@@ -100,71 +109,93 @@
     return { jours, parJour, total: jours * parJour };
   }
   function revenuGmfu(r) {
-    const W = Math.max(0, r.semaines), N = r.demiJournees, H = r.heuresParDJ;
+    const W = Math.max(0, r.semaines), N = r.demiJournees, H = r.heuresParDJ, TF = tarifsDe(r);
     const SRV = Math.max(0, r.demiJourneesSRV || 0), patientsSRV = Math.max(0, r.patientsSRV || 0);
     const T = Math.min(r.enseignement, N), C = Math.max(N - T, 0);
     const heuresSup = Math.min(H, r.supervisionMaxH);
-    const v = r.partVulnerable / 100;
+    // Clientèle : non vulnérables, vulnérables et très vulnérables (parts des inscrits).
+    const vt = borne((r.partTresVulnerable || 0) / 100, 0, 1), v = borne(r.partVulnerable / 100, 0, 1 - vt), nv = 1 - v - vt;
     const premiere = r.annee === "premiere";
+    // Apprenants en GMF-U : visites des résidents et des externes par demi-journée d'enseignement,
+    // facturées si l'on ne choisit pas l'acte de supervision (qui couvre toute la demi-journée).
+    const resid = Math.max(0, r.residents || 0), ext = Math.max(0, r.externes || 0);
+    const parSupervision = r.supervisionFacturation === "visites";
+    const visitesApprenants = parSupervision ? resid * (r.patientsParResident ?? 4.5) + ext * (r.patientsParExterne ?? 2.5) : 0;
+    // Sans rendez-vous : part des visites ponctuelles complexes.
+    const pc = borne((r.pctSrvComplexe || 0) / 100, 0, 1);
+    const tarifSrv = palier => (1 - pc) * TF.srvMineure[palier] + pc * TF.srvComplexe[palier];
+    // Majoration selon le territoire (rémunération différente) : sur les visites, les heures,
+    // la supervision, les demi-per diem et les activités ; pas sur les forfaits annuels.
+    const maj = 1 + (r.majorationPct || 0) / 100;
 
     const nouveaux = premiere ? r.nouveauxGuichet + r.nouveauxSansMedecin + r.nouveauxTransferes : 0;
     const etalement = Math.max(1, Math.min(W, r.semainesArrivee || W));
     let inscrits = premiere ? r.inscritsDebut : r.inscritsDebut + r.nouveauxGuichet + r.nouveauxSansMedecin + r.nouveauxTransferes;
     const inscritsDepart = inscrits;
 
-    let visitesMixte = 0, nbVisites = 0, nbPriseEnCharge = 0, forfaitVulnNouveaux = 0, semainesPalierHaut = 0;
+    let visitesMixte = 0, visitesSrv = 0, nbVisites = 0, nbPriseEnCharge = 0, forfaitVulnNouveaux = 0, semainesPalierHaut = 0;
     for (let k = 0; k < W; k++) {
       const palier = inscrits >= 499.999 ? 1 : 0;
       if (palier) semainesPalierHaut++;
       const arrivees = k < etalement ? nouveaux / etalement : 0;
       const visitesSem = C * r.patientsParDJ;
       const pec = Math.min(arrivees, visitesSem);
-      const tarifPec = (1 - v) * PRISE_EN_CHARGE.nonVuln[palier] + v * PRISE_EN_CHARGE.vuln[palier];
-      visitesMixte += pec * tarifPec + (visitesSem - pec) * tarifVisite(r.mix, palier);
-      visitesMixte += (T * r.patientsPendantSupervision + SRV * patientsSRV) * tarifVisite(r.mix, palier);
-      nbVisites += visitesSem + T * r.patientsPendantSupervision + SRV * patientsSRV;
+      const tarifPec = nv * TF.pecNonVuln[palier] + (v + vt) * TF.pecVuln[palier];
+      const tv = tarifVisite(r.mix, palier, TF);
+      visitesMixte += pec * tarifPec + (visitesSem - pec) * tv;
+      visitesMixte += (T * (r.patientsPendantSupervision || 0) + T * visitesApprenants) * tv;
+      visitesSrv += SRV * patientsSRV * tarifSrv(palier);
+      nbVisites += visitesSem + T * (r.patientsPendantSupervision || 0) + T * visitesApprenants + SRV * patientsSRV;
       nbPriseEnCharge += pec;
       // Forfait vulnérable : payé à partir du mois d'inscription (EP 40, par. 6.01).
       const mois = Math.floor((k / W) * 12);
-      forfaitVulnNouveaux += arrivees * v * r.forfaitVulnerable * (12 - mois) / 12;
+      forfaitVulnNouveaux += arrivees * (v * r.forfaitVulnerable + vt * (r.forfaitTresVulnerable ?? r.forfaitVulnerable)) * (12 - mois) / 12;
       inscrits += arrivees;
     }
     const inscritsFin = inscrits;
 
     // Forfaits et suppléments : identiques dans les deux modes.
     const forfaitInscription = inscritsFin * r.forfaitInscription;   // payé en entier (EP 40, par. 4.08)
-    const forfaitVulnerable = inscritsDepart * v * r.forfaitVulnerable + forfaitVulnNouveaux;
+    const forfaitVulnerable = inscritsDepart * (v * r.forfaitVulnerable + vt * (r.forfaitTresVulnerable ?? r.forfaitVulnerable)) + forfaitVulnNouveaux;
     let supplements = 0;
     if (premiere) {
       // Guichet : après 4 ans de pratique, le supplément majoré ne vaut que pour 150 patients par année (EP 40, par. 13.02).
       const guichetMajore = r.quatrePremieresAnnees ? r.nouveauxGuichet : Math.min(150, r.nouveauxGuichet);
-      supplements += r.nouveauxGuichet * (1 - v) * r.suppNonVulnerable;
-      supplements += guichetMajore * v * r.suppVulnerableGuichet;
+      const suppTV = r.suppTresVulnerable ?? r.suppVulnerableGuichet;
+      supplements += r.nouveauxGuichet * nv * r.suppNonVulnerable;
+      supplements += guichetMajore * v * r.suppVulnerableGuichet + r.nouveauxGuichet * vt * suppTV;
       supplements += (r.nouveauxGuichet - guichetMajore) * v * r.suppVulnerableHorsGuichet;
-      supplements += r.nouveauxSansMedecin * ((1 - v) * r.suppNonVulnerable + v * r.suppVulnerableHorsGuichet);
+      supplements += r.nouveauxSansMedecin * (nv * r.suppNonVulnerable + (v + vt) * r.suppVulnerableHorsGuichet);
+      // Prime d'inscription individuelle d'une entente ponctuelle, par nouveau patient (0 si aucune).
+      supplements += (r.nouveauxGuichet + r.nouveauxSansMedecin) * (r.primeInscription || 0);
     }
-    const perDiem = W * T * r.residents * r.perDiemResident;
+    // Supplément GMF par demi-journée de sans rendez-vous, selon le nombre de patients (codes 19928, 19929).
+    const suppSRVdj = patientsSRV >= 20 ? (r.suppSRV20 || 0) : patientsSRV >= 10 ? (r.suppSRV10 || 0) : 0;
+    const supplementsSRV = W * SRV * suppSRVdj;
+    const perDiem = W * T * (resid * r.perDiemResident + ext * (r.perDiemExterne || 0)) * maj;
     const detailActivites = (r.activites || []).map(a => revenuActivite(a, W));
-    const activites = detailActivites.reduce((t, x) => t + x.total, 0), autres = r.autresRevenus || 0;
-    const commun = forfaitInscription + forfaitVulnerable + supplements + perDiem + activites + autres;
+    const activites = detailActivites.reduce((t, x) => t + x.total, 0) * maj, autres = r.autresRevenus || 0;
+    const commun = forfaitInscription + forfaitVulnerable + supplements + supplementsSRV + perDiem + activites + autres;
+    const base = { perDiem, forfaitInscription, forfaitVulnerable, supplements, supplementsSRV, activites, autres };
 
     const heures = W * (N + SRV) * H;
-    const horaire = { heures: heures * r.tarifHoraire, perDiem, forfaitInscription, forfaitVulnerable, supplements, activites, autres };
+    const horaire = { heures: heures * r.tarifHoraire * maj, ...base };
     horaire.total = horaire.heures + commun;
+    const actesSupervision = parSupervision ? 0 : W * T * heuresSup * r.acteSupervision * maj;
     const mixte = {
-      forfaitHoraire: heures * r.forfaitHoraireMixte,
-      visites: visitesMixte * r.pctMixte / 100,
-      supervision: W * T * heuresSup * r.acteSupervision * r.pctSupervision / 100,
-      perDiem, forfaitInscription, forfaitVulnerable, supplements, activites, autres,
+      forfaitHoraire: heures * r.forfaitHoraireMixte * maj,
+      visites: (visitesMixte + visitesSrv) * maj * r.pctMixte / 100,
+      supervision: actesSupervision * r.pctSupervision / 100,
+      ...base,
     };
     mixte.total = mixte.forfaitHoraire + mixte.visites + mixte.supervision + commun;
     // À l'acte : chaque visite et l'acte de supervision au tarif de l'entente (100 % par défaut),
     // sans forfait horaire ; forfaits d'inscription, suppléments et demi-per diem comme ailleurs.
     const pctActe = r.pctActe ?? 100, pctSupActe = r.pctSupervisionActe ?? 100;
     const acte = {
-      visites: visitesMixte * pctActe / 100,
-      supervision: W * T * heuresSup * r.acteSupervision * pctSupActe / 100,
-      perDiem, forfaitInscription, forfaitVulnerable, supplements, activites, autres,
+      visites: (visitesMixte + visitesSrv) * maj * pctActe / 100,
+      supervision: actesSupervision * pctSupActe / 100,
+      ...base,
     };
     acte.total = acte.visites + acte.supervision + commun;
     // Frais de cabinet (loyer, personnel, équipement) remis à la clinique : un pourcentage
@@ -178,14 +209,14 @@
     acte.fraisCabinet = frais(acte, true);
 
     // Seuil : nombre de patients par demi-journée clinique où le mixte égale l'horaire.
-    const parVisite = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0) * r.pctMixte / 100;
-    const seuil = parVisite > 0 ? (r.tarifHoraire - r.forfaitHoraireMixte) * H / parVisite : null;
-    const parVisiteActe = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0) * pctActe / 100;
+    const parVisite = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0, TF) * maj * r.pctMixte / 100;
+    const seuil = parVisite > 0 ? (r.tarifHoraire - r.forfaitHoraireMixte) * maj * H / parVisite : null;
+    const parVisiteActe = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0, TF) * maj * pctActe / 100;
     // Au seuil, chaque visite à l'acte, après le pourcentage remis à la clinique, égale l'heure au taux horaire.
     const netVisite = parVisiteActe * (1 - (r.fraisCabinetPct || 0) / 100) / (r.fraisCabinetTousModes ? 1 - (r.fraisCabinetPct || 0) / 100 : 1);
-    const seuilActe = netVisite > 0 ? r.tarifHoraire * H / netVisite : null;
+    const seuilActe = netVisite > 0 ? r.tarifHoraire * maj * H / netVisite : null;
 
-    return { heures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, semainesPalierHaut, activites, detailActivites,
+    return { heures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, semainesPalierHaut, activites, detailActivites, visitesApprenants: W * T * visitesApprenants,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
   }
 
@@ -225,19 +256,21 @@
   /* Revenu de travail autonome (RAMQ), moins les dépenses et le REER.
      interetsEtudes : intérêts payés sur un prêt de l'aide financière aux études.
      Rend aussi le revenu net fédéral et québécois, qui servent aux prestations familiales. */
+  // autresImposables : revenus imposables qui ne sont pas du travail (location nette, placements
+  // hors REER et CELI) : sans RRQ ni RQAP. reer : REER et CELIAPP, déductibles.
   function impotParticulier(o) {
-    const revenuNetAffaires = Math.max(0, o.revenu - (o.depensesPro || 0));
+    const revenuNetAffaires = Math.max(0, o.revenu - (o.depensesPro || 0)), autres = Math.max(0, o.autresImposables || 0);
     const c = cotisationsAutonome(revenuNetAffaires);
-    const imposableFed = Math.max(0, revenuNetAffaires - c.deduction - (o.reer || 0));
+    const imposableFed = Math.max(0, revenuNetAffaires - c.deduction - (o.reer || 0) + autres);
     const imposableQc = Math.max(0, imposableFed - deductionTravailleur(revenuNetAffaires));
     const ie = o.interetsEtudes || 0;
     const { fed, qc } = impotsDeBase(imposableFed, imposableQc, c.creditFederal, 0,
       ie * P2026.creditInteretsEtudes.federal, ie * P2026.creditInteretsEtudes.quebec);
-    const cotisationFss = fss(revenuNetAffaires);
+    const cotisationFss = fss(revenuNetAffaires + autres);
     const total = fed + qc + c.rrq + c.rqap + cotisationFss;
-    return { revenu: o.revenu, imposable: imposableFed, imposableQc, revenuNetFed: imposableFed, revenuNetQc: imposableQc,
+    return { revenu: o.revenu, autres, imposable: imposableFed, imposableQc, revenuNetFed: imposableFed, revenuNetQc: imposableQc,
       fed, qc, rrq: c.rrq, rqap: c.rqap, ae: 0, fss: cotisationFss, total, totalGlobal: total,
-      net: o.revenu - total, tauxMoyen: o.revenu > 0 ? total / o.revenu : 0 };
+      net: o.revenu + autres - total, tauxMoyen: o.revenu + autres > 0 ? total / (o.revenu + autres) : 0 };
   }
 
   /* Salarié : RRQ, RQAP et assurance-emploi de l'employé. Déductions : cotisations
@@ -336,16 +369,16 @@
     const impotSoc = profit * o.tauxSociete;
     const disponible = profit - impotSoc;
     const dividendes = o.retrait === "fixe" ? Math.min(disponible, Math.max(0, o.retraitFixe || 0)) : disponible;
-    const d = P2026.dividendes, majore = dividendes * (1 + d.majoration);
-    const imposable = Math.max(0, majore - (o.reer || 0));
+    const d = P2026.dividendes, majore = dividendes * (1 + d.majoration), autres = Math.max(0, o.autresImposables || 0);
+    const imposable = Math.max(0, majore + autres - (o.reer || 0));
     const ie = o.interetsEtudes || 0;
     const { fed, qc } = impotsDeBase(imposable, imposable, 0, 0,
       majore * d.creditFederal + ie * P2026.creditInteretsEtudes.federal, majore * d.creditQuebec + ie * P2026.creditInteretsEtudes.quebec);
-    const cotisationFss = fss(majore);
+    const cotisationFss = fss(majore + autres);
     const total = fed + qc + cotisationFss;
-    return { revenu: o.revenu, dividendes, imposable, imposableQc: imposable, revenuNetFed: imposable, revenuNetQc: imposable,
+    return { revenu: o.revenu, autres, dividendes, imposable, imposableQc: imposable, revenuNetFed: imposable, revenuNetQc: imposable,
       fed, qc, rrq: 0, rqap: 0, ae: 0, fss: cotisationFss, total, totalGlobal: total + impotSoc,
-      net: dividendes - total, tauxMoyen: o.revenu > 0 ? (total + impotSoc) / o.revenu : 0,
+      net: dividendes + autres - total, tauxMoyen: o.revenu + autres > 0 ? (total + impotSoc) / (o.revenu + autres) : 0,
       societe: { profit, impotSociete: impotSoc, disponible, dividendes, retenu: disponible - dividendes, frais: o.fraisSociete || 0, depenses: o.depensesPro || 0 } };
   }
 
@@ -540,6 +573,9 @@
     const ans = o.annees || 20, r = o.rendement / 100, rm = Math.pow(1 + r, 1 / 12) - 1;
     const voitures = o.voitures || [];
     let reer = o.reer.solde, celi = o.celi.solde, conj = o.actifsConjoint || 0, soc = o.societe ? o.societe.solde || 0 : 0;
+    // CELIAPP : cotisations jusqu'au plafond à vie (40 000 $), croissance à l'abri de l'impôt.
+    const ca = o.celiapp || { solde: 0, cotisationAnnuelle: 0 };
+    let celiapp = ca.solde || 0, cumulCeliapp = ca.solde || 0;
     // Placements de la société : rendement après l'impôt de la société sur le revenu de placement.
     const rmSoc = o.societe ? Math.pow(1 + r * (1 - (o.societe.impotPlacement ?? 0.5)), 1 / 12) - 1 : 0;
     // Autos : chacune perd de la valeur chaque année ; si un remplacement est prévu, une auto
@@ -561,6 +597,9 @@
           // Sans remboursement accéléré (minimums seulement), le surplus du mois est épargné.
           celi = celi * (1 + rm) + o.celi.cotisationAnnuelle / 12 + (libre || 0) + (o.ajoutMensuel ? Math.max(0, o.ajoutMensuel(a - 1)) : 0);
           conj = conj * (1 + rm) + (o.epargneConjointe || 0) * Math.pow(1 + (o.hausseEpargneConjointe || 0) / 100, a - 1);
+          const cCeliapp = k % 12 === 0 ? Math.min(ca.cotisationAnnuelle || 0, Math.max(0, 40000 - cumulCeliapp)) : 0;
+          if (k % 12 === 0) cumulCeliapp += cCeliapp;
+          celiapp = celiapp * (1 + rm) + cCeliapp;
           if (o.societe) soc = soc * (1 + rmSoc) + Math.max(0, o.societe.retenuAnnee(a - 1)) / 12;
         }
         for (const v of autos) {
@@ -588,18 +627,18 @@
       const maisonMenage = valeurMaison * (o.maison.partMenage ?? o.maison.part) / 100;
       const vMoi = autos.filter(v => !v.conjointe).reduce((s, v) => s + v.valeurCourante, 0);
       const vMenage = autos.reduce((s, v) => s + v.valeurCourante, 0);
-      const placements = reer + celi + encaisse + attente;
+      const placements = reer + celi + celiapp + encaisse + attente;
       const moi = maisonMoi - hypMoi + vMoi + placements + soc - autresMoi;
       const menage = maisonMenage - hypMenage + vMenage + placements + conj + soc - autresMenage;
       res.push({ annee: o.anneeDepart + a, moi, menage, valeurMaison, maisonMoi, maisonMenage, hypMoi, hypMenage,
         equiteMoi: maisonMoi - hypMoi, equiteMenage: maisonMenage - hypMenage, autresMoi, autresMenage,
-        voitureMoi: vMoi, voitureMenage: vMenage, reer, celi, encaisse, attente, placements, societe: soc, conjointe: conj,
+        voitureMoi: vMoi, voitureMenage: vMenage, reer, celi, celiapp, encaisse, attente, placements, societe: soc, conjointe: conj,
         hypotheque: hypMenage, dettes: hypMenage + autresMenage });
     }
     return res;
   }
 
-  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

@@ -26,23 +26,41 @@ propriétaire ou locataire, travail autonome ou pratique incorporée.
 
 Au premier lancement, un **assistant de départ** pose quelques questions
 (famille, enfants, pratique, logement, dettes) et bâtit le point de départ
-à partir des réponses ; l'exemple fictif reste offert. Des conjoints de
+à partir des réponses ; l'exemple fictif reste offert. Il propose ensuite
+deux **parcours pas à pas**, facultatifs : les revenus (pratique, semaine,
+apprenants, clientèle, frais de cabinet, activités, autres revenus,
+dépenses professionnelles) et le budget (une catégorie par écran). Chaque
+écran explique quoi inscrire et se passe. La carte **Votre portrait** de
+l'aperçu montre ce qui est rempli et propose la suite. Des conjoints de
 fait ne forment un couple pour l'impôt qu'après 12 mois de vie commune ou
 avec un enfant commun : avant, chacun est imposé seul.
+
+L'essentiel suffit pour commencer ; le bouton **Optimiser** du panneau
+Revenu affiche tous les détails.
 
 - **Revenu** : pratique principale en GMF ou clinique privée (à l'acte,
   frais de cabinet), en GMF-U ou en CLSC (taux horaire, mode mixte ou à
   l'acte), avec les tarifs de la RAMQ : demi-journées de rendez-vous et de
-  sans rendez-vous, patients, supervision, prise en charge de nouveaux
-  patients. En plus : activités en établissement (urgence,
-  hospitalisation, obstétrique, soins palliatifs, CHSLD, gardes, autre),
-  par semaine, par mois, par année ou toutes les N semaines, au revenu par
-  jour ou aux patients par jour × revenu par patient.
+  sans rendez-vous (tarifs à part : visites ponctuelles mineures et
+  complexes, suppléments GMF par demi-journée), patients, prise en charge
+  de nouveaux patients, patients vulnérables et très vulnérables. En GMF-U :
+  résidents (4 à 5 patients par demi-journée) et externes (2 à 3),
+  supervision facturée à l'acte de supervision ou aux visites des
+  apprenants. Tous les tarifs, forfaits et suppléments se modifient ;
+  majoration selon le territoire. En plus : activités en établissement
+  (urgence, hospitalisation, obstétrique, soins palliatifs, CHSLD, gardes,
+  autre), par semaine, par mois, par année ou toutes les N semaines, au
+  revenu par jour ou aux patients par jour × revenu par patient ; autres
+  revenus (formulaires, expertises, médico-administratif, enseignement,
+  location, placements) et lignes libres.
 - **Impôt 2026** : fédéral et Québec, RRQ, RQAP, Fonds des services de
   santé ; société et dividendes ; partenaire salarié ou à son compte et
   transferts de crédits ; allocations
-  familiales, prime d'assurance médicaments, REER, société.
-- **Budget et dettes** : une case par dépense récurrente ; avalanche,
+  familiales, prime d'assurance médicaments, REER, CELIAPP, société ;
+  dépenses professionnelles en un total ou ligne par ligne (Collège des
+  médecins, FMOQ, ACPM, formation, équipement…).
+- **Budget et dettes** : une case par dépense récurrente (plus de 70
+  postes) ou un total estimé par catégorie ; avalanche,
   hybride ou boule de neige ; hypothèques à intérêt composé deux fois par
   année, paiement recalculé au renouvellement, droit annuel de
   remboursement anticipé.
@@ -73,7 +91,7 @@ REEE. Cas fictifs seulement.
 |---|---|
 | `index.html` | Structure de la page |
 | `styles.css` | Mise en page, thèmes clair et sombre |
-| `js/calc.js` | Calculs (revenu détaillé ou simple, impôt 2026, dettes, épargne), sans accès à la page |
+| `js/calc.js` | Calculs (revenu, impôt 2026, dettes, épargne), sans accès à la page |
 | `js/app.js` | Interface, sauvegarde locale, import et export |
 | `js/rapport.js` | Rapport PDF mis en page |
 | `tests/calculs.test.js` | Tests des calculs (Node, sans dépendance) |
@@ -90,7 +108,12 @@ dossier racine.
 - Tarif horaire, mode mixte et supervision : EP 42 et annexe XXIII ; les
   montants par défaut sont les derniers publiés trouvés et doivent être
   confirmés.
-- Forfaits et suppléments d'inscription : EP 40.
+- Forfaits et suppléments d'inscription : EP 40. Suppléments du sans
+  rendez-vous (codes 19928 et 19929) et des patients très vulnérables
+  (code 19960) : à inscrire selon les montants en vigueur.
+- Dépenses professionnelles : grille tarifaire 2026-2027 du Collège des
+  médecins ; cotisations 2027 de l'ACPM au Québec.
+- CELIAPP : 8 000 $ par année, 40 000 $ à vie (Agence du revenu du Canada).
 - Impôt : tables fédérales et québécoises 2026, RRQ et RQAP 2026 ; vérifié
   contre l'outil de calcul du revenu disponible du ministère des Finances
   du Québec (mai 2026).

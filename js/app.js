@@ -34,9 +34,15 @@
       pctActe: 100, pctSupervisionActe: 100,
       fraisCabinetPct: 30, fraisCabinetMois: 0, compensationCabinet: 0, fraisCabinetTousModes: false,
       // Activités en établissement, en plus de la pratique principale.
+      partTresVulnerable: 0, forfaitTresVulnerable: 55, suppTresVulnerable: 124.50, primeInscription: 0,
+      externes: 0, patientsParResident: 4.5, patientsParExterne: 2.5, supervisionFacturation: "acte", perDiemExterne: 0,
+      pctSrvComplexe: 0, suppSRV10: 0, suppSRV20: 0, majorationPct: 0,
+      tarifs: JSON.parse(JSON.stringify(C.TARIFS_DEFAUT)),
+      // Autres revenus : une ligne par source (voir CATALOGUE_REVENUS) ; montants à 0 au départ.
+      lignes: [],
       activites: [{ id: "a1", type: "hospitalisation", nom: "", nombre: 7, frequence: "cycle", cycle: 6, calcul: "patients", parJour: 960, patients: 16, parPatient: 60 }],
     },
-    impot: { depensesPro: 3000, structure: "particulier" },
+    impot: { depensesPro: 3000, structure: "particulier", depensesProMode: "total", depensesProDetail: [] },
     // Union : mariés (ou union civile) ou conjoints de fait ; ces derniers forment un couple
     // pour l'impôt après 12 mois de vie commune ou avec un enfant commun.
     conjointe: { active: false, designation: "partenaire", lien: "maries", depuis12mois: true, enfantCommun: false, statut: "salarie", salaire: 0, rpa: 0, syndicat: 0, revenuAutonome: 0, depensesAutonome: 0,
@@ -71,7 +77,11 @@
       reee: { cotisationAnnuelle: 0, enfants: [] },
       reer: { solde: 25000, droits: 0, cotisationAnnuelle: 0 },
       celi: { solde: 0, cotisationAnnuelle: 0 },
+      // CELIAPP : 8 000 $ par année, 40 000 $ à vie ; déductible ; retrait sans impôt pour une première propriété.
+      celiapp: { solde: 0, cotisationAnnuelle: 0 },
     },
+    // Catégories du budget où l'on inscrit un seul total plutôt que le détail.
+    budgetTotaux: {},
     // Logement : propriétaire (maison et hypothèque) ou locataire (loyer au budget, pas de maison).
     actifs: { logement: "locataire", maison: { valeur: 0, part: 0, croissance: 3 }, voiture: { valeur: 0, depreciation: 15, remplacementAns: 0, prixNeuf: 40000 }, actifsConjoint: 0 },
   };
@@ -95,11 +105,14 @@
       ["terrain", "Terrain, piscine, paysagement", "an", "moi"],
       ["alarme", "Système d'alarme", "mois", "moi"],
       ["meubles", "Meubles et électroménagers", "an", "moi"],
+      ["condo", "Frais de copropriété (condo)", "mois", "moi"],
+      ["entreposage", "Entreposage", "mois", "moi"],
     ] },
     { cat: "Alimentation", items: [
       ["epicerie", "Épicerie", "mois", "moi"],
       ["restaurants", "Restaurants et commandes", "mois", "moi"],
       ["lunchs", "Lunchs et cafés au travail", "mois", "moi"],
+      ["alcool", "Alcool et SAQ", "mois", "moi"],
     ] },
     { cat: "Transport", items: [
       ["assuranceAuto", "Assurance auto", "mois", "moi"],
@@ -109,6 +122,9 @@
       ["immatriculation", "Immatriculation et permis de conduire", "an", "moi"],
       ["stationnement", "Stationnement", "mois", "moi"],
       ["transportCommun", "Transport en commun et taxi", "mois", "moi"],
+      ["locationAuto", "Location d'auto (crédit-bail)", "mois", "moi"],
+      ["caa", "CAA et assistance routière", "an", "moi"],
+      ["veloPartage", "Vélo, BIXI, Communauto", "mois", "moi"],
     ] },
     { cat: "Enfants", items: [
       ["garderie", "Garderie ou CPE", "mois", "moi"],
@@ -119,6 +135,8 @@
       ["gardiennage", "Gardiennage", "mois", "moi"],
       ["jouets", "Jouets, livres, fêtes d'amis", "mois", "moi"],
       ["ecole", "École : frais, fournitures et service de garde", "mois", "moi"],
+      ["ecolePrivee", "École privée : droits de scolarité", "an", "moi"],
+      ["argentPoche", "Argent de poche", "mois", "moi"],
     ] },
     { cat: "Santé", items: [
       ["assuranceMedicaments", "Assurance médicaments", "an", "moi"],
@@ -126,17 +144,22 @@
       ["dentiste", "Dentiste", "an", "moi"],
       ["lunettes", "Optométriste et lunettes", "an", "moi"],
       ["therapies", "Physiothérapie, psychologue et autres soins", "an", "moi"],
+      ["orthodontie", "Orthodontie", "an", "moi"],
+      ["assuranceSante", "Assurance santé et dentaire privée", "mois", "moi"],
     ] },
     { cat: "Assurances personnelles", items: [
       ["assuranceInvalidite", "Assurance invalidité", "mois", "moi"],
       ["assuranceVie", "Assurance vie", "mois", "moi"],
       ["maladiesGraves", "Assurance maladies graves", "mois", "moi"],
+      ["assuranceVoyage", "Assurance voyage", "an", "moi"],
     ] },
     { cat: "Télécom et abonnements", items: [
       ["cellulaires", "Cellulaires", "mois", "moi"],
       ["internet", "Internet", "mois", "moi"],
       ["television", "Télévision et diffusion en continu", "mois", "moi"],
       ["abonnements", "Autres abonnements : applications, journaux", "mois", "moi"],
+      ["telephoneFixe", "Téléphone fixe", "mois", "moi"],
+      ["infonuagique", "Logiciels et stockage en ligne", "mois", "moi"],
     ] },
     { cat: "Personnel et loisirs", items: [
       ["vetementsAdultes", "Vêtements des adultes", "mois", "moi"],
@@ -147,16 +170,62 @@
       ["cadeaux", "Cadeaux et fêtes", "an", "moi"],
       ["animaux", "Animaux", "mois", "moi"],
       ["dons", "Dons", "an", "moi"],
+      ["electronique", "Électronique et ordinateurs", "an", "moi"],
+      ["clubs", "Clubs et cotisations", "an", "moi"],
+      ["tabac", "Tabac et vapotage", "mois", "moi"],
     ] },
     { cat: "Finances", items: [
       ["fraisBancaires", "Frais bancaires", "mois", "moi"],
       ["comptable", "Comptable et déclarations de revenus", "an", "moi"],
       ["pensionAlimentaire", "Pension alimentaire", "mois", "moi"],
+      ["fraisPlacements", "Frais de gestion de placements", "an", "moi"],
+      ["aideFamille", "Aide financière à la famille", "mois", "moi"],
     ] },
     { cat: "Imprévus", items: [
       ["imprevus", "Imprévus", "mois", "moi"],
     ] },
   ];
+  /* AUTRES REVENUS : une ligne par source possible, à 0 au départ. pro : revenu professionnel
+     (avec la pratique : impôt, RRQ, RQAP) ; sinon imposable, sans RRQ ni RQAP. */
+  const CATALOGUE_REVENUS = [
+    ["formulaires", "Formulaires et services non assurés", true, "SAAQ, assureurs, notes et certificats médicaux facturés aux patients ou aux tiers."],
+    ["expertises", "Expertises médicales", true, "Évaluations pour la CNESST, la SAAQ, des assureurs ou des avocats."],
+    ["medicoAdmin", "Activités médico-administratives", true, "Comités, chef de département ou de GMF, médecin responsable : per diem et forfaits."],
+    ["enseignement", "Enseignement et conférences (hors RAMQ)", true, "Chargé de cours, conférences, préceptorat payé par l'université."],
+    ["ressourcement", "Formation continue remboursée", true, "Allocations de ressourcement et per diem de formation."],
+    ["prive", "Services privés ou hors RAMQ", true, "Télémédecine privée, médecine du voyage, services aux entreprises."],
+    ["ramq", "Autres paiements de la RAMQ", true, "Ce qui n'entre ni dans la pratique ni dans les activités en établissement."],
+    ["location", "Revenus de location, après dépenses", false, "Logement ou local loué."],
+    ["placements", "Revenus de placements hors REER et CELI", false, "Intérêts et dividendes d'un compte non enregistré."],
+  ];
+  const ITEMS_REVENUS = new Map(CATALOGUE_REVENUS.map(([k, nom, pro, aide]) => [k, { k, nom, pro, aide }]));
+  // Toutes les cases du catalogue, dans l'ordre, puis les lignes ajoutées à la main.
+  function normaliserLignes(lignes) {
+    const parCle = new Map((lignes || []).filter(l => l.k && ITEMS_REVENUS.has(l.k)).map(l => [l.k, l]));
+    const r = CATALOGUE_REVENUS.map(([k]) => { const l = parCle.get(k); return { id: k, k, nom: "", montant: l ? +l.montant || 0 : 0, periode: l ? l.periode || "an" : "an" }; });
+    for (const l of lignes || []) if (!l.k || !ITEMS_REVENUS.has(l.k)) r.push({ id: l.id || nouvelId("r"), k: null, nom: l.nom || "Revenu", montant: +l.montant || 0, periode: l.periode || "an", pro: l.pro !== false });
+    return r;
+  }
+  const annuelLigne = l => (+l.montant || 0) * (l.periode === "mois" ? 12 : 1);
+  const estPro = l => l.k ? ITEMS_REVENUS.get(l.k).pro : l.pro !== false;
+  const nomLigne = l => l.k ? ITEMS_REVENUS.get(l.k).nom : l.nom;
+  /* DÉPENSES PROFESSIONNELLES déductibles : un total, ou le détail ligne par ligne. */
+  const CATALOGUE_PRO = [
+    ["cmq", "Collège des médecins : cotisation annuelle", "1 930 $ pour un membre actif en 2026-2027 (grille tarifaire du CMQ)."],
+    ["fmoq", "FMOQ et association régionale", "Retenue par la RAMQ sur vos paiements (5 % jusqu'au plein montant annuel)."],
+    ["acpm", "ACPM : responsabilité professionnelle, part non remboursée", "Au Québec, environ 515 $ en moyenne en 2027, plus 9 % de taxe ; selon votre code de travail."],
+    ["formation", "Formation continue et congrès", "Inscriptions, déplacements et hébergement."],
+    ["abonnements", "Livres, abonnements et applications médicales", "UpToDate, revues, applications cliniques."],
+    ["equipement", "Équipement et instruments médicaux", "Stéthoscope, otoscope, trousse, petit matériel."],
+    ["telecom", "Cellulaire et internet : partie professionnelle", ""],
+    ["auto", "Auto : partie professionnelle", "Déplacements entre lieux de travail ; pas le trajet entre la maison et le travail."],
+    ["bureau", "Bureau à domicile", "Part des frais de la maison, si vous y travaillez."],
+    ["fraisGeneraux", "Assurance frais généraux", "Paie les frais du cabinet pendant une invalidité."],
+    ["comptable", "Comptable et frais de gestion", ""],
+    ["autres", "Autres dépenses professionnelles", ""],
+  ];
+  const ITEMS_PRO = new Map(CATALOGUE_PRO.map(([k, nom, aide]) => [k, { k, nom, aide }]));
+  const normaliserPro = l => { const m = new Map((l || []).map(x => [x.k, x])); return CATALOGUE_PRO.map(([k]) => ({ k, montant: m.has(k) ? +m.get(k).montant || 0 : 0, periode: m.has(k) ? m.get(k).periode || "an" : "an" })); };
   const ITEMS = new Map(CATALOGUE.flatMap(c => c.items.map(([k, nom, periode, qui]) => [k, { k, nom, periode, qui, cat: c.cat }])));
   const AIDE_CATEGORIE = {
     "Santé": "Sans assurance collective, la prime du régime public d'assurance médicaments se paie avec l'impôt du Québec : inscrivez-la ici.",
@@ -178,7 +247,13 @@
     return resultat;
   }
   const nomDepense = b => b.k ? ITEMS.get(b.k).nom : b.nom;
-  const categorie = b => b.k ? ITEMS.get(b.k).cat : "Autres dépenses";
+  const categorie = b => b.cat || (b.k ? ITEMS.get(b.k).cat : "Autres dépenses");
+  // Dépenses prises en compte : les lignes, sauf dans les catégories où l'on a choisi un total.
+  const totalActif = g => S.budgetTotaux && S.budgetTotaux[g] && S.budgetTotaux[g].actif;
+  const depensesEffectives = () => [
+    ...S.budget.filter(b => !totalActif(categorie(b))),
+    ...Object.entries(S.budgetTotaux || {}).filter(([, t]) => t.actif).map(([g, t]) => ({ id: "total-" + g, k: null, cat: g, nom: g + " (total)", montant: +t.montant || 0, periode: "mois", qui: t.qui || "moi" })),
+  ];
 
   /* Résultats de l'outil de calcul du revenu disponible du ministère des Finances du
      Québec (version de mai 2026, revenus d'emploi), relevés le 25 octobre 2026.
@@ -204,6 +279,8 @@
     if (d.revenu) {
       if (!["clinique", "gmfu", "clsc"].includes(d.revenu.milieu)) d.revenu.milieu = d.revenu.milieu ? "clinique" : "gmfu";
       d.revenu.demiJourneesSRV ??= 0; d.revenu.patientsSRV ??= 0; d.revenu.activites ??= [];
+      if (!d.revenu.lignes && d.revenu.autresRevenus > 0) d.revenu.lignes = [{ k: "ramq", montant: d.revenu.autresRevenus, periode: "an" }];
+      if (d.revenu.lignes) d.revenu.autresRevenus = 0;
     }
     if (d.actifs && !d.actifs.logement) d.actifs.logement = d.actifs.maison && d.actifs.maison.valeur > 0 ? "proprietaire" : "locataire";
     return d;
@@ -212,8 +289,14 @@
     try { const t = localStorage.getItem(CLE); if (t) return fusion(clone(EXEMPLE), migrer(JSON.parse(t))); } catch (e) { /* stockage indisponible */ }
     return clone(EXEMPLE);
   }
-  let S = charger();
-  S.budget = normaliserBudget(S.budget);
+  // Une case par poste des catalogues : budget, autres revenus, dépenses professionnelles.
+  function normaliser(s) {
+    s.budget = normaliserBudget(s.budget);
+    s.revenu.lignes = normaliserLignes(s.revenu.lignes);
+    s.impot.depensesProDetail = normaliserPro(s.impot.depensesProDetail);
+    return s;
+  }
+  let S = normaliser(charger());
   function sauver() {
     S.meta.misAJour = new Date().toISOString();
     try { localStorage.setItem(CLE, JSON.stringify(S)); } catch (e) { /* le calcul fonctionne quand même */ }
@@ -271,60 +354,83 @@
       { p: "revenu.milieu", l: "Pratique principale", t: "select", o: Object.entries(MILIEUX).map(([k, m]) => [k, m.long]), h: "Urgence, hospitalisation, obstétrique et autres activités en établissement : ajoutez-les dans la page Revenu." },
       { p: "revenu.annee", l: "Année calculée", t: "select", o: [["premiere", "Première année de pratique"], ["type", "Année type, plein régime"]], h: "Première année : arrivée des nouveaux patients au fil de l'année." },
       { p: "revenu.semaines", l: "Semaines en clinique par année", u: "sem.", h: "Sans les vacances ni les semaines passées à l'hôpital." },
-      { p: "revenu.autresRevenus", l: "Autres revenus RAMQ", u: "$/an", s: 100, h: "Ce qui n'entre ni dans la pratique principale ni dans les activités." },
-      { g: "Votre semaine" },
-      { p: "revenu.demiJournees", l: "Demi-journées de rendez-vous par semaine", u: "d.-j.", h: "En GMF-U, enseignement compris." },
+      { p: "revenu.majorationPct", l: "Majoration selon le territoire", u: "%", s: 0.5, si: "details", h: "Rémunération différente en territoire désigné (annexe XII) : par exemple 15 pour 115 %. Sur les visites, les heures et les activités ; pas sur les forfaits. 0 ailleurs." },
+      { g: "Vos demi-journées" },
+      { p: "revenu.demiJournees", l: "Demi-journées de rendez-vous par semaine", u: "d.-j.", h: "Vos propres patients. En GMF-U, enseignement compris." },
       { p: "revenu.patientsParDJ", l: "Patients par demi-journée de rendez-vous", u: "pat.", s: 0.5 },
-      { p: "revenu.demiJourneesSRV", l: "Demi-journées de sans rendez-vous (SRV)", u: "d.-j." },
+      { p: "revenu.demiJourneesSRV", l: "Demi-journées de sans rendez-vous (SRV)", u: "d.-j.", h: "Urgences mineures, souvent des patients d'autres médecins : tarifs à part." },
       { p: "revenu.patientsSRV", l: "Patients par demi-journée de SRV", u: "pat.", s: 0.5, si: "revenu.demiJourneesSRV" },
-      { p: "revenu.heuresParDJ", l: "Heures par demi-journée", u: "h", s: 0.25 },
-      { p: "revenu.enseignement", l: "Demi-journées d'enseignement", u: "d.-j.", si: SI_GMFU },
-      { p: "revenu.residents", l: "Résidents supervisés en même temps", u: "rés.", si: SI_GMFU },
-      { p: "revenu.patientsPendantSupervision", l: "Patients vus vous-même pendant la supervision", u: "pat.", s: 0.5, h: "Payés seulement au mode mixte.", si: SI_GMFU },
+      { p: "revenu.heuresParDJ", l: "Heures par demi-journée", u: "h", s: 0.25, si: "details" },
+      { g: "Enseignement et apprenants", si: SI_GMFU },
+      { p: "revenu.enseignement", l: "Demi-journées d'enseignement par semaine", u: "d.-j." },
+      { p: "revenu.residents", l: "Résidents supervisés en même temps", u: "rés." },
+      { p: "revenu.externes", l: "Externes supervisés en même temps", u: "ext." },
+      { p: "revenu.supervisionFacturation", l: "Facturation des demi-journées de supervision", t: "select", o: [["acte", "Acte de supervision, un par demi-journée"], ["visites", "Visites vues par les apprenants"]], h: "L'acte de supervision couvre tous les services de la demi-journée. Sinon, les visites des apprenants sont facturées (avec le forfait horaire au mixte)." },
+      { p: "revenu.patientsParResident", l: "Patients vus par un résident, par demi-journée", u: "pat.", s: 0.5, si: "revenu.supervisionFacturation=visites", h: "En moyenne 4 à 5." },
+      { p: "revenu.patientsParExterne", l: "Patients vus par un externe, par demi-journée", u: "pat.", s: 0.5, si: "revenu.supervisionFacturation=visites", h: "En moyenne 2 à 3." },
+      { p: "revenu.patientsPendantSupervision", l: "Patients vus vous-même pendant la supervision", u: "pat.", s: 0.5, si: "details" },
       { g: "Votre clientèle" },
       { p: "revenu.inscritsDebut", l: "Patients inscrits au départ", u: "pat." },
       { p: "revenu.nouveauxGuichet", l: "Nouveaux patients du guichet d'accès", u: "pat." },
-      { p: "revenu.nouveauxSansMedecin", l: "Nouveaux patients sans médecin, hors guichet", u: "pat.", h: "Par exemple, les patients d'un médecin retraité qui a avisé la RAMQ. Ils donnent droit au supplément." },
-      { p: "revenu.nouveauxTransferes", l: "Patients transférés, déjà inscrits ailleurs", u: "pat.", h: "Pas de supplément." },
-      { p: "revenu.semainesArrivee", l: "Arrivée des nouveaux patients étalée sur", u: "sem." },
-      { p: "revenu.partVulnerable", l: "Patients vulnérables", u: "%" },
-      { p: "revenu.quatrePremieresAnnees", l: "Dans mes 4 premières années de pratique", t: "check", h: "Après 4 ans, le supplément majoré du guichet ne s'applique qu'à 150 patients par année." },
-      { g: "Vos visites, hors prise en charge (%)" },
+      { p: "revenu.partVulnerable", l: "Patients vulnérables", u: "%", h: "Forfait annuel plus élevé, versé par la RAMQ en 4 paiements." },
+      { p: "revenu.partTresVulnerable", l: "Patients très vulnérables", u: "%", h: "En plus des vulnérables. Leur supplément d'inscription exige l'attribution par le guichet." },
+      { p: "revenu.nouveauxSansMedecin", l: "Nouveaux patients sans médecin, hors guichet", u: "pat.", si: "details", h: "Par exemple, les patients d'un médecin retraité qui a avisé la RAMQ. Ils donnent droit au supplément." },
+      { p: "revenu.nouveauxTransferes", l: "Patients transférés, déjà inscrits ailleurs", u: "pat.", si: "details", h: "Pas de supplément." },
+      { p: "revenu.semainesArrivee", l: "Arrivée des nouveaux patients étalée sur", u: "sem.", si: "details" },
+      { p: "revenu.quatrePremieresAnnees", l: "Dans mes 4 premières années de pratique", t: "check", si: "details", h: "Après 4 ans, le supplément majoré du guichet ne s'applique qu'à 150 patients par année." },
+      { g: "Frais de cabinet" },
+      { p: "revenu.fraisCabinetPct", l: "Part de la facturation remise à la clinique", u: "%", s: 0.5, h: "À l'acte : loyer, personnel, équipement, DMÉ. Souvent de 25 à 35 % en clinique privée." },
+      { p: "revenu.fraisCabinetMois", l: "Frais fixes : loyer et autres", u: "$/mois", s: 50, si: "details" },
+      { p: "revenu.compensationCabinet", l: "Compensation des frais de cabinet par la RAMQ", u: "$/an", s: 100, si: "details", h: "Entente particulière GMF (EP 40), s'il y a lieu." },
+      { p: "revenu.fraisCabinetTousModes", l: "La clinique les exige aussi au taux horaire et au mixte", t: "check", si: SI_ETAB + "&details", h: "Non en GMF-U situé en CLSC ou à l'hôpital : l'établissement fournit les locaux." },
+      { g: "Pour le budget", si: SI_ETAB },
+      { p: "revenu.modeBudget", l: "Mode de rémunération utilisé", t: "select", o: [["horaire", "Taux horaire"], ["mixte", "Taux mixte"], ["acte", "À l'acte"]] },
+      { g: "Vos visites, hors prise en charge (%)", si: "details" },
       { p: "revenu.mix.suivi", l: "Suivis", u: "%" },
       { p: "revenu.mix.suiviV", l: "Suivis de patients vulnérables", u: "%" },
       { p: "revenu.mix.perioV", l: "Visites périodiques de patients vulnérables", u: "%" },
       { p: "revenu.mix.pedia", l: "Visites périodiques pédiatriques", u: "%" },
       { p: "revenu.mix.gross", l: "Suivis de grossesse", u: "%" },
-      { g: "Taux horaire (EP 42)", si: SI_ETAB },
+      { g: "Sans rendez-vous : détails", si: "details&revenu.demiJourneesSRV" },
+      { p: "revenu.pctSrvComplexe", l: "Visites ponctuelles complexes", u: "%", h: "Le reste : visites ponctuelles mineures." },
+      { p: "revenu.suppSRV10", l: "Supplément GMF, demi-journée de 10 patients et plus", u: "$", s: 0.01, h: "Code 19928. Inscrivez le montant en vigueur ; 0 hors GMF." },
+      { p: "revenu.suppSRV20", l: "Supplément GMF, demi-journée de 20 patients et plus", u: "$", s: 0.01, h: "Code 19929." },
+      { g: "Tarifs des visites (onglet B)", si: "details" },
+      ...[["suivi", "Suivi"], ["suiviV", "Suivi, patient vulnérable"], ["perioV", "Visite périodique, patient vulnérable"], ["pedia", "Visite périodique pédiatrique"], ["gross", "Suivi de grossesse"],
+        ["pecNonVuln", "Prise en charge, patient non vulnérable"], ["pecVuln", "Prise en charge, patient vulnérable"], ["srvMineure", "Sans rendez-vous : visite ponctuelle mineure"], ["srvComplexe", "Sans rendez-vous : visite ponctuelle complexe"]]
+        .flatMap(([k, nom]) => [
+          { p: `revenu.tarifs.${k}.0`, l: `${nom} : moins de 500 inscrits`, u: "$", s: 0.05 },
+          { p: `revenu.tarifs.${k}.1`, l: `${nom} : 500 inscrits et plus`, u: "$", s: 0.05 },
+        ]),
+      { g: "Taux horaire (EP 42)", si: SI_ETAB + "&details" },
       { p: "revenu.tarifHoraire", l: "Tarif horaire", u: "$/h", s: 0.01 },
-      { g: "Taux mixte (annexe XXIII)", si: SI_ETAB },
+      { g: "Taux mixte (annexe XXIII)", si: SI_ETAB + "&details" },
       { p: "revenu.forfaitHoraireMixte", l: "Forfait horaire", u: "$/h", s: 0.01 },
       { p: "revenu.pctMixte", l: "Pourcentage du tarif des visites", u: "%" },
       { p: "revenu.acteSupervision", l: "Acte de supervision, tarif à 100 %", u: "$/h", s: 0.01, si: SI_GMFU },
       { p: "revenu.pctSupervision", l: "Part versée de l'acte de supervision", u: "%", si: SI_GMFU },
       { p: "revenu.supervisionMaxH", l: "Heures de supervision payées au plus", u: "h/d.-j.", s: 0.25, si: SI_GMFU },
-      { g: "À l'acte, règles d'avant la Loi 2" },
-      { p: "revenu.pctActe", l: "Part du tarif des visites payée à l'acte", u: "%", h: "100 % : chaque visite au tarif de l'onglet B, avec les forfaits d'inscription et les suppléments. Le mode composé de la Loi 2 n'est pas en vigueur." },
+      { g: "À l'acte, règles d'avant la Loi 2", si: "details" },
+      { p: "revenu.pctActe", l: "Part du tarif des visites payée à l'acte", u: "%", h: "100 % : chaque visite au tarif ci-dessus. En cabinet, si vos tarifs diffèrent, ajustez les tarifs ou ce pourcentage." },
       { p: "revenu.pctSupervisionActe", l: "Part de l'acte de supervision payée à l'acte", u: "%", si: SI_GMFU },
-      { p: "revenu.fraisCabinetPct", l: "Frais de cabinet : part de la facturation remise à la clinique", u: "%", s: 0.5, h: "Loyer, personnel, équipement, DMÉ. Souvent de 25 à 35 % en clinique privée." },
-      { p: "revenu.fraisCabinetMois", l: "Frais de cabinet fixes : loyer et autres", u: "$/mois", s: 50 },
-      { p: "revenu.compensationCabinet", l: "Compensation des frais de cabinet par la RAMQ", u: "$/an", s: 100, h: "Entente particulière GMF (EP 40), s'il y a lieu." },
-      { p: "revenu.fraisCabinetTousModes", l: "La clinique les exige aussi au taux horaire et au mixte", t: "check", h: "Non en GMF-U situé en CLSC ou à l'hôpital : l'établissement fournit les locaux.", si: SI_ETAB },
-      { g: "Forfaits et suppléments" },
+      { g: "Forfaits et suppléments", si: "details" },
+      { p: "revenu.forfaitInscription", l: "Forfait annuel d'inscription, par patient", u: "$/pat.", s: 0.01 },
+      { p: "revenu.forfaitVulnerable", l: "Forfait annuel, patient vulnérable", u: "$/pat.", s: 0.01 },
+      { p: "revenu.forfaitTresVulnerable", l: "Forfait annuel, patient très vulnérable", u: "$/pat.", s: 0.01 },
+      { p: "revenu.suppNonVulnerable", l: "Supplément d'inscription, patient non vulnérable sans médecin", u: "$", s: 0.01, h: "Code 19957." },
+      { p: "revenu.suppVulnerableHorsGuichet", l: "Supplément, patient vulnérable hors guichet", u: "$", s: 0.01, h: "Code 19958." },
+      { p: "revenu.suppVulnerableGuichet", l: "Supplément, patient vulnérable du guichet", u: "$", s: 0.01, h: "Code 19959." },
+      { p: "revenu.suppTresVulnerable", l: "Supplément, patient très vulnérable du guichet", u: "$", s: 0.01, h: "Code 19960." },
+      { p: "revenu.primeInscription", l: "Prime ponctuelle par nouveau patient inscrit", u: "$", s: 0.01, h: "Selon une entente en vigueur (par exemple 231,75 $ par patient inscrit individuellement lors de l'opération de prise en charge de 2026). 0 sinon." },
       { p: "revenu.perDiemResident", l: "Demi-per diem de supervision, par résident", u: "$", s: 0.01, si: SI_GMFU },
-      { p: "revenu.forfaitInscription", l: "Forfait d'inscription générale", u: "$/pat.", s: 0.01 },
-      { p: "revenu.forfaitVulnerable", l: "Forfait annuel moyen, patient vulnérable", u: "$/pat.", s: 0.01 },
-      { p: "revenu.suppNonVulnerable", l: "Supplément, patient non vulnérable sans médecin", u: "$", s: 0.01 },
-      { p: "revenu.suppVulnerableHorsGuichet", l: "Supplément, patient vulnérable hors guichet", u: "$", s: 0.01 },
-      { p: "revenu.suppVulnerableGuichet", l: "Supplément, patient vulnérable du guichet", u: "$", s: 0.01 },
-      { g: "Pour le budget", si: SI_ETAB },
-      { p: "revenu.modeBudget", l: "Mode de rémunération utilisé", t: "select", o: [["horaire", "Taux horaire"], ["mixte", "Taux mixte"], ["acte", "À l'acte"]] },
+      { p: "revenu.perDiemExterne", l: "Demi-per diem de supervision, par externe", u: "$", s: 0.01, si: SI_GMFU },
     ],
     impot: [
       { g: "Votre pratique" },
       { p: "impot.structure", l: "Les paiements de la RAMQ sont versés", t: "select", o: [["particulier", "À vous : travail autonome, sans société"], ["societe", "À votre société (pratique incorporée)"]] },
       { g: "Déductions" },
-      { p: "impot.depensesPro", l: "Dépenses professionnelles", u: "$/an", s: 100, h: "Collège des médecins, FMOQ, formation, assurance responsabilité non remboursée. Payées par la société si vous êtes incorporé(e)." },
+      { p: "impot.depensesProMode", l: "Dépenses professionnelles", t: "select", o: [["total", "Un total"], ["detail", "Le détail, ligne par ligne"]], h: "Collège des médecins, FMOQ, ACPM, formation, équipement… Payées par la société si vous êtes incorporé(e)." },
+      { p: "impot.depensesPro", l: "Total des dépenses professionnelles", u: "$/an", s: 100, si: "impot.depensesProMode=total" },
       { p: "epargne.reer.cotisationAnnuelle", l: "Cotisation REER de l'année", u: "$/an", s: 100 },
       { g: "Société" },
       { p: "societe.tauxSociete", l: "Taux d'impôt de la société", u: "%", s: 0.1, h: "9 % fédéral et 11,5 % Québec : une société de médecin a rarement droit à la déduction québécoise pour petite entreprise." },
@@ -377,6 +483,8 @@
       { p: "epargne.reer.cotisationAnnuelle", l: "Cotisation REER par année", u: "$/an", s: 100 },
       { p: "epargne.celi.solde", l: "Solde CELI", u: "$", s: 100 },
       { p: "epargne.celi.cotisationAnnuelle", l: "Cotisation CELI par année", u: "$/an", s: 100 },
+      { p: "epargne.celiapp.solde", l: "Solde CELIAPP", u: "$", s: 100, h: "Compte d'épargne libre d'impôt pour l'achat d'une première propriété." },
+      { p: "epargne.celiapp.cotisationAnnuelle", l: "Cotisation CELIAPP par année", u: "$/an", s: 100, h: "8 000 $ par année au plus, 40 000 $ à vie ; déductible comme un REER ; retrait sans impôt pour acheter une première propriété." },
       { p: "epargne.encaisse", l: "Comptes et encaisse", u: "$", s: 100 },
       { g: "Biens" },
       { p: "actifs.logement", l: "Votre logement", t: "select", o: [["proprietaire", "Propriétaire"], ["locataire", "Locataire"]], h: "Locataire : le loyer va au budget (Logement) ; aucune maison dans la valeur nette." },
@@ -460,6 +568,7 @@
   // Champs qui ne s'affichent que selon un autre champ (« !chemin » pour l'inverse).
   function majVisibilite() {
     const vrai = cond => {
+      if (cond === "details") return detailsAffiches();
       const neg = cond.startsWith("!"), [chemin, attendu] = cond.replace("!", "").split("=");
       const v = attendu === undefined ? !!lire(chemin) : attendu.split("|").includes(String(lire(chemin)));
       return neg ? !v : v;
@@ -470,15 +579,25 @@
   }
   // Champ d'une liste (dépense, dette, enfant) : lié par data-l, data-i et data-k.
   const lierListe = (liste, i, k) => inp => { inp.dataset.l = liste; inp.dataset.i = i; inp.dataset.k = k; };
-  const tableau = nom => nom === "enfants" ? S.epargne.reee.enfants : nom === "activites" ? S.revenu.activites : S[nom];
+  const tableau = nom => nom === "enfants" ? S.epargne.reee.enfants : nom === "activites" ? S.revenu.activites : nom === "lignes" ? S.revenu.lignes : nom === "depensesPro" ? S.impot.depensesProDetail : S[nom];
+  // Essentiel ou tous les détails (Optimiser) : préférence de cet appareil.
+  const detailsAffiches = () => { try { return localStorage.getItem("wm.details") === "1"; } catch (e) { return false; } };
+  function boutonDetails(c) {
+    const b = el("button", "bouton secondaire bouton-details"); b.type = "button";
+    const maj = () => { const d = detailsAffiches(); b.textContent = d ? "Afficher l'essentiel seulement" : "Optimiser : afficher tous les détails"; b.setAttribute("aria-pressed", d ? "true" : "false"); };
+    b.addEventListener("click", () => { try { localStorage.setItem("wm.details", detailsAffiches() ? "0" : "1"); } catch (e) { /* préférence non gardée */ } maj(); majVisibilite(); });
+    maj(); c.appendChild(b);
+  }
 
   /* ============================================================
      PANNEAU « MODIFIER » : glisse du bas (téléphone) ou de la droite
      ============================================================ */
   const feuille = document.getElementById("feuille"), corps = document.getElementById("feuille-corps"), titreFeuille = document.getElementById("feuille-titre");
-  let feuilleCourante = null;
+  const piedFeuille = document.getElementById("feuille-pied"), boutonFermer = document.getElementById("feuille-fermer");
+  let feuilleCourante = null, parcours = null;   // parcours : écran du parcours pas à pas ouvert, s'il y a lieu
   function ouvrirFeuille(titre, construire) {
-    feuilleCourante = { titre, construire, maj: null };
+    feuilleCourante = { titre, construire, maj: null }; parcours = null;
+    piedFeuille.hidden = true; piedFeuille.textContent = ""; boutonFermer.textContent = "Terminé";
     titreFeuille.textContent = titre; corps.textContent = "";
     construire(corps); remplirChamps();
     if (!feuille.open) feuille.showModal();
@@ -506,7 +625,16 @@
   function ouvrirSection(nom) {
     const [titre, champs] = FEUILLES[nom];
     ouvrirFeuille(titre, c => {
+      if (nom === "revenu") {
+        c.appendChild(el("p", "aide feuille-intro", "L'essentiel suffit pour commencer. Pour optimiser, affichez tous les détails : tarifs, forfaits, suppléments, apprenants, majoration selon le territoire."));
+        boutonDetails(c);
+      }
       construireChamps(c, champs);
+      if (nom === "impot") {
+        const a = el("div", "actions"); a.dataset.si = "impot.depensesProMode=detail";
+        const b = el("button", "bouton secondaire", "Détailler les dépenses professionnelles"); b.type = "button"; b.addEventListener("click", feuilleDepensesPro);
+        a.appendChild(b); c.querySelector(".groupe:nth-of-type(2)") ? c.querySelectorAll(".groupe")[1].appendChild(a) : c.appendChild(a);
+      }
       if (nom !== "revenu") return;
       // Total des types de visites, qui doit faire 100 %.
       const groupe = [...c.querySelectorAll(".groupe")].find(g => g.firstChild.textContent.startsWith("Vos visites"));
@@ -522,27 +650,44 @@
   }
 
   // Une catégorie de dépenses : une ligne par dépense du catalogue.
-  function feuilleCategorie(g) {
-    ouvrirFeuille(g, c => {
-      const total = el("div", "feuille-total"); c.appendChild(total);
-      feuilleCourante.maj = () => {
-        const t = S.budget.filter(b => categorie(b) === g).reduce((a, b) => a + mensuel(b), 0);
-        total.textContent = ""; total.append(el("span", null, "Total par mois"), el("strong", null, $(t)));
-      };
-      feuilleCourante.maj();
-      c.appendChild(el("p", "aide", "Montant, période et qui paie. « Partagée » suit votre part des dépenses partagées (bouton Ménage du budget)." + (AIDE_CATEGORIE[g] ? " " + AIDE_CATEGORIE[g] : "")));
-      S.budget.forEach((b, i) => { if (categorie(b) === g) c.appendChild(ligneDepense(b, i)); });
-      if (g === "Autres dépenses") {
-        const a = el("div", "feuille-actions");
-        const bt = el("button", "bouton secondaire large", "Ajouter une dépense"); bt.type = "button";
-        bt.addEventListener("click", () => {
-          S.budget.push({ id: nouvelId("b"), k: null, nom: "Nouvelle dépense", montant: 0, periode: "mois", qui: "moi" });
-          sauver(); reconstruireFeuille(); tout();
-          const champs = corps.querySelectorAll('input[data-k="nom"]'); if (champs.length) { champs[champs.length - 1].focus(); champs[champs.length - 1].select(); }
-        });
-        a.appendChild(bt); c.appendChild(a);
+  function feuilleCategorie(g) { ouvrirFeuille(g, c => construireCategorie(c, g)); }
+  function construireCategorie(c, g) {
+    const total = el("div", "feuille-total"); c.appendChild(total);
+    feuilleCourante.maj = () => {
+      const t = totalActif(g) ? +S.budgetTotaux[g].montant || 0 : S.budget.filter(b => categorie(b) === g).reduce((a, b) => a + mensuel(b), 0);
+      total.textContent = ""; total.append(el("span", null, "Total par mois"), el("strong", null, $(t)));
+    };
+    feuilleCourante.maj();
+    // Un seul total estimé, ou le détail ligne par ligne (on peut passer de l'un à l'autre).
+    if (g !== "Autres dépenses") {
+      const choix = el("div", "segment petit"); choix.id = "cat-mode"; c.appendChild(choix);
+      segment("cat-mode", [["detail", "Ligne par ligne"], ["total", "Un total estimé"]], totalActif(g) ? "total" : "detail", v => {
+        S.budgetTotaux = S.budgetTotaux || {};
+        const t = S.budgetTotaux[g] || { montant: Math.round(S.budget.filter(b => categorie(b) === g).reduce((a, b) => a + mensuel(b), 0)), qui: "moi" };
+        S.budgetTotaux[g] = { ...t, actif: v === "total" }; S.meta.exemple = false;
+        sauver(); reconstruireFeuille(); tout();
+      }, "Total ou détail");
+      if (totalActif(g)) {
+        const gr = el("div", "groupe");
+        gr.appendChild(creerChamp({ l: "Total par mois", u: "$/mois", s: 10 }, "cat-total", inp => { inp.dataset.p = `budgetTotaux.${g}.montant`; }, false));
+        gr.appendChild(creerChamp({ l: "Qui paie", t: "select", o: [["moi", "Moi"], ["commun", "Partagée"], ["conjoint", S.conjointe.active ? Pn() : "Autre"]] }, "cat-qui", inp => { inp.dataset.p = `budgetTotaux.${g}.qui`; }, false));
+        c.appendChild(gr);
+        c.appendChild(el("p", "aide", "Les lignes de cette catégorie sont mises de côté tant que vous utilisez un total. Revenez à « Ligne par ligne » pour les détailler."));
+        return;
       }
-    });
+    }
+    c.appendChild(el("p", "aide", "Montant, période et qui paie. « Partagée » suit votre part des dépenses partagées (bouton Ménage du budget)." + (AIDE_CATEGORIE[g] ? " " + AIDE_CATEGORIE[g] : "")));
+    S.budget.forEach((b, i) => { if (categorie(b) === g) c.appendChild(ligneDepense(b, i)); });
+    if (g === "Autres dépenses") {
+      const a = el("div", "feuille-actions");
+      const bt = el("button", "bouton secondaire large", "Ajouter une dépense"); bt.type = "button";
+      bt.addEventListener("click", () => {
+        S.budget.push({ id: nouvelId("b"), k: null, nom: "Nouvelle dépense", montant: 0, periode: "mois", qui: "moi" });
+        sauver(); reconstruireFeuille(); tout();
+        const champs = corps.querySelectorAll('input[data-k="nom"]'); if (champs.length) { champs[champs.length - 1].focus(); champs[champs.length - 1].select(); }
+      });
+      a.appendChild(bt); c.appendChild(a);
+    }
   }
   function ligneDepense(b, i) {
     const l = el("div", "ligne-depense" + (b.montant > 0 ? " remplie" : ""));
@@ -660,8 +805,13 @@
     R.milieu = MILIEUX[S.revenu.milieu] ? S.revenu.milieu : "clinique";
     R.modes = MILIEUX[R.milieu].modes;
     R.plusieursModes = R.modes.length > 1;
-    // Enseignement et supervision de résidents : en GMF-U seulement.
-    const entree = (x = {}) => R.milieu === "gmfu" ? { ...S.revenu, ...x } : { ...S.revenu, enseignement: 0, residents: 0, patientsPendantSupervision: 0, ...x };
+    // Autres revenus : professionnels (avec la pratique) et non professionnels (imposables, sans RRQ).
+    R.autresPro = S.revenu.lignes.filter(estPro).reduce((t, l) => t + annuelLigne(l), 0);
+    R.autresNonPro = S.revenu.lignes.filter(l => !estPro(l)).reduce((t, l) => t + annuelLigne(l), 0);
+    // Enseignement et supervision d'apprenants : en GMF-U seulement.
+    const autresRev = (S.revenu.autresRevenus || 0) + R.autresPro;
+    const entree = (x = {}) => R.milieu === "gmfu" ? { ...S.revenu, autresRevenus: autresRev, ...x }
+      : { ...S.revenu, autresRevenus: autresRev, enseignement: 0, residents: 0, externes: 0, patientsPendantSupervision: 0, ...x };
     const revenuDe = x => C.revenuGmfu(entree(x));
     R.rev = revenuDe();
     const mode = !R.plusieursModes ? R.modes[0] : MODES.includes(S.revenu.modeBudget) ? S.revenu.modeBudget : "horaire";
@@ -675,7 +825,12 @@
     // partagent le logement et les dépenses.
     R.coupleFiscal = R.couple && (S.conjointe.lien !== "fait" || !!S.conjointe.depuis12mois || !!S.conjointe.enfantCommun);
     R.interetsEtudes = S.dettes.filter(d => d.creditImpot > 0).reduce((a, d) => a + d.solde * d.taux / 100, 0);
-    const base = { depensesPro: S.impot.depensesPro, reer: S.epargne.reer.cotisationAnnuelle, interetsEtudes: R.interetsEtudes };
+    // Dépenses professionnelles : le total, ou la somme du détail.
+    R.depensesPro = S.impot.depensesProMode === "detail" ? S.impot.depensesProDetail.reduce((t, l) => t + annuelLigne(l), 0) : S.impot.depensesPro;
+    // CELIAPP : cotisations jusqu'au plafond à vie de 40 000 $ ; déductibles comme le REER.
+    const ca = S.epargne.celiapp || { solde: 0, cotisationAnnuelle: 0 };
+    R.celiappAnnee = a => Math.min(ca.cotisationAnnuelle || 0, Math.max(0, 40000 - (ca.solde || 0) - a * (ca.cotisationAnnuelle || 0)));
+    const base = { depensesPro: R.depensesPro, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(0), interetsEtudes: R.interetsEtudes, autresImposables: R.autresNonPro };
     // Partenaire : salarié, ou à son compte (même calcul que le médecin travailleur autonome).
     // reel : facteur de revenu en dollars d'aujourd'hui (années futures).
     R.autonomeP = R.couple && S.conjointe.statut === "autonome";
@@ -687,7 +842,7 @@
     // Pratique incorporée : la société reçoit les revenus et verse des dividendes ;
     // sinon, travail autonome. f : facteur des dividendes fixes en dollars d'aujourd'hui.
     R.societeActive = S.impot.structure === "societe";
-    R.dproPerso = R.societeActive ? 0 : S.impot.depensesPro + R.rev[mode].fraisCabinet;
+    R.dproPerso = R.societeActive ? 0 : R.depensesPro + R.rev[mode].fraisCabinet;
     const impotDe = (o, f = 1) => R.societeActive
       ? C.impotSociete({ ...o, fraisSociete: S.societe.fraisSociete, tauxSociete: S.societe.tauxSociete / 100, retrait: S.societe.retrait, retraitFixe: S.societe.retraitFixe * f })
       : C.impotParticulier(o);
@@ -698,9 +853,9 @@
     // facturation de la clinique seulement (sans activités ni autres revenus) ; f : facteur des
     // années futures, appliqué aussi aux activités et aux autres revenus.
     const fraisCabinet = (total, md, f = 1) => md === "acte" || S.revenu.fraisCabinetTousModes
-      ? Math.max(0, Math.max(0, total - (R.rev.activites + (S.revenu.autresRevenus || 0)) * f) * (S.revenu.fraisCabinetPct || 0) / 100
+      ? Math.max(0, Math.max(0, total - (R.rev.activites + R.rev.acte.autres) * f) * (S.revenu.fraisCabinetPct || 0) / 100
         + (S.revenu.fraisCabinetMois || 0) * 12 - (S.revenu.compensationCabinet || 0)) : 0;
-    const depensesMode = md => S.impot.depensesPro + R.rev[md].fraisCabinet;
+    const depensesMode = md => R.depensesPro + R.rev[md].fraisCabinet;
     for (const md of R.modes) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, depensesPro: depensesMode(md), revenu: R.rev[md].total }));
     // Net après impôt et frais de cabinet (les dépenses professionnelles, égales dans tous les modes, à part).
     R.nets = {};
@@ -709,10 +864,10 @@
     R.conjointe = R.couple ? partenaires[mode] : null;
     const totalDe = x => x.totalGlobal ?? x.total;
     // Taux marginal : impôt (société comprise) sur 1 000 $ de plus.
-    R.tauxMarginal = (totalDe(impotDe({ ...base, depensesPro: S.impot.depensesPro + fraisCabinet(R.brut + 1000, mode), revenu: R.brut + 1000 }))
+    R.tauxMarginal = (totalDe(impotDe({ ...base, depensesPro: R.depensesPro + fraisCabinet(R.brut + 1000, mode), revenu: R.brut + 1000 }))
       - totalDe(impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.brut }))) / 1000;
     // Revenu net d'impôt et de frais de cabinet pour un autre revenu brut (mêmes déductions, mêmes transferts).
-    R.netPour = (rev, frais = 0) => avec(impotDe({ ...base, depensesPro: S.impot.depensesPro + frais, revenu: rev }))[0].net - (R.societeActive ? 0 : frais);
+    R.netPour = (rev, frais = 0) => avec(impotDe({ ...base, depensesPro: R.depensesPro + frais, revenu: rev }))[0].net - (R.societeActive ? 0 : frais);
     // Sensibilité : revenu brut et net pour d'autres valeurs d'un champ (x : ce qui change).
     const sens = (valeurs, x) => valeurs.map(v => {
       const g = revenuDe(x(v)), o = { v };
@@ -750,7 +905,7 @@
     R.allocConjointe = R.couple ? (R.allocations - allocMoi) / 12 : 0;
     R.netConjointe = R.travailConjointe + R.allocConjointe;
     R.depMoi = 0; R.depConjointe = 0; R.depMenage = 0;
-    for (const b of S.budget) {
+    for (const b of depensesEffectives()) {
       const m = mensuel(b);
       R.depMenage += m;
       R.depMoi += b.qui === "moi" ? m : b.qui === "commun" ? m * part : 0;
@@ -764,7 +919,7 @@
       if (R.couple) R.dettesConjointe += m * (100 - (d.paiementMoi ?? 100)) / 100;
     }
     const enfants = S.epargne.reee.enfants.filter(x => x.age < 17).length;
-    R.epargneMoi = (enfants * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle) / 12;
+    R.epargneMoi = (enfants * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle + R.celiappAnnee(0)) / 12;
     R.surplusMoi = R.netMoi - R.depMoi - R.dettesMoi - R.epargneMoi;
     R.epargneConjointe = R.couple ? S.conjointe.epargneMensuelle || 0 : 0;
     R.surplusConjointe = R.netConjointe - R.depConjointe - R.dettesConjointe - R.epargneConjointe;
@@ -793,7 +948,7 @@
       else {
         const conj = impotPartenaire(reel);
         const fraisA = fraisCabinet(R.revType[mode].total * reel, mode, reel);
-        let moi = impotDe({ ...base, depensesPro: S.impot.depensesPro + fraisA, revenu: R.revType[mode].total * reel }, 1 / I);
+        let moi = impotDe({ ...base, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImposables: R.autresNonPro * reel, depensesPro: R.depensesPro + fraisA, revenu: R.revType[mode].total * reel }, 1 / I);
         // L'an prochain, des conjoints de fait auront 12 mois de vie commune : couple pour l'impôt.
         const fisc = R.couple && (R.coupleFiscal || a >= 1);
         if (fisc) moi = C.transfertsConjoints(moi, conj)[0];
@@ -803,10 +958,10 @@
         const alloc = S.famille.calculAuto ? C.prestationsFamille({ revenuNetFed: nf, revenuNetQc: nq, ages, couple: fisc }).total * I : S.menage.allocationsAnnuelles;
         const enf = S.epargne.reee.enfants.filter(x => +x.age + a < 17).length;
         res = {
-          travail: (moi.net - (R.societeActive ? 0 : S.impot.depensesPro + fraisA) - prime) * I,
+          travail: (moi.net - (R.societeActive ? 0 : R.depensesPro + fraisA) - prime) * I,
           retenu: moi.societe ? moi.societe.retenu * I : 0,
           alloc: !R.couple || S.famille.versementA !== "conjointe" ? alloc : 0,
-          epargne: enf * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle,
+          epargne: enf * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle + R.celiappAnnee(a),
         };
       }
       cacheAnnee.set(cle, res);
@@ -837,7 +992,7 @@
     // Valeur nette : maison (sa valeur croît, l'hypothèque payée devient de l'équité), autos, placements.
     const projeter = (h, sim, m = methode) => C.projeterValeurNette({
       annees: ANNEES, anneeDepart: +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear(),
-      rendement: h.rendement, reer: S.epargne.reer, celi: S.epargne.celi, encaisse: S.epargne.encaisse,
+      rendement: h.rendement, reer: S.epargne.reer, celi: S.epargne.celi, celiapp: S.epargne.celiapp, encaisse: S.epargne.encaisse,
       maison: R.locataire ? { valeur: 0, part: 0, croissance: 0, partMenage: 0 }
         : { ...S.actifs.maison, croissance: h.croissanceMaison, partMenage: S.actifs.maison.part + (R.couple ? S.conjointe.partMaison : 0) },
       voitures: [{ valeur: S.actifs.voiture.valeur, depreciation: h.depreciationAuto },
@@ -866,7 +1021,7 @@
 
     // Société : le ménage a besoin de vous de quoi couvrir votre part.
     R.besoinNet = Math.max(0, (R.depMoi + R.dettesMoi + R.extra + (enfants * S.epargne.reee.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle) / 12) * 12);
-    R.societe = C.comparerSociete({ revenu: R.brut, depensesPro: S.impot.depensesPro, fraisSociete: S.societe.fraisSociete,
+    R.societe = C.comparerSociete({ revenu: R.brut, depensesPro: R.depensesPro, fraisSociete: S.societe.fraisSociete,
       tauxSociete: S.societe.tauxSociete / 100, besoinNet: R.besoinNet });
     return R;
   }
@@ -1109,6 +1264,7 @@
 
   function rendreApercu(R) {
     document.getElementById("ap-exemple").hidden = !S.meta.exemple;
+    rendrePortrait();
     hero("ap-hero", "Votre surplus mensuel", $(R.surplusMoi), [
       R.surplusMoi >= 0 ? `Sur un revenu net de ${$(R.netMoi)} par mois` : puce("Vos sorties dépassent vos revenus", "bas", false),
     ], R.surplusMoi);
@@ -1155,7 +1311,7 @@
     else action("important", `Mettez ${pct(R.impot.total / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$(R.impot.total / 12)} par mois.`);
     // Après l'assistant : ce qu'il reste à entrer.
     if (S.meta.assistant) {
-      if (S.budget.filter(b => b.montant > 0 && b.k !== "loyer").length < 3) action("important", "Entrez vos dépenses du mois (page Budget) : épicerie, électricité, assurances, transport… Sans elles, le surplus est surestimé.");
+      if (depensesEffectives().filter(b => b.montant > 0 && b.k !== "loyer").length < 3) action("important", "Entrez vos dépenses du mois (page Budget, « Remplir pas à pas ») : épicerie, électricité, assurances, transport… Sans elles, le surplus est surestimé.");
       if ((S.revenu.activites || []).some(x => x.calcul !== "patients" && ACTIVITES[x.type] && x.parJour === ACTIVITES[x.type].parJour))
         action("info", "Vérifiez le revenu par jour de vos activités en établissement (page Revenu) : les valeurs de départ sont indicatives.");
       if (!S.epargne.encaisse && !S.epargne.reer.solde && !S.epargne.celi.solde && !S.epargne.reer.droits) action("info", "Ajoutez votre épargne et vos droits REER (page Avenir, bouton Modifier).");
@@ -1258,6 +1414,7 @@
     document.getElementById("rv-carte-faits").classList.toggle("demi", R.plusieursModes);
     choixMode("rv-mode");
     rendreActivites(R);
+    rendreAutresRevenus();
     const g = R.rev, autres = R.modes.filter(m => m !== R.mode);
     const meilleur = autres.reduce((a, m) => g[m].total > g[a].total ? m : a, autres[0]);
     const diff = meilleur ? g[R.mode].total - g[meilleur].total : 0;
@@ -1336,6 +1493,92 @@
     ]);
   }
 
+  // Dépenses professionnelles déductibles : un total, ou le détail ligne par ligne.
+  function rendreDepensesPro() {
+    const z = document.getElementById("im-pro"), detail = S.impot.depensesProMode === "detail";
+    const l = detail ? S.impot.depensesProDetail.filter(x => annuelLigne(x) > 0) : [];
+    rangees(z, [
+      ...l.map(x => ({ titre: ITEMS_PRO.get(x.k).nom, valeur: $(annuelLigne(x)), action: feuilleDepensesPro })),
+      { titre: detail ? "Total" : "Total estimé", sous: R.societeActive ? "Payées par la société" : "Déduites du revenu imposable", cls: "total", valeur: $(R.depensesPro), action: feuilleDepensesPro },
+    ]);
+  }
+  function feuilleDepensesPro() { ouvrirFeuille("Dépenses professionnelles", construireDepensesPro); }
+  function construireDepensesPro(c) {
+    const total = el("div", "feuille-total"); c.appendChild(total);
+    feuilleCourante.maj = () => { total.textContent = ""; total.append(el("span", null, "Total par année"), el("strong", null, $(R ? R.depensesPro : 0))); };
+    feuilleCourante.maj();
+    const choix = el("div", "segment petit"); choix.id = "pro-mode"; c.appendChild(choix);
+    segment("pro-mode", [["total", "Un total"], ["detail", "Ligne par ligne"]], S.impot.depensesProMode === "detail" ? "detail" : "total", v => {
+      // Passer au détail : on garde le même total (cotisation du Collège, puis le reste en « Autres »).
+      if (v === "detail" && !S.impot.depensesProDetail.some(x => x.montant > 0)) {
+        const t = S.impot.depensesPro || 0, cmq = Math.min(1930, t);
+        S.impot.depensesProDetail.find(x => x.k === "cmq").montant = cmq;
+        S.impot.depensesProDetail.find(x => x.k === "autres").montant = t - cmq;
+      }
+      S.impot.depensesProMode = v; S.meta.exemple = false; sauver(); reconstruireFeuille(); tout();
+    }, "Total ou détail");
+    if (S.impot.depensesProMode !== "detail") {
+      const gr = el("div", "groupe");
+      gr.appendChild(creerChamp({ l: "Total par année", u: "$/an", s: 100 }, "pro-total", inp => { inp.dataset.p = "impot.depensesPro"; }, false));
+      c.appendChild(gr);
+      c.appendChild(el("p", "aide", "Collège des médecins, FMOQ, ACPM, formation, équipement, abonnements… Choisissez « Ligne par ligne » pour les détailler et optimiser."));
+      return;
+    }
+    c.appendChild(el("p", "aide", "Montant et période. Déductibles du revenu imposable ; payées par la société si vous êtes incorporé(e)."));
+    S.impot.depensesProDetail.forEach((x, i) => {
+      const it = ITEMS_PRO.get(x.k), l = el("div", "ligne-depense ligne-revenu" + (x.montant > 0 ? " remplie" : ""));
+      const nom = el("label", null, it.nom); nom.htmlFor = `dp-${x.k}`;
+      const bm = el("div", "saisie"), m = el("input"); m.type = "number"; m.step = "1"; m.min = "0"; m.inputMode = "decimal"; m.value = x.montant || ""; m.placeholder = "0"; m.id = `dp-${x.k}`;
+      lierListe("depensesPro", i, "montant")(m); bm.append(m, el("span", "unite", "$"));
+      const bp = el("div", "saisie"), per = el("select"); [["an", "/ an"], ["mois", "/ mois"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; per.appendChild(o); });
+      per.value = x.periode; per.setAttribute("aria-label", "Période : " + it.nom); lierListe("depensesPro", i, "periode")(per); bp.appendChild(per);
+      l.append(nom, bm, bp, el("span"), el("span"));
+      if (it.aide) l.appendChild(el("p", "aide ligne-aide", it.aide));
+      c.appendChild(l);
+    });
+  }
+
+  // Autres revenus : les lignes inscrites ; Modifier ouvre toutes les sources possibles.
+  function rendreAutresRevenus() {
+    const z = document.getElementById("rv-autres"), l = S.revenu.lignes.filter(x => annuelLigne(x) > 0);
+    if (!l.length) { z.textContent = ""; z.appendChild(el("p", "aide", "Formulaires et services non assurés, expertises, activités médico-administratives, enseignement, location, placements… Touchez Modifier pour les ajouter.")); return; }
+    rangees(z, [
+      ...l.map(x => ({ titre: nomLigne(x), sous: estPro(x) ? "Revenu professionnel" : "Imposable, sans RRQ ni RQAP", valeur: $(annuelLigne(x)), valeurSous: "par année", action: feuilleAutresRevenus })),
+      l.length > 1 ? { titre: "Total des autres revenus", cls: "total", valeur: $(l.reduce((t, x) => t + annuelLigne(x), 0)) } : null,
+    ]);
+  }
+  function feuilleAutresRevenus() { ouvrirFeuille("Autres revenus", construireAutresRevenus); }
+  function construireAutresRevenus(c) {
+    const total = el("div", "feuille-total"); c.appendChild(total);
+    feuilleCourante.maj = () => { total.textContent = ""; total.append(el("span", null, "Total par année"), el("strong", null, $(S.revenu.lignes.reduce((t, x) => t + annuelLigne(x), 0)))); };
+    feuilleCourante.maj();
+    c.appendChild(el("p", "aide", "Montant et période. Les revenus professionnels s'ajoutent à la pratique (impôt, RRQ, RQAP) ; la location et les placements sont imposables, sans RRQ ni RQAP. Laissez 0 ce qui ne s'applique pas."));
+    S.revenu.lignes.forEach((x, i) => {
+      const l = el("div", "ligne-depense ligne-revenu" + (x.montant > 0 ? " remplie" : ""));
+      let nom;
+      if (x.k) { nom = el("label", null, nomLigne(x)); nom.htmlFor = `rl-${x.id}`; nom.title = ITEMS_REVENUS.get(x.k).aide; }
+      else { nom = el("input"); nom.type = "text"; nom.value = x.nom; nom.setAttribute("aria-label", "Nom du revenu"); lierListe("lignes", i, "nom")(nom); }
+      const bm = el("div", "saisie"), m = el("input"); m.type = "number"; m.step = "1"; m.min = "0"; m.inputMode = "decimal"; m.value = x.montant || ""; m.placeholder = "0"; m.id = `rl-${x.id}`;
+      lierListe("lignes", i, "montant")(m); if (!x.k) m.setAttribute("aria-label", "Montant : " + x.nom); bm.append(m, el("span", "unite", "$"));
+      const bp = el("div", "saisie"), per = el("select"); [["an", "/ an"], ["mois", "/ mois"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; per.appendChild(o); });
+      per.value = x.periode; per.setAttribute("aria-label", "Période : " + nomLigne(x)); lierListe("lignes", i, "periode")(per); bp.appendChild(per);
+      let bt = el("span");
+      if (!x.k) { bt = el("div", "saisie"); const t = el("select"); [["true", "Professionnel"], ["false", "Autre"]].forEach(([v, tx]) => { const o = el("option", null, tx); o.value = v; t.appendChild(o); });
+        t.value = String(x.pro !== false); t.setAttribute("aria-label", "Type de revenu : " + x.nom); t.dataset.l = "lignes"; t.dataset.i = i; t.dataset.k = "pro"; t.dataset.bool = "1"; bt.appendChild(t); }
+      l.append(nom, bm, bp, bt);
+      if (!x.k) { const s2 = el("button", "supprimer", "×"); s2.type = "button"; s2.setAttribute("aria-label", "Supprimer : " + x.nom); s2.dataset.suppr = "lignes"; s2.dataset.i = i; l.appendChild(s2); } else l.appendChild(el("span"));
+      if (x.k) { const a = el("p", "aide ligne-aide", ITEMS_REVENUS.get(x.k).aide); l.appendChild(a); }
+      c.appendChild(l);
+    });
+    const a = el("div", "feuille-actions"), b = el("button", "bouton secondaire large", "Ajouter un revenu"); b.type = "button";
+    b.addEventListener("click", () => {
+      S.revenu.lignes.push({ id: nouvelId("r"), k: null, nom: "Nouveau revenu", montant: 0, periode: "an", pro: true });
+      sauver(); reconstruireFeuille(); tout();
+      const champs = corps.querySelectorAll('.ligne-revenu input[type="text"]'); if (champs.length) { champs[champs.length - 1].focus(); champs[champs.length - 1].select(); }
+    });
+    a.appendChild(b); c.appendChild(a);
+  }
+
   // Activités en établissement : une rangée par activité, revenu de l'année ; touchez pour modifier.
   const FREQUENCES = { semaine: "par semaine", mois: "par mois", annee: "par année" };
   const unite = a => (ACTIVITES[a.type] || ACTIVITES.autre).unite === "quart" ? "quart" : "jour";
@@ -1371,23 +1614,27 @@
         { titre: "Jours ou quarts", valeur: nb(x.jours, 1) }, { titre: "Revenu brut par jour", valeur: $(x.parJour) }, { titre: "Revenu brut de l'année", cls: "total", valeur: $(x.total) }]); };
       feuilleCourante.maj();
       c.appendChild(el("div", "groupe")).appendChild(el("h3", null, "Activité"));
-      for (const ch of CHAMPS_ACTIVITE) {
-        if (ch.seul && !ch.seul(a)) continue;
-        let ligne;
-        if (ch.t === "text") {
-          ligne = el("div", "champ large"); const lab = el("label", null, ch.l); lab.htmlFor = `ac-${a.id}-nom`;
-          const boite = el("div", "saisie"), inp = el("input"); inp.type = "text"; inp.id = `ac-${a.id}-nom`; inp.value = a.nom || ""; inp.placeholder = (ACTIVITES[a.type] || ACTIVITES.autre).nom;
-          lierListe("activites", i, "nom")(inp); boite.appendChild(inp); ligne.append(lab, boite, el("span"));
-        } else {
-          ligne = creerChamp(ch, `ac-${a.id}-${ch.k}`, lierListe("activites", i, ch.k), false);
-          const inp = ligne.querySelector("input, select"); inp.value = a[ch.k] ?? "";
-        }
-        c.appendChild(ligne);
-      }
+      champsActivite(c, i);
       const ac = el("div", "feuille-actions");
       const x = el("button", "bouton danger large", "Retirer cette activité"); x.type = "button"; x.dataset.suppr = "activites"; x.dataset.i = i;
       ac.appendChild(x); c.appendChild(ac);
     });
+  }
+  function champsActivite(c, i) {
+    const a = S.revenu.activites[i];
+    for (const ch of CHAMPS_ACTIVITE) {
+      if (ch.seul && !ch.seul(a)) continue;
+      let ligne;
+      if (ch.t === "text") {
+        ligne = el("div", "champ large"); const lab = el("label", null, ch.l); lab.htmlFor = `ac-${a.id}-nom`;
+        const boite = el("div", "saisie"), inp = el("input"); inp.type = "text"; inp.id = `ac-${a.id}-nom`; inp.value = a.nom || ""; inp.placeholder = (ACTIVITES[a.type] || ACTIVITES.autre).nom;
+        lierListe("activites", i, "nom")(inp); boite.appendChild(inp); ligne.append(lab, boite, el("span"));
+      } else {
+        ligne = creerChamp(ch, `ac-${a.id}-${ch.k}`, lierListe("activites", i, ch.k), false);
+        const inp = ligne.querySelector("input, select"); inp.value = a[ch.k] ?? "";
+      }
+      c.appendChild(ligne);
+    }
   }
   function ajouterActivite() {
     const d = ACTIVITES.urgence;
@@ -1482,6 +1729,7 @@
     document.getElementById("im-societe").closest(".carte").hidden = soc;
 
     rendreFamille(R);
+    rendreDepensesPro();
     rendreVerification();
 
     const s = R.societe, z = document.getElementById("im-societe"); z.textContent = "";
@@ -1609,6 +1857,8 @@
     const cats = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
     rangees("bu-depenses", [
       ...cats.map(g => {
+        if (totalActif(g)) { const t = depensesEffectives().find(b => b.id === "total-" + g); const v = mensuel(t) * qui(t);
+          return { titre: g, sous: "Total estimé", valeur: $(v), action: () => feuilleCategorie(g) }; }
         const l = S.budget.filter(b => categorie(b) === g);
         const n = l.filter(b => b.montant > 0).length;
         const v = l.reduce((s, b) => s + mensuel(b) * qui(b), 0);
@@ -1817,6 +2067,198 @@
   }
 
   /* ============================================================
+     PARCOURS PAS À PAS : les revenus, puis le budget, un écran à la fois dans
+     le panneau. Chaque écran se passe ; « Suivant » le marque comme fait, et la
+     carte « Votre portrait » de l'aperçu en suit la progression.
+     ============================================================ */
+  const faits = nom => { S.meta.parcours = S.meta.parcours || {}; return (S.meta.parcours[nom] = S.meta.parcours[nom] || []); };
+  const estFait = (nom, cle) => ((S.meta.parcours || {})[nom] || []).includes(cle);
+  function marquer(nom, cle) { const l = faits(nom); if (!l.includes(cle)) { l.push(cle); sauver(); } }
+
+  // Champs de base de ces groupes du Revenu, sans les détails d'Optimiser ; la condition du groupe passe aux champs.
+  function essentiels(...groupes) {
+    const out = []; let g = null;
+    for (const c of CHAMPS.revenu) {
+      if (c.g) { g = groupes.includes(c.g) ? c : null; continue; }
+      if (!g || (c.si || "").includes("details")) continue;
+      out.push(g.si ? { ...c, si: c.si ? `${g.si}&${c.si}` : g.si } : c);
+    }
+    return out;
+  }
+  // Activités en établissement : toutes sur un écran, ajout et retrait sur place.
+  function construireActivites(c) {
+    const liste = S.revenu.activites || [];
+    const total = el("div", "feuille-total"); c.appendChild(total);
+    feuilleCourante.maj = () => { total.textContent = ""; total.append(el("span", null, "Total par année"), el("strong", null, $(R ? R.rev.activites : 0))); };
+    feuilleCourante.maj();
+    liste.forEach((a, i) => {
+      const g = el("div", "groupe"); g.appendChild(el("h3", null, nomActivite(a))); c.appendChild(g);
+      champsActivite(g, i);
+      const x = el("button", "bouton secondaire petit bouton-retirer", "Retirer cette activité"); x.type = "button"; x.dataset.suppr = "activites"; x.dataset.i = i;
+      g.appendChild(x);
+    });
+    if (!liste.length) c.appendChild(el("p", "aide", "Aucune activité pour l'instant. Si vous n'en faites pas, passez à l'écran suivant."));
+    const ac = el("div", "feuille-actions"), b = el("button", "bouton secondaire large", "Ajouter une activité"); b.type = "button";
+    b.addEventListener("click", () => {
+      const d = ACTIVITES.urgence;
+      S.revenu.activites = liste;
+      liste.push({ id: nouvelId("a"), type: "urgence", nom: "", nombre: 4, frequence: "mois", cycle: 6, calcul: "jour", parJour: d.parJour, patients: d.patients, parPatient: d.parPatient });
+      S.meta.exemple = false; sauver(); reconstruireFeuille(); tout();
+      const gs = corps.querySelectorAll(".groupe"); if (gs.length) gs[gs.length - 1].scrollIntoView({ block: "start" });
+    });
+    ac.appendChild(b); c.appendChild(ac);
+  }
+  function resumeRevenus(c) {
+    const z = el("div"); c.appendChild(z);
+    feuilleCourante.maj = () => {
+      const act = R.rev.activites, autres = R.autresPro + (S.revenu.autresRevenus || 0), frais = R.rev[R.mode].fraisCabinet || 0;
+      rangees(z, [
+        { titre: "Pratique principale", sous: libelleRevenu(), valeur: $(R.brut - act - autres) },
+        act > 0 && { titre: "Activités en établissement", valeur: $(act) },
+        autres > 0 && { titre: "Autres revenus professionnels", valeur: $(autres) },
+        { titre: "Revenu brut", cls: "total", valeur: $(R.brut) },
+        frais > 0 && { titre: "Frais de cabinet", valeur: "−" + $(frais) },
+        R.depensesPro > 0 && { titre: "Dépenses professionnelles", valeur: "−" + $(R.depensesPro) },
+        R.autresNonPro > 0 && { titre: "Location et placements", sous: "Imposables, sans RRQ ni RQAP", valeur: $(R.autresNonPro) },
+        { titre: "Net après impôt", sous: `${$(R.impot.net / 12)} par mois`, cls: "total", valeur: $(R.impot.net) },
+      ]);
+    };
+    feuilleCourante.maj();
+    c.appendChild(el("p", "aide", "Pour aller plus loin : page Revenu, bouton Modifier, puis « Optimiser » affiche tous les détails (tarifs des visites, forfaits, suppléments, majoration selon le territoire)."));
+  }
+  function resumeBudget(c) {
+    const z = el("div"); c.appendChild(z);
+    feuilleCourante.maj = () => {
+      const cats = categoriesParcours(), n = cats.filter(categorieFaite).length;
+      rangees(z, [
+        { titre: "Catégories remplies", valeur: `${n} sur ${cats.length}` },
+        { titre: "Dépenses", sous: R.couple ? "Votre part" : null, valeur: $(R.depMoi), valeurSous: "par mois" },
+        { titre: "Paiements de dettes", valeur: $(R.dettesMoi), valeurSous: "par mois" },
+        { titre: "Épargne", valeur: $(R.epargneMoi), valeurSous: "par mois" },
+        { titre: "Surplus", cls: "total", valeur: $(R.surplusMoi), valeurSous: "par mois" },
+      ]);
+    };
+    feuilleCourante.maj();
+    c.appendChild(el("p", "aide", "Les dettes se précisent dans la page Budget ; l'épargne (REER, CELI, CELIAPP, REEE), dans la page Avenir, bouton Modifier."));
+  }
+  const INTRO_CATEGORIE = {
+    "Logement": "Loyer ou taxes, assurance habitation, électricité, chauffage, entretien. L'hypothèque se gère dans les dettes.",
+    "Alimentation": "Épicerie, restaurants, lunchs et cafés. Un bon repère : vos relevés de carte des deux ou trois derniers mois.",
+    "Transport": "Assurance, essence ou recharge, entretien, immatriculation, stationnement. Le paiement d'un prêt auto se gère dans les dettes.",
+    "Enfants": "Garderie, école, activités, vêtements, camps de jour.",
+    "Santé": "Médicaments, dentiste, lunettes, thérapies, assurance santé privée.",
+    "Assurances personnelles": "Invalidité, vie, maladies graves, voyage : les montants sont sur vos avis de prime.",
+    "Télécom et abonnements": "Cellulaires, internet, télé et diffusion en continu, applications. La partie professionnelle va dans les dépenses professionnelles.",
+    "Personnel et loisirs": "Vêtements, soins, sports, sorties, vacances, cadeaux, animaux, dons. Pour une dépense irrégulière, comme les vacances, inscrivez le montant par année.",
+    "Finances": "Frais bancaires, comptable, frais de gestion de placements, pension alimentaire, aide à la famille.",
+    "Imprévus": "Une réserve pour ce qui n'est pas prévu : bris, réparations, dépenses oubliées.",
+    "Autres dépenses": "Ce qui n'entre nulle part ailleurs : ajoutez vos propres lignes.",
+  };
+  // Catégories du parcours : « Enfants » seulement s'il y a des enfants (ou déjà des montants).
+  const categoriesParcours = () => [...CATALOGUE.map(x => x.cat), "Autres dépenses"]
+    .filter(g => g !== "Enfants" || S.epargne.reee.enfants.length || S.budget.some(b => categorie(b) === g && b.montant > 0));
+  const categorieFaite = g => estFait("budget", g) || totalActif(g) || S.budget.some(b => categorie(b) === g && b.montant > 0);
+  const PARCOURS = {
+    revenus: { titre: "Vos revenus", etapes: () => [
+      { cle: "pratique", titre: "Votre pratique", intro: "Votre milieu détermine les modes de rémunération possibles. En première année, la clientèle se bâtit au fil des mois.",
+        construire: c => construireChamps(c, essentiels("Votre pratique", "Pour le budget")) },
+      { cle: "semaine", titre: "Votre semaine", intro: "Rendez-vous : vos propres patients. Sans rendez-vous (SRV) : surtout des urgences mineures, souvent des patients d'autres médecins, payées à des tarifs à part.",
+        construire: c => construireChamps(c, essentiels("Vos demi-journées")) },
+      S.revenu.milieu === "gmfu" && { cle: "apprenants", titre: "Enseignement et apprenants", intro: "Un résident voit en moyenne 4 à 5 patients par demi-journée ; un externe, 2 à 3. Indiquez aussi comment la supervision est facturée.",
+        construire: c => construireChamps(c, essentiels("Enseignement et apprenants")) },
+      { cle: "clientele", titre: "Votre clientèle", intro: "La RAMQ verse un forfait annuel pour chaque patient inscrit, plus élevé s'il est vulnérable, et un supplément à l'inscription des nouveaux patients du guichet d'accès.",
+        construire: c => construireChamps(c, essentiels("Votre clientèle")) },
+      { cle: "frais", titre: "Frais de cabinet", intro: "À l'acte, la clinique garde une part de votre facturation pour le loyer, le personnel et l'équipement. Demandez le pourcentage à votre clinique.",
+        construire: c => construireChamps(c, essentiels("Frais de cabinet")) },
+      { cle: "activites", titre: "Activités en établissement", intro: "Urgence, hospitalisation, obstétrique, soins palliatifs, CHSLD, gardes : en plus de la pratique principale. Les revenus par jour de départ sont indicatifs.",
+        construire: construireActivites },
+      { cle: "autres", titre: "Autres revenus", intro: "Formulaires, expertises, activités médico-administratives, enseignement, location, placements. Laissez 0 ce qui ne s'applique pas.",
+        construire: construireAutresRevenus },
+      { cle: "pro", titre: "Dépenses professionnelles", intro: "Collège des médecins, FMOQ, ACPM, formation, équipement : elles réduisent le revenu imposable. Un total suffit pour commencer.",
+        construire: construireDepensesPro },
+      { cle: "resume", titre: "Votre revenu", fin: true, construire: resumeRevenus },
+    ].filter(Boolean) },
+    budget: { titre: "Votre budget", etapes: () => [
+      R && R.couple && { cle: "partage", titre: "Le partage des dépenses", intro: "Pour chaque dépense, vous direz qui la paie : vous, l'autre personne ou les deux. Les dépenses partagées se divisent selon votre part.",
+        construire: c => construireChamps(c, CHAMPS.menage.filter(x => x.p === "menage.partCommunMoi")) },
+      ...categoriesParcours().map(g => ({ cle: g, titre: g, intro: `${INTRO_CATEGORIE[g] || ""} Pas sûr(e) du détail ? Choisissez « Un total estimé ».`.trim(),
+        construire: c => construireCategorie(c, g) })),
+      { cle: "resume", titre: "Votre budget", fin: true, construire: resumeBudget },
+    ].filter(Boolean) },
+  };
+  const etapeFaite = (nom, e) => nom === "budget" && categoriesParcours().includes(e.cle) ? categorieFaite(e.cle) : estFait(nom, e.cle);
+  // Reprendre au premier écran pas encore vu (une catégorie déjà entamée, comme le loyer, se revoit).
+  function premiereEtape(nom) { const i = PARCOURS[nom].etapes().findIndex(e => !e.fin && !estFait(nom, e.cle)); return i < 0 ? 0 : i; }
+  function ouvrirParcours(nom, i = premiereEtape(nom)) {
+    const etapes = PARCOURS[nom].etapes();
+    i = Math.max(0, Math.min(i, etapes.length - 1));
+    const e = etapes[i];
+    ouvrirFeuille(e.titre, c => {
+      const tete = el("div", "parcours-tete");
+      tete.appendChild(el("p", "as-etape", `${PARCOURS[nom].titre} · ${i + 1} sur ${etapes.length}`));
+      const j = el("div", "jauge"), sp = el("span"); sp.style.width = `${Math.round((i + 1) / etapes.length * 100)}%`; j.appendChild(sp); tete.appendChild(j);
+      if (e.intro) tete.appendChild(el("p", "parcours-intro", e.intro));
+      c.appendChild(tete);
+      e.construire(c);
+    });
+    parcours = { nom, i };
+    boutonFermer.textContent = "Plus tard";
+    const bouton = (texte, cls, f) => { const b = el("button", "bouton " + cls, texte); b.type = "button"; b.addEventListener("click", f); piedFeuille.appendChild(b); return b; };
+    // Au résumé des revenus, la suite vers le budget remplace « Retour » (trois boutons ne tiennent pas sur un téléphone).
+    if (i > 0 && !(e.fin && nom === "revenus")) bouton("Retour", "secondaire", () => ouvrirParcours(nom, i - 1));
+    if (!e.fin) {
+      bouton("Passer", "secondaire", () => ouvrirParcours(nom, i + 1));
+      bouton("Suivant", "", () => { marquer(nom, e.cle); ouvrirParcours(nom, i + 1); }).classList.add("parcours-suivant");
+    } else {
+      if (nom === "revenus") bouton("Mon budget, pas à pas", "secondaire", () => { marquer(nom, e.cle); ouvrirParcours("budget"); });
+      bouton("Terminer", "", () => { marquer(nom, e.cle); feuille.close(); toast(nom === "revenus" ? "Vos revenus sont à jour." : "Votre budget est à jour."); }).classList.add("parcours-suivant");
+    }
+    piedFeuille.hidden = false;
+    titreFeuille.tabIndex = -1; titreFeuille.focus();
+  }
+  feuille.addEventListener("close", () => {
+    parcours = null; piedFeuille.hidden = true; piedFeuille.textContent = ""; boutonFermer.textContent = "Terminé";
+    if (boiteToast.parentNode !== document.body) document.body.appendChild(boiteToast);
+  });
+
+  // Carte « Votre portrait » de l'aperçu : ce qui est rempli, et la suite proposée.
+  function portrait() {
+    const rev = PARCOURS.revenus.etapes().filter(e => !e.fin), cats = categoriesParcours();
+    const nRev = rev.filter(e => estFait("revenus", e.cle)).length, nCat = cats.filter(categorieFaite).length;
+    const ep = S.epargne, epargne = estFait("autres", "epargne") || ep.encaisse > 0 || ep.reer.solde > 0 || ep.reer.droits > 0 || ep.celi.solde > 0;
+    const items = [
+      { titre: "Votre situation", sous: "Famille, pratique, logement, dettes", f: S.meta.exemple ? 0 : 1, poids: 15, action: ouvrirAssistant },
+      { titre: "Vos revenus, pas à pas", sous: `${nRev} écran${nRev > 1 ? "s" : ""} sur ${rev.length}`, f: nRev / rev.length, poids: 35, action: () => ouvrirParcours("revenus") },
+      { titre: "Votre budget, pas à pas", sous: `${nCat} catégorie${nCat > 1 ? "s" : ""} sur ${cats.length}`, f: nCat / cats.length, poids: 35, action: () => ouvrirParcours("budget") },
+      { titre: "Votre épargne", sous: "REER, CELI, CELIAPP, REEE", f: epargne ? 1 : 0, poids: 10, action: () => { marquer("autres", "epargne"); ouvrirSection("epargne"); } },
+      { titre: "Une copie de sauvegarde", sous: "Vos données ne vivent que dans ce navigateur", f: S.meta.dernierExport ? 1 : 0, poids: 5, action: () => ouvrir("donnees") },
+    ];
+    const total = items.reduce((t, x) => t + x.poids, 0);
+    return { items, pct: Math.round(items.reduce((t, x) => t + x.poids * x.f, 0) / total * 100) };
+  }
+  const portraitMasque = () => { try { return sessionStorage.getItem("wm.portrait") === "masque"; } catch (e) { return false; } };
+  function rendrePortrait() {
+    const carte = document.getElementById("ap-portrait"), P = portrait();
+    carte.hidden = S.meta.exemple || P.pct >= 100 || portraitMasque();
+    document.querySelectorAll("[data-parcours]").forEach(b => {
+      const nom = b.dataset.parcours, fait = PARCOURS[nom].etapes().every(e => e.fin || etapeFaite(nom, e));
+      b.textContent = fait ? "Revoir pas à pas" : "Remplir pas à pas";
+      b.closest(".guide").classList.toggle("fait", fait);
+    });
+    if (carte.hidden) return;
+    document.getElementById("ap-portrait-titre").textContent = `Votre portrait : ${P.pct} % complété`;
+    const j = carte.querySelector(".jauge"); j.setAttribute("aria-valuenow", P.pct); j.firstElementChild.style.width = P.pct + "%";
+    rangees("ap-portrait-liste", P.items.map((x, i) => ({ titre: x.titre, sous: x.sous, ico: x.f >= 1 ? "ok" : String(i + 1), cls: x.f >= 1 ? "fait" : null, action: x.action })));
+    const suite = P.items.find(x => x.f < 1);
+    document.getElementById("ap-portrait-suite").textContent = suite ? `Continuer : ${suite.titre.replace(", pas à pas", "").toLowerCase()}` : "Continuer";
+    document.getElementById("ap-portrait-suite").onclick = suite ? suite.action : null;
+  }
+  document.getElementById("ap-portrait-masquer").addEventListener("click", () => {
+    try { sessionStorage.setItem("wm.portrait", "masque"); } catch (e) { /* rien à garder */ }
+    rendrePortrait(); toast("Carte masquée jusqu'à la prochaine ouverture de l'app.");
+  });
+
+  /* ============================================================
      ÉVÉNEMENTS
      ============================================================ */
   let minuterie = null;
@@ -1839,14 +2281,15 @@
       const v = valeur(inp); if (v === null) return;
       const item = tableau(inp.dataset.l)[+inp.dataset.i];
       item[inp.dataset.k] = v; S.meta.exemple = false;
-      if (inp.dataset.k === "nom" && inp.dataset.l !== "budget" && feuilleCourante) { feuilleCourante.titre = inp.dataset.l === "activites" ? nomActivite(item) : v || "Sans nom"; titreFeuille.textContent = feuilleCourante.titre; }
-      if (inp.dataset.l === "budget" && inp.dataset.k === "montant") inp.closest(".ligne-depense").classList.toggle("remplie", v > 0);
+      if (inp.dataset.k === "nom" && ["dettes", "enfants", "activites"].includes(inp.dataset.l) && feuilleCourante && !parcours) { feuilleCourante.titre = inp.dataset.l === "activites" ? nomActivite(item) : v || "Sans nom"; titreFeuille.textContent = feuilleCourante.titre; }
+      if (inp.dataset.bool) item[inp.dataset.k] = v === "true";
+      if (["budget", "lignes", "depensesPro"].includes(inp.dataset.l) && inp.dataset.k === "montant") inp.closest(".ligne-depense").classList.toggle("remplie", v > 0);
       if (inp.dataset.l === "dettes" && (inp.dataset.k === "type" || inp.dataset.k === "interetsSeulement")) { sauver(); reconstruireFeuille(); tout(); return; }
       if (inp.dataset.l === "activites" && ["type", "frequence", "calcul"].includes(inp.dataset.k)) {
         // Nouveau type : ses valeurs de départ, sauf celles déjà modifiées (égales à celles d'un autre type).
         if (inp.dataset.k === "type" && ACTIVITES[v]) for (const k of ["parJour", "patients", "parPatient"])
           if (Object.values(ACTIVITES).some(t => t[k] === item[k])) item[k] = ACTIVITES[v][k];
-        if (feuilleCourante) { feuilleCourante.titre = nomActivite(item); titreFeuille.textContent = feuilleCourante.titre; }
+        if (feuilleCourante && !parcours) { feuilleCourante.titre = nomActivite(item); titreFeuille.textContent = feuilleCourante.titre; }
         sauver(); reconstruireFeuille(); tout(); return;
       }
       plusTard();
@@ -1861,19 +2304,24 @@
       sauver(); rendreFiabilite();
     } else if (b.dataset.suppr) {
       const nomListe = b.dataset.suppr, liste = tableau(nomListe), i = +b.dataset.i, [retire] = liste.splice(i, 1); sauver();
-      if (nomListe === "budget") { reconstruireFeuille(); tout(); } else feuille.close();
+      const surPlace = nomListe === "budget" || nomListe === "lignes" || !!parcours;
+      if (surPlace) { reconstruireFeuille(); tout(); } else feuille.close();
       toast(`« ${nomListe === "activites" ? nomActivite(retire) : retire.nom || "Élément"} » supprimé.`, () => {
         tableau(nomListe).splice(i, 0, retire); sauver();
-        if (nomListe === "budget") reconstruireFeuille();
+        if (surPlace) reconstruireFeuille();
         tout();
       });
     } else if (b.dataset.feuille) ouvrirSection(b.dataset.feuille);
+    else if (b.dataset.parcours) ouvrirParcours(b.dataset.parcours);
   });
 
   /* Message en bas de l'écran ; « Annuler » défait la dernière suppression. */
   const boiteToast = document.getElementById("toast");
   let annulerToast = null, minuterieToast = null;
   function toast(texte, annuler) {
+    // Un panneau ouvert est modal : le message y loge pour que « Annuler » reste cliquable.
+    const hote = [feuille, document.getElementById("assistant")].find(d => d.open) || document.body;
+    if (boiteToast.parentNode !== hote) hote.appendChild(boiteToast);
     document.getElementById("toast-texte").textContent = texte;
     annulerToast = annuler || null;
     document.getElementById("toast-annuler").hidden = !annuler;
@@ -1917,7 +2365,7 @@
       try {
         const d = JSON.parse(lecteur.result);
         if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
-        S = fusion(clone(EXEMPLE), migrer(d)); S.budget = normaliserBudget(S.budget); S.meta.exemple = false; sauver();
+        S = normaliser(fusion(clone(EXEMPLE), migrer(d))); S.meta.exemple = false; sauver();
         tout(); message(`Données importées : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`);
         if (boiteAssistant.open) { fermerAssistant(); ouvrir("apercu"); toast("Données importées."); }
       } catch (err) { message("Ce fichier n'est pas un fichier de données WealthMorand (ou Wealthnord, Boussole). Rien n'a été changé."); }
@@ -1926,7 +2374,7 @@
   });
   const reinit = document.getElementById("reinitialiser"), confirmer = document.getElementById("confirmer-reinit");
   reinit.addEventListener("click", () => { confirmer.hidden = false; confirmer.focus(); });
-  confirmer.addEventListener("click", () => { S = clone(EXEMPLE); S.budget = normaliserBudget(S.budget); sauver(); tout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
+  confirmer.addEventListener("click", () => { S = normaliser(clone(EXEMPLE)); sauver(); tout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
 
   /* Apparence : automatique (selon l'appareil), claire ou sombre. */
   // Bouton lune / soleil, en haut à droite : passe du clair au sombre et l'inverse.
@@ -1959,6 +2407,8 @@
   document.getElementById("rapport-pdf").addEventListener("click", rapportPdf);
   document.getElementById("rv-milieu").addEventListener("change", e => choisirMilieu(e.target.value));
   document.getElementById("rv-ajout-activite").addEventListener("click", ajouterActivite);
+  document.getElementById("rv-autres-modifier").addEventListener("click", feuilleAutresRevenus);
+  document.getElementById("im-pro-modifier").addEventListener("click", feuilleDepensesPro);
   document.getElementById("de-ajout").addEventListener("input", majSimulation);
   // Plan de remboursement mois par mois, en CSV (séparateur « ; », virgule décimale, pour Excel en français).
   document.getElementById("exporter-plan").addEventListener("click", () => {
@@ -1987,7 +2437,7 @@
       VERIFICATION.forEach(v => { const b = casCalcul(v); CHAMPS_VERIF.forEach(([k]) => { const e = Math.abs(Math.round(b[k]) - v.officiel[k]); total++; if (e <= 1) egaux++; pire = Math.max(pire, e); }); });
       return { total, egaux, pire, cas: VERIFICATION.length };
     },
-    outils: { $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, ACTIVITES, nomActivite, frequenceTexte, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
+    outils: { depensesEffectives, annuelLigne, nomLigne, estPro, ITEMS_PRO, $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, ACTIVITES, nomActivite, frequenceTexte, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
   };
 
   /* Application installable (PWA) : fonctionne hors ligne. */
@@ -2172,7 +2622,7 @@
     const h = el("h2", null, e.titre); h.id = "as-titre"; h.tabIndex = -1; asCorps.appendChild(h);
     e.rendre(asCorps);
     const msg = el("p", "as-message avertissement"); msg.id = "as-message"; msg.setAttribute("role", "alert"); asCorps.appendChild(msg);
-    asRetour.hidden = etape === 0; asSuivant.textContent = e.bouton || "Continuer";
+    asRetour.hidden = etape === 0; asSuivant.hidden = false; asSuivant.textContent = e.bouton || "Continuer";
     document.querySelectorAll("#as-points li").forEach((li, i) => li.classList.toggle("fait", i < etape));
   }
   function ouvrirAssistant() {
@@ -2193,6 +2643,7 @@
   });
   asRetour.addEventListener("click", () => { if (etape > 0) { etape--; rendreEtape(); document.getElementById("as-titre").focus(); } });
   document.getElementById("as-fermer").addEventListener("click", fermerAssistant);
+  boiteAssistant.addEventListener("close", () => { if (boiteToast.parentNode === boiteAssistant) document.body.appendChild(boiteToast); });
   boiteAssistant.addEventListener("cancel", assistantVu);
   document.getElementById("ap-assistant").addEventListener("click", ouvrirAssistant);
   document.getElementById("reprendre-assistant").addEventListener("click", ouvrirAssistant);
@@ -2200,7 +2651,7 @@
   // Portrait de départ à partir des réponses : rien d'autre ne vient de l'exemple que les
   // tarifs, les paramètres d'impôt et les hypothèses de l'avenir.
   function portraitDepuis(A) {
-    const s = clone(EXEMPLE), auj = new Date(), mm = String(auj.getMonth() + 1).padStart(2, "0");
+    const s = normaliser(clone(EXEMPLE)), auj = new Date(), mm = String(auj.getMonth() + 1).padStart(2, "0");
     const couple = A.famille === "maries" || A.famille === "fait", proprio = A.logement === "proprietaire";
     s.meta = { exemple: false, misAJour: null, assistant: auj.toISOString() };
     s.confirmes = {};
@@ -2246,10 +2697,24 @@
     s.strategie = { ...s.strategie, debut: `${auj.getFullYear()}-${mm}` };
     return s;
   }
+  // Fin de l'assistant : le portrait est créé ; on propose les parcours pas à pas (facultatifs).
   function terminerAssistant() {
-    S = portraitDepuis(A); sauver(); fermerAssistant();
+    S = portraitDepuis(A); sauver();
     ouvrir("apercu"); tout();
-    toast("Votre portrait est prêt. Entrez maintenant vos dépenses du mois dans Budget.");
+    asCorps.textContent = ""; asRetour.hidden = true; asSuivant.hidden = true;
+    document.querySelectorAll("#as-points li").forEach(li => li.classList.add("fait"));
+    const h = el("h2", null, "Votre portrait est prêt"); h.id = "as-titre"; h.tabIndex = -1;
+    asCorps.append(h, el("p", "as-intro", "Il part de vos réponses. Pour des chiffres justes, précisez maintenant vos revenus et vos dépenses, un écran à la fois, avec des explications. C'est facultatif : passez ce qui ne s'applique pas, et reprenez quand vous voulez depuis l'aperçu."));
+    const choix = el("div", "as-choix");
+    [["Remplir mes revenus pas à pas", "Pratique, clientèle, activités, autres revenus · environ 3 minutes", () => ouvrirParcours("revenus")],
+     ["Remplir mon budget pas à pas", "Une catégorie de dépenses à la fois · environ 5 minutes", () => ouvrirParcours("budget")],
+     ["Plus tard", "Voir l'aperçu", null]].forEach(([titre, sous, f]) => {
+      const b = el("button", "as-option"); b.type = "button";
+      const t = el("span"); t.append(el("strong", null, titre), el("em", null, sous)); b.appendChild(t);
+      b.addEventListener("click", () => { fermerAssistant(); if (f) f(); });
+      choix.appendChild(b);
+    });
+    asCorps.appendChild(choix); asCorps.scrollTop = 0; h.focus();
   }
 
   ouvrir((location.hash || "#apercu").slice(1), true);

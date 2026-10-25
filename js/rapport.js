@@ -138,8 +138,8 @@
     /* 2. Revenu : pratique principale (un ou trois modes) et activités en établissement */
     const M = R.modes, plusieurs = R.plusieursModes;
     const parts = [["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire ?? 0], ["Visites", x => x.visites || 0], ["Acte de supervision", x => x.supervision || 0],
-      ["Demi-per diem de supervision", x => x.perDiem], ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable], ["Suppléments sans médecin", x => x.supplements],
-      ["Activités en établissement", x => x.activites || 0], ["Autres revenus", x => x.autres]];
+      ["Demi-per diem des apprenants", x => x.perDiem], ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable], ["Suppléments à l'inscription", x => x.supplements],
+      ["Suppléments du sans rendez-vous", x => x.supplementsSRV || 0], ["Activités en établissement", x => x.activites || 0], ["Autres revenus professionnels", x => x.autres]];
     const partsUtiles = parts.map((pt, i) => [...pt, i]).filter(([, f]) => M.some(m => f(g[m]) > 0));
     const maxMode = Math.max(...M.map(m => g[m].total), 1);
     const dj = S.revenu.demiJournees, ens = R.milieu === "gmfu" ? S.revenu.enseignement : 0, srv = S.revenu.demiJourneesSRV;
@@ -147,22 +147,29 @@
     const kpisRevenu = plusieurs
       ? M.map(m => `<div class="rp-kpi rp-mode ${m === mode ? "choisi" : ""}"><span><i style="background:${COULEUR_MODE[m]}"></i>${esc(NOM_MODE[m])}${m === mode ? " · utilisé" : ""}</span><strong>${$(g[m].total)}</strong><em>Net après impôt${g[m].fraisCabinet ? " et frais" : ""} : ${$(R.nets[m])}</em></div>`).join("")
       : kpi("Revenu brut", $(g[mode].total), NOM_MODE[mode]) + kpi("Frais de cabinet", $(g[mode].fraisCabinet), `${nb(S.revenu.fraisCabinetPct)} % de la facturation de la clinique`) + kpi(soc ? "Pour vous" : "Net après impôt et frais", $(R.nets[mode]), `${$(R.nets[mode] / 12)} par mois`);
-    const acts = S.revenu.activites || [];
-    pages.push(page(`Revenu · ${milieu}`, `${nb(dj)} demi-journées de rendez-vous par semaine${ens ? `, dont ${nb(ens)} d'enseignement` : ""}, à ${nb(S.revenu.patientsParDJ)} patients${srv ? ` ; ${nb(srv)} de sans rendez-vous à ${nb(S.revenu.patientsSRV)} patients` : ""} ; ${nb(S.revenu.semaines)} semaines en clinique. ${S.revenu.annee === "premiere" ? "Première année de pratique : arrivée des nouveaux patients." : "Année type : clientèle stable."}`, `
+    const acts = S.revenu.activites || [], autresL = S.revenu.lignes.filter(l => O.annuelLigne(l) > 0);
+    const serre = acts.length > 0 && autresL.length > 0;   // page chargée : graphique et tableau plus courts
+    const apprenants = ens ? [S.revenu.residents && `${nb(S.revenu.residents)} résident${S.revenu.residents > 1 ? "s" : ""}`, S.revenu.externes && `${nb(S.revenu.externes)} externe${S.revenu.externes > 1 ? "s" : ""}`].filter(Boolean).join(" et ") : "";
+    pages.push(page(`Revenu · ${milieu}`, `${nb(dj)} demi-journées de rendez-vous par semaine${ens ? `, dont ${nb(ens)} d'enseignement${apprenants ? ` (${apprenants})` : ""}` : ""}, à ${nb(S.revenu.patientsParDJ)} patients${srv ? ` ; ${nb(srv)} de sans rendez-vous à ${nb(S.revenu.patientsSRV)} patients` : ""} ; ${nb(S.revenu.semaines)} semaines en clinique. ${S.revenu.annee === "premiere" ? "Première année de pratique : arrivée des nouveaux patients." : "Année type : clientèle stable."}${S.revenu.majorationPct ? ` Majoration de ${nb(S.revenu.majorationPct)} % selon le territoire.` : ""}`, `
       <div class="rp-kpis rp-kpis-3">${kpisRevenu}</div>
       <div class="rp-carte"><h2>D'où vient le revenu</h2>
         ${M.map(m => `<div class="rp-ligne-empilee"><span class="nom">${esc(COURT_MODE[m])}</span><div class="rp-piste-empilee"><div class="rp-empilee" style="width:${g[m].total / maxMode * 100}%">${partsUtiles.map(([, f, i]) => f(g[m]) > 0 ? `<span style="flex:${f(g[m])} 0 0;background:${C(i)}"></span>` : "").join("")}</div></div><strong>${$(g[m].total)}</strong></div>`).join("")}
         ${legende(partsUtiles.map(([n, , i]) => ({ nom: n, couleur: C(i) })))}
         ${M.some(m => g[m].fraisCabinet > 0) ? `<p class="rp-note">Frais de cabinet : ${M.filter(m => g[m].fraisCabinet > 0).map(m => `${plusieurs ? NOM_MODE[m].toLowerCase() + " " : ""}${$(g[m].fraisCabinet)}`).join(", ")} par année (${nb(S.revenu.fraisCabinetPct)} % de la facturation de la clinique${S.revenu.fraisCabinetMois ? ` et ${$(S.revenu.fraisCabinetMois)} par mois` : ""}).</p>` : ""}
       </div>
+      ${acts.length && autresL.length ? `<div class="rp-deux">` : ""}
       ${acts.length ? `<div class="rp-carte"><h2>Activités en établissement</h2>${tableau(["", "Fréquence", "Par jour", "Par année"], [
         ...acts.map((a, i) => ({ c: [nomActivite(a), frequenceTexte(a), $(g.detailActivites[i].parJour), $(g.detailActivites[i].total)] })),
         ...(acts.length > 1 ? [{ cls: "total", c: ["Total", "", "", $(g.activites)] }] : [])])}
         <p class="rp-note">Revenus par jour indicatifs ou estimés (patients par jour × revenu moyen par patient) : à préciser avec vos relevés de la RAMQ.</p></div>` : ""}
+      ${autresL.length ? `<div class="rp-carte"><h2>Autres revenus</h2>${tableau(["", "Type", "Par année"], [
+        ...autresL.map(l => ({ c: [O.nomLigne(l), O.estPro(l) ? "Professionnel" : "Imposable, sans RRQ ni RQAP", $(O.annuelLigne(l))] })),
+        ...(autresL.length > 1 ? [{ cls: "total", c: ["Total", "", $(autresL.reduce((t, l) => t + O.annuelLigne(l), 0))] }] : [])], "compact")}</div>` : ""}
+      ${acts.length && autresL.length ? `</div>` : ""}
       <div class="rp-carte"><h2>Revenu net selon les demi-journées de rendez-vous</h2>
         ${plusieurs ? legende(M.map(m => ({ nom: NOM_MODE[m], couleur: COULEUR_MODE[m], ligne: true }))) : ""}
-        ${lignes({ x: R.sensDJ.map(x => `${x.v} d.-j.`), series: M.map(m => ({ nom: NOM_MODE[m], couleur: COULEUR_MODE[m], valeurs: R.sensDJ.map(x => x[m + "Net"]) })), baseLibre: true, hauteur: 190, titre: "Revenu net selon les demi-journées" })}
-        ${tableau(["Demi-journées", ...colsSens], R.sensDJ.map(x => ({ cls: x.v === dj ? "choisi" : "", c: [`${x.v}${x.v === dj ? " (vous)" : ""}`, ...(plusieurs ? M.map(m => $(x[m + "Net"])) : [$(x[mode]), $(x[mode + "Net"])])] })), "compact")}
+        ${lignes({ x: R.sensDJ.map(x => `${x.v} d.-j.`), series: M.map(m => ({ nom: NOM_MODE[m], couleur: COULEUR_MODE[m], valeurs: R.sensDJ.map(x => x[m + "Net"]) })), baseLibre: true, hauteur: serre ? 130 : acts.length || autresL.length ? 160 : 190, titre: "Revenu net selon les demi-journées" })}
+        ${tableau(["Demi-journées", ...colsSens], R.sensDJ.filter(x => !serre || Math.abs(x.v - dj) <= 2).map(x => ({ cls: x.v === dj ? "choisi" : "", c: [`${x.v}${x.v === dj ? " (vous)" : ""}`, ...(plusieurs ? M.map(m => $(x[m + "Net"])) : [$(x[mode]), $(x[mode + "Net"])])] })), "compact")}
         <p class="rp-note">Après impôt${M.some(m => g[m].fraisCabinet > 0) ? " et frais de cabinet" : ""}. ${plusieurs ? `Le mixte dépasse l'horaire au-delà de ${g.seuilPatients != null ? nb(g.seuilPatients) : "—"} patients par demi-journée ; l'acte, au-delà de ${g.seuilActe != null ? nb(g.seuilActe) : "—"}. ` : ""}À l'acte : règles d'avant la Loi 2.</p>
       </div>`));
 
@@ -192,6 +199,11 @@
       R.couple ? { c: [`Net de ${O.votreP()} après impôt`, $(R.conjointe.net - R.depensesPartenaire)] } : null,
       R.couple && (R.impot.transferts || 0) + (R.conjointe.transferts || 0) > 0 ? { c: ["Crédits transférés entre conjoints", $((R.impot.transferts || 0) + (R.conjointe.transferts || 0))] } : null,
     ].filter(Boolean);
+    const proL = S.impot.depensesProMode === "detail" ? S.impot.depensesProDetail.filter(l => O.annuelLigne(l) > 0) : [];
+    const dproTable = [
+      ...(proL.length ? proL.map(l => ({ c: [O.ITEMS_PRO.get(l.k).nom, $(O.annuelLigne(l))] })) : [{ c: ["Total estimé", $(R.depensesPro)] }]),
+      ...(proL.length > 1 ? [{ cls: "total", c: ["Total", $(R.depensesPro)] }] : []),
+    ];
     pages.push(page("Impôt 2026", soc ? "Pratique incorporée : la société paie ses dépenses et son impôt, puis vous verse des dividendes non déterminés." : "Travail autonome : impôt fédéral et du Québec, RRQ des deux parts, RQAP et Fonds des services de santé.", `
       <div class="rp-kpis rp-kpis-4">
         ${kpi("Impôt de l'année", $(totalImpot), soc ? "Société et vous" : "Impôt et cotisations")}
@@ -203,12 +215,15 @@
       <div class="rp-carte"><h2>${R.plusieursModes ? "Détail selon le mode" : "Détail de l'impôt"}</h2>${tableau(["", ...R.modes.map(m => R.plusieursModes ? COURT_MODE[m] : "Par année")], lignesImpot)}</div>
       <div class="rp-deux">
         <div class="rp-carte"><h2>Famille${R.couple ? " et couple" : ""}</h2>${tableau(["", "Par année"], fam)}</div>
-        <div class="rp-carte"><h2>REER : remboursement</h2>${tableau(["Cotisation", "Remboursement", "Taux", "Coût réel"], reer)}</div>
-      </div>`));
+        <div class="rp-carte"><h2>REER : remboursement</h2>${tableau(["Cotisation", "Remboursement", "Taux", "Coût réel"], reer)}
+          ${(S.epargne.celiapp || {}).cotisationAnnuelle ? `<p class="rp-note">CELIAPP : ${$(S.epargne.celiapp.cotisationAnnuelle)} par année, déduits comme le REER, jusqu'au plafond à vie de 40 000 $.</p>` : ""}</div>
+      </div>
+      ${R.depensesPro > 0 ? `<div class="rp-carte"><h2>Dépenses professionnelles</h2>${tableau(["", "Par année"], dproTable, "compact")}
+        <p class="rp-note">${soc ? "Payées par la société." : "Déduites du revenu imposable."}</p></div>` : ""}`));
 
     /* 4. Budget */
     const part = S.menage.partCommunMoi / 100, partMoi = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0;
-    const cats = [...O.CATALOGUE.map(c => c.cat), "Autres dépenses"].map(c => ({ nom: c, valeur: S.budget.filter(b => O.categorie(b) === c).reduce((a, b) => a + O.mensuel(b) * partMoi(b), 0) }))
+    const cats = [...O.CATALOGUE.map(c => c.cat), "Autres dépenses"].map(c => ({ nom: c, valeur: O.depensesEffectives().filter(b => O.categorie(b) === c).reduce((a, b) => a + O.mensuel(b) * partMoi(b), 0) }))
       .filter(c => c.valeur > 0).sort((a, b) => b.valeur - a.valeur);
     const nAns = Math.min(R.annees, 20), an0 = +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear();
     const surplus = Array.from({ length: nAns + 1 }, (_, a) => R.surplusAnnee(a));
@@ -249,7 +264,7 @@
     /* 6. Avenir */
     const cols = [0, Math.round(fin / 2), fin], v = (i, f) => f(p[i]) / def(i);
     const L = [["Maison, votre part", y => y.maisonMoi], ["Hypothèques, votre part", y => -y.hypMoi], ["Équité dans la maison", y => y.equiteMoi, "sous-total"],
-      ["Placements : REER, CELI, comptes", y => y.placements], ...(soc ? [["Placements dans la société", y => y.societe]] : []), ["Auto", y => y.voitureMoi], ["Autres dettes, votre part", y => -y.autresMoi]]
+      ["Placements : REER, CELI, CELIAPP, comptes", y => y.placements], ...(soc ? [["Placements dans la société", y => y.societe]] : []), ["Auto", y => y.voitureMoi], ["Autres dettes, votre part", y => -y.autresMoi]]
       .filter(([n]) => !R.locataire || !/Maison|Hypoth|Équité/.test(n) || S.dettes.some(d => d.type === "hypotheque"));
     const jal = O.jalons(R);
     pages.push(page("Avenir", `Scénario ${scen} : placements ${nb(R.hyp.rendement, 1)} %${R.locataire ? "" : `, maison ${O.signePct(R.hyp.croissanceMaison)}`}, autos −${nb(R.hyp.depreciationAuto, 0)} %, inflation ${nb(R.hyp.inflation, 1)} % par année${S.scenarios.dollarsAujourdhui ? " ; montants en dollars d'aujourd'hui" : ""}.`, `
@@ -284,12 +299,15 @@
           ["Tarif horaire (EP 42)", O.$2(r.tarifHoraire) + " / h"], ["Mixte : forfait horaire", O.$2(r.forfaitHoraireMixte) + " / h"], ["Mixte : part du tarif des visites", nb(r.pctMixte) + " %"],
           ["Acte de supervision, à 100 %", O.$2(r.acteSupervision) + " / h"], ["À l'acte : part du tarif", nb(r.pctActe ?? 100) + " %"],
           ["Frais de cabinet", `${nb(r.fraisCabinetPct || 0)} % + ${$(r.fraisCabinetMois || 0)} / mois`], ["Demi-per diem par résident", O.$2(r.perDiemResident)],
+          ...(r.perDiemExterne ? [["Demi-per diem par externe", O.$2(r.perDiemExterne)]] : []), ...(r.majorationPct ? [["Majoration selon le territoire", nb(r.majorationPct) + " %"]] : []),
         ].map(c => ({ c })), "compact")}</div>
         <div class="rp-carte"><h2>Vérification officielle</h2><p class="rp-gros">${nb(ver.egaux, 0)} sur ${nb(ver.total, 0)}</p>
           <p class="rp-note">montants identiques, à 1 $ près, à ceux de l'outil de calcul du revenu disponible du ministère des Finances du Québec (mai 2026), sur ${ver.cas} cas ; plus grand écart : ${$(ver.pire)}.</p></div>
       </div>
       <div class="rp-carte"><h2>Sources</h2><ul class="rp-sources">
-        <li>RAMQ : tarifs de l'onglet B (août 2026), entente particulière 40 (inscription), EP 42 et annexe XXIII (taux horaire et mixte). À l'acte : règles d'avant la Loi 2.</li>
+        <li>RAMQ : tarifs de l'onglet B (août 2026), entente particulière 40 (inscription), EP 42 et annexe XXIII (taux horaire et mixte). À l'acte : règles d'avant la Loi 2. Tarifs et suppléments modifiables dans l'app.</li>
+        <li>Collège des médecins du Québec : grille tarifaire 2026-2027 ; ACPM : cotisations 2027 au Québec ; FMOQ : infolettres sur l'entente.</li>
+        <li>CELIAPP : Agence du revenu du Canada (8 000 $ par année, 40 000 $ à vie).</li>
         <li>Tables d'impôt fédérales et du Québec 2026 ; RRQ, RQAP, assurance-emploi et Fonds des services de santé 2026.</li>
         <li>Allocation canadienne pour enfants, Allocation famille et prime d'assurance médicaments 2026.</li>
         <li>Normes d'hypothèses de projection 2026, Institut de planification financière et FP Canada.</li>

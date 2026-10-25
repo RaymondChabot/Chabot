@@ -72,6 +72,13 @@
         </div>
       </div>
       <div class="hero" id="ap-hero"></div>
+      <div class="carte portrait" id="ap-portrait" hidden>
+        <div class="carte-tete"><h2 id="ap-portrait-titre">Votre portrait</h2><button type="button" class="lien-carte" id="ap-portrait-masquer">Masquer</button></div>
+        <div class="jauge" role="progressbar" aria-labelledby="ap-portrait-titre" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+        <p class="aide">Facultatif, mais plus il est complet, plus vos chiffres sont justes. Un écran à la fois, avec des explications ; passez ce qui ne s'applique pas.</p>
+        <div id="ap-portrait-liste"></div>
+        <div class="actions"><button type="button" class="bouton" id="ap-portrait-suite">Continuer</button></div>
+      </div>
       <div class="carte">
         <div class="carte-tete"><h2>Ce mois-ci</h2><span class="carte-sous">Votre part</span></div>
         <div id="ap-flux"></div>
@@ -99,6 +106,7 @@
     <!-- ============ REVENU ============ -->
     <section class="vue" id="v-revenu" aria-labelledby="h-revenu" hidden>
       <header class="tete-page"><h1 id="h-revenu">Revenu</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
+      <div class="guide"><p>Un écran à la fois, avec des explications : pratique, clientèle, activités, autres revenus.</p><button type="button" class="bouton petit" data-parcours="revenus">Remplir pas à pas</button></div>
       <div class="choix-milieu">
         <label for="rv-milieu">Pratique principale</label>
         <div class="saisie"><select id="rv-milieu"></select></div>
@@ -119,6 +127,10 @@
         <div class="carte-tete"><h2>Activités en établissement</h2></div>
         <div id="rv-activites"></div>
         <div class="actions"><button type="button" class="bouton secondaire" id="rv-ajout-activite">Ajouter une activité</button></div>
+      </div>
+      <div class="carte" id="rv-carte-autres">
+        <div class="carte-tete"><h2>Autres revenus</h2><button type="button" class="lien-carte" id="rv-autres-modifier">Modifier</button></div>
+        <div id="rv-autres"></div>
       </div>
       <div class="carte" id="rv-carte-sens">
         <div class="carte-tete"><h2 id="rv-sens-titre">Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>
@@ -158,6 +170,10 @@
         <p class="aide" id="im-tableau-note"></p>
       </div>
       <div class="carte">
+        <div class="carte-tete"><h2>Dépenses professionnelles</h2><button type="button" class="lien-carte" id="im-pro-modifier">Modifier</button></div>
+        <div id="im-pro"></div>
+      </div>
+      <div class="carte">
         <div class="carte-tete"><h2>Famille et couple</h2><button type="button" class="lien-carte" data-feuille="menage">Modifier</button></div>
         <div id="im-famille"></div>
       </div>
@@ -174,6 +190,7 @@
     <!-- ============ BUDGET ============ -->
     <section class="vue" id="v-budget" aria-labelledby="h-budget" hidden>
       <header class="tete-page"><h1 id="h-budget">Budget</h1><button type="button" class="bouton-modifier" data-feuille="menage">Ménage</button></header>
+      <div class="guide"><p>Une catégorie à la fois : le détail ligne par ligne ou un total estimé.</p><button type="button" class="bouton petit" data-parcours="budget">Remplir pas à pas</button></div>
       <div class="segment" id="bu-vue"></div>
       <div class="hero" id="bu-hero"></div>
       <div class="carte demi">
@@ -319,6 +336,7 @@
     <button type="button" class="bouton petit" id="feuille-fermer">Terminé</button>
   </div>
   <div class="feuille-corps" id="feuille-corps"></div>
+  <div class="feuille-pied" id="feuille-pied" hidden></div>
 </dialog>
 
 <div class="toast" id="toast" role="status" hidden><span id="toast-texte"></span><button type="button" id="toast-annuler">Annuler</button></div>

@@ -122,5 +122,22 @@ const totalHosp = 7 * 52 / 6 * 960;
 verifier("activité : ajoutée à chaque mode", ["horaire", "mixte", "acte"].every(m => proche(ga[m].total - g[m].total, totalHosp, 0.01)));
 verifier("activité : sans frais de cabinet", proche(ga.acte.fraisCabinet, (ga.acte.total - totalHosp) * 0.30, 0.01));
 
+/* 10. Tarifs modifiables, très vulnérables, apprenants, suppléments SRV, majoration. */
+const g2 = C.revenuGmfu({ ...rev, tarifs: { suivi: [42.25, 46.95] } });
+verifier("tarifs : un tarif modifié change les visites", g2.acte.visites > g.acte.visites && g2.horaire.total === g.horaire.total);
+const gtv = C.revenuGmfu({ ...rev, partVulnerable: 10, partTresVulnerable: 10, forfaitTresVulnerable: 155 });
+verifier("très vulnérables : forfait annuel propre", proche(gtv.acte.forfaitVulnerable - C.revenuGmfu({ ...rev, partVulnerable: 20 }).acte.forfaitVulnerable, 500 * 0.10 * (155 - 55), 0.01));
+const gsup = C.revenuGmfu({ ...rev, supervisionFacturation: "visites", residents: 1, externes: 1 });
+verifier("apprenants : 4,5 + 2,5 visites par demi-journée d'enseignement", proche(gsup.visitesApprenants, 46 * 3 * 7, 1e-9) && gsup.acte.supervision === 0 && gsup.acte.visites > g.acte.visites);
+verifier("apprenants : acte de supervision par défaut", g.visitesApprenants === 0 && g.acte.supervision > 0);
+const gsrv = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, suppSRV10: 50, suppSRV20: 90 });
+verifier("SRV : supplément GMF de 10 patients et plus", proche(gsrv.acte.supplementsSRV, 46 * 50, 1e-9));
+const gmaj = C.revenuGmfu({ ...rev, majorationPct: 15 });
+verifier("majoration : +15 % sur les heures, pas sur les forfaits", proche(gmaj.horaire.heures, g.horaire.heures * 1.15, 0.01) && proche(gmaj.horaire.forfaitInscription, g.horaire.forfaitInscription, 1e-9));
+
+/* 11. Revenus non professionnels : imposables, sans RRQ ni RQAP. */
+const pBase = C.impotParticulier({ revenu: 200000, depensesPro: 3000 }), pAutres = C.impotParticulier({ revenu: 200000, depensesPro: 3000, autresImposables: 10000 });
+verifier("autres revenus : même RRQ, plus d'impôt, net plus élevé", pAutres.rrq === pBase.rrq && pAutres.fed + pAutres.qc > pBase.fed + pBase.qc && pAutres.net > pBase.net && pAutres.net - pBase.net < 10000);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);
