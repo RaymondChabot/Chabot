@@ -6,7 +6,7 @@
   const W = window.Wealthnord;
   if (!W) return;
   const O = W.outils;
-  const { $, nb, pct, signe, moisAn, MODES, NOM_MODE, COULEUR_MODE, SCENARIOS, NOMS_METHODES, MILIEUX, libelleRevenu } = O;
+  const { $, nb, pct, signe, moisAn, MODES, NOM_MODE, COULEUR_MODE, SCENARIOS, NOMS_METHODES, MILIEUX, nomActivite, frequenceTexte, libelleRevenu } = O;
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   // Montant abrégé pour les axes et les étiquettes : 12 k$, 1,25 M$.
@@ -85,36 +85,6 @@
     <header class="rp-tete">${marque}<svg class="rp-nom" aria-hidden="true"><use href="#wm-nom"/></svg><span class="rp-tete-titre">${esc(titre)}</span></header>
     <h1>${esc(titre)}</h1>${intro ? `<p class="rp-intro">${esc(intro)}</p>` : ""}${contenu}</section>`;
 
-  /* Revenu au calcul simple : d'où vient le revenu et, s'il y a lieu, selon les jours par semaine. */
-  function pageRevenuSimple(S, R) {
-    const g = R.rev, x = g.simple, sp = S.revenu.simple, milieu = MILIEUX[R.milieu].nom, soc = R.societeActive;
-    const montee = S.revenu.annee === "premiere" && g.facteur < 1;
-    const intro = g.jours != null
-      ? `${nb(sp.joursSemaine)} jours (ou quarts) par semaine, ${nb(S.revenu.semaines, 0)} semaines, ${$(sp.parJour)} par jour.`
-      : `Facturation annuelle de ${$(sp.annuel)} au plein régime.`;
-    const rangs = [
-      { c: [`Activité : ${milieu}, année complète`, $(g.plein)] },
-      montee ? { c: [`Montée de la clientèle : de ${nb(sp.debutPct, 0)} % au plein régime en ${nb(sp.moisMontee, 0)} mois`, moins(g.plein - x.activite)] } : null,
-      x.autres ? { c: ["Autres revenus RAMQ", $(x.autres)] } : null,
-      { cls: "total", c: ["Revenu brut de l'année", $(x.total)] },
-      x.fraisCabinet ? { c: [`Frais de cabinet (${nb(sp.fraisPct)} %${sp.fraisMois ? ` et ${$(sp.fraisMois)} par mois` : ""})`, moins(x.fraisCabinet)] } : null,
-      { cls: "total", c: [soc ? "Net pour vous" : "Net après impôt et frais", $(R.nets.simple)] },
-    ].filter(Boolean);
-    const L = R.sensJours, j = sp.joursSemaine;
-    return page(`Revenu · ${milieu}`, `${intro} ${montee ? "Première année de pratique : montée de la clientèle." : "Année type : activité au plein régime."}`, `
-      <div class="rp-kpis rp-kpis-3">
-        ${kpi("Revenu brut de l'année", $(x.total), montee ? `${pct(g.facteur, 0)} d'une année complète` : "Au plein régime")}
-        ${kpi("Une année complète", $(g.plein + x.autres), "Au plein régime")}
-        ${kpi(soc ? "Pour vous" : "Net après impôt et frais", $(R.nets.simple), `${$(R.nets.simple / 12)} par mois`)}
-      </div>
-      <div class="rp-carte"><h2>D'où vient le revenu</h2>${tableau(["", "Par année"], rangs)}</div>
-      ${L ? `<div class="rp-carte"><h2>Revenu net selon les jours par semaine</h2>
-        ${lignes({ x: L.map(y => `${nb(y.v)} j`), series: [{ nom: milieu, couleur: C(0), valeurs: L.map(y => y.simpleNet) }], baseLibre: true, hauteur: 190, titre: "Revenu net selon les jours par semaine" })}
-        ${tableau(["Jours par semaine", "Brut", soc ? "Pour vous" : "Net"], L.map(y => ({ cls: y.v === j ? "choisi" : "", c: [`${nb(y.v)}${y.v === j ? " (vous)" : ""}`, $(y.simple), $(y.simpleNet)] })), "compact")}
-        <p class="rp-note">Même revenu par jour, mêmes semaines et mêmes frais. Valeurs de départ indicatives : à remplacer par votre propre facturation.</p>
-      </div>` : ""}`);
-  }
-
   /* ---------- Le rapport ---------- */
   function construire() {
     const S = W.etat(), R = W.resultats();
@@ -133,9 +103,7 @@
     const points = [
       soc ? `La société garde environ ${$(R.impot.societe.impotSociete / 12)} par mois pour son impôt ; vous, ${$(R.impot.total / 12)} pour l'impôt sur vos dividendes.`
         : `Mettez de côté environ ${$(R.impot.total / 12)} par mois, soit ${pct(R.impot.total / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, pour l'impôt et les cotisations.`,
-      !R.detaille ? (g.facteur < 1 && S.revenu.annee === "premiere"
-          ? `Première année : montée de la clientèle, ${pct(g.facteur, 0)} d'une année complète. Au plein régime, le revenu brut serait de ${$(g.plein + g.simple.autres)}.`
-          : `Revenu calculé à partir de ${g.jours != null ? `${nb(S.revenu.simple.joursSemaine)} jours par semaine à ${$(S.revenu.simple.parJour)} par jour` : "votre facturation annuelle"} (${milieu}).`)
+      !R.plusieursModes ? `${NOM_MODE[mode]} en ${milieu}${g.activites ? `, plus ${$(g.activites)} d'activités en établissement par année` : ""} : ${$(R.nets[mode])} après impôt et frais.`
         : meilleurMode !== mode ? `${NOM_MODE[meilleurMode]} donnerait ${$(R.nets[meilleurMode] - R.nets[mode])} de plus par année après impôt et frais que votre mode actuel (${NOM_MODE[mode].toLowerCase()}).`
         : `Votre mode actuel (${NOM_MODE[mode].toLowerCase()}) donne le revenu net le plus élevé des trois.`,
       R.sim.libre ? `Méthode ${NOMS_METHODES[R.recommandee].toLowerCase()} recommandée ; avec la méthode ${meth}, plus aucune dette en ${moisAn(R.sim.libre)}.` : "Au rythme actuel, la marge de crédit n'est jamais remboursée.",
@@ -167,29 +135,36 @@
       <div class="rp-carte"><h2>Points clés</h2><ul class="rp-points">${points.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
     </section>`);
 
-    /* 2. Revenu : calcul détaillé (GMF-U, CLSC) ou simple (clinique, hôpital, urgence) */
-    if (!R.detaille) pages.push(pageRevenuSimple(S, R));
-    else {
+    /* 2. Revenu : pratique principale (un ou trois modes) et activités en établissement */
+    const M = R.modes, plusieurs = R.plusieursModes;
     const parts = [["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire ?? 0], ["Visites", x => x.visites || 0], ["Acte de supervision", x => x.supervision || 0],
-      ["Demi-per diem de supervision", x => x.perDiem], ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable], ["Suppléments sans médecin", x => x.supplements], ["Autres revenus", x => x.autres]];
-    const partsUtiles = parts.map((pt, i) => [...pt, i]).filter(([, f]) => MODES.some(m => f(g[m]) > 0));
-    const maxMode = Math.max(...MODES.map(m => g[m].total), 1);
-    const dj = S.revenu.demiJournees;
-    const ens = R.milieu === "clsc" ? 0 : S.revenu.enseignement;
-    pages.push(page(`Revenu · ${milieu}`, `${nb(S.revenu.demiJournees)} demi-journées par semaine${ens ? `, dont ${nb(ens)} d'enseignement` : ""} ; ${nb(S.revenu.patientsParDJ)} patients par demi-journée en clinique ; ${nb(S.revenu.semaines)} semaines. ${S.revenu.annee === "premiere" ? "Première année de pratique : arrivée des nouveaux patients." : "Année type : clientèle stable."}`, `
-      <div class="rp-kpis rp-kpis-3">${MODES.map(m => `<div class="rp-kpi rp-mode ${m === mode ? "choisi" : ""}"><span><i style="background:${COULEUR_MODE[m]}"></i>${esc(NOM_MODE[m])}${m === mode ? " · utilisé" : ""}</span><strong>${$(g[m].total)}</strong><em>Net après impôt${g[m].fraisCabinet ? " et frais" : ""} : ${$(R.nets[m])}</em></div>`).join("")}</div>
+      ["Demi-per diem de supervision", x => x.perDiem], ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable], ["Suppléments sans médecin", x => x.supplements],
+      ["Activités en établissement", x => x.activites || 0], ["Autres revenus", x => x.autres]];
+    const partsUtiles = parts.map((pt, i) => [...pt, i]).filter(([, f]) => M.some(m => f(g[m]) > 0));
+    const maxMode = Math.max(...M.map(m => g[m].total), 1);
+    const dj = S.revenu.demiJournees, ens = R.milieu === "gmfu" ? S.revenu.enseignement : 0, srv = S.revenu.demiJourneesSRV;
+    const colsSens = plusieurs ? M.map(m => COURT_MODE[m]) : ["Brut", soc ? "Pour vous" : "Net"];
+    const kpisRevenu = plusieurs
+      ? M.map(m => `<div class="rp-kpi rp-mode ${m === mode ? "choisi" : ""}"><span><i style="background:${COULEUR_MODE[m]}"></i>${esc(NOM_MODE[m])}${m === mode ? " · utilisé" : ""}</span><strong>${$(g[m].total)}</strong><em>Net après impôt${g[m].fraisCabinet ? " et frais" : ""} : ${$(R.nets[m])}</em></div>`).join("")
+      : kpi("Revenu brut", $(g[mode].total), NOM_MODE[mode]) + kpi("Frais de cabinet", $(g[mode].fraisCabinet), `${nb(S.revenu.fraisCabinetPct)} % de la facturation de la clinique`) + kpi(soc ? "Pour vous" : "Net après impôt et frais", $(R.nets[mode]), `${$(R.nets[mode] / 12)} par mois`);
+    const acts = S.revenu.activites || [];
+    pages.push(page(`Revenu · ${milieu}`, `${nb(dj)} demi-journées de rendez-vous par semaine${ens ? `, dont ${nb(ens)} d'enseignement` : ""}, à ${nb(S.revenu.patientsParDJ)} patients${srv ? ` ; ${nb(srv)} de sans rendez-vous à ${nb(S.revenu.patientsSRV)} patients` : ""} ; ${nb(S.revenu.semaines)} semaines en clinique. ${S.revenu.annee === "premiere" ? "Première année de pratique : arrivée des nouveaux patients." : "Année type : clientèle stable."}`, `
+      <div class="rp-kpis rp-kpis-3">${kpisRevenu}</div>
       <div class="rp-carte"><h2>D'où vient le revenu</h2>
-        ${MODES.map(m => `<div class="rp-ligne-empilee"><span class="nom">${esc(COURT_MODE[m])}</span><div class="rp-piste-empilee"><div class="rp-empilee" style="width:${g[m].total / maxMode * 100}%">${partsUtiles.map(([, f, i]) => f(g[m]) > 0 ? `<span style="flex:${f(g[m])} 0 0;background:${C(i)}"></span>` : "").join("")}</div></div><strong>${$(g[m].total)}</strong></div>`).join("")}
+        ${M.map(m => `<div class="rp-ligne-empilee"><span class="nom">${esc(COURT_MODE[m])}</span><div class="rp-piste-empilee"><div class="rp-empilee" style="width:${g[m].total / maxMode * 100}%">${partsUtiles.map(([, f, i]) => f(g[m]) > 0 ? `<span style="flex:${f(g[m])} 0 0;background:${C(i)}"></span>` : "").join("")}</div></div><strong>${$(g[m].total)}</strong></div>`).join("")}
         ${legende(partsUtiles.map(([n, , i]) => ({ nom: n, couleur: C(i) })))}
-        ${MODES.some(m => g[m].fraisCabinet > 0) ? `<p class="rp-note">Frais de cabinet : ${MODES.filter(m => g[m].fraisCabinet > 0).map(m => `${NOM_MODE[m].toLowerCase()} ${$(g[m].fraisCabinet)}`).join(", ")} par année (${nb(S.revenu.fraisCabinetPct)} % de la facturation${S.revenu.fraisCabinetMois ? ` et ${$(S.revenu.fraisCabinetMois)} par mois` : ""}).</p>` : ""}
+        ${M.some(m => g[m].fraisCabinet > 0) ? `<p class="rp-note">Frais de cabinet : ${M.filter(m => g[m].fraisCabinet > 0).map(m => `${plusieurs ? NOM_MODE[m].toLowerCase() + " " : ""}${$(g[m].fraisCabinet)}`).join(", ")} par année (${nb(S.revenu.fraisCabinetPct)} % de la facturation de la clinique${S.revenu.fraisCabinetMois ? ` et ${$(S.revenu.fraisCabinetMois)} par mois` : ""}).</p>` : ""}
       </div>
-      <div class="rp-carte"><h2>Revenu net selon les demi-journées par semaine</h2>
-        ${legende(MODES.map(m => ({ nom: NOM_MODE[m], couleur: COULEUR_MODE[m], ligne: true })))}
-        ${lignes({ x: R.sensDJ.map(x => `${x.v} d.-j.`), series: MODES.map(m => ({ nom: NOM_MODE[m], couleur: COULEUR_MODE[m], valeurs: R.sensDJ.map(x => x[m + "Net"]) })), baseLibre: true, hauteur: 190, titre: "Revenu net selon les demi-journées" })}
-        ${tableau(["Demi-journées", "Horaire", "Mixte", "À l'acte"], R.sensDJ.map(x => ({ cls: x.v === dj ? "choisi" : "", c: [`${x.v}${x.v === dj ? " (vous)" : ""}`, ...MODES.map(m => $(x[m + "Net"]))] })), "compact")}
-        <p class="rp-note">Après impôt${MODES.some(m => g[m].fraisCabinet > 0) ? " et frais de cabinet" : ""}. Le mixte dépasse l'horaire au-delà de ${g.seuilPatients != null ? nb(g.seuilPatients) : "—"} patients par demi-journée ; l'acte, au-delà de ${g.seuilActe != null ? nb(g.seuilActe) : "—"}. À l'acte : règles d'avant la Loi 2.</p>
+      ${acts.length ? `<div class="rp-carte"><h2>Activités en établissement</h2>${tableau(["", "Fréquence", "Par jour", "Par année"], [
+        ...acts.map((a, i) => ({ c: [nomActivite(a), frequenceTexte(a), $(g.detailActivites[i].parJour), $(g.detailActivites[i].total)] })),
+        ...(acts.length > 1 ? [{ cls: "total", c: ["Total", "", "", $(g.activites)] }] : [])])}
+        <p class="rp-note">Revenus par jour indicatifs ou estimés (patients par jour × revenu moyen par patient) : à préciser avec vos relevés de la RAMQ.</p></div>` : ""}
+      <div class="rp-carte"><h2>Revenu net selon les demi-journées de rendez-vous</h2>
+        ${plusieurs ? legende(M.map(m => ({ nom: NOM_MODE[m], couleur: COULEUR_MODE[m], ligne: true }))) : ""}
+        ${lignes({ x: R.sensDJ.map(x => `${x.v} d.-j.`), series: M.map(m => ({ nom: NOM_MODE[m], couleur: COULEUR_MODE[m], valeurs: R.sensDJ.map(x => x[m + "Net"]) })), baseLibre: true, hauteur: 190, titre: "Revenu net selon les demi-journées" })}
+        ${tableau(["Demi-journées", ...colsSens], R.sensDJ.map(x => ({ cls: x.v === dj ? "choisi" : "", c: [`${x.v}${x.v === dj ? " (vous)" : ""}`, ...(plusieurs ? M.map(m => $(x[m + "Net"])) : [$(x[mode]), $(x[mode + "Net"])])] })), "compact")}
+        <p class="rp-note">Après impôt${M.some(m => g[m].fraisCabinet > 0) ? " et frais de cabinet" : ""}. ${plusieurs ? `Le mixte dépasse l'horaire au-delà de ${g.seuilPatients != null ? nb(g.seuilPatients) : "—"} patients par demi-journée ; l'acte, au-delà de ${g.seuilActe != null ? nb(g.seuilActe) : "—"}. ` : ""}À l'acte : règles d'avant la Loi 2.</p>
       </div>`));
-    }
 
     /* 3. Impôt */
     const x = R.impot.societe, dpro = Math.min(R.dproPerso, R.impot.revenu || 1);
@@ -225,7 +200,7 @@
         ${kpi("À mettre de côté", $(R.impot.total / 12), "Par mois, pour vous")}
       </div>
       <div class="rp-carte"><h2>Sur chaque 100 $ gagnés</h2>${empilee(cent, R.impot.revenu, v => O.$2(v / Math.max(1, R.impot.revenu) * 100))}</div>
-      <div class="rp-carte"><h2>${R.detaille ? "Détail selon le mode" : "Détail de l'impôt"}</h2>${tableau(R.detaille ? ["", "Horaire", "Mixte", "À l'acte"] : ["", milieu], lignesImpot)}</div>
+      <div class="rp-carte"><h2>${R.plusieursModes ? "Détail selon le mode" : "Détail de l'impôt"}</h2>${tableau(["", ...R.modes.map(m => R.plusieursModes ? COURT_MODE[m] : "Par année")], lignesImpot)}</div>
       <div class="rp-deux">
         <div class="rp-carte"><h2>Famille${R.couple ? " et couple" : ""}</h2>${tableau(["", "Par année"], fam)}</div>
         <div class="rp-carte"><h2>REER : remboursement</h2>${tableau(["Cotisation", "Remboursement", "Taux", "Coût réel"], reer)}</div>

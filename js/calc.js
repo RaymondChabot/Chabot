@@ -78,14 +78,30 @@
   }
 
   /* ============================================================
-     REVENU GMF-U ET CLSC : taux horaire, mode mixte et à l'acte
+     REVENU DE LA PRATIQUE : GMF ou clinique, GMF-U, CLSC
      ============================================================
-     Simulation semaine par semaine pour suivre l'arrivée des nouveaux
-     patients : le palier de 500 inscrits change le tarif des visites, et
-     le forfait annuel d'un patient vulnérable n'est payé qu'à partir du
-     mois de son inscription. */
+     Taux horaire, mode mixte et à l'acte. Simulation semaine par semaine pour
+     suivre l'arrivée des nouveaux patients : le palier de 500 inscrits change
+     le tarif des visites, et le forfait annuel d'un patient vulnérable n'est
+     payé qu'à partir du mois de son inscription. Les demi-journées de sans
+     rendez-vous (SRV) s'ajoutent aux demi-journées de rendez-vous ; les
+     activités en établissement (urgence, hospitalisation…) s'ajoutent au
+     total, sans frais de cabinet. */
+  // Jours (ou quarts) d'une activité par année, selon sa fréquence.
+  function joursActivite(a, semaines) {
+    const n = Math.max(0, a.nombre || 0);
+    return a.frequence === "semaine" ? n * semaines : a.frequence === "mois" ? n * 12
+      : a.frequence === "cycle" ? n * 52 / Math.max(1, a.cycle || 1) : n;
+  }
+  // Une activité : revenu par jour donné, ou patients par jour × revenu moyen par patient.
+  function revenuActivite(a, semaines) {
+    const parJour = a.calcul === "patients" ? Math.max(0, a.patients || 0) * Math.max(0, a.parPatient || 0) : Math.max(0, a.parJour || 0);
+    const jours = joursActivite(a, semaines);
+    return { jours, parJour, total: jours * parJour };
+  }
   function revenuGmfu(r) {
     const W = Math.max(0, r.semaines), N = r.demiJournees, H = r.heuresParDJ;
+    const SRV = Math.max(0, r.demiJourneesSRV || 0), patientsSRV = Math.max(0, r.patientsSRV || 0);
     const T = Math.min(r.enseignement, N), C = Math.max(N - T, 0);
     const heuresSup = Math.min(H, r.supervisionMaxH);
     const v = r.partVulnerable / 100;
@@ -105,8 +121,8 @@
       const pec = Math.min(arrivees, visitesSem);
       const tarifPec = (1 - v) * PRISE_EN_CHARGE.nonVuln[palier] + v * PRISE_EN_CHARGE.vuln[palier];
       visitesMixte += pec * tarifPec + (visitesSem - pec) * tarifVisite(r.mix, palier);
-      visitesMixte += T * r.patientsPendantSupervision * tarifVisite(r.mix, palier);
-      nbVisites += visitesSem + T * r.patientsPendantSupervision;
+      visitesMixte += (T * r.patientsPendantSupervision + SRV * patientsSRV) * tarifVisite(r.mix, palier);
+      nbVisites += visitesSem + T * r.patientsPendantSupervision + SRV * patientsSRV;
       nbPriseEnCharge += pec;
       // Forfait vulnérable : payé à partir du mois d'inscription (EP 40, par. 6.01).
       const mois = Math.floor((k / W) * 12);
@@ -128,16 +144,18 @@
       supplements += r.nouveauxSansMedecin * ((1 - v) * r.suppNonVulnerable + v * r.suppVulnerableHorsGuichet);
     }
     const perDiem = W * T * r.residents * r.perDiemResident;
-    const commun = forfaitInscription + forfaitVulnerable + supplements + perDiem + (r.autresRevenus || 0);
+    const detailActivites = (r.activites || []).map(a => revenuActivite(a, W));
+    const activites = detailActivites.reduce((t, x) => t + x.total, 0), autres = r.autresRevenus || 0;
+    const commun = forfaitInscription + forfaitVulnerable + supplements + perDiem + activites + autres;
 
-    const heures = W * N * H;
-    const horaire = { heures: heures * r.tarifHoraire, perDiem, forfaitInscription, forfaitVulnerable, supplements, autres: r.autresRevenus || 0 };
+    const heures = W * (N + SRV) * H;
+    const horaire = { heures: heures * r.tarifHoraire, perDiem, forfaitInscription, forfaitVulnerable, supplements, activites, autres };
     horaire.total = horaire.heures + commun;
     const mixte = {
       forfaitHoraire: heures * r.forfaitHoraireMixte,
       visites: visitesMixte * r.pctMixte / 100,
       supervision: W * T * heuresSup * r.acteSupervision * r.pctSupervision / 100,
-      perDiem, forfaitInscription, forfaitVulnerable, supplements, autres: r.autresRevenus || 0,
+      perDiem, forfaitInscription, forfaitVulnerable, supplements, activites, autres,
     };
     mixte.total = mixte.forfaitHoraire + mixte.visites + mixte.supervision + commun;
     // À l'acte : chaque visite et l'acte de supervision au tarif de l'entente (100 % par défaut),
@@ -146,14 +164,15 @@
     const acte = {
       visites: visitesMixte * pctActe / 100,
       supervision: W * T * heuresSup * r.acteSupervision * pctSupActe / 100,
-      perDiem, forfaitInscription, forfaitVulnerable, supplements, autres: r.autresRevenus || 0,
+      perDiem, forfaitInscription, forfaitVulnerable, supplements, activites, autres,
     };
     acte.total = acte.visites + acte.supervision + commun;
     // Frais de cabinet (loyer, personnel, équipement) remis à la clinique : un pourcentage
-    // de la facturation RAMQ et un montant fixe, moins la compensation de la RAMQ. À l'acte
-    // seulement, sauf si la clinique les exige aussi au taux horaire et au mixte.
+    // de la facturation RAMQ de la clinique (sans les activités en établissement ni les autres
+    // revenus) et un montant fixe, moins la compensation de la RAMQ. À l'acte seulement, sauf
+    // si la clinique les exige aussi au taux horaire et au mixte.
     const frais = (x, applique) => !applique ? 0 : Math.max(0,
-      (x.total - (r.autresRevenus || 0)) * (r.fraisCabinetPct || 0) / 100 + (r.fraisCabinetMois || 0) * 12 - (r.compensationCabinet || 0));
+      (x.total - activites - autres) * (r.fraisCabinetPct || 0) / 100 + (r.fraisCabinetMois || 0) * 12 - (r.compensationCabinet || 0));
     horaire.fraisCabinet = frais(horaire, r.fraisCabinetTousModes);
     mixte.fraisCabinet = frais(mixte, r.fraisCabinetTousModes);
     acte.fraisCabinet = frais(acte, true);
@@ -166,34 +185,8 @@
     const netVisite = parVisiteActe * (1 - (r.fraisCabinetPct || 0) / 100) / (r.fraisCabinetTousModes ? 1 - (r.fraisCabinetPct || 0) / 100 : 1);
     const seuilActe = netVisite > 0 ? r.tarifHoraire * H / netVisite : null;
 
-    return { heures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, semainesPalierHaut,
+    return { heures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, semainesPalierHaut, activites, detailActivites,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
-  }
-
-  /* ============================================================
-     REVENU SIMPLE : clinique, hôpital, urgence
-     ============================================================
-     Jours (ou quarts) par semaine × semaines × revenu brut par jour, ou la
-     facturation annuelle. La première année, l'activité part de debutPct % du
-     plein régime et l'atteint, en ligne droite, après moisMontee mois : la
-     clientèle se bâtit. Frais de cabinet : un pourcentage de la facturation
-     (hors autres revenus) et un montant fixe par mois. */
-  function facteurMontee(debutPct, moisMontee) {
-    const d = borne((debutPct ?? 100) / 100, 0, 1), m = Math.max(0, moisMontee || 0);
-    if (d >= 1 || m === 0) return 1;
-    let somme = 0;
-    for (let k = 0; k < 12; k++) somme += d + (1 - d) * Math.min(1, (k + 0.5) / m);
-    return somme / 12;
-  }
-  function revenuSimple(r) {
-    const s = r.simple || {}, W = Math.max(0, r.semaines || 0), parJour = s.calcul !== "annuel";
-    const jours = parJour ? Math.max(0, s.joursSemaine || 0) * W : null;
-    const plein = parJour ? jours * Math.max(0, s.parJour || 0) : Math.max(0, s.annuel || 0);
-    const facteur = r.annee === "premiere" ? facteurMontee(s.debutPct, s.moisMontee) : 1;
-    const activite = plein * facteur, autres = r.autresRevenus || 0;
-    const simple = { activite, autres, total: activite + autres,
-      fraisCabinet: Math.max(0, activite * (s.fraisPct || 0) / 100 + (s.fraisMois || 0) * 12) };
-    return { simple, plein, facteur, jours };
   }
 
   /* ============================================================
@@ -606,7 +599,7 @@
     return res;
   }
 
-  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, tarifVisite, revenuGmfu, facteurMontee, revenuSimple, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

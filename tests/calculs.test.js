@@ -109,19 +109,18 @@ const gt = C.revenuGmfu({ ...rev, fraisCabinetPct: 30, fraisCabinetTousModes: tr
 verifier("frais : tous les modes si demandé", gt.horaire.fraisCabinet > 0 && gt.mixte.fraisCabinet > 0);
 verifier("frais : le seuil de l'acte monte avec le pourcentage", gf.seuilActe > g.seuilActe);
 
-/* 9. Revenu simple (clinique, hôpital, urgence) : jours × semaines × revenu par jour, montée de la clientèle, frais. */
-const simple = { calcul: "jour", joursSemaine: 4, parJour: 1600, annuel: 250000, fraisPct: 30, fraisMois: 500, debutPct: 60, moisMontee: 12 };
-const st = C.revenuSimple({ annee: "type", semaines: 46, autresRevenus: 10000, simple });
-verifier("simple : 4 jours × 46 semaines × 1 600 $", proche(st.simple.activite, 4 * 46 * 1600, 0.01) && st.jours === 184);
-verifier("simple : autres revenus ajoutés, sans frais de cabinet", proche(st.simple.total, 294400 + 10000, 0.01) && proche(st.simple.fraisCabinet, 294400 * 0.30 + 6000, 0.01));
-const sp = C.revenuSimple({ annee: "premiere", semaines: 46, autresRevenus: 0, simple });
-// De 60 % à 100 % en 12 mois : moyenne des mois (k + 0,5) / 12 = 60 % + 40 % × 0,5 = 80 %.
-verifier("simple : première année, montée de 60 % sur 12 mois = 80 %", proche(sp.facteur, 0.8, 1e-9) && proche(sp.simple.activite, 294400 * 0.8, 0.01));
-// En 6 mois : 6 mois de montée (moyenne 80 %) puis 6 mois au plein régime = 90 %.
-verifier("simple : montée en 6 mois = 90 %", proche(C.facteurMontee(60, 6), 0.9, 1e-9));
-verifier("simple : 100 % ou 0 mois = aucune montée", C.facteurMontee(100, 12) === 1 && C.facteurMontee(50, 0) === 1);
-const sa = C.revenuSimple({ annee: "premiere", semaines: 46, autresRevenus: 0, simple: { ...simple, calcul: "annuel", debutPct: 100 } });
-verifier("simple : facturation annuelle, sans jours", proche(sa.simple.activite, 250000, 0.01) && sa.jours === null);
+/* 9. SRV et activités en établissement. */
+const gs = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12 });
+verifier("SRV : 12 visites de plus par semaine", gs.nbVisites - g.nbVisites === 12 * 46 && gs.acte.visites > g.acte.visites);
+verifier("SRV : heures au taux horaire comprises", proche(gs.heures - g.heures, 46 * 4, 1e-9));
+const hosp = { calcul: "patients", patients: 16, parPatient: 60, nombre: 7, frequence: "cycle", cycle: 6 };
+verifier("activité : 7 jours toutes les 6 semaines = 60,7 jours", proche(C.joursActivite(hosp, 46), 7 * 52 / 6, 1e-9));
+verifier("activité : 16 patients × 60 $ = 960 $ par jour", C.revenuActivite(hosp, 46).parJour === 960);
+verifier("activité : fréquences semaine, mois, année", C.joursActivite({ nombre: 2, frequence: "semaine" }, 46) === 92 && C.joursActivite({ nombre: 4, frequence: "mois" }, 46) === 48 && C.joursActivite({ nombre: 10, frequence: "annee" }, 46) === 10);
+const ga = C.revenuGmfu({ ...rev, fraisCabinetPct: 30, activites: [hosp] });
+const totalHosp = 7 * 52 / 6 * 960;
+verifier("activité : ajoutée à chaque mode", ["horaire", "mixte", "acte"].every(m => proche(ga[m].total - g[m].total, totalHosp, 0.01)));
+verifier("activité : sans frais de cabinet", proche(ga.acte.fraisCabinet, (ga.acte.total - totalHosp) * 0.30, 0.01));
 
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

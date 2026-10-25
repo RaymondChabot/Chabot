@@ -36,6 +36,7 @@
   <span class="marque" role="img" aria-label="WealthMorand"><svg class="marque-ico" aria-hidden="true"><use href="#wm-sceau"/></svg><svg class="marque-nom" aria-hidden="true"><use href="#wm-nom"/></svg></span>
   <div class="barre-actions">
   <button type="button" class="bouton-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer</span></button>
+  <button type="button" class="bouton-icone" data-bascule-theme aria-label="Changer de thème"></button>
   <a class="bouton-icone" href="#donnees" data-onglet="donnees" aria-label="Données et confidentialité">
     <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg>
   </a>
@@ -99,7 +100,7 @@
     <section class="vue" id="v-revenu" aria-labelledby="h-revenu" hidden>
       <header class="tete-page"><h1 id="h-revenu">Revenu</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
       <div class="choix-milieu">
-        <label for="rv-milieu">Milieu de pratique</label>
+        <label for="rv-milieu">Pratique principale</label>
         <div class="saisie"><select id="rv-milieu"></select></div>
         <p class="aide" id="rv-milieu-aide"></p>
       </div>
@@ -113,6 +114,11 @@
       <div class="carte demi" id="rv-carte-faits">
         <div class="carte-tete"><h2>Votre année en chiffres</h2></div>
         <div class="rangees" id="rv-faits"></div>
+      </div>
+      <div class="carte" id="rv-carte-activites">
+        <div class="carte-tete"><h2>Activités en établissement</h2></div>
+        <div id="rv-activites"></div>
+        <div class="actions"><button type="button" class="bouton secondaire" id="rv-ajout-activite">Ajouter une activité</button></div>
       </div>
       <div class="carte" id="rv-carte-sens">
         <div class="carte-tete"><h2 id="rv-sens-titre">Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>

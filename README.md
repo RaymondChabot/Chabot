@@ -30,13 +30,14 @@ Au premier lancement, un **assistant de départ** pose quelques questions
 fait ne forment un couple pour l'impôt qu'après 12 mois de vie commune ou
 avec un enfant commun : avant, chacun est imposé seul.
 
-- **Revenu** : selon le milieu de pratique.
-  - GMF-U et CLSC : calcul détaillé avec les tarifs de la RAMQ (taux
-    horaire, mode mixte ou à l'acte), selon les demi-journées, les
-    patients, la supervision et la prise en charge de nouveaux patients.
-  - GMF ou clinique, hôpital, urgence : calcul simple, à partir des jours
-    et du revenu brut par jour (ou de la facturation annuelle), avec les
-    frais de cabinet et la montée de la clientèle la première année.
+- **Revenu** : pratique principale en GMF ou clinique privée (à l'acte,
+  frais de cabinet), en GMF-U ou en CLSC (taux horaire, mode mixte ou à
+  l'acte), avec les tarifs de la RAMQ : demi-journées de rendez-vous et de
+  sans rendez-vous, patients, supervision, prise en charge de nouveaux
+  patients. En plus : activités en établissement (urgence,
+  hospitalisation, obstétrique, soins palliatifs, CHSLD, gardes, autre),
+  par semaine, par mois, par année ou toutes les N semaines, au revenu par
+  jour ou aux patients par jour × revenu par patient.
 - **Impôt 2026** : fédéral et Québec, RRQ, RQAP, Fonds des services de
   santé ; société et dividendes ; partenaire salarié ou à son compte et
   transferts de crédits ; allocations

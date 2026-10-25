@@ -196,7 +196,11 @@ main {
 .vue { display: flex; flex-direction: column; gap: 14px; }
 .vue[hidden] { display: none; }
 .tete-page { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 2px 2px; }
-.tete-page h1 { font: 450 2.15rem/1.1 var(--police-titre); letter-spacing: -0.015em; }
+.tete-page h1 { font: 450 2.15rem/1.1 var(--police-titre); letter-spacing: -0.015em; margin-right: auto; }
+/* Bouton lune / soleil : dans la barre du haut (téléphone), dans l'en-tête de chaque page (ordinateur). */
+.tete-page .tete-theme { display: none; }
+@media (min-width: 960px) { .tete-page .tete-theme { display: grid; } }
+@media print { [data-bascule-theme] { display: none !important; } }
 
 /* ---------- Héros : le chiffre principal de la page ---------- */
 .hero { padding: 6px 2px 4px; display: flex; flex-direction: column; gap: 6px; }
@@ -563,7 +567,8 @@ a.tuile:hover { border-color: var(--trait); }
 /* ---------- Rapport imprimé : toutes les pages, sans navigation ---------- */
 @media print {
   @page { margin: 14mm 12mm; }
-  html, body { background: #fff; }
+  :root, :root[data-theme="dark"] { color-scheme: light; }
+  html, body { background: #fff; color: #121211; }
   body { font-size: 10.5pt; }
   .barre-haut, .nav, .feuille, .toast, .saut, .bouton-modifier, .lien-carte, .segment, .carte.exemple, #carte-installer, .bouton, .chevron, .bulle, .graphique .reticule, .graphique .point, .hyp-ligne { display: none !important; }
   #v-donnees { display: none !important; }
@@ -693,21 +698,21 @@ a.tuile:hover { border-color: var(--trait); }
 .rp-kpi em { font-style: normal; font-size: 7.2pt; color: #6f6d66; }
 .rp-kpi.bon strong { color: #0b7a3e; }
 .rp-kpi.mauvais strong { color: #b42318; }
-.rp-kpi.fort { background: #121211; }
-.rp-kpi.fort span, .rp-kpi.fort em { color: #cfcdc5; }
-.rp-kpi.fort strong { color: #e8cf9c; }
+.rp-kpi.fort { background: #f6efe0; box-shadow: inset 0 0 0 1px #e3d3b0; }
+.rp-kpi.fort span, .rp-kpi.fort em { color: #6f6d66; }
+.rp-kpi.fort strong { color: #8a6a32; }
 .rp-mode span i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 .rp-mode.choisi { box-shadow: inset 0 0 0 1.5px #121211; }
 
 /* Couverture */
 .rp-couverture { gap: 11px; }
-.rp-bandeau { position: relative; --logo-sep: #121211; background: #121211; color: #f5f4f0; border-radius: 16px; padding: 22px 180px 22px 26px; }
-.rp-sceau { position: absolute; right: 24px; top: calc(50% - 68px); width: 136px; height: 136px; color: #d6b57a; }
+.rp-bandeau { position: relative; --logo-sep: #fff; background: #fff; color: #121211; border: 1.5px solid #d8c39a; border-radius: 16px; padding: 22px 180px 22px 26px; }
+.rp-sceau { position: absolute; right: 24px; top: calc(50% - 68px); width: 136px; height: 136px; color: #b48a4a; }
 .rp-marque { display: flex; align-items: center; }
-.rp-marque .rp-nom { width: 164px; height: 11px; color: #d6b57a; }
-.rp-bandeau h1 { font: 450 34pt/1.05 "Newsreader", Georgia, serif; color: #fff; margin: 30px 0 8px; letter-spacing: -0.015em; }
-.rp-sous { color: #e8cf9c; font-size: 11pt; margin: 0; }
-.rp-date { color: #9c9a91; font-size: 8.5pt; margin: 4px 0 0; }
+.rp-marque .rp-nom { width: 164px; height: 11px; color: #b48a4a; }
+.rp-bandeau h1 { font: 450 34pt/1.05 "Newsreader", Georgia, serif; color: #121211; margin: 30px 0 8px; letter-spacing: -0.015em; }
+.rp-sous { color: #8a6a32; font-size: 11pt; margin: 0; }
+.rp-date { color: #6f6d66; font-size: 8.5pt; margin: 4px 0 0; }
 .rp-points { margin: 0; padding-left: 16px; font-size: 9.2pt; display: flex; flex-direction: column; gap: 4px; }
 
 /* Graphiques */
@@ -761,6 +766,8 @@ a.tuile:hover { border-color: var(--trait); }
 
 /* Installer l'application */
 .barre-actions { display: flex; align-items: center; gap: 8px; }
+/* Téléphone étroit : « Installer » en icône seulement, pour laisser la place au logo. */
+@media (max-width: 400px) { .bouton-installer { width: 40px; padding: 0; justify-content: center; } .bouton-installer span { display: none; } }
 .bouton-installer {
   display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px 0 11px; border-radius: 999px; cursor: pointer;
   border: 0; background: var(--action); color: var(--sur-action); font: 600 0.88rem var(--police);
