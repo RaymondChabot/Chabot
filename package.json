@@ -1,0 +1,16 @@
+{
+  "name": "wealthmorand",
+  "private": true,
+  "description": "WealthMorand : revenu, impôt, budget, dettes et patrimoine d'un médecin de famille, calculés sur l'appareil.",
+  "scripts": {
+    "lint": "eslint .",
+    "test": "node tests/calculs.test.js && node tests/navigateur.test.js",
+    "test:calculs": "node tests/calculs.test.js",
+    "test:navigateur": "node tests/navigateur.test.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.13.0",
+    "globals": "17.13.0"
+  }
+}

@@ -6,7 +6,7 @@
   const W = window.Wealthnord;
   if (!W) return;
   const O = W.outils;
-  const { $, nb, pct, signe, moisAn, MODES, NOM_MODE, COULEUR_MODE, SCENARIOS, NOMS_METHODES, MILIEUX, nomActivite, frequenceTexte, libelleRevenu } = O;
+  const { $, nb, pct, moisAn, NOM_MODE, COULEUR_MODE, SCENARIOS, NOMS_METHODES, MILIEUX, nomActivite, frequenceTexte, libelleRevenu } = O;
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   // Montant abrégé pour les axes et les étiquettes : 12 k$, 1,25 M$.
@@ -139,7 +139,7 @@
     /* 2. Revenu : pratique principale (un ou trois modes) et activités en établissement */
     const M = R.modes, plusieurs = R.plusieursModes;
     const parts = [["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire ?? 0], ["Visites", x => x.visites || 0], ["Intervention de supervision", x => x.supervision || 0],
-      ["Demi-per diem des apprenants", x => x.perDiem], ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable], ["Suppléments à l'inscription", x => x.supplements],
+      ["Demi-per diem des apprenants", x => x.perDiem], ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable], ["Forfait GMF", x => x.forfaitGmf || 0], ["Suppléments à l'inscription", x => x.supplements],
       ["Volume de patients", x => x.volume || 0], ["Activités en établissement", x => x.activites || 0], ["Pratique polyvalente", x => x.polyvalence || 0],
       ["Autres revenus professionnels", x => x.autres]];
     const partsUtiles = parts.map((pt, i) => [...pt, i]).filter(([, f]) => M.some(m => f(g[m]) > 0));
@@ -330,7 +330,7 @@
         <div class="rp-carte"><h2>Rémunération</h2>${tableau(["", ""], [
           ["Tarif horaire (annexe XIV)", `${O.$2(r.tarifHoraire)} / h, à 100 % jusqu'à ${nb(r.heuresMax100 ?? 1540, 0)} h`], ["Mixte : forfait horaire", O.$2(r.forfaitHoraireMixte) + " / h"], ["Mixte : part du tarif des visites", nb(r.pctMixte, 2) + " %"],
           ...(R.milieu === "gmfu" ? [["Mixte : intervention de supervision", `${O.$2(r.acteSupervision)} / h à ${nb(r.pctSupervision, 2)} %`]] : []), ["À l'acte : part du tarif", nb(r.pctActe ?? 100) + " %"],
-          ["Forfait d'inscription", O.$2(r.forfaitInscription) + " par patient"], ["Frais de cabinet", `${nb(r.fraisCabinetPct || 0)} % + ${$(r.fraisCabinetMois || 0)} / mois`],
+          ["Forfait d'inscription", O.$2(r.forfaitInscription) + " par patient"], ...(r.membreGmf ? [["Forfait GMF (08875)", `${O.$2(r.forfaitGmf)} par patient vu`]] : []), ["Frais de cabinet", `${nb(r.fraisCabinetPct || 0)} % + ${$(r.fraisCabinetMois || 0)} / mois`],
           ...(R.milieu === "gmfu" ? [["Demi-per diem : résident, externe", `${O.$2(r.perDiemResident)}, ${O.$2(r.perDiemExterne)}`]] : []), ...(r.majorationPct ? [["Majoration selon le territoire", nb(r.majorationPct) + " %"]] : []),
         ].map(c => ({ c })), "compact")}</div>
         <div class="rp-carte"><h2>Vérification officielle</h2><p class="rp-gros">${nb(ver.egaux, 0)} sur ${nb(ver.total, 0)}</p>

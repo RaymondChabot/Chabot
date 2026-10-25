@@ -10,11 +10,11 @@ valeur nette.
 
 - Le code ne contient **aucune donnée personnelle**. Les valeurs affichées
   au premier lancement sont un exemple fictif.
-- Les données saisies ou importées restent dans le navigateur
+- Les données saisies restent dans le navigateur
   (`localStorage`). La page ne charge aucune ressource externe et n'envoie
   rien à un serveur.
-- Le bouton **Exporter** crée une copie de sauvegarde ; **Importer** la
-  recharge sur un autre appareil.
+- **Exporter une sauvegarde** (page Données) crée une copie de vos données ;
+  **Restaurer une sauvegarde** la recharge sur un autre appareil.
 - Ne versez jamais un fichier de données dans ce dépôt : `.gitignore`
   bloque les fichiers `*donnees*.json`.
 
@@ -108,12 +108,21 @@ avec frais de cabinet (pourcentage de la facturation et montant fixe).
 ## Tests
 
 ```
-node tests/calculs.test.js
+npm ci                          # ESLint seulement
+npx eslint .                    # vérification du code
+node tests/calculs.test.js      # calculs
+node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
 ```
 
-Vérifie l'impôt contre l'outil officiel du ministère des Finances du Québec,
-les formules hypothécaires, la simulation des dettes, la projection et le
-REEE. Cas fictifs seulement.
+- `calculs.test.js` vérifie l'impôt contre l'outil officiel du ministère des
+  Finances du Québec, les montants de la RAMQ, les formules hypothécaires, la
+  simulation des dettes, la projection et le REEE.
+- `navigateur.test.js` ouvre l'app : pages sans débordement sur téléphone,
+  montants de la RAMQ selon la colonne, alertes, sauvegarde et restauration,
+  démarrage avec un ancien fichier, noms piégés, rapport, avis de nouvelle
+  version, politique de sécurité du contenu.
+- GitHub Actions lance les trois à chaque publication sur `main`
+  (`.github/workflows/tests.yml`). Cas fictifs seulement.
 
 ## Fichiers
 
@@ -122,9 +131,11 @@ REEE. Cas fictifs seulement.
 | `index.html` | Structure de la page |
 | `styles.css` | Mise en page, thèmes clair et sombre |
 | `js/calc.js` | Calculs (revenu, impôt 2026, dettes, épargne), sans accès à la page |
-| `js/app.js` | Interface, sauvegarde locale, import et export |
+| `js/app.js` | Interface, sauvegarde locale, sauvegarde et restauration |
 | `js/rapport.js` | Rapport PDF mis en page |
-| `tests/calculs.test.js` | Tests des calculs (Node, sans dépendance) |
+| `js/demarrage.js` | Thème et écran d'ouverture, avant l'affichage |
+| `tests/` | Tests des calculs et du navigateur |
+| `package.json`, `eslint.config.js`, `.github/` | Outils de vérification (rien à installer pour utiliser l'app) |
 | `manifest.webmanifest`, `sw.js`, `icone.svg`, `icones/` | Application installable (PWA), hors ligne |
 | `polices/` | Inter et Newsreader (SIL Open Font License), hébergées ici |
 

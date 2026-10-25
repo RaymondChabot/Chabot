@@ -7,8 +7,8 @@
   const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)"];
 
   /* ============================================================
-     EXEMPLE : valeurs fictives, affichées tant qu'aucun fichier n'est
-     importé. Les tarifs RAMQ et les paramètres fiscaux sont réels.
+     EXEMPLE : valeurs fictives, affichées tant qu'on n'a pas entré sa
+     situation. Les tarifs RAMQ et les paramètres fiscaux sont réels.
      Un médecin qui débute en GMF (non universitaire), payé à l'acte :
      7 demi-journées de rendez-vous à 6 patients et 1 demi-journée de
      sans rendez-vous à 12 patients ; une semaine d'hospitalisation toutes
@@ -26,7 +26,7 @@
       demiJourneesSRV: 1, patientsSRV: 12,
       residents: 0, patientsPendantSupervision: 0, autresRevenus: 0,
       inscritsDebut: 0, nouveauxGuichet: 500, nouveauxSansMedecin: 0, nouveauxTransferes: 0,
-      semainesArrivee: 38, partVulnerable: 20, assiduite80: true, anneePratique: "5",
+      semainesArrivee: 38, partVulnerable: 20, assiduite80: true, anneePratique: "5", membreGmf: true, pctPatientsVus: 80,
       mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 },
       // Taux horaire, mixte et supervision (Brochure no 1) ; forfaits, suppléments et demi-per diem de la colonne cabinet.
       ...C.RAMQ, ...C.montantsLieu("cabinet", 1), listeEnseignement: "1",
@@ -305,6 +305,8 @@
       // de départ du mixte et de la supervision deviennent celles de la brochure.
       delete d.revenu.quatrePremieresAnnees; delete d.revenu.pctSupervisionActe;
       for (const [k, ancien] of [["pctMixte", 60], ["acteSupervision", 114.2], ["pctSupervision", 60]]) if (+d.revenu[k] === ancien) d.revenu[k] = C.RAMQ[k];
+      // Forfait GMF (EP 33) : décoché dans les données d'avant, jusqu'à ce qu'on le confirme.
+      d.revenu.membreGmf ??= false;
       // Tarifs enregistrés avant les deux colonnes (cabinet, établissement) : s'ils sont ceux de départ
       // (anciens tarifs du sans rendez-vous compris), ils suivent désormais la colonne de la pratique.
       const t = d.revenu.tarifs;
@@ -330,7 +332,7 @@
   // suppléments et demi-per diem, sa colonne et la liste de l'EP 42. « tous » rétablit aussi le taux horaire et le mixte.
   function synchroniserTarifs(s, tous) {
     const r = s.revenu, lieu = C.lieuTarifs(r);
-    if (tous) { r.tarifsModifies = false; for (const k of ["tarifHoraire", "forfaitHoraireMixte", "pctMixte", "acteSupervision", "pctSupervision"]) r[k] = C.RAMQ[k]; }
+    if (tous) { r.tarifsModifies = false; for (const k of ["tarifHoraire", "forfaitHoraireMixte", "pctMixte", "acteSupervision", "pctSupervision", "forfaitGmf"]) r[k] = C.RAMQ[k]; }
     if (!r.tarifsModifies) r.tarifs = clone(C.TARIFS_LIEU[lieu]);
     const cible = C.montantsLieu(lieu, r.listeEnseignement);
     const connus = k => [...["cabinet", "etablissement"].flatMap(l => [1, 2].map(n => C.montantsLieu(l, n)[k])), ...(ANCIENS_MONTANTS[k] || [])];
@@ -431,6 +433,8 @@
       { p: "revenu.nouveauxGuichet", l: "Nouveaux patients du guichet d'accès", u: "pat." },
       { p: "revenu.partVulnerable", l: "Patients vulnérables", u: "%", h: "Forfait annuel plus élevé, versé par la RAMQ en 4 paiements." },
       { p: "revenu.partTresVulnerable", l: "Patients très vulnérables", u: "%", h: "En plus des vulnérables. Leur supplément d'inscription exige l'attribution par le guichet." },
+      { p: "revenu.membreGmf", l: "Membre d'un GMF", t: "check", h: "Forfait de 9,35 $ par patient inscrit vu dans l'année (EP 33, annexe V, code 08875), en cabinet, en CLSC ou en GMF-U. Un GMF-U est un GMF." },
+      { p: "revenu.pctPatientsVus", l: "Inscrits vus au moins une fois par année", u: "%", si: "revenu.membreGmf&details", h: "Les nouveaux patients comptent tous. Souvent de 75 à 85 %." },
       { p: "revenu.nouveauxSansMedecin", l: "Nouveaux patients sans médecin, hors guichet", u: "pat.", si: "details", h: "Par exemple, les patients d'un médecin retraité qui a avisé la RAMQ. Ils donnent droit au supplément." },
       { p: "revenu.nouveauxTransferes", l: "Patients transférés, déjà inscrits ailleurs", u: "pat.", si: "details", h: "Pas de supplément." },
       { p: "revenu.semainesArrivee", l: "Arrivée des nouveaux patients étalée sur", u: "sem.", si: "details" },
@@ -476,6 +480,7 @@
       { p: "revenu.forfaitInscription", l: "Forfait annuel d'inscription, par patient", u: "$/pat.", s: 0.01, h: "11,85 $ en cabinet, 8,95 $ en établissement (EP 40, par. 4.01). Ces montants suivent la colonne de tarifs." },
       { p: "revenu.forfaitVulnerable", l: "Forfait annuel, patient vulnérable", u: "$/pat.", s: 0.01, h: "Une catégorie de problèmes de santé : 62,50 $ en cabinet, 47 $ en établissement ; deux catégories : 150 % ; trois ou plus : 200 % (par. 6.01)." },
       { p: "revenu.forfaitTresVulnerable", l: "Forfait annuel, patient très vulnérable", u: "$/pat.", s: 0.01, h: "Plusieurs catégories, à 200 % : 125 $ en cabinet, 94 $ en établissement." },
+      { p: "revenu.forfaitGmf", l: "Forfait GMF, par patient vu dans l'année", u: "$/pat.", s: 0.01, si: "revenu.membreGmf", h: "Code 08875 : 9,35 $ (EP 33, annexe V)." },
       { p: "revenu.suppNonVulnerable", l: "Supplément d'inscription, patient non vulnérable sans médecin", u: "$", s: 0.01, h: "Code 19957 : 23,55 $ en cabinet, 19,55 $ en établissement (par. 4.12)." },
       { p: "revenu.suppVulnerableHorsGuichet", l: "Supplément, patient vulnérable hors guichet", u: "$", s: 0.01, h: "Code 19958 : 72,50 $ en cabinet, 60,15 $ en établissement." },
       { p: "revenu.suppVulnerableGuichet", l: "Supplément, patient vulnérable du guichet", u: "$", s: 0.01, h: "Code 19959 : 155,35 $ en cabinet, 128,90 $ en établissement." },
@@ -1462,14 +1467,15 @@
     if (!S.meta.exemple) {
       const jours = S.meta.dernierExport ? Math.floor((Date.now() - new Date(S.meta.dernierExport)) / 864e5) : Infinity;
       if (jours > 30) action("info", jours === Infinity
-        ? "Exportez une copie de vos données (page Données) : elles ne vivent que dans ce navigateur."
-        : `Votre dernière copie de sauvegarde date de ${jours} jours : exportez-en une nouvelle (page Données).`);
+        ? "Exportez une sauvegarde de vos données (page Données) : elles ne vivent que dans ce navigateur."
+        : `Votre dernière sauvegarde date de ${jours} jours : exportez-en une nouvelle (page Données).`);
     }
     S.dettes.forEach(d => {
       if (d.type === "marge" && d.limite > 0 && d.solde > d.limite) action("important", `« ${d.nom} » dépasse sa limite de ${$(d.solde - d.limite)} : vérifiez le solde et la limite.`);
       const pm = d.frequence === "2sem" ? d.paiement * 26 / 12 : d.paiement;
       if (!d.interetsSeulement && d.solde > 0 && pm <= d.solde * C.tauxMensuel(d, d.taux)) action("important", `Le paiement de « ${d.nom} » ne couvre pas les intérêts : vérifiez le montant, ou choisissez « Intérêts seulement ».`);
     });
+    alertesRamq(R, action);
     const mix = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
     if (Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
     if (R.surplusMoi < 0) action("important", `Votre budget est négatif de ${$(-R.surplusMoi)} par mois : revoyez les dépenses ou leur partage.`);
@@ -1541,6 +1547,31 @@
     return l.sort((a, b) => a.t - b.t).slice(0, 8);
   }
 
+  /* Alertes de la RAMQ dans « À faire » : plafond d'heures, seuils de patients inscrits (tarifs,
+     montants liés au volume, pratique polyvalente), assiduité et forfait GMF. */
+  function alertesRamq(R, action) {
+    const g = R.rev, rv = S.revenu, inscrits = Math.round(g.inscritsFin);
+    if (R.mode === "horaire" && g.heuresAuDela > 0) action("important", `Taux horaire : ${nb(g.heuresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h par année sont payées à 71,8 %, environ ${$(g.perteHeures)} de moins. `
+      + (g.plafondHeures < 2420 ? "Si votre chef de département autorise le dépassement (jusqu'à 880 h, annexe XIV), inscrivez-le dans Revenu, Modifier." : "C'est au-delà du dépassement maximal de 880 heures."));
+    if (R.mode !== "horaire" && inscrits >= 350 && inscrits < 500 && g.gainPalier > 0)
+      action("info", `Encore ${nb(500 - inscrits, 0)} patients inscrits pour atteindre 500 : chaque visite est alors payée environ ${pct(g.gainPalier, 0)} de plus.`);
+    const seuil = [[750, 7500], [1000, 15000]].find(([s]) => inscrits < s && inscrits >= s - 100);
+    if (seuil) action("info", `Encore ${nb(seuil[0] - inscrits, 0)} patients inscrits actifs au 31 décembre pour recevoir ${$(seuil[1])}${seuil[0] === 1000 ? " au lieu de 7 500 $" : ""} en juin (EP 40, par. 4.15).`);
+    if (g.basePolyvalence > 0) {
+      const n = Math.round(g.inscritsFin + Math.max(0, g.vulnerablesFin - 245) * 1.5), prochain = C.SEUILS_POLYVALENCE[g.anneePratique].find(s => s > n);
+      if (prochain && prochain - n <= 100) {
+        const taux = C.tauxPolyvalence(prochain, 0, g.anneePratique);
+        action("info", `Encore ${nb(prochain - n, 0)} patients inscrits pour une majoration de ${nb(taux, 1)} % de vos activités en établissement (pratique polyvalente), environ ${$(g.basePolyvalence * (taux - g.pctPolyvalence) / 100)} de plus.`);
+      }
+    }
+    if (rv.assiduite80 === false) {
+      const perdu = C.montantsVolume(g.inscritsFin, g.vulnerablesFin, true).supplements;
+      if (perdu > 0) action("info", `Avec un taux d'assiduité de 80 %, vous recevriez ${$(perdu)} de suppléments au volume (EP 40, par. 15.03).`);
+    }
+    if (!rv.membreGmf && !S.confirmes["revenu.membreGmf"] && g.forfaitGmfPossible > 0)
+      action("info", `${R.milieu === "gmfu" ? "Un GMF-U est un GMF : le" : R.milieu === "clsc" ? "Si votre CLSC fait partie d'un GMF, le" : "Si votre clinique est un GMF, le"} forfait de 9,35 $ par patient vu dans l'année (code 08875) ajouterait environ ${$(g.forfaitGmfPossible)}. Vérifiez-le, puis cochez ou non « Membre d'un GMF » (Revenu, Modifier).`);
+  }
+
   const COURT_MODE = { horaire: "Horaire", mixte: "Mixte", acte: "À l'acte" };
   function rendreRevenu(R) {
     // Pratique principale, en haut de la section.
@@ -1599,6 +1630,7 @@
       ["Intervention de supervision", x => x.supervision || 0],
       ["Demi-per diem de supervision", x => x.perDiem],
       ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable],
+      ["Forfait GMF", x => x.forfaitGmf || 0],
       ["Suppléments sans médecin", x => x.supplements],
       ["Volume de patients", x => x.volume || 0],
       ["Activités en établissement", x => x.activites || 0],
@@ -1753,7 +1785,6 @@
   ];
   function feuilleActivite(i) {
     ouvrirFeuille(nomActivite(S.revenu.activites[i]), c => {
-      const a = S.revenu.activites[i];
       const g2 = el("div", "groupe"); g2.appendChild(el("h3", null, "Sur une année"));
       const infos = el("div", "rangees"); g2.appendChild(infos); c.appendChild(g2);
       feuilleCourante.maj = () => { const x = R && R.rev.detailActivites[i]; if (x) rangees(infos, [
@@ -2469,7 +2500,7 @@
     return out;
   }
   function changementsPlan(a, b) {
-    const valeurTexte = (c, v) => c.t === "select" ? texteDe((c.o.find(([k]) => String(k) === String(v)) || [, v])[1]) : c.t === "check" ? (v ? "oui" : "non") : typeof v === "number" ? nb(v) : String(v ?? "—");
+    const valeurTexte = (c, v) => c.t === "select" ? texteDe((c.o.find(([k]) => String(k) === String(v)) || [null, v])[1]) : c.t === "check" ? (v ? "oui" : "non") : typeof v === "number" ? nb(v) : String(v ?? "—");
     const champs = [], autres = new Set();
     for (const [p, va, vb] of differences(a, b)) {
       const c = DEF_CHAMPS.get(p);
@@ -3039,6 +3070,7 @@
       const v = valeur(inp); if (v === null) return;
       if (inp.dataset.p === "revenu.milieu") { choisirMilieu(v); return; }
       if (inp.dataset.p.startsWith("revenu.tarifs.")) S.revenu.tarifsModifies = true;
+      if (inp.dataset.p === "revenu.membreGmf") S.confirmes["revenu.membreGmf"] = true;   // l'alerte de l'Aperçu disparaît
       ecrire(inp.dataset.p, v); S.meta.exemple = false;
       majVisibilite();   // un champ peut en afficher ou en cacher d'autres
       if (inp.dataset.p === "conjointe.designation") { S.conjointe.designation = v; reconstruireFeuille(); }
@@ -3090,15 +3122,17 @@
   /* Message en bas de l'écran ; « Annuler » défait la dernière suppression. */
   const boiteToast = document.getElementById("toast");
   let annulerToast = null, minuterieToast = null;
-  function toast(texte, annuler) {
-    // Un panneau ouvert est modal : le message y loge pour que « Annuler » reste cliquable.
+  // Message bref, avec au besoin un bouton d'action (« Annuler » par défaut).
+  function toast(texte, annuler, libelle = "Annuler", duree = 6000) {
+    // Un panneau ouvert est modal : le message y loge pour que le bouton reste cliquable.
     const hote = [feuille, document.getElementById("assistant")].find(d => d.open) || document.body;
     if (boiteToast.parentNode !== hote) hote.appendChild(boiteToast);
     document.getElementById("toast-texte").textContent = texte;
     annulerToast = annuler || null;
-    document.getElementById("toast-annuler").hidden = !annuler;
+    const bouton = document.getElementById("toast-annuler");
+    bouton.hidden = !annuler; bouton.textContent = libelle;
     boiteToast.hidden = false;
-    clearTimeout(minuterieToast); minuterieToast = setTimeout(() => { boiteToast.hidden = true; annulerToast = null; }, 6000);
+    clearTimeout(minuterieToast); minuterieToast = setTimeout(() => { boiteToast.hidden = true; annulerToast = null; }, duree);
   }
   document.getElementById("toast-annuler").addEventListener("click", () => {
     if (annulerToast) annulerToast();
@@ -3130,7 +3164,7 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     S.meta.dernierExport = new Date().toISOString(); sauver(); tout();
-    message("Fichier exporté. Gardez-le dans un endroit sûr : il contient toutes vos données.");
+    message("Sauvegarde exportée. Gardez-la dans un endroit sûr : elle contient toutes vos données.");
   });
   document.getElementById("importer").addEventListener("change", e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
@@ -3140,9 +3174,8 @@
         const d = JSON.parse(lecteur.result);
         if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
         sortirPlan(true); S = normaliser(fusion(clone(EXEMPLE), migrer(d))); S.meta.exemple = false; sauver();
-        tout(); message(`Données importées : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`);
-        if (boiteAssistant.open) { fermerAssistant(); ouvrir("apercu"); toast("Données importées."); }
-      } catch (err) { message("Ce fichier n'est pas un fichier de données WealthMorand (ou Wealthnord, Boussole). Rien n'a été changé."); }
+        tout(); message(`Sauvegarde restaurée : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`);
+      } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
     };
     lecteur.readAsText(f); e.target.value = "";
   });
@@ -3215,8 +3248,17 @@
   };
 
   /* Application installable (PWA) : fonctionne hors ligne. */
-  if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname)))
-    navigator.serviceWorker.register("sw.js").catch(() => { /* le site fonctionne quand même */ });
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname))) {
+    // Nouvelle version publiée pendant que l'app est ouverte : on propose de recharger. On vérifie
+    // aussi chaque fois que l'app revient à l'écran (application installée laissée ouverte).
+    const avaitVersion = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (avaitVersion) toast("Une nouvelle version de WealthMorand est prête.", () => location.reload(), "Recharger", 20000);
+    });
+    navigator.serviceWorker.register("sw.js").then(reg => {
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+    }).catch(() => { /* le site fonctionne quand même */ });
+  }
   /* Installer l'application : invite du navigateur (Chrome, Edge, Android) ;
      sinon, les étapes selon l'appareil (iPhone, iPad, Mac, Firefox). */
   let invite = null;
@@ -3231,7 +3273,7 @@
     const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const android = /Android/.test(ua), firefox = /Firefox|FxiOS/.test(ua), safariMac = !ios && /Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|Edg/.test(ua);
     if (ios) return { titre: "Sur iPhone ou iPad", etapes: ["Ouvrez cette page dans Safari.", "Touchez le bouton Partager (le carré avec une flèche vers le haut), en bas de l'écran.", "Faites défiler et touchez « Sur l'écran d'accueil ».", "Touchez « Ajouter » : l'icône WealthMorand apparaît sur votre écran d'accueil."],
-      note: "L'application installée garde ses propres données, séparées de Safari : ouvrez-la, puis importez votre fichier de données une fois (Données, Importer)." };
+      note: "L'application installée garde ses propres données, séparées de Safari : ouvrez-la, puis restaurez votre sauvegarde une fois (Données, Restaurer une sauvegarde)." };
     if (android) return { titre: "Sur Android", etapes: ["Ouvrez cette page dans Chrome.", "Touchez le menu ⋮, en haut à droite.", "Touchez « Installer l'application » ou « Ajouter à l'écran d'accueil ».", "Confirmez : l'icône WealthMorand apparaît avec vos applications."] };
     if (safariMac) return { titre: "Sur Mac, avec Safari", etapes: ["Dans le menu Fichier, choisissez « Ajouter au Dock ».", "Confirmez : WealthMorand s'ouvre dans sa propre fenêtre, depuis le Dock."] };
     if (firefox) return { titre: "Avec Firefox", etapes: ["Firefox n'installe pas les applications web.", "Ouvrez cette page dans Chrome, Edge ou Safari, puis touchez « Installer » de nouveau.", "Ou ajoutez la page à vos favoris : elle fonctionne aussi sans connexion après une première visite."] };
@@ -3250,7 +3292,7 @@
       const g = el("div", "groupe"); g.appendChild(el("h3", null, e.titre));
       const ol = el("ol", "etapes"); e.etapes.forEach(x => ol.appendChild(el("li", null, x))); g.appendChild(ol); c.appendChild(g);
       if (e.note) c.appendChild(el("p", "aide", e.note));
-      c.appendChild(el("p", "aide", "Vos données restent sur l'appareil. Pour les retrouver dans l'application installée ou sur un autre appareil : Données, Exporter, puis Importer."));
+      c.appendChild(el("p", "aide", "Vos données restent sur l'appareil. Pour les retrouver dans l'application installée ou sur un autre appareil : Données, Exporter une sauvegarde, puis Restaurer une sauvegarde."));
     });
   }
   window.addEventListener("beforeinstallprompt", ev => { ev.preventDefault(); invite = ev; majInstaller(); });
@@ -3308,13 +3350,10 @@
   const ETAPES = [
     { titre: "Bienvenue dans WealthMorand", bouton: "Commencer", rendre: c => {
       c.appendChild(el("p", "as-intro", "Quelques questions pour partir de votre situation : votre famille, votre pratique, votre logement et vos dettes. Environ deux minutes. Tout reste sur cet appareil, et tout se modifie ensuite."));
-      const a = el("div", "actions");
-      const imp = el("label", "bouton secondaire", "Importer mon fichier de données"); imp.htmlFor = "importer"; a.appendChild(imp);
-      if (S.meta.exemple) { const ex = el("button", "bouton secondaire", "Voir un exemple"); ex.type = "button"; ex.addEventListener("click", () => fermerAssistant()); a.appendChild(ex); }
-      c.appendChild(a);
-      c.appendChild(el("p", "aide", S.meta.exemple
-        ? "Déjà utilisé sur un autre appareil ? Importez le fichier exporté (page Données)."
-        : "À la fin, vos valeurs actuelles seront remplacées. Exportez-les d'abord (page Données) si vous voulez les garder."));
+      if (S.meta.exemple) {
+        const a = el("div", "actions"), ex = el("button", "bouton secondaire", "Voir un exemple"); ex.type = "button";
+        ex.addEventListener("click", () => fermerAssistant()); a.appendChild(ex); c.appendChild(a);
+      } else c.appendChild(el("p", "aide", "À la fin, vos valeurs actuelles seront remplacées. Exportez d'abord une sauvegarde (page Données) si vous voulez les garder."));
     } },
     { titre: "Votre situation familiale", valide: () => A.famille ? "" : "Choisissez votre situation familiale.", rendre: c => {
       c.appendChild(asChoix("Vous êtes", "famille", [["seul", "Seul(e)"], ["maries", "En couple : mariés ou union civile"], ["fait", "En couple : conjoints de fait"]]));

@@ -87,9 +87,10 @@
      de plus (par. 5.10) ; au-delà, 71,8 % (par. 5.04). Mixte en CLSC et en GMF-U (annexe XXIII, sections B-1
      et B-2) : forfait horaire de 59,68 $ et 63,58 % du tarif des services médicaux ; en GMF-U, intervention
      de supervision à 24,87 $ par 15 minutes (99,48 $ l'heure), payée à 62,15 % (services sur base de temps),
-     jusqu'à 3,5 heures par demi-journée (B-2, par. 3.1). */
+     jusqu'à 3,5 heures par demi-journée (B-2, par. 3.1). Membre d'un GMF (EP 33, annexe V, code 08875) :
+     9,35 $ par patient inscrit, une fois par année civile, à sa première visite de l'année. */
   const RAMQ = { tarifHoraire: 99.48, heuresMax100: 1540, forfaitHoraireMixte: 59.68, pctMixte: 63.58,
-    acteSupervision: 99.48, pctSupervision: 62.15, supervisionMaxH: 3.5 };
+    acteSupervision: 99.48, pctSupervision: 62.15, supervisionMaxH: 3.5, forfaitGmf: 9.35 };
   const PCT_AU_DELA = 71.8;
   const E = TARIFS_LIEU.etablissement;
   const VISITES = [
@@ -236,19 +237,23 @@
       supplements += (r.nouveauxGuichet + r.nouveauxSansMedecin) * (r.primeInscription || 0);
     }
     const detailVolume = montantsVolume(inscritsFin, vulnerablesFin, r.assiduite80 !== false), volume = detailVolume.total;
+    // Forfait GMF : chaque nouveau patient à son inscription, et les inscrits vus au moins une fois dans l'année.
+    const patientsVus = nouveaux + inscritsDepart * borne((r.pctPatientsVus ?? 80) / 100, 0, 1);
+    const forfaitGmfPossible = patientsVus * m("forfaitGmf"), forfaitGmf = r.membreGmf ? forfaitGmfPossible : 0;
     const perDiem = W * T * (resid * m("perDiemResident") + ext * m("perDiemExterne")) * maj;
     const detailActivites = (r.activites || []).map(a => revenuActivite(a, W));
     const activites = detailActivites.reduce((t, x) => t + x.total, 0) * maj, autres = r.autresRevenus || 0;
     // Pratique polyvalente : sur les activités qui y donnent droit, sans la majoration du territoire (par. 16.02).
     const anneePratique = premiere ? 1 : borne(Math.floor(+r.anneePratique || 5), 1, 5);
     const pctPolyvalence = tauxPolyvalence(inscritsFin, vulnerablesFin, anneePratique);
-    const polyvalence = (r.activites || []).reduce((t, a, i) => t + (ACTIVITES_POLYVALENTES.includes(a.type) ? detailActivites[i].total : 0), 0) * pctPolyvalence / 100;
-    const commun = forfaitInscription + forfaitVulnerable + supplements + volume + perDiem + activites + polyvalence + autres;
-    const base = { perDiem, forfaitInscription, forfaitVulnerable, supplements, volume, activites, polyvalence, autres };
+    const basePolyvalence = (r.activites || []).reduce((t, a, i) => t + (ACTIVITES_POLYVALENTES.includes(a.type) ? detailActivites[i].total : 0), 0);
+    const polyvalence = basePolyvalence * pctPolyvalence / 100;
+    const commun = forfaitInscription + forfaitVulnerable + forfaitGmf + supplements + volume + perDiem + activites + polyvalence + autres;
+    const base = { perDiem, forfaitInscription, forfaitVulnerable, forfaitGmf, supplements, volume, activites, polyvalence, autres };
 
     // Taux horaire : à 100 % jusqu'au plafond annuel, puis 71,8 % du tarif (annexe XIV, par. 5.02 et 5.04).
     const heures = W * (N + SRV) * H, plafondHeures = Math.max(0, m("heuresMax100"));
-    const heuresAuDela = Math.max(0, heures - plafondHeures);
+    const heuresAuDela = Math.max(0, heures - plafondHeures), perteHeures = heuresAuDela * (1 - PCT_AU_DELA / 100) * m("tarifHoraire") * maj;
     const horaire = { heures: (heures - heuresAuDela * (1 - PCT_AU_DELA / 100)) * m("tarifHoraire") * maj, ...base };
     horaire.total = horaire.heures + commun;
     // Mixte : forfait horaire, part du tarif des visites et, en GMF-U, l'intervention de supervision
@@ -286,8 +291,11 @@
     // Revenu moyen par patient, à 100 % du tarif, au palier de fin d'année : rendez-vous et sans rendez-vous.
     const palierFin = inscritsFin >= 499.999 ? 1 : 0;
     const tarifMoyenRdv = tarifVisite(r.mix, palierFin, TF) * maj, tarifMoyenSrv = tarifSrv(palierFin) * maj;
-    return { heures, heuresAuDela, plafondHeures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, vulnerablesFin, semainesPalierHaut,
-      activites, detailActivites, polyvalence, pctPolyvalence, anneePratique, detailVolume, visitesApprenants: W * T * apprenants, tarifMoyenRdv, tarifMoyenSrv,
+    // Hausse du tarif moyen d'une visite au palier de 500 inscrits.
+    const t0 = tarifVisite(r.mix, 0, TF), gainPalier = t0 > 0 ? tarifVisite(r.mix, 1, TF) / t0 - 1 : 0;
+    return { heures, heuresAuDela, plafondHeures, perteHeures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, vulnerablesFin, semainesPalierHaut, gainPalier,
+      patientsVus, forfaitGmfPossible, activites, detailActivites, basePolyvalence, polyvalence, pctPolyvalence, anneePratique, detailVolume,
+      visitesApprenants: W * T * apprenants, tarifMoyenRdv, tarifMoyenSrv,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
   }
 
@@ -533,7 +541,7 @@
       return x;
     });
     const mois = [], parAn = [];
-    let interetsTotaux = 0, interetsNetsTotaux = 0, extraLibre = 0, reserve = 0, gainsAttente = 0;
+    let interetsTotaux = 0, interetsNetsTotaux = 0, extraLibre, reserve = 0, gainsAttente = 0;
     // L'argent en attente (plafond de remboursement anticipé atteint) est placé à court terme
     // jusqu'au prochain droit de remboursement : 2,4 % par an selon les normes de projection 2026.
     const rAttente = Math.pow(1 + (o.rendementAttente ?? 2.4) / 100, 1 / 12) - 1;
@@ -723,7 +731,7 @@
     return res;
   }
 
-  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, ACTIVITES_POLYVALENTES, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

@@ -1,0 +1,24 @@
+# Tests à chaque publication : vérification du code, calculs, puis parcours dans Chromium.
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx eslint .
+      - run: node tests/calculs.test.js
+      - name: Chromium pour les tests du navigateur
+        run: npm install --no-save playwright@1.63.0 && npx playwright install --with-deps chromium
+      - run: node tests/navigateur.test.js

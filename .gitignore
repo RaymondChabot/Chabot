@@ -2,3 +2,6 @@
 *donnees*.json
 *.backup.json
 .DS_Store
+
+# Outils de développement (npm ci).
+node_modules/

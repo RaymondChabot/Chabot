@@ -180,6 +180,9 @@ verifier("polyvalence : 5 % des activités à 1 000 inscrits", proche(C.revenuGm
 verifier("polyvalence : première année, 10 % dès 300 inscrits", C.revenuGmfu({ ...rev, annee: "premiere", inscritsDebut: 0, nouveauxGuichet: 300, activites: [hospT] }).pctPolyvalence === 10);
 verifier("polyvalence : seuils de la 3e année", C.tauxPolyvalence(650, 0, 3) === 5 && C.tauxPolyvalence(399, 0, 3) === 0 && C.tauxPolyvalence(650, 0, 5) === 0);
 verifier("polyvalence : pas sur la garde ni sur une autre activité", C.revenuGmfu({ ...rev, inscritsDebut: 1000, activites: [{ ...hosp, type: "garde" }, { ...hosp, type: "autre" }] }).horaire.polyvalence === 0);
+verifier("forfait GMF : 9,35 $ par inscrit vu (80 % par défaut)", proche(C.revenuGmfu({ ...rev, membreGmf: true }).horaire.forfaitGmf, 500 * 0.8 * 9.35, 1e-6) && g.horaire.forfaitGmf === 0 && proche(g.forfaitGmfPossible, 500 * 0.8 * 9.35, 1e-6));
+verifier("forfait GMF : chaque nouveau patient compte", proche(C.revenuGmfu({ ...gpe, membreGmf: true, pctPatientsVus: 50 }).horaire.forfaitGmf, 100 * 9.35, 1e-6));
+verifier("taux horaire : perte au-delà du plafond", proche(g.perteHeures, 116 * 0.282 * 99.48, 0.01) && g.gainPalier > 0.1);
 verifier("polyvalence : au-delà de 245 vulnérables, chacun compte 2,5 fois", C.tauxPolyvalence(800, 345, 5) === 2.5 && C.tauxPolyvalence(800, 445, 5) === 5);
 
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
