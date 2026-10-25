@@ -101,5 +101,13 @@ verifier("à l'acte : pas de forfait horaire", g.acte.forfaitHoraire === undefin
 const g10 = C.revenuGmfu({ ...rev, patientsParDJ: g.seuilActe });
 verifier("à l'acte : au seuil, la clinique paie comme l'horaire", proche(g10.acte.visites, 6 * 46 * 99.48 * 4, 1), `${Math.round(g10.acte.visites)}`);
 
+/* 8. Frais de cabinet : pourcentage de la facturation et montant fixe, à l'acte seulement par défaut. */
+const gf = C.revenuGmfu({ ...rev, fraisCabinetPct: 30, fraisCabinetMois: 500, compensationCabinet: 1000 });
+verifier("frais : à l'acte = 30 % + 6 000 $ − 1 000 $", proche(gf.acte.fraisCabinet, gf.acte.total * 0.30 + 6000 - 1000, 0.01));
+verifier("frais : rien au taux horaire ni au mixte par défaut", gf.horaire.fraisCabinet === 0 && gf.mixte.fraisCabinet === 0);
+const gt = C.revenuGmfu({ ...rev, fraisCabinetPct: 30, fraisCabinetTousModes: true });
+verifier("frais : tous les modes si demandé", gt.horaire.fraisCabinet > 0 && gt.mixte.fraisCabinet > 0);
+verifier("frais : le seuil de l'acte monte avec le pourcentage", gf.seuilActe > g.seuilActe);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

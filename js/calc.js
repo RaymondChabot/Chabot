@@ -149,12 +149,22 @@
       perDiem, forfaitInscription, forfaitVulnerable, supplements, autres: r.autresRevenus || 0,
     };
     acte.total = acte.visites + acte.supervision + commun;
+    // Frais de cabinet (loyer, personnel, équipement) remis à la clinique : un pourcentage
+    // de la facturation RAMQ et un montant fixe, moins la compensation de la RAMQ. À l'acte
+    // seulement, sauf si la clinique les exige aussi au taux horaire et au mixte.
+    const frais = (x, applique) => !applique ? 0 : Math.max(0,
+      (x.total - (r.autresRevenus || 0)) * (r.fraisCabinetPct || 0) / 100 + (r.fraisCabinetMois || 0) * 12 - (r.compensationCabinet || 0));
+    horaire.fraisCabinet = frais(horaire, r.fraisCabinetTousModes);
+    mixte.fraisCabinet = frais(mixte, r.fraisCabinetTousModes);
+    acte.fraisCabinet = frais(acte, true);
 
     // Seuil : nombre de patients par demi-journée clinique où le mixte égale l'horaire.
     const parVisite = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0) * r.pctMixte / 100;
     const seuil = parVisite > 0 ? (r.tarifHoraire - r.forfaitHoraireMixte) * H / parVisite : null;
     const parVisiteActe = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0) * pctActe / 100;
-    const seuilActe = parVisiteActe > 0 ? r.tarifHoraire * H / parVisiteActe : null;
+    // Au seuil, chaque visite à l'acte, après le pourcentage remis à la clinique, égale l'heure au taux horaire.
+    const netVisite = parVisiteActe * (1 - (r.fraisCabinetPct || 0) / 100) / (r.fraisCabinetTousModes ? 1 - (r.fraisCabinetPct || 0) / 100 : 1);
+    const seuilActe = netVisite > 0 ? r.tarifHoraire * H / netVisite : null;
 
     return { heures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, semainesPalierHaut,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };

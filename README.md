@@ -38,6 +38,13 @@ travail autonome ou pratique incorporée.
   dollars de l'année (paliers d'impôt indexés, enfants qui vieillissent) ;
   équité de la maison, autos, placements, valeur nette sur 10 à 30 ans.
 
+- **Rapport PDF** : 7 pages mises en page (couverture et chiffres clés,
+  revenu, impôt, budget, dettes, avenir, hypothèses et sources), avec
+  graphiques en couleurs ; « Enregistrer en PDF » du navigateur.
+
+À l'acte : règles d'avant la Loi 2 (le mode composé n'est pas en vigueur),
+avec frais de cabinet (pourcentage de la facturation et montant fixe).
+
 ## Tests
 
 ```
@@ -56,6 +63,7 @@ REEE. Cas fictifs seulement.
 | `styles.css` | Mise en page, thèmes clair et sombre |
 | `js/calc.js` | Calculs (revenu GMF-U, impôt 2026, dettes, épargne), sans accès à la page |
 | `js/app.js` | Interface, sauvegarde locale, import et export |
+| `js/rapport.js` | Rapport PDF mis en page |
 | `tests/calculs.test.js` | Tests des calculs (Node, sans dépendance) |
 | `manifest.webmanifest`, `sw.js`, `icone.svg`, `icones/` | Application installable (PWA), hors ligne |
 | `polices/` | Inter et Newsreader (SIL Open Font License), hébergées ici |

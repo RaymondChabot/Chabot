@@ -50,7 +50,7 @@
     <div class="entete-impression" aria-hidden="true"><span class="marque-nom">Wealthnord</span><span id="impression-info"></span></div>
     <!-- ============ ACCUEIL ============ -->
     <section class="vue" id="v-apercu" aria-labelledby="h-apercu">
-      <header class="tete-page"><h1 id="h-apercu">Aperçu</h1></header>
+      <header class="tete-page"><h1 id="h-apercu">Aperçu</h1><button type="button" class="bouton-modifier bouton-pdf" id="rapport-pdf">Rapport PDF</button></header>
       <div class="carte exemple" id="ap-exemple" hidden>
         <div>
           <h2>Ces chiffres sont un exemple</h2>
@@ -254,8 +254,8 @@
       <div class="carte">
         <div class="carte-tete"><h2>Apparence et rapport</h2></div>
         <div class="segment" id="theme-choix"></div>
-        <p class="aide">Le rapport imprimable réunit toutes les pages, sans la navigation : imprimez-le ou enregistrez-le en PDF pour votre comptable ou votre planificateur financier.</p>
-        <div class="actions"><button type="button" class="bouton secondaire" id="imprimer">Imprimer un rapport</button></div>
+        <p class="aide">Un rapport de 7 pages, mis en page avec graphiques en couleurs : couverture et chiffres clés, revenu, impôt, budget, dettes, avenir, hypothèses et sources. Dans la fenêtre qui s'ouvre, choisissez « Enregistrer en PDF » (sur iPhone : Partager, puis Enregistrer dans Fichiers).</p>
+        <div class="actions"><button type="button" class="bouton" id="imprimer">Créer le rapport PDF</button></div>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>Recommencer</h2></div>
@@ -285,5 +285,7 @@
 
 <script src="js/calc.js"></script>
 <script src="js/app.js"></script>
+<script src="js/rapport.js"></script>
+<div id="rapport" aria-hidden="true"></div>
 </body>
 </html>

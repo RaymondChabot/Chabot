@@ -24,6 +24,7 @@
       perDiemResident: 39.65, forfaitInscription: 10, forfaitVulnerable: 55,
       suppNonVulnerable: 18.90, suppVulnerableHorsGuichet: 58.10, suppVulnerableGuichet: 124.50,
       pctActe: 100, pctSupervisionActe: 100,
+      fraisCabinetPct: 30, fraisCabinetMois: 0, compensationCabinet: 0, fraisCabinetTousModes: false,
       modeBudget: "horaire",
     },
     impot: { depensesPro: 3000, structure: "particulier" },
@@ -257,9 +258,13 @@
       { p: "revenu.acteSupervision", l: "Acte de supervision, tarif à 100 %", u: "$/h", s: 0.01 },
       { p: "revenu.pctSupervision", l: "Part versée de l'acte de supervision", u: "%" },
       { p: "revenu.supervisionMaxH", l: "Heures de supervision payées au plus", u: "h/d.-j.", s: 0.25 },
-      { g: "À l'acte" },
-      { p: "revenu.pctActe", l: "Part du tarif des visites payée à l'acte", u: "%", h: "100 % : chaque visite au tarif de l'onglet B. Vérifiez votre entente." },
+      { g: "À l'acte, règles d'avant la Loi 2" },
+      { p: "revenu.pctActe", l: "Part du tarif des visites payée à l'acte", u: "%", h: "100 % : chaque visite au tarif de l'onglet B, avec les forfaits d'inscription et les suppléments. Le mode composé de la Loi 2 n'est pas en vigueur." },
       { p: "revenu.pctSupervisionActe", l: "Part de l'acte de supervision payée à l'acte", u: "%" },
+      { p: "revenu.fraisCabinetPct", l: "Frais de cabinet : part de la facturation remise à la clinique", u: "%", s: 0.5, h: "Loyer, personnel, équipement, DMÉ. Souvent de 25 à 35 % en clinique privée." },
+      { p: "revenu.fraisCabinetMois", l: "Frais de cabinet fixes : loyer et autres", u: "$/mois", s: 50 },
+      { p: "revenu.compensationCabinet", l: "Compensation des frais de cabinet par la RAMQ", u: "$/an", s: 100, h: "Entente particulière GMF (EP 40), s'il y a lieu." },
+      { p: "revenu.fraisCabinetTousModes", l: "La clinique les exige aussi au taux horaire et au mixte", t: "check", h: "Non en GMF-U situé en CLSC ou à l'hôpital : l'établissement fournit les locaux." },
       { g: "Payés dans tous les modes" },
       { p: "revenu.perDiemResident", l: "Demi-per diem de supervision, par résident", u: "$", s: 0.01 },
       { p: "revenu.forfaitInscription", l: "Forfait d'inscription générale", u: "$/pat.", s: 0.01 },
@@ -618,35 +623,43 @@
     // Pratique incorporée : la société reçoit les revenus et verse des dividendes ;
     // sinon, travail autonome. f : facteur des dividendes fixes en dollars d'aujourd'hui.
     R.societeActive = S.impot.structure === "societe";
-    R.dproPerso = R.societeActive ? 0 : S.impot.depensesPro;
+    R.dproPerso = R.societeActive ? 0 : S.impot.depensesPro + R.gmfu[mode].fraisCabinet;
     const impotDe = (o, f = 1) => R.societeActive
       ? C.impotSociete({ ...o, fraisSociete: S.societe.fraisSociete, tauxSociete: S.societe.tauxSociete / 100, retrait: S.societe.retrait, retraitFixe: S.societe.retraitFixe * f })
       : C.impotParticulier(o);
     // Conjoints : transferts de crédits, calculés pour chaque mode.
     const avec = r => R.couple ? C.transfertsConjoints(r, salariee) : [r, null];
     R.impots = {}; const partenaires = {};
-    for (const md of MODES) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, revenu: R.gmfu[md].total }));
+    // Frais de cabinet : déductibles (ou payés par la société) ; varient selon le mode.
+    const fraisCabinet = (total, md) => md === "acte" || S.revenu.fraisCabinetTousModes
+      ? Math.max(0, (total - (S.revenu.autresRevenus || 0)) * (S.revenu.fraisCabinetPct || 0) / 100 + (S.revenu.fraisCabinetMois || 0) * 12 - (S.revenu.compensationCabinet || 0)) : 0;
+    const depensesMode = md => S.impot.depensesPro + R.gmfu[md].fraisCabinet;
+    for (const md of MODES) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, depensesPro: depensesMode(md), revenu: R.gmfu[md].total }));
+    // Net après impôt et frais de cabinet (les dépenses professionnelles, égales dans tous les modes, à part).
+    R.nets = {};
+    for (const md of MODES) R.nets[md] = R.impots[md].net - (R.societeActive ? 0 : R.gmfu[md].fraisCabinet);
     R.impot = R.impots[mode];
     R.conjointe = R.couple ? partenaires[mode] : null;
     const totalDe = x => x.totalGlobal ?? x.total;
     // Taux marginal : impôt (société comprise) sur 1 000 $ de plus.
-    R.tauxMarginal = (totalDe(impotDe({ ...base, revenu: R.brut + 1000 })) - totalDe(impotDe({ ...base, revenu: R.brut }))) / 1000;
-    // Revenu net d'impôt pour un autre revenu brut (mêmes déductions, mêmes transferts entre conjoints).
-    R.netPour = rev => avec(impotDe({ ...base, revenu: rev }))[0].net;
+    R.tauxMarginal = (totalDe(impotDe({ ...base, depensesPro: S.impot.depensesPro + fraisCabinet(R.brut + 1000, mode), revenu: R.brut + 1000 }))
+      - totalDe(impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.brut }))) / 1000;
+    // Revenu net d'impôt et de frais de cabinet pour un autre revenu brut (mêmes déductions, mêmes transferts).
+    R.netPour = (rev, frais = 0) => avec(impotDe({ ...base, depensesPro: S.impot.depensesPro + frais, revenu: rev }))[0].net - (R.societeActive ? 0 : frais);
     const sens = (k, valeurs) => valeurs.map(v => {
       const g = C.revenuGmfu({ ...S.revenu, [k]: v });
       const x = { v };
-      for (const md of MODES) { x[md] = g[md].total; x[md + "Net"] = R.netPour(g[md].total); }
+      for (const md of MODES) { x[md] = g[md].total; x[md + "Net"] = R.netPour(g[md].total, g[md].fraisCabinet); }
       return x;
     });
     const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ;
     R.sensDJ = sens("demiJournees", [...new Set([4, 5, 6, 7, 8, 9, 10, dj])].filter(n => n >= Math.max(1, S.revenu.enseignement)).sort((a, b) => a - b));
     R.sensPat = sens("patientsParDJ", [...new Set([3, 4, 5, 6, 7, 8, pat])].sort((a, b) => a - b));
     // REER : impôt sans cotisation, et avec une cotisation donnée (au revenu de l'année).
-    R.impotSansReer = impotDe({ ...base, reer: 0, revenu: R.brut }).total;
-    R.impotAvecReer = m => impotDe({ ...base, reer: m, revenu: R.brut }).total;
-    R.remboursementReer = S.epargne.reer.cotisationAnnuelle > 0
-      ? impotDe({ ...base, reer: 0, revenu: R.brut }).total - impotDe({ ...base, revenu: R.brut }).total : 0;
+    const baseMode = { ...base, depensesPro: depensesMode(mode), revenu: R.brut };
+    R.impotSansReer = impotDe({ ...baseMode, reer: 0 }).total;
+    R.impotAvecReer = m => impotDe({ ...baseMode, reer: m }).total;
+    R.remboursementReer = S.epargne.reer.cotisationAnnuelle > 0 ? impotDe({ ...baseMode, reer: 0 }).total - impotDe(baseMode).total : 0;
 
     // Famille : allocations et assurance médicaments, sur le revenu net familial.
     R.ages = S.epargne.reee.enfants.map(x => +x.age).filter(a => a < 18);
@@ -710,7 +723,8 @@
       if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, epargne: R.epargneMoi * 12, retenu: R.impot.societe ? R.impot.societe.retenu : 0 };
       else {
         const conj = impotPartenaire(reel);
-        let moi = impotDe({ ...base, revenu: R.gmfuType[mode].total * reel }, 1 / I);
+        const fraisA = fraisCabinet(R.gmfuType[mode].total * reel, mode);
+        let moi = impotDe({ ...base, depensesPro: S.impot.depensesPro + fraisA, revenu: R.gmfuType[mode].total * reel }, 1 / I);
         if (R.couple) moi = C.transfertsConjoints(moi, conj)[0];
         const ages = S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x < 18);
         const nf = moi.revenuNetFed + (conj ? conj.revenuNetFed : 0), nq = moi.revenuNetQc + (conj ? conj.revenuNetQc : 0);
@@ -718,7 +732,7 @@
         const alloc = S.famille.calculAuto ? C.prestationsFamille({ revenuNetFed: nf, revenuNetQc: nq, ages, couple: R.couple }).total * I : S.menage.allocationsAnnuelles;
         const enf = S.epargne.reee.enfants.filter(x => +x.age + a < 17).length;
         res = {
-          travail: (moi.net - R.dproPerso - prime) * I,
+          travail: (moi.net - (R.societeActive ? 0 : S.impot.depensesPro + fraisA) - prime) * I,
           retenu: moi.societe ? moi.societe.retenu * I : 0,
           alloc: !R.couple || S.famille.versementA !== "conjointe" ? alloc : 0,
           epargne: enf * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle,
@@ -1148,7 +1162,7 @@
     choixMode("rv-mode");
     const diff = g[R.mode].total - g[meilleur].total;
     hero("rv-hero", "Revenu brut de l'année", $(g[R.mode].total), [
-      `Net après impôt : ${$(R.impots[R.mode].net)}`,
+      `Net après impôt${g[R.mode].fraisCabinet ? " et frais" : ""} : ${$(R.nets[R.mode])}`,
       puce(`${signe(diff)} par rapport ${AU_MODE[meilleur]}`, diff >= 0 ? "haut" : "bas", diff >= 0),
     ], g[R.mode].total);
 
@@ -1164,13 +1178,14 @@
       const sp = el("span"); sp.style.background = R.mode === k ? "var(--encre)" : "var(--trait)"; barre.appendChild(sp);
       barre.style.width = (g[k].total / max * 100) + "%";
       piste.appendChild(barre);
+      const fr = g[k].fraisCabinet ? `Frais de cabinet : ${moins(g[k].fraisCabinet)} · ` : "";
       b.append(tete, piste, el("div", "aide", R.societeActive
-        ? `Pour vous : ${$(R.impots[k].net)} · laissé dans la société : ${$(R.impots[k].societe.retenu)}`
-        : `Net après impôt : ${$(R.impots[k].net)}`));
+        ? `${fr}Pour vous : ${$(R.nets[k])} · laissé dans la société : ${$(R.impots[k].societe.retenu)}`
+        : `${fr}Net après impôt${fr ? " et frais" : ""} : ${$(R.nets[k])}`));
       comp.appendChild(b);
     });
     comp.appendChild(rangees(el("div"), autres.map((m, i) => ({ titre: `${NOM_MODE[m]} par rapport ${AU_MODE[R.mode]}`,
-      sous: R.societeActive ? `Laissé dans la société : ${signe(R.impots[m].societe.retenu - R.impots[R.mode].societe.retenu)}` : `Après impôt : ${signe(R.impots[m].net - R.impots[R.mode].net)}`,
+      sous: R.societeActive ? `Laissé dans la société : ${signe(R.impots[m].societe.retenu - R.impots[R.mode].societe.retenu)}` : `Après impôt et frais : ${signe(R.nets[m] - R.nets[R.mode])}`,
       valeur: signe(g[m].total - g[R.mode].total), cls: i === 0 ? "total" : null }))));
     const pat = nb(S.revenu.patientsParDJ);
     document.getElementById("rv-seuil").textContent = [
@@ -1205,6 +1220,7 @@
     lignes(document.getElementById("rv-detail"), ["", "Horaire", "Mixte", "À l'acte"], [
       ...parts.filter(([, f]) => MODES.some(m => f(g[m]) > 0)).map(([n, f]) => ({ cellules: [n, ...MODES.map(m => $(f(g[m])))] })),
       { cls: "total", cellules: ["Total brut", ...MODES.map(m => $(g[m].total))] },
+      ...(MODES.some(m => g[m].fraisCabinet > 0) ? [{ cls: "sous", cellules: ["Frais de cabinet", ...MODES.map(m => moins(g[m].fraisCabinet))] }] : []),
     ]);
     rangees("rv-faits", [
       { titre: "Heures travaillées", valeur: nb(g.heures, 0) + " h" },
@@ -1241,12 +1257,12 @@
 
     // Sur chaque 100 $ gagnés : où va le revenu brut.
     const brut = Math.max(1, R.impot.revenu), cotis = R.impot.rrq + R.impot.rqap + R.impot.fss;
-    const dpro = Math.min(S.impot.depensesPro, brut), x = R.impot.societe;
+    const dpro = Math.min(R.dproPerso, brut), x = R.impot.societe;
     const morceaux = soc
       ? [["Impôt de la société", x.impotSociete, SERIES[0]], ["Votre impôt sur les dividendes", R.impot.fed + R.impot.qc + R.impot.fss, SERIES[1]],
          ["Dépenses et frais de la société", x.depenses + x.frais, SERIES[3]], ["Laissé dans la société", x.retenu, SERIES[5]], ["Reste pour vous", R.impot.net, SERIES[4]]]
       : [["Impôt fédéral", R.impot.fed, SERIES[0]], ["Impôt du Québec", R.impot.qc, SERIES[1]], ["RRQ, RQAP et Fonds des services de santé", cotis, SERIES[2]],
-         ["Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", R.impot.net - dpro, SERIES[4]]];
+         [R.gmfu[R.mode].fraisCabinet ? "Dépenses et frais de cabinet" : "Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", R.impot.net - dpro, SERIES[4]]];
     const cent = document.getElementById("im-cent"); cent.textContent = "";
     const barre = el("div", "flux-barre"); barre.setAttribute("role", "img");
     barre.setAttribute("aria-label", morceaux.map(([n, v]) => `${n} ${$2(v / brut * 100)}`).join(", "));
@@ -1280,13 +1296,16 @@
         ligne("Impôt de la société", x => moins(x.societe.impotSociete)),
         ligne("Dividendes versés", x => $(x.societe.dividendes)),
         ligne("Laissé dans la société", x => $(x.societe.retenu), "sous"),
-      ] : [ligne("Revenu imposable", x => $(x.imposable), "sous")]),
+      ] : [
+        ...(MODES.some(md => R.gmfu[md].fraisCabinet > 0) ? [{ cellules: ["Frais de cabinet", ...MODES.map(md => moins(R.gmfu[md].fraisCabinet))] }] : []),
+        ligne("Revenu imposable", x => $(x.imposable), "sous"),
+      ]),
       ligne("Impôt fédéral", x => $(x.fed)),
       ligne("Impôt du Québec", x => $(x.qc)),
       ...(soc ? [] : [ligne("RRQ (deux parts)", x => $(x.rrq)), ligne("RQAP", x => $(x.rqap))]),
       ligne("Fonds des services de santé", x => $(x.fss)),
       ...(R.couple && I3.some(x => x.transferts > 0) ? [ligne(`Crédits transférés par ${votreP()}`, x => moins(x.transferts))] : []),
-      ligne(soc ? "Net pour vous" : "Net après impôt", x => $(x.net), "total"),
+      { cls: "total", cellules: [soc ? "Net pour vous" : "Net après impôt et frais", ...MODES.map(md => $(R.nets[md]))] },
       ligne(soc ? "Taux moyen, société comprise" : "Taux moyen", x => pct(x.tauxMoyen), "sous"),
     ]);
     document.getElementById("im-tableau-note").textContent = soc
@@ -1740,7 +1759,10 @@
     if (R) tout();
   }
   appliquerTheme(lireTheme());
-  document.getElementById("imprimer").addEventListener("click", () => window.print());
+  // Rapport PDF : mis en page à part (js/rapport.js), puis « Enregistrer en PDF » du navigateur.
+  const rapportPdf = () => (window.Wealthnord.rapport ? window.Wealthnord.rapport.imprimer() : window.print());
+  document.getElementById("imprimer").addEventListener("click", rapportPdf);
+  document.getElementById("rapport-pdf").addEventListener("click", rapportPdf);
   document.getElementById("de-ajout").addEventListener("input", majSimulation);
   // Plan de remboursement mois par mois, en CSV (séparateur « ; », virgule décimale, pour Excel en français).
   document.getElementById("exporter-plan").addEventListener("click", () => {
@@ -1760,6 +1782,17 @@
   window.addEventListener("beforeprint", () => {
     document.getElementById("impression-info").textContent = `Rapport du ${new Date().toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" })} · ${NOM_MODE[R.mode].toLowerCase()} · scénario ${SCENARIOS[R.scenario].toLowerCase()} · méthode ${NOMS_METHODES[R.methode].toLowerCase()}`;
   });
+
+  /* Outils pour le rapport PDF (js/rapport.js). */
+  window.Wealthnord = {
+    etat: () => S, resultats: () => R,
+    verification: () => {
+      let total = 0, egaux = 0, pire = 0;
+      VERIFICATION.forEach(v => { const b = casCalcul(v); CHAMPS_VERIF.forEach(([k]) => { const e = Math.abs(Math.round(b[k]) - v.officiel[k]); total++; if (e <= 1) egaux++; pire = Math.max(pire, e); }); });
+      return { total, egaux, pire, cas: VERIFICATION.length };
+    },
+    outils: { $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
+  };
 
   /* Application installable (PWA) : fonctionne hors ligne. */
   if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname)))
