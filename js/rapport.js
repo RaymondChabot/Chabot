@@ -274,9 +274,10 @@
     /* 6. Avenir */
     const cols = [0, Math.round(fin / 2), fin], v = (i, f) => f(p[i]) / def(i);
     const L = [["Maison, votre part", y => y.maisonMoi], ["Hypothèques, votre part", y => -y.hypMoi], ["Équité dans la maison", y => y.equiteMoi, "sous-total"],
-      ["Placements : REER, CELI, comptes", y => y.placements], ...(soc ? [["Placements dans la société", y => y.societe]] : []), ["Auto", y => y.voitureMoi], ["Autres dettes, votre part", y => -y.autresMoi]];
+      ["Placements : REER, CELI, comptes", y => y.placements], ...(soc ? [["Placements dans la société", y => y.societe]] : []), ["Auto", y => y.voitureMoi], ["Autres dettes, votre part", y => -y.autresMoi]]
+      .filter(([n]) => !R.locataire || !/Maison|Hypoth|Équité/.test(n) || S.dettes.some(d => d.type === "hypotheque"));
     const jal = O.jalons(R);
-    pages.push(page("Avenir", `Scénario ${scen} : placements ${nb(R.hyp.rendement, 1)} %, maison ${O.signePct(R.hyp.croissanceMaison)}, autos −${nb(R.hyp.depreciationAuto, 0)} %, inflation ${nb(R.hyp.inflation, 1)} % par année${S.scenarios.dollarsAujourdhui ? " ; montants en dollars d'aujourd'hui" : ""}.`, `
+    pages.push(page("Avenir", `Scénario ${scen} : placements ${nb(R.hyp.rendement, 1)} %${R.locataire ? "" : `, maison ${O.signePct(R.hyp.croissanceMaison)}`}, autos −${nb(R.hyp.depreciationAuto, 0)} %, inflation ${nb(R.hyp.inflation, 1)} % par année${S.scenarios.dollarsAujourdhui ? " ; montants en dollars d'aujourd'hui" : ""}.`, `
       <div class="rp-carte"><h2>Valeur nette projetée</h2>
         ${legende([{ nom: `Scénario ${scen}`, couleur: C(0), ligne: true }, { nom: "Du prudent à l'optimiste", couleur: C(0), zone: true }])}
         ${lignes({ x: p.map(y => String(y.annee)), series: [{ nom: "Valeur nette", couleur: C(0), valeurs: vals }], bande: { bas, haut, couleur: C(0) }, hauteur: 175, titre: "Valeur nette projetée" })}

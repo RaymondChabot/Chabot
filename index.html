@@ -63,9 +63,12 @@
       <div class="carte exemple" id="ap-exemple" hidden>
         <div>
           <h2>Ces chiffres sont un exemple</h2>
-          <p class="aide">Importez votre fichier de données, ou modifiez les valeurs de chaque section.</p>
+          <p class="aide">Répondez à quelques questions pour partir de votre situation, ou importez votre fichier de données.</p>
         </div>
-        <a class="bouton" href="#donnees" data-onglet="donnees">Importer mes données</a>
+        <div class="actions">
+          <button type="button" class="bouton" id="ap-assistant">Partir de ma situation</button>
+          <a class="bouton secondaire" href="#donnees" data-onglet="donnees">Importer mes données</a>
+        </div>
       </div>
       <div class="hero" id="ap-hero"></div>
       <div class="carte">
@@ -275,8 +278,9 @@
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>Recommencer</h2></div>
-        <p class="aide">Remplace toutes vos valeurs par l'exemple. Exportez d'abord si vous voulez les garder.</p>
+        <p class="aide">Remplace toutes vos valeurs : par vos réponses à quelques questions, ou par l'exemple. Exportez d'abord si vous voulez les garder.</p>
         <div class="actions">
+          <button type="button" class="bouton secondaire" id="reprendre-assistant">Recommencer avec l'assistant</button>
           <button type="button" class="bouton danger" id="reinitialiser">Revenir à l'exemple</button>
           <button type="button" class="bouton danger plein" id="confirmer-reinit" hidden>Oui, tout remplacer</button>
         </div>
@@ -288,6 +292,20 @@
 </div>
 
 <!-- Panneau de saisie : glisse du bas sur téléphone, de la droite sur ordinateur -->
+<!-- Assistant de départ : quelques questions au premier lancement. -->
+<dialog class="assistant" id="assistant" aria-labelledby="as-titre">
+  <div class="as-tete">
+    <svg class="as-sceau" aria-hidden="true"><use href="#wm-sceau"/></svg>
+    <ol class="as-points" id="as-points" aria-hidden="true"></ol>
+    <button type="button" class="bouton-icone" id="as-fermer" aria-label="Fermer l'assistant"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="as-corps" id="as-corps"></div>
+  <div class="as-pied">
+    <button type="button" class="bouton secondaire" id="as-retour">Retour</button>
+    <button type="button" class="bouton" id="as-suivant">Continuer</button>
+  </div>
+</dialog>
+
 <dialog class="feuille" id="feuille" aria-labelledby="feuille-titre">
   <div class="feuille-poignee" aria-hidden="true"></div>
   <div class="feuille-tete">

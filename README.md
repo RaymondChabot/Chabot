@@ -21,7 +21,14 @@ valeur nette.
 ## Ce qu'elle calcule
 
 Pour tout médecin de famille au Québec, dans tous les milieux : seul ou
-en couple, travail autonome ou pratique incorporée.
+en couple (mariés ou conjoints de fait), avec ou sans enfants,
+propriétaire ou locataire, travail autonome ou pratique incorporée.
+
+Au premier lancement, un **assistant de départ** pose quelques questions
+(famille, enfants, pratique, logement, dettes) et bâtit le point de départ
+à partir des réponses ; l'exemple fictif reste offert. Des conjoints de
+fait ne forment un couple pour l'impôt qu'après 12 mois de vie commune ou
+avec un enfant commun : avant, chacun est imposé seul.
 
 - **Revenu** : selon le milieu de pratique.
   - GMF-U et CLSC : calcul détaillé avec les tarifs de la RAMQ (taux
