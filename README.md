@@ -42,8 +42,12 @@ Revenu affiche tous les détails.
   patients, prise en charge
   de nouveaux patients, patients vulnérables et très vulnérables. En GMF-U :
   résidents (4 à 5 patients par demi-journée) et externes (2 à 3),
-  supervision facturée à l'acte de supervision ou aux visites des
-  apprenants. Tous les tarifs, forfaits et suppléments se modifient ;
+  demi-per diem selon le lieu et la région ; au mixte, intervention de
+  supervision ou visites des apprenants ; à l'acte, visites des
+  apprenants. Taux horaire plafonné à 1 540 heures par année à 100 %
+  (dépassement autorisé modifiable). Montants liés au volume de patients
+  et majoration de la pratique polyvalente sur les activités en
+  établissement. Tous les tarifs, forfaits et suppléments se modifient ;
   majoration selon le territoire. En plus : activités en établissement
   (urgence, hospitalisation, obstétrique, soins palliatifs, CHSLD, gardes,
   autre), par semaine, par mois, par année ou toutes les N semaines, au
@@ -134,11 +138,26 @@ dossier racine.
   2026) : colonne « en cabinet » pour la clinique privée et le GMF,
   « en CLSC ou en GMF-U en établissement » pour le CLSC et le GMF-U
   (modifiable). Tarifs modifiables ; « Rétablir les tarifs de la RAMQ ».
-- Tarif horaire, mode mixte et supervision : EP 42 et annexe XXIII ; les
-  montants par défaut sont les derniers publiés trouvés et doivent être
-  confirmés.
-- Forfaits et suppléments d'inscription : EP 40. Supplément des patients
-  très vulnérables (code 19960) : à confirmer selon le montant en vigueur.
+- Brochure no 1 de la RAMQ (consultée le 25 octobre 2026), montants en
+  vigueur depuis 2018 ou 2019 :
+  - Taux horaire (annexe XIV) : 99,48 $ l'heure, à 100 % jusqu'à
+    1 540 heures par année (jusqu'à 880 heures de plus si le chef de
+    département l'autorise), puis 71,8 %.
+  - Mixte en CLSC et en GMF-U (annexe XXIII, sections B-1 et B-2) :
+    forfait horaire de 59,68 $, 63,58 % du tarif des services médicaux ;
+    intervention de supervision en GMF-U à 24,87 $ par 15 minutes, payée
+    à 62,15 %, jusqu'à 3,5 heures par demi-journée.
+  - EP 40 : forfait d'inscription (11,85 $ en cabinet, 8,95 $ en
+    établissement), forfait annuel d'un patient vulnérable (62,50 $ et
+    47 $, jusqu'à 200 % selon les catégories), suppléments à l'inscription
+    d'un patient sans médecin de famille (codes 19957 à 19960), montants
+    liés au volume de patients (par. 4.15 et 15.01) et majoration de la
+    pratique polyvalente (par. 16.00). La majoration temporaire des
+    suppléments (par. 18.01) a pris fin le 30 avril 2021 ; la limite de
+    150 patients du guichet après 4 ans (ancien par. 13.02) est abolie
+    depuis le 1er janvier 2023.
+  - EP 42 (médecin enseignant) : demi-per diem par résident et par externe,
+    en établissement ou en cabinet reconnu, liste 1 ou liste 2.
 - Sans rendez-vous : visites ponctuelles mineures (15765, 15766) et
   complexes (15773, 15774), seules facturables sans rendez-vous d'après
   le tableau-synthèse des visites (P.G. 2.2.6 A, 25 juillet 2025).

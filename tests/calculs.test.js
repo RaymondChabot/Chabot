@@ -89,16 +89,17 @@ const sTout = C.impotSociete({ revenu: 200000, depensesPro: 3000, fraisSociete: 
 const sansSoc = C.impotParticulier({ revenu: 200000, depensesPro: 3000 });
 verifier("société, tout versé : impôt total proche du particulier (± 10 %)", Math.abs(sTout.totalGlobal - sansSoc.total) < 0.1 * sansSoc.total, `${Math.round(sTout.totalGlobal)} contre ${Math.round(sansSoc.total)}`);
 
-/* 7. À l'acte : visites et supervision à 100 %, sans forfait horaire. */
+/* 7. À l'acte : visites à 100 %, celles des apprenants comprises, sans forfait horaire. Les montants
+   de la RAMQ absents viennent de la Brochure no 1 (colonne établissement, liste 1). */
 const rev = { annee: "type", demiJournees: 9, enseignement: 3, heuresParDJ: 4, semaines: 46, patientsParDJ: 5, residents: 1, patientsPendantSupervision: 0, autresRevenus: 0,
-  inscritsDebut: 500, nouveauxGuichet: 0, nouveauxSansMedecin: 0, nouveauxTransferes: 0, semainesArrivee: 46, partVulnerable: 20, quatrePremieresAnnees: true,
-  mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 }, tarifHoraire: 99.48, forfaitHoraireMixte: 59.68, pctMixte: 60, acteSupervision: 114.2, pctSupervision: 60,
-  supervisionMaxH: 3.5, perDiemResident: 39.65, forfaitInscription: 10, forfaitVulnerable: 55, suppNonVulnerable: 18.9, suppVulnerableHorsGuichet: 58.1, suppVulnerableGuichet: 124.5 };
-const g = C.revenuGmfu(rev);
-verifier("à l'acte : visites = mixte × 100 / 60", proche(g.acte.visites, g.mixte.visites * 100 / 60, 0.01));
-verifier("à l'acte : supervision = mixte × 100 / 60", proche(g.acte.supervision, g.mixte.supervision * 100 / 60, 0.01));
+  inscritsDebut: 500, nouveauxGuichet: 0, nouveauxSansMedecin: 0, nouveauxTransferes: 0, semainesArrivee: 46, partVulnerable: 20,
+  mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 } };
+const g = C.revenuGmfu(rev), g0 = C.revenuGmfu({ ...rev, residents: 0 });
+const tv1 = C.tarifVisite(rev.mix, 1, C.TARIFS_LIEU.etablissement);
+verifier("à l'acte : visites = mixte × 100 / 63,58 (sans apprenants)", proche(g0.acte.visites, g0.mixte.visites * 100 / 63.58, 0.01));
+verifier("à l'acte : visites des apprenants facturées, pas d'intervention de supervision", proche(g.acte.visites - g0.acte.visites, 46 * 3 * 4.5 * tv1, 0.01) && g.acte.supervision === undefined);
 verifier("à l'acte : pas de forfait horaire", g.acte.forfaitHoraire === undefined && g.acte.heures === undefined);
-const g10 = C.revenuGmfu({ ...rev, patientsParDJ: g.seuilActe });
+const g10 = C.revenuGmfu({ ...rev, residents: 0, patientsParDJ: g0.seuilActe });
 verifier("à l'acte : au seuil, la clinique paie comme l'horaire", proche(g10.acte.visites, 6 * 46 * 99.48 * 4, 1), `${Math.round(g10.acte.visites)}`);
 
 /* 8. Frais de cabinet : pourcentage de la facturation et montant fixe, à l'acte seulement par défaut. */
@@ -126,15 +127,17 @@ verifier("activité : sans frais de cabinet", proche(ga.acte.fraisCabinet, (ga.a
 const g2 = C.revenuGmfu({ ...rev, tarifs: { suivi: [42.25, 46.95] } });
 verifier("tarifs : un tarif modifié change les visites", g2.acte.visites > g.acte.visites && g2.horaire.total === g.horaire.total);
 const gtv = C.revenuGmfu({ ...rev, partVulnerable: 10, partTresVulnerable: 10, forfaitTresVulnerable: 155 });
-verifier("très vulnérables : forfait annuel propre", proche(gtv.acte.forfaitVulnerable - C.revenuGmfu({ ...rev, partVulnerable: 20 }).acte.forfaitVulnerable, 500 * 0.10 * (155 - 55), 0.01));
+verifier("très vulnérables : forfait annuel propre", proche(gtv.acte.forfaitVulnerable - C.revenuGmfu({ ...rev, partVulnerable: 20 }).acte.forfaitVulnerable, 500 * 0.10 * (155 - 47), 0.01));
 const gsup = C.revenuGmfu({ ...rev, supervisionFacturation: "visites", residents: 1, externes: 1 });
-verifier("apprenants : 4,5 + 2,5 visites par demi-journée d'enseignement", proche(gsup.visitesApprenants, 46 * 3 * 7, 1e-9) && gsup.acte.supervision === 0 && gsup.acte.visites > g.acte.visites);
-verifier("apprenants : acte de supervision par défaut", g.visitesApprenants === 0 && g.acte.supervision > 0);
+verifier("apprenants : 4,5 + 2,5 visites par demi-journée d'enseignement", proche(gsup.visitesApprenants, 46 * 3 * 7, 1e-9) && gsup.mixte.supervision === 0 && gsup.mixte.visites > g.mixte.visites);
+verifier("apprenants : au mixte, intervention de supervision par défaut", proche(g.mixte.visites, g0.mixte.visites, 1e-6) && proche(g.mixte.supervision, 46 * 3 * 3.5 * 99.48 * 0.6215, 0.01));
 const gsrv = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, pctSrvComplexe: 50 });
 verifier("SRV : patient payé moins qu'une visite de rendez-vous", gsrv.tarifMoyenSrv < gsrv.tarifMoyenRdv && gsrv.tarifMoyenSrv > 0);
 verifier("SRV : visites ponctuelles à l'acte, sans supplément", proche(gsrv.acte.total - C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 0 }).acte.total, 46 * 12 * (0.5 * 17.70 + 0.5 * 35.40), 0.5) && gsrv.acte.supplementsSRV === undefined);
-const gmaj = C.revenuGmfu({ ...rev, majorationPct: 15 });
-verifier("majoration : +15 % sur les heures, pas sur les forfaits", proche(gmaj.horaire.heures, g.horaire.heures * 1.15, 0.01) && proche(gmaj.horaire.forfaitInscription, g.horaire.forfaitInscription, 1e-9));
+const gmaj = C.revenuGmfu({ ...rev, majorationPct: 15 }), gpe = { ...rev, annee: "premiere", inscritsDebut: 0, nouveauxGuichet: 100, partVulnerable: 20, partTresVulnerable: 10 };
+verifier("majoration : +15 % sur les heures et les forfaits", proche(gmaj.horaire.heures, g.horaire.heures * 1.15, 0.01) && proche(gmaj.horaire.forfaitInscription, g.horaire.forfaitInscription * 1.15, 1e-6)
+  && proche(gmaj.horaire.forfaitVulnerable, g.horaire.forfaitVulnerable * 1.15, 1e-6));
+verifier("majoration : pas sur les suppléments", proche(C.revenuGmfu({ ...gpe, majorationPct: 15 }).horaire.supplements, C.revenuGmfu(gpe).horaire.supplements, 1e-9));
 
 /* 11. Revenus non professionnels : imposables, sans RRQ ni RQAP. */
 const pBase = C.impotParticulier({ revenu: 200000, depensesPro: 3000 }), pAutres = C.impotParticulier({ revenu: 200000, depensesPro: 3000, autresImposables: 10000 });
@@ -159,6 +162,25 @@ verifier("tarifs : suivi 15803-15804, cabinet et établissement", String(TL.cabi
 verifier("tarifs : visites ponctuelles du sans rendez-vous", String(TL.etablissement.srvMineure) === "15.3,17.7" && String(TL.cabinet.srvComplexe) === "40.8,47.05");
 const gCab = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, tarifs: TL.cabinet }), gEtab = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, tarifs: TL.etablissement });
 verifier("tarifs : le cabinet paie plus la visite que l'établissement", gCab.acte.visites > gEtab.acte.visites * 1.3 && gCab.tarifMoyenSrv > gEtab.tarifMoyenSrv);
+
+/* 14. Brochure no 1 : taux horaire, montants du lieu, volume de patients, pratique polyvalente. */
+verifier("taux horaire : 1 540 h à 100 %, puis 71,8 %", g.heures === 1656 && g.heuresAuDela === 116 && proche(g.horaire.heures, (1540 + 116 * 0.718) * 99.48, 0.01));
+verifier("taux horaire : dépassement autorisé (2 420 h)", proche(C.revenuGmfu({ ...rev, heuresMax100: 2420 }).horaire.heures, 1656 * 99.48, 0.01));
+verifier("lieu : établissement par défaut (forfait 8,95 $, demi-per diem 41,45 $)", proche(g.horaire.forfaitInscription, 500 * 8.95, 1e-6) && proche(g.horaire.perDiem, 46 * 3 * 41.45, 1e-6));
+const gCab2 = C.revenuGmfu({ ...rev, lieuTarifs: "cabinet", listeEnseignement: "2", externes: 1 });
+verifier("lieu : cabinet, liste 2 (86,95 $ et 98 $ par demi-journée)", proche(gCab2.horaire.perDiem, 46 * 3 * (86.95 + 98), 1e-6) && proche(gCab2.horaire.forfaitInscription, 500 * 11.85, 1e-6));
+verifier("lieu : la clinique prend la colonne cabinet", C.lieuTarifs({ milieu: "clinique", lieuTarifs: "auto" }) === "cabinet" && C.lieuTarifs({ milieu: "gmfu" }) === "etablissement" && C.lieuTarifs({ milieu: "clinique", lieuTarifs: "etablissement" }) === "etablissement");
+verifier("suppléments 19957 à 19960 en établissement", proche(C.revenuGmfu(gpe).horaire.supplements, 100 * (0.7 * 19.55 + 0.2 * 128.90 + 0.1 * 257.80), 1e-6));
+const gv = C.revenuGmfu({ ...rev, inscritsDebut: 1000, partVulnerable: 30 });
+verifier("volume : 15 000 $ à 1 000 inscrits, plus les suppléments au-delà de 500 et de 200 vulnérables", proche(gv.horaire.volume, 15000 + 250 * 5.23 + 250 * 10.46 + 100 * 5.23, 1e-6));
+verifier("volume : sans assiduité de 80 %, le montant seulement", proche(C.revenuGmfu({ ...rev, inscritsDebut: 1000, partVulnerable: 30, assiduite80: false }).horaire.volume, 15000, 1e-9));
+verifier("volume : 7 500 $ de 750 à 999, rien sous 750", C.montantsVolume(800, 0).montant === 7500 && C.montantsVolume(999, 0).montant === 7500 && C.montantsVolume(749, 0).montant === 0 && g.horaire.volume === 0);
+const hospT = { ...hosp, type: "hospitalisation" };
+verifier("polyvalence : 5 % des activités à 1 000 inscrits", proche(C.revenuGmfu({ ...rev, inscritsDebut: 1000, activites: [hospT] }).horaire.polyvalence, totalHosp * 0.05, 0.01));
+verifier("polyvalence : première année, 10 % dès 300 inscrits", C.revenuGmfu({ ...rev, annee: "premiere", inscritsDebut: 0, nouveauxGuichet: 300, activites: [hospT] }).pctPolyvalence === 10);
+verifier("polyvalence : seuils de la 3e année", C.tauxPolyvalence(650, 0, 3) === 5 && C.tauxPolyvalence(399, 0, 3) === 0 && C.tauxPolyvalence(650, 0, 5) === 0);
+verifier("polyvalence : pas sur la garde ni sur une autre activité", C.revenuGmfu({ ...rev, inscritsDebut: 1000, activites: [{ ...hosp, type: "garde" }, { ...hosp, type: "autre" }] }).horaire.polyvalence === 0);
+verifier("polyvalence : au-delà de 245 vulnérables, chacun compte 2,5 fois", C.tauxPolyvalence(800, 345, 5) === 2.5 && C.tauxPolyvalence(800, 445, 5) === 5);
 
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

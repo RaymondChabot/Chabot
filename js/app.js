@@ -26,16 +26,15 @@
       demiJourneesSRV: 1, patientsSRV: 12,
       residents: 0, patientsPendantSupervision: 0, autresRevenus: 0,
       inscritsDebut: 0, nouveauxGuichet: 500, nouveauxSansMedecin: 0, nouveauxTransferes: 0,
-      semainesArrivee: 38, partVulnerable: 20, quatrePremieresAnnees: true,
+      semainesArrivee: 38, partVulnerable: 20, assiduite80: true, anneePratique: "5",
       mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 },
-      tarifHoraire: 99.48, forfaitHoraireMixte: 59.68, pctMixte: 60, acteSupervision: 114.20, pctSupervision: 60, supervisionMaxH: 3.5,
-      perDiemResident: 39.65, forfaitInscription: 10, forfaitVulnerable: 55,
-      suppNonVulnerable: 18.90, suppVulnerableHorsGuichet: 58.10, suppVulnerableGuichet: 124.50,
-      pctActe: 100, pctSupervisionActe: 100,
+      // Taux horaire, mixte et supervision (Brochure no 1) ; forfaits, suppléments et demi-per diem de la colonne cabinet.
+      ...C.RAMQ, ...C.montantsLieu("cabinet", 1), listeEnseignement: "1",
+      pctActe: 100,
       fraisCabinetPct: 30, fraisCabinetMois: 0, compensationCabinet: 0, fraisCabinetTousModes: false,
       // Activités en établissement, en plus de la pratique principale.
-      partTresVulnerable: 0, forfaitTresVulnerable: 55, suppTresVulnerable: 124.50, primeInscription: 0,
-      externes: 0, patientsParResident: 4.5, patientsParExterne: 2.5, supervisionFacturation: "acte", perDiemExterne: 0,
+      partTresVulnerable: 0, primeInscription: 0,
+      externes: 0, patientsParResident: 4.5, patientsParExterne: 2.5, supervisionFacturation: "acte",
       pctSrvComplexe: 50, majorationPct: 0,
       // Tarifs de la colonne cabinet ou établissement (selon la pratique, ou lieuTarifs), sauf s'ils ont été modifiés.
       lieuTarifs: "auto", tarifsModifies: false,
@@ -301,6 +300,11 @@
       if (d.revenu.lignes) d.revenu.autresRevenus = 0;
       // Sans rendez-vous : plus de supplément par demi-journée.
       delete d.revenu.suppSRV10; delete d.revenu.suppSRV20;
+      // Brochure no 1 : la limite de 150 patients du guichet après 4 ans (ancien par. 13.02 de l'EP 40) est abolie
+      // depuis le 1er janvier 2023, et l'intervention de supervision n'existe qu'au mixte. Les anciennes valeurs
+      // de départ du mixte et de la supervision deviennent celles de la brochure.
+      delete d.revenu.quatrePremieresAnnees; delete d.revenu.pctSupervisionActe;
+      for (const [k, ancien] of [["pctMixte", 60], ["acteSupervision", 114.2], ["pctSupervision", 60]]) if (+d.revenu[k] === ancien) d.revenu[k] = C.RAMQ[k];
       // Tarifs enregistrés avant les deux colonnes (cabinet, établissement) : s'ils sont ceux de départ
       // (anciens tarifs du sans rendez-vous compris), ils suivent désormais la colonne de la pratique.
       const t = d.revenu.tarifs;
@@ -319,10 +323,18 @@
   }
   // Une case par poste des catalogues : budget, autres revenus, dépenses professionnelles.
   // Colonne de tarifs de la RAMQ : en cabinet (clinique privée, GMF) ou en établissement (CLSC, GMF-U).
-  const colonneTarifs = s => ["cabinet", "etablissement"].includes(s.revenu.lieuTarifs) ? s.revenu.lieuTarifs : s.revenu.milieu === "clinique" ? "cabinet" : "etablissement";
-  // Tant qu'on ne les a pas modifiés, les tarifs suivent la colonne de la pratique.
-  function synchroniserTarifs(s) {
-    if (!s.revenu.tarifsModifies) s.revenu.tarifs = clone(C.TARIFS_LIEU[colonneTarifs(s)]);
+  // Valeurs de départ de l'app d'avant la Brochure no 1 : remplacées comme celles de la RAMQ.
+  const ANCIENS_MONTANTS = { forfaitInscription: [10], forfaitVulnerable: [55], forfaitTresVulnerable: [55], suppNonVulnerable: [18.9],
+    suppVulnerableHorsGuichet: [58.1], suppVulnerableGuichet: [124.5], suppTresVulnerable: [124.5], perDiemResident: [39.65], perDiemExterne: [0] };
+  // Tant qu'on ne les a pas modifiés, les tarifs des visites suivent la colonne de la pratique, et les forfaits,
+  // suppléments et demi-per diem, sa colonne et la liste de l'EP 42. « tous » rétablit aussi le taux horaire et le mixte.
+  function synchroniserTarifs(s, tous) {
+    const r = s.revenu, lieu = C.lieuTarifs(r);
+    if (tous) { r.tarifsModifies = false; for (const k of ["tarifHoraire", "forfaitHoraireMixte", "pctMixte", "acteSupervision", "pctSupervision"]) r[k] = C.RAMQ[k]; }
+    if (!r.tarifsModifies) r.tarifs = clone(C.TARIFS_LIEU[lieu]);
+    const cible = C.montantsLieu(lieu, r.listeEnseignement);
+    const connus = k => [...["cabinet", "etablissement"].flatMap(l => [1, 2].map(n => C.montantsLieu(l, n)[k])), ...(ANCIENS_MONTANTS[k] || [])];
+    for (const k of Object.keys(cible)) if (tous || r[k] == null || connus(k).includes(+r[k])) r[k] = cible[k];
     return s;
   }
   function normaliser(s) {
@@ -392,8 +404,10 @@
       { g: "Votre pratique" },
       { p: "revenu.milieu", l: "Pratique principale", t: "select", o: Object.entries(MILIEUX).map(([k, m]) => [k, m.long]), h: "Urgence, hospitalisation, obstétrique et autres activités en établissement : ajoutez-les dans la page Revenu." },
       { p: "revenu.annee", l: "Année calculée", t: "select", o: [["premiere", "Première année de pratique"], ["type", "Année type, plein régime"]], h: "Première année : arrivée des nouveaux patients au fil de l'année." },
+      { p: "revenu.anneePratique", l: "Année de pratique, depuis le permis", t: "select", o: [["2", "2e année"], ["3", "3e année"], ["4", "4e année"], ["5", "5e année ou plus"]], si: "revenu.annee=type&details",
+        h: "Les quatre premières années, la majoration de la pratique polyvalente s'obtient avec moins de patients inscrits (EP 40, par. 16.04)." },
       { p: "revenu.semaines", l: "Semaines en clinique par année", u: "sem.", h: "Sans les vacances ni les semaines passées à l'hôpital." },
-      { p: "revenu.majorationPct", l: "Majoration selon le territoire", u: "%", s: 0.5, si: "details", h: "Rémunération différente en territoire désigné (annexe XII) : par exemple 15 pour 115 %. Sur les visites, les heures et les activités ; pas sur les forfaits. 0 ailleurs." },
+      { p: "revenu.majorationPct", l: "Majoration selon le territoire", u: "%", s: 0.5, si: "details", h: "Rémunération différente en territoire désigné (annexes XII et XII-A) : par exemple 15 pour 115 %. Sur les visites, les heures, les activités et les forfaits d'inscription ; pas sur les suppléments. 0 ailleurs." },
       { g: "Vos demi-journées" },
       { p: "revenu.demiJournees", l: "Demi-journées de rendez-vous par semaine", u: "d.-j.", h: "Vos propres patients. En GMF-U, enseignement compris." },
       { p: "revenu.patientsParDJ", l: "Patients par demi-journée de rendez-vous", u: "pat.", s: 0.5 },
@@ -404,9 +418,12 @@
       { p: "revenu.enseignement", l: "Demi-journées d'enseignement par semaine", u: "d.-j." },
       { p: "revenu.residents", l: "Résidents supervisés en même temps", u: "rés." },
       { p: "revenu.externes", l: "Externes supervisés en même temps", u: "ext." },
-      { p: "revenu.supervisionFacturation", l: "Facturation des demi-journées de supervision", t: "select", o: [["acte", "Acte de supervision, un par demi-journée"], ["visites", "Visites vues par les apprenants"]], h: "L'acte de supervision couvre tous les services de la demi-journée. Sinon, les visites des apprenants sont facturées (avec le forfait horaire au mixte)." },
-      { p: "revenu.patientsParResident", l: "Patients vus par un résident, par demi-journée", u: "pat.", s: 0.5, si: "revenu.supervisionFacturation=visites", h: "En moyenne 4 à 5." },
-      { p: "revenu.patientsParExterne", l: "Patients vus par un externe, par demi-journée", u: "pat.", s: 0.5, si: "revenu.supervisionFacturation=visites", h: "En moyenne 2 à 3." },
+      { p: "revenu.supervisionFacturation", l: "Au mixte, facturation des demi-journées de supervision", t: "select", o: [["acte", "Intervention de supervision"], ["visites", "Visites vues par les apprenants"]],
+        h: "Au mixte, pour chaque demi-journée : l'intervention de supervision (24,87 $ par 15 minutes, jusqu'à 3,5 h, quel que soit le nombre d'apprenants) ou les visites des apprenants (annexe XXIII, B-2). À l'acte, les visites des apprenants sont toujours facturées." },
+      { p: "revenu.patientsParResident", l: "Patients vus par un résident, par demi-journée", u: "pat.", s: 0.5, si: "revenu.residents", h: "En moyenne 4 à 5." },
+      { p: "revenu.patientsParExterne", l: "Patients vus par un externe, par demi-journée", u: "pat.", s: 0.5, si: "revenu.externes", h: "En moyenne 2 à 3." },
+      { p: "revenu.listeEnseignement", l: "Région du lieu de formation", t: "select", o: [["1", "Liste 1 : régions régulières"], ["2", "Liste 2 : régions du par. 5.03 de l'EP 42"]],
+        h: "Liste 2, demi-per diem plus élevés : territoires des annexes XII et XII-A, et les réseaux locaux d'Alphonse-Desjardins (CLSC Laurier-Station), Lanaudière-Nord, Argenteuil, Rivière-du-Nord–Mirabel-Nord, Pays-d'en-Haut, Laurentides, Haute-Yamaska, Richelieu-Yamaska, Sorel-Tracy, Vaudreuil-Soulanges, Haut-Saint-Laurent, Suroît, Haut-Richelieu-Rouville, Jardins-Roussillon et Pommeraie." },
       { p: "revenu.patientsPendantSupervision", l: "Patients vus vous-même pendant la supervision", u: "pat.", s: 0.5, si: "details" },
       { g: "Votre clientèle" },
       { p: "revenu.inscritsDebut", l: "Patients inscrits au départ", u: "pat." },
@@ -416,11 +433,12 @@
       { p: "revenu.nouveauxSansMedecin", l: "Nouveaux patients sans médecin, hors guichet", u: "pat.", si: "details", h: "Par exemple, les patients d'un médecin retraité qui a avisé la RAMQ. Ils donnent droit au supplément." },
       { p: "revenu.nouveauxTransferes", l: "Patients transférés, déjà inscrits ailleurs", u: "pat.", si: "details", h: "Pas de supplément." },
       { p: "revenu.semainesArrivee", l: "Arrivée des nouveaux patients étalée sur", u: "sem.", si: "details" },
-      { p: "revenu.quatrePremieresAnnees", l: "Dans mes 4 premières années de pratique", t: "check", si: "details", h: "Après 4 ans, le supplément majoré du guichet ne s'applique qu'à 150 patients par année." },
+      { p: "revenu.assiduite80", l: "Taux d'assiduité de 80 % ou plus", t: "check", si: "details", h: "Condition des suppléments au volume : par patient au-delà de 500 inscrits et de 200 vulnérables (EP 40, par. 15.01 et 15.03)." },
       { g: "Frais de cabinet" },
       { p: "revenu.fraisCabinetPct", l: "Part de la facturation remise à la clinique", u: "%", s: 0.5, h: "À l'acte : loyer, personnel, équipement, DMÉ. Souvent de 25 à 35 % en clinique privée." },
       { p: "revenu.fraisCabinetMois", l: "Frais fixes : loyer et autres", u: "$/mois", s: 50, si: "details" },
-      { p: "revenu.compensationCabinet", l: "Compensation des frais de cabinet par la RAMQ", u: "$/an", s: 100, si: "details", h: "Entente particulière GMF (EP 40), s'il y a lieu." },
+      { p: "revenu.compensationCabinet", l: "Compensation des frais de cabinet par la RAMQ", u: "$/an", s: 100, si: "details",
+        h: "En cabinet (EP 40) : 32,40 $ par jour où vous voyez au moins 6 patients inscrits, 64,80 $ à 12 ou plus (sans rendez-vous : 10 et 20 patients, par. 14.01) ; DMÉ, jusqu'à 459,90 $ par trimestre pour les licences (par. 17.01)." },
       { p: "revenu.fraisCabinetTousModes", l: "La clinique les exige aussi au taux horaire et au mixte", t: "check", si: SI_ETAB + "&details", h: "Non en GMF-U situé en CLSC ou à l'hôpital : l'établissement fournit les locaux." },
       { g: "Pour le budget", si: SI_ETAB },
       { p: "revenu.modeBudget", l: "Mode de rémunération utilisé", t: "select", o: [["horaire", "Taux horaire"], ["mixte", "Taux mixte"], ["acte", "À l'acte"]] },
@@ -441,28 +459,29 @@
           { p: `revenu.tarifs.${k}.0`, l: `${nom} : moins de 500 inscrits`, u: "$", s: 0.05 },
           { p: `revenu.tarifs.${k}.1`, l: `${nom} : 500 inscrits et plus`, u: "$", s: 0.05 },
         ]),
-      { g: "Taux horaire (EP 42)", si: SI_ETAB + "&details" },
+      { g: "Taux horaire (annexe XIV)", si: SI_ETAB + "&details" },
       { p: "revenu.tarifHoraire", l: "Tarif horaire", u: "$/h", s: 0.01 },
+      { p: "revenu.heuresMax100", l: "Heures payées à 100 % par année", u: "h", s: 10,
+        h: "1 540 heures du 1er juin au 31 mai, puis 71,8 % du tarif. Si votre avis de service prévoit le dépassement autorisé par le chef de département (jusqu'à 880 heures, par. 5.10), inscrivez 2 420." },
       { g: "Taux mixte (annexe XXIII)", si: SI_ETAB + "&details" },
       { p: "revenu.forfaitHoraireMixte", l: "Forfait horaire", u: "$/h", s: 0.01 },
-      { p: "revenu.pctMixte", l: "Pourcentage du tarif des visites", u: "%" },
-      { p: "revenu.acteSupervision", l: "Acte de supervision, tarif à 100 %", u: "$/h", s: 0.01, si: SI_GMFU },
-      { p: "revenu.pctSupervision", l: "Part versée de l'acte de supervision", u: "%", si: SI_GMFU },
-      { p: "revenu.supervisionMaxH", l: "Heures de supervision payées au plus", u: "h/d.-j.", s: 0.25, si: SI_GMFU },
+      { p: "revenu.pctMixte", l: "Pourcentage du tarif des visites", u: "%", s: 0.01, h: "63,58 % des services médicaux, en CLSC et en GMF-U (annexe XXIII, sections B-1 et B-2)." },
+      { p: "revenu.acteSupervision", l: "Intervention de supervision, tarif à 100 %", u: "$/h", s: 0.01, si: SI_GMFU, h: "24,87 $ par 15 minutes (codes 42096 à 42098)." },
+      { p: "revenu.pctSupervision", l: "Part versée de l'intervention de supervision", u: "%", s: 0.01, si: SI_GMFU, h: "62,15 % : services sur base de temps (annexe XXIII, B-2)." },
+      { p: "revenu.supervisionMaxH", l: "Heures de supervision payées au plus", u: "h/d.-j.", s: 0.25, si: SI_GMFU, h: "3,5 h l'avant-midi ou le soir ; jusqu'à 5 h l'après-midi." },
       { g: "À l'acte, règles d'avant la Loi 2", si: "details" },
       { p: "revenu.pctActe", l: "Part du tarif des visites payée à l'acte", u: "%", h: "100 % : chaque visite au tarif ci-dessus. En cabinet, si vos tarifs diffèrent, ajustez les tarifs ou ce pourcentage." },
-      { p: "revenu.pctSupervisionActe", l: "Part de l'acte de supervision payée à l'acte", u: "%", si: SI_GMFU },
       { g: "Forfaits et suppléments", si: "details" },
-      { p: "revenu.forfaitInscription", l: "Forfait annuel d'inscription, par patient", u: "$/pat.", s: 0.01 },
-      { p: "revenu.forfaitVulnerable", l: "Forfait annuel, patient vulnérable", u: "$/pat.", s: 0.01 },
-      { p: "revenu.forfaitTresVulnerable", l: "Forfait annuel, patient très vulnérable", u: "$/pat.", s: 0.01 },
-      { p: "revenu.suppNonVulnerable", l: "Supplément d'inscription, patient non vulnérable sans médecin", u: "$", s: 0.01, h: "Code 19957." },
-      { p: "revenu.suppVulnerableHorsGuichet", l: "Supplément, patient vulnérable hors guichet", u: "$", s: 0.01, h: "Code 19958." },
-      { p: "revenu.suppVulnerableGuichet", l: "Supplément, patient vulnérable du guichet", u: "$", s: 0.01, h: "Code 19959." },
-      { p: "revenu.suppTresVulnerable", l: "Supplément, patient très vulnérable du guichet", u: "$", s: 0.01, h: "Code 19960." },
+      { p: "revenu.forfaitInscription", l: "Forfait annuel d'inscription, par patient", u: "$/pat.", s: 0.01, h: "11,85 $ en cabinet, 8,95 $ en établissement (EP 40, par. 4.01). Ces montants suivent la colonne de tarifs." },
+      { p: "revenu.forfaitVulnerable", l: "Forfait annuel, patient vulnérable", u: "$/pat.", s: 0.01, h: "Une catégorie de problèmes de santé : 62,50 $ en cabinet, 47 $ en établissement ; deux catégories : 150 % ; trois ou plus : 200 % (par. 6.01)." },
+      { p: "revenu.forfaitTresVulnerable", l: "Forfait annuel, patient très vulnérable", u: "$/pat.", s: 0.01, h: "Plusieurs catégories, à 200 % : 125 $ en cabinet, 94 $ en établissement." },
+      { p: "revenu.suppNonVulnerable", l: "Supplément d'inscription, patient non vulnérable sans médecin", u: "$", s: 0.01, h: "Code 19957 : 23,55 $ en cabinet, 19,55 $ en établissement (par. 4.12)." },
+      { p: "revenu.suppVulnerableHorsGuichet", l: "Supplément, patient vulnérable hors guichet", u: "$", s: 0.01, h: "Code 19958 : 72,50 $ en cabinet, 60,15 $ en établissement." },
+      { p: "revenu.suppVulnerableGuichet", l: "Supplément, patient vulnérable du guichet", u: "$", s: 0.01, h: "Code 19959 : 155,35 $ en cabinet, 128,90 $ en établissement." },
+      { p: "revenu.suppTresVulnerable", l: "Supplément, patient très vulnérable du guichet", u: "$", s: 0.01, h: "Code 19960 : 310,65 $ en cabinet, 257,80 $ en établissement (par. 13.01)." },
       { p: "revenu.primeInscription", l: "Prime ponctuelle par nouveau patient inscrit", u: "$", s: 0.01, h: "Selon une entente en vigueur (par exemple 231,75 $ par patient inscrit individuellement lors de l'opération de prise en charge de 2026). 0 sinon." },
-      { p: "revenu.perDiemResident", l: "Demi-per diem de supervision, par résident", u: "$", s: 0.01, si: SI_GMFU },
-      { p: "revenu.perDiemExterne", l: "Demi-per diem de supervision, par externe", u: "$", s: 0.01, si: SI_GMFU },
+      { p: "revenu.perDiemResident", l: "Demi-per diem de supervision, par résident", u: "$", s: 0.01, si: SI_GMFU, h: "Par demi-journée d'au moins 3,5 h (EP 42, par. 5.01 et 5.02) : 41,45 $ en établissement, 55,35 $ en cabinet reconnu ; liste 2 : 65,20 $ et 86,95 $." },
+      { p: "revenu.perDiemExterne", l: "Demi-per diem de supervision, par externe", u: "$", s: 0.01, si: SI_GMFU, h: "49,85 $ en établissement, 66,45 $ en cabinet reconnu ; liste 2 : 73,55 $ et 98 $." },
     ],
     impot: [
       { g: "Votre pratique" },
@@ -687,7 +706,7 @@
       const gTarifs = [...c.querySelectorAll(".groupe")].find(g => g.firstChild.textContent.startsWith("Tarifs des visites"));
       if (gTarifs) {
         const a = el("div", "actions"), b = el("button", "bouton secondaire", "Rétablir les tarifs de la RAMQ"); b.type = "button";
-        b.addEventListener("click", () => { S.revenu.tarifsModifies = false; synchroniserTarifs(S); sauver(); remplirChamps(); tout(); toast("Tarifs de la RAMQ rétablis."); });
+        b.addEventListener("click", () => { synchroniserTarifs(S, true); sauver(); remplirChamps(); tout(); toast("Tarifs, forfaits et suppléments de la RAMQ rétablis."); });
         a.appendChild(b); gTarifs.appendChild(a);
       }
       // Total des types de visites, qui doit faire 100 %.
@@ -927,7 +946,7 @@
     // facturation de la clinique seulement (sans activités ni autres revenus) ; f : facteur des
     // années futures, appliqué aussi aux activités et aux autres revenus.
     const fraisCabinet = (total, md, f = 1) => md === "acte" || S.revenu.fraisCabinetTousModes
-      ? Math.max(0, Math.max(0, total - (R.rev.activites + R.rev.acte.autres) * f) * (S.revenu.fraisCabinetPct || 0) / 100
+      ? Math.max(0, Math.max(0, total - (R.rev.activites + R.rev.polyvalence + R.rev.acte.autres) * f) * (S.revenu.fraisCabinetPct || 0) / 100
         + (S.revenu.fraisCabinetMois || 0) * 12 - (S.revenu.compensationCabinet || 0)) : 0;
     const depensesMode = md => R.depensesPro + R.rev[md].fraisCabinet;
     for (const md of R.modes) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, depensesPro: depensesMode(md), revenu: R.rev[md].total }));
@@ -1576,11 +1595,13 @@
     const parts = [
       ["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire ?? 0],
       ["Visites", x => x.visites || 0],
-      ["Acte de supervision", x => x.supervision || 0],
+      ["Intervention de supervision", x => x.supervision || 0],
       ["Demi-per diem de supervision", x => x.perDiem],
       ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable],
       ["Suppléments sans médecin", x => x.supplements],
+      ["Volume de patients", x => x.volume || 0],
       ["Activités en établissement", x => x.activites || 0],
+      ["Pratique polyvalente", x => x.polyvalence || 0],
       ["Autres revenus", x => x.autres],
     ];
     const zone = document.getElementById("rv-barres"); zone.textContent = ""; zone.className = "barres";
@@ -1601,15 +1622,19 @@
       ...(R.modes.some(m => g[m].fraisCabinet > 0) ? [{ cls: "sous", cellules: ["Frais de cabinet", ...R.modes.map(m => moins(g[m].fraisCabinet))] }] : []),
     ]);
     const srv = S.revenu.demiJourneesSRV * S.revenu.patientsSRV * S.revenu.semaines;
+    const auDela = R.modes.includes("horaire") && g.heuresAuDela > 0;
+    const sousVisites = [srv ? `${nb(srv, 0)} en sans rendez-vous` : "", g.visitesApprenants ? `${nb(g.visitesApprenants, 0)} vues par les apprenants` : ""].filter(Boolean).join(", ");
     rangees("rv-faits", [
-      { titre: "Heures en clinique", valeur: nb(g.heures, 0) + " h" },
-      { titre: "Visites en clinique", sous: srv ? `Dont ${nb(srv, 0)} en sans rendez-vous` : null, valeur: nb(g.nbVisites, 0) },
+      { titre: "Heures en clinique", sous: auDela ? `Au taux horaire, ${nb(g.heuresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h sont payées à 71,8 % (annexe XIV)` : null, valeur: nb(g.heures, 0) + " h" },
+      { titre: "Visites en clinique", sous: sousVisites ? `Dont ${sousVisites}` : null, valeur: nb(g.nbVisites, 0) },
       { titre: "Tarif moyen d'une visite de rendez-vous", sous: "À l'acte, à 100 % du tarif", valeur: $2(g.tarifMoyenRdv) },
       srv ? { titre: "Tarif moyen d'un patient au sans rendez-vous", sous: `Visite ponctuelle : ${nb(S.revenu.pctSrvComplexe || 0)} % complexes`, valeur: $2(g.tarifMoyenSrv) } : null,
       { titre: "Visites de prise en charge", valeur: nb(g.nbPriseEnCharge, 0) },
       { titre: "Patients inscrits", sous: "Du début à la fin de l'année", valeur: `${nb(g.inscritsDepart, 0)} → ${nb(g.inscritsFin, 0)}` },
       { titre: "Semaines au tarif de 500 patients et plus", valeur: `${g.semainesPalierHaut} sur ${S.revenu.semaines}` },
       g.detailActivites.length ? { titre: "Jours d'activités en établissement", valeur: nb(g.detailActivites.reduce((t, x) => t + x.jours, 0), 0) } : null,
+      g.detailActivites.length ? { titre: "Majoration de la pratique polyvalente", sous: g.pctPolyvalence ? `Sur l'urgence, l'hospitalisation, l'obstétrique, les soins palliatifs et le CHSLD : ${$(g.polyvalence)}` : `Selon vos inscrits au 31 décembre${g.anneePratique < 5 ? ` (seuils de la ${g.anneePratique}${g.anneePratique === 1 ? "re" : "e"} année de pratique)` : ""}`, valeur: nb(g.pctPolyvalence, 1) + " %" } : null,
+      g.detailVolume.total ? { titre: "Montants liés au volume de patients", sous: "Versés en juin de l'année suivante (EP 40, par. 4.15 et 15.01)", valeur: $(g.detailVolume.total) } : null,
     ]);
   }
 
@@ -2323,7 +2348,7 @@
      ============================================================ */
   function fluxAnnee(R) {
     const g = R.rev, soc = R.societeActive, x = R.impot.societe, part = S.menage.partCommunMoi / 100;
-    const act = g.activites || 0, autresPro = R.autresPro + (S.revenu.autresRevenus || 0), deficit = Math.max(0, -R.surplusMoi * 12);
+    const act = (g.activites || 0) + (g.polyvalence || 0), autresPro = R.autresPro + (S.revenu.autresRevenus || 0), deficit = Math.max(0, -R.surplusMoi * 12);
     const sources = [
       ["Pratique principale", R.brut - act - autresPro], ["Activités en établissement", act], ["Autres revenus professionnels", autresPro],
       ["Location et placements", R.autresNonPro], ["Allocations familiales", R.allocMoi * 12], ["Manque à combler", deficit],
@@ -3016,7 +3041,7 @@
       ecrire(inp.dataset.p, v); S.meta.exemple = false;
       majVisibilite();   // un champ peut en afficher ou en cacher d'autres
       if (inp.dataset.p === "conjointe.designation") { S.conjointe.designation = v; reconstruireFeuille(); }
-      if (inp.dataset.p === "revenu.lieuTarifs") { synchroniserTarifs(S); remplirChamps(); }
+      if (inp.dataset.p === "revenu.lieuTarifs" || inp.dataset.p === "revenu.listeEnseignement") { synchroniserTarifs(S); remplirChamps(); }
       plusTard();
     } else if (inp.dataset.l) {
       const v = valeur(inp); if (v === null) return;
