@@ -140,7 +140,7 @@
     const M = R.modes, plusieurs = R.plusieursModes;
     const parts = [["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire ?? 0], ["Visites", x => x.visites || 0], ["Intervention de supervision", x => x.supervision || 0],
       ["Demi-per diem des apprenants", x => x.perDiem], ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable], ["Forfait GMF", x => x.forfaitGmf || 0], ["Suppléments à l'inscription", x => x.supplements],
-      ["Volume de patients", x => x.volume || 0], ["Activités en établissement", x => x.activites || 0], ["Pratique polyvalente", x => x.polyvalence || 0],
+      ["Volume de patients", x => x.volume || 0], ["Compensation des frais de cabinet", x => x.compensation || 0], ["Activités en établissement", x => x.activites || 0], ["Pratique polyvalente", x => x.polyvalence || 0],
       ["Autres revenus professionnels", x => x.autres]];
     const partsUtiles = parts.map((pt, i) => [...pt, i]).filter(([, f]) => M.some(m => f(g[m]) > 0));
     const maxMode = Math.max(...M.map(m => g[m].total), 1);

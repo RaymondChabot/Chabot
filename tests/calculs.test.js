@@ -103,8 +103,8 @@ const g10 = C.revenuGmfu({ ...rev, residents: 0, patientsParDJ: g0.seuilActe });
 verifier("à l'acte : au seuil, la clinique paie comme l'horaire", proche(g10.acte.visites, 6 * 46 * 99.48 * 4, 1), `${Math.round(g10.acte.visites)}`);
 
 /* 8. Frais de cabinet : pourcentage de la facturation et montant fixe, à l'acte seulement par défaut. */
-const gf = C.revenuGmfu({ ...rev, fraisCabinetPct: 30, fraisCabinetMois: 500, compensationCabinet: 1000 });
-verifier("frais : à l'acte = 30 % + 6 000 $ − 1 000 $", proche(gf.acte.fraisCabinet, gf.acte.total * 0.30 + 6000 - 1000, 0.01));
+const gf = C.revenuGmfu({ ...rev, fraisCabinetPct: 30, fraisCabinetMois: 500, compensationMode: "manuel", compensationCabinet: 1000 });
+verifier("frais : à l'acte = 30 % (hors compensation) + 6 000 $", proche(gf.acte.fraisCabinet, (gf.acte.total - 1000) * 0.30 + 6000, 0.01) && gf.acte.compensation === 1000);
 verifier("frais : rien au taux horaire ni au mixte par défaut", gf.horaire.fraisCabinet === 0 && gf.mixte.fraisCabinet === 0);
 const gt = C.revenuGmfu({ ...rev, fraisCabinetPct: 30, fraisCabinetTousModes: true });
 verifier("frais : tous les modes si demandé", gt.horaire.fraisCabinet > 0 && gt.mixte.fraisCabinet > 0);
@@ -183,6 +183,11 @@ verifier("polyvalence : pas sur la garde ni sur une autre activité", C.revenuGm
 verifier("forfait GMF : 9,35 $ par inscrit vu (80 % par défaut)", proche(C.revenuGmfu({ ...rev, membreGmf: true }).horaire.forfaitGmf, 500 * 0.8 * 9.35, 1e-6) && g.horaire.forfaitGmf === 0 && proche(g.forfaitGmfPossible, 500 * 0.8 * 9.35, 1e-6));
 verifier("forfait GMF : chaque nouveau patient compte", proche(C.revenuGmfu({ ...gpe, membreGmf: true, pctPatientsVus: 50 }).horaire.forfaitGmf, 100 * 9.35, 1e-6));
 verifier("taux horaire : perte au-delà du plafond", proche(g.perteHeures, 116 * 0.282 * 99.48, 0.01) && g.gainPalier > 0.1);
+const gc = C.revenuGmfu({ ...rev, lieuTarifs: "cabinet", enseignement: 0, demiJournees: 7, patientsParDJ: 6, demiJourneesSRV: 1, patientsSRV: 12 });
+verifier("compensation : 3 jours à 64,80 $, une demi-journée et un sans rendez-vous à 32,40 $", proche(gc.detailCompensation.jour, 46 * (3 * 64.8 + 32.4 + 32.4), 1e-6));
+verifier("compensation : DMÉ hors GMF dès 150 inscrits, licences seulement en GMF", proche(gc.detailCompensation.dme, 4 * (459.9 + 287.45), 1e-6)
+  && proche(C.revenuGmfu({ ...rev, lieuTarifs: "cabinet", membreGmf: true }).detailCompensation.dme, 4 * 459.9, 1e-6) && C.compensationCabinet(rev, 46, 6, 149).dme === 0);
+verifier("compensation : rien en établissement", g.detailCompensation.total === 0 && g.horaire.compensation === 0);
 verifier("polyvalence : au-delà de 245 vulnérables, chacun compte 2,5 fois", C.tauxPolyvalence(800, 345, 5) === 2.5 && C.tauxPolyvalence(800, 445, 5) === 5);
 
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);

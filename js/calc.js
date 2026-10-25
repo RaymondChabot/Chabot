@@ -173,6 +173,19 @@
     const [a, b, c] = SEUILS_POLYVALENCE[borne(Math.floor(+anneePratique || 5), 1, 5)];
     return n >= c ? 10 : n >= b ? 5 : n >= a ? 2.5 : 0;
   }
+  /* Compensation des frais de cabinet, en cabinet seulement (EP 40) : par jour de pratique, 32,40 $ si l'on voit
+     au moins 6 patients inscrits, 64,80 $ à 12 ou plus, au plus 64,80 $ par jour (par. 14.01, codes 19928 et 19929) ;
+     au sans rendez-vous, 10 et 20 patients. Les demi-journées de rendez-vous vont par deux dans une journée ; une
+     demi-journée de sans rendez-vous compte pour une journée. DMÉ, dès 150 inscrits (par. 17.01) : licences,
+     459,90 $ par trimestre ; hors GMF, équipements, 287,45 $ par trimestre en plus. */
+  const parJourCabinet = (n, [haut, bas]) => n >= haut ? 64.80 : n >= bas ? 32.40 : 0;
+  function compensationCabinet(r, semaines, demiJournees, inscrits) {
+    const p = Math.max(0, r.patientsParDJ || 0), srv = Math.max(0, r.demiJourneesSRV || 0), pSrv = Math.max(0, r.patientsSRV || 0);
+    const jours = Math.floor(demiJournees / 2), seule = demiJournees - 2 * jours >= 1;
+    const parSemaine = jours * parJourCabinet(2 * p, [12, 6]) + (seule ? parJourCabinet(p, [12, 6]) : 0) + srv * parJourCabinet(pSrv, [20, 10]);
+    const jour = Math.max(0, semaines) * parSemaine, dme = inscrits >= 150 ? 4 * (459.90 + (r.membreGmf ? 0 : 287.45)) : 0;
+    return { jour, dme, total: jour + dme };
+  }
   function revenuGmfu(r) {
     const W = Math.max(0, r.semaines), N = r.demiJournees, H = r.heuresParDJ, TF = tarifsDe(r);
     // Montants de la RAMQ : ceux saisis, sinon ceux de la brochure pour le lieu (cabinet ou établissement).
@@ -248,8 +261,11 @@
     const pctPolyvalence = tauxPolyvalence(inscritsFin, vulnerablesFin, anneePratique);
     const basePolyvalence = (r.activites || []).reduce((t, a, i) => t + (ACTIVITES_POLYVALENTES.includes(a.type) ? detailActivites[i].total : 0), 0);
     const polyvalence = basePolyvalence * pctPolyvalence / 100;
-    const commun = forfaitInscription + forfaitVulnerable + forfaitGmf + supplements + volume + perDiem + activites + polyvalence + autres;
-    const base = { perDiem, forfaitInscription, forfaitVulnerable, forfaitGmf, supplements, volume, activites, polyvalence, autres };
+    // Compensation des frais de cabinet : calculée selon l'EP 40, ou le montant inscrit.
+    const detailCompensation = lieuTarifs(r) === "cabinet" ? compensationCabinet(r, W, C, inscritsFin) : { jour: 0, dme: 0, total: 0 };
+    const compensation = r.compensationMode === "manuel" ? Math.max(0, r.compensationCabinet || 0) : detailCompensation.total;
+    const commun = forfaitInscription + forfaitVulnerable + forfaitGmf + supplements + volume + perDiem + compensation + activites + polyvalence + autres;
+    const base = { perDiem, forfaitInscription, forfaitVulnerable, forfaitGmf, supplements, volume, compensation, activites, polyvalence, autres };
 
     // Taux horaire : à 100 % jusqu'au plafond annuel, puis 71,8 % du tarif (annexe XIV, par. 5.02 et 5.04).
     const heures = W * (N + SRV) * H, plafondHeures = Math.max(0, m("heuresMax100"));
@@ -271,11 +287,11 @@
     const acte = { visites: (visitesMixte + visitesSrv + visitesAppr) * maj * pctActe / 100, ...base };
     acte.total = acte.visites + commun;
     // Frais de cabinet (loyer, personnel, équipement) remis à la clinique : un pourcentage
-    // de la facturation RAMQ de la clinique (sans les activités en établissement ni les autres
-    // revenus) et un montant fixe, moins la compensation de la RAMQ. À l'acte seulement, sauf
-    // si la clinique les exige aussi au taux horaire et au mixte.
+    // de la facturation RAMQ de la clinique (sans la compensation des frais de cabinet, les
+    // activités en établissement ni les autres revenus) et un montant fixe. À l'acte seulement,
+    // sauf si la clinique les exige aussi au taux horaire et au mixte.
     const frais = (x, applique) => !applique ? 0 : Math.max(0,
-      (x.total - activites - polyvalence - autres) * (r.fraisCabinetPct || 0) / 100 + (r.fraisCabinetMois || 0) * 12 - (r.compensationCabinet || 0));
+      (x.total - compensation - activites - polyvalence - autres) * (r.fraisCabinetPct || 0) / 100 + (r.fraisCabinetMois || 0) * 12);
     horaire.fraisCabinet = frais(horaire, r.fraisCabinetTousModes);
     mixte.fraisCabinet = frais(mixte, r.fraisCabinetTousModes);
     acte.fraisCabinet = frais(acte, true);
@@ -294,7 +310,7 @@
     // Hausse du tarif moyen d'une visite au palier de 500 inscrits.
     const t0 = tarifVisite(r.mix, 0, TF), gainPalier = t0 > 0 ? tarifVisite(r.mix, 1, TF) / t0 - 1 : 0;
     return { heures, heuresAuDela, plafondHeures, perteHeures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, vulnerablesFin, semainesPalierHaut, gainPalier,
-      patientsVus, forfaitGmfPossible, activites, detailActivites, basePolyvalence, polyvalence, pctPolyvalence, anneePratique, detailVolume,
+      patientsVus, forfaitGmfPossible, detailCompensation, activites, detailActivites, basePolyvalence, polyvalence, pctPolyvalence, anneePratique, detailVolume,
       visitesApprenants: W * T * apprenants, tarifMoyenRdv, tarifMoyenSrv,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
   }
@@ -731,7 +747,7 @@
     return res;
   }
 
-  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

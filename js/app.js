@@ -31,7 +31,7 @@
       // Taux horaire, mixte et supervision (Brochure no 1) ; forfaits, suppléments et demi-per diem de la colonne cabinet.
       ...C.RAMQ, ...C.montantsLieu("cabinet", 1), listeEnseignement: "1",
       pctActe: 100,
-      fraisCabinetPct: 30, fraisCabinetMois: 0, compensationCabinet: 0, fraisCabinetTousModes: false,
+      fraisCabinetPct: 30, fraisCabinetMois: 0, compensationMode: "auto", compensationCabinet: 0, fraisCabinetTousModes: false,
       // Activités en établissement, en plus de la pratique principale.
       partTresVulnerable: 0, primeInscription: 0,
       externes: 0, patientsParResident: 4.5, patientsParExterne: 2.5, supervisionFacturation: "acte",
@@ -307,6 +307,8 @@
       for (const [k, ancien] of [["pctMixte", 60], ["acteSupervision", 114.2], ["pctSupervision", 60]]) if (+d.revenu[k] === ancien) d.revenu[k] = C.RAMQ[k];
       // Forfait GMF (EP 33) : décoché dans les données d'avant, jusqu'à ce qu'on le confirme.
       d.revenu.membreGmf ??= false;
+      // Compensation des frais de cabinet : un montant déjà inscrit reste ; sinon, elle est calculée.
+      d.revenu.compensationMode ??= d.revenu.compensationCabinet > 0 ? "manuel" : "auto";
       // Tarifs enregistrés avant les deux colonnes (cabinet, établissement) : s'ils sont ceux de départ
       // (anciens tarifs du sans rendez-vous compris), ils suivent désormais la colonne de la pratique.
       const t = d.revenu.tarifs;
@@ -442,8 +444,9 @@
       { g: "Frais de cabinet" },
       { p: "revenu.fraisCabinetPct", l: "Part de la facturation remise à la clinique", u: "%", s: 0.5, h: "À l'acte : loyer, personnel, équipement, DMÉ. Souvent de 25 à 35 % en clinique privée." },
       { p: "revenu.fraisCabinetMois", l: "Frais fixes : loyer et autres", u: "$/mois", s: 50, si: "details" },
-      { p: "revenu.compensationCabinet", l: "Compensation des frais de cabinet par la RAMQ", u: "$/an", s: 100, si: "details",
-        h: "En cabinet (EP 40) : 32,40 $ par jour où vous voyez au moins 6 patients inscrits, 64,80 $ à 12 ou plus (sans rendez-vous : 10 et 20 patients, par. 14.01) ; DMÉ, jusqu'à 459,90 $ par trimestre pour les licences (par. 17.01)." },
+      { p: "revenu.compensationMode", l: "Compensation des frais de cabinet par la RAMQ", t: "select", o: [["auto", "Calculée selon l'EP 40"], ["manuel", "Montant que j'inscris"]], si: "details",
+        h: "En cabinet seulement. Par jour : 32,40 $ à 6 patients inscrits vus, 64,80 $ à 12 (sans rendez-vous : 10 et 20 patients, par. 14.01). DMÉ, dès 150 inscrits : 459,90 $ par trimestre, plus 287,45 $ hors GMF (par. 17.01)." },
+      { p: "revenu.compensationCabinet", l: "Compensation des frais de cabinet", u: "$/an", s: 100, si: "revenu.compensationMode=manuel&details", h: "Si votre clinique garde cette compensation, inscrivez 0." },
       { p: "revenu.fraisCabinetTousModes", l: "La clinique les exige aussi au taux horaire et au mixte", t: "check", si: SI_ETAB + "&details", h: "Non en GMF-U situé en CLSC ou à l'hôpital : l'établissement fournit les locaux." },
       { g: "Pour le budget", si: SI_ETAB },
       { p: "revenu.modeBudget", l: "Mode de rémunération utilisé", t: "select", o: [["horaire", "Taux horaire"], ["mixte", "Taux mixte"], ["acte", "À l'acte"]] },
@@ -952,8 +955,8 @@
     // facturation de la clinique seulement (sans activités ni autres revenus) ; f : facteur des
     // années futures, appliqué aussi aux activités et aux autres revenus.
     const fraisCabinet = (total, md, f = 1) => md === "acte" || S.revenu.fraisCabinetTousModes
-      ? Math.max(0, Math.max(0, total - (R.rev.activites + R.rev.polyvalence + R.rev.acte.autres) * f) * (S.revenu.fraisCabinetPct || 0) / 100
-        + (S.revenu.fraisCabinetMois || 0) * 12 - (S.revenu.compensationCabinet || 0)) : 0;
+      ? Math.max(0, Math.max(0, total - (R.rev.activites + R.rev.polyvalence + R.rev.acte.compensation + R.rev.acte.autres) * f) * (S.revenu.fraisCabinetPct || 0) / 100
+        + (S.revenu.fraisCabinetMois || 0) * 12) : 0;
     const depensesMode = md => R.depensesPro + R.rev[md].fraisCabinet;
     for (const md of R.modes) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, depensesPro: depensesMode(md), revenu: R.rev[md].total }));
     // Net après impôt et frais de cabinet (les dépenses professionnelles, égales dans tous les modes, à part).
@@ -1633,6 +1636,7 @@
       ["Forfait GMF", x => x.forfaitGmf || 0],
       ["Suppléments sans médecin", x => x.supplements],
       ["Volume de patients", x => x.volume || 0],
+      ["Compensation des frais de cabinet", x => x.compensation || 0],
       ["Activités en établissement", x => x.activites || 0],
       ["Pratique polyvalente", x => x.polyvalence || 0],
       ["Autres revenus", x => x.autres],
@@ -1667,6 +1671,7 @@
       { titre: "Semaines au tarif de 500 patients et plus", valeur: `${g.semainesPalierHaut} sur ${S.revenu.semaines}` },
       g.detailActivites.length ? { titre: "Jours d'activités en établissement", valeur: nb(g.detailActivites.reduce((t, x) => t + x.jours, 0), 0) } : null,
       g.detailActivites.length ? { titre: "Majoration de la pratique polyvalente", sous: g.pctPolyvalence ? `Sur l'urgence, l'hospitalisation, l'obstétrique, les soins palliatifs et le CHSLD : ${$(g.polyvalence)}` : `Selon vos inscrits au 31 décembre${g.anneePratique < 5 ? ` (seuils de la ${g.anneePratique}${g.anneePratique === 1 ? "re" : "e"} année de pratique)` : ""}`, valeur: nb(g.pctPolyvalence, 1) + " %" } : null,
+      g.detailCompensation.total && S.revenu.compensationMode !== "manuel" ? { titre: "Compensation des frais de cabinet", sous: `Par jour de pratique : ${$(g.detailCompensation.jour)} ; DMÉ : ${$(g.detailCompensation.dme)} (EP 40)`, valeur: $(g.detailCompensation.total) } : null,
       g.detailVolume.total ? { titre: "Montants liés au volume de patients", sous: "Versés en juin de l'année suivante (EP 40, par. 4.15 et 15.01)", valeur: $(g.detailVolume.total) } : null,
     ]);
   }
@@ -2030,7 +2035,7 @@
       V.autres > 0 && { titre: "Autres revenus", valeur: $(V.autres) },
       { titre: "Total", cls: "total", valeur: $(V.rev) },
     ]);
-    rendreAnnuelles(); rendreFlux(R); rendreReste(R); rendreBilanMois(R);
+    rendreAnnuelles(); rendreFlux(R); rendreTresorerie(R); rendreReste(R); rendreBilanMois(R);
     // Dépenses : une rangée par catégorie ; toucher ouvre ses cases.
     const cats = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
     rangees("bu-depenses", [
@@ -2264,6 +2269,22 @@
     for (const b of depensesEffectives()) { const m = mensuel(b) * qui(b); if (b.periode === "an") annuelles += m; else if (estFixe(b)) fixes += m; else variables += m; }
     return { fixes, annuelles, variables, libre: R.netMoi - fixes - annuelles - R.dettesMoi - R.epargneMoi };
   }
+  // Dépenses variables du budget par catégorie (votre part, par mois) : ni fixes, ni annuelles.
+  function variablesParCategorie() {
+    const part = S.menage.partCommunMoi / 100, qui = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0, m = new Map();
+    for (const b of depensesEffectives()) if (b.periode !== "an" && !estFixe(b)) m.set(categorie(b), (m.get(categorie(b)) || 0) + mensuel(b) * qui(b));
+    return [...m].filter(([, v]) => v > 0.5);
+  }
+  // Report par catégorie : la marge (ou le dépassement) cumulée sur les mois où le réel a été noté.
+  function reportParCategorie() {
+    const budget = new Map(variablesParCategorie()), cumul = new Map();
+    for (const b of S.bilans || []) for (const [cat, reel] of Object.entries(b.cats || {})) {
+      if (!budget.has(cat) || reel == null || reel === "") continue;
+      const c = cumul.get(cat) || { marge: 0, mois: 0 };
+      c.marge += budget.get(cat) - +reel; c.mois++; cumul.set(cat, c);
+    }
+    return [...cumul].map(([cat, c]) => ({ cat, ...c }));
+  }
   function rendreReste(R) {
     const z = document.getElementById("bu-reste"); z.textContent = "";
     const x = resteADepenser(R);
@@ -2273,8 +2294,14 @@
       x.annuelles > 0 && { titre: "Dépenses annuelles, par mois", sous: "À mettre de côté", valeur: moins(x.annuelles) },
       R.dettesMoi > 0 && { titre: "Paiements de dettes", sous: "Minimums", valeur: moins(R.dettesMoi) },
       R.epargneMoi > 0 && { titre: "Épargne et objectifs", valeur: moins(R.epargneMoi) },
-      { titre: "Reste à dépenser librement", cls: "total", valeur: $(x.libre) },
+      { titre: "Reste à dépenser librement", cls: "total", valeur: $(x.libre), valeurSous: x.libre > 0 ? `${$(x.libre * 12 / 365)} par jour` : undefined },
     ]);
+    if (x.libre > 0) {
+      const auj = new Date(), restants = new Date(auj.getFullYear(), auj.getMonth() + 1, 0).getDate() - auj.getDate() + 1;
+      const report = reportParCategorie().reduce((t, c) => t + c.marge, 0);
+      z.appendChild(el("p", "aide", `Environ ${$(x.libre * 12 / 52)} par semaine. Ce mois-ci, il reste ${restants} jour${restants > 1 ? "s" : ""} : ${$(x.libre * 12 / 365 * restants)} au rythme prévu.`
+        + (report ? ` Report des mois notés : ${signe(report)} sur vos dépenses variables.` : "")));
+    }
     z.appendChild(el("p", "aide" + (x.libre < 0 ? " avertissement" : ""), x.libre < 0
       ? "Vos dépenses fixes, vos dettes et votre épargne dépassent votre revenu net : revoyez-les avant tout."
       : `Vous y avez prévu ${$(x.variables)} de dépenses variables (épicerie, essence, sorties…). Ce que vous ne dépensez pas va aux dettes, puis au placement : c'est votre surplus de ${$(Math.max(0, R.surplusMoi))}.`));
@@ -2297,6 +2324,24 @@
         const inp = ligne.querySelector("input"); inp.value = b[k] ?? ""; inp.placeholder = String(Math.round(prevu)); c.appendChild(ligne); };
       champ("recu", "Revenu net reçu", R.netMoi);
       champ("depense", "Dépenses du mois", R.depMoi);
+      // Facultatif : le réel des dépenses variables, par catégorie, pour suivre le report.
+      const cats = variablesParCategorie();
+      if (cats.length) {
+        const g = el("div", "groupe"); g.appendChild(el("h3", null, "Dépenses variables par catégorie (facultatif)"));
+        g.appendChild(el("p", "aide", "Ce que vous avez dépensé dans chaque catégorie. Le non-dépensé, ou le dépassement, s'accumule d'un mois à l'autre : c'est le report."));
+        cats.forEach(([cat, prevu], k) => {
+          const ligne = creerChamp({ l: cat, u: "$", s: 10, h: `Prévu : ${$(prevu)}` }, `bm-${b.id}-cat-${k}`, inp => {
+            inp.value = (b.cats || {})[cat] ?? ""; inp.placeholder = String(Math.round(prevu));
+            inp.addEventListener("input", () => {
+              const v = valeur(inp); b.cats = b.cats || {};
+              if (inp.value === "" || v === null) delete b.cats[cat]; else b.cats[cat] = v;
+              S.meta.exemple = false; plusTard();
+            });
+          }, false);
+          g.appendChild(ligne);
+        });
+        c.appendChild(g);
+      }
       const l = el("div", "champ large"), lab = el("label", null, "Note"), boite = el("div", "saisie"), inp = el("input"); lab.htmlFor = `bm-${b.id}-note`;
       inp.type = "text"; inp.id = `bm-${b.id}-note`; inp.value = b.note || ""; inp.placeholder = "Vacances, réparation de l'auto…"; lierListe("bilans", i, "note")(inp);
       boite.appendChild(inp); l.append(lab, boite, el("span")); c.appendChild(l);
@@ -2311,11 +2356,17 @@
       const d = l[0], ecart = (d.depense ?? 0) - R.depMoi;
       const res = el("p", "resume");
       res.append(document.createTextNode(`En ${nomMois(d.mois)}, vous avez dépensé `), el("strong", null, $(d.depense ?? 0)),
-        document.createTextNode(`, soit ${$(Math.abs(ecart))} ${ecart > 0 ? "de plus" : "de moins"} que prévu. Reçu : ${$(d.recu ?? 0)} (prévu ${$(R.netMoi)}).`));
+        document.createTextNode(`, soit ${$(Math.abs(ecart))} ${ecart > 0 ? "de plus" : "de moins"} que prévu.${d.recu != null ? ` Reçu : ${$(d.recu)} (prévu ${$(R.netMoi)}).` : ""}`));
       z.appendChild(res);
       z.appendChild(rangees(el("div"), l.map(b => { const e = (b.depense ?? 0) - R.depMoi;
-        return { titre: nomMois(b.mois)[0].toUpperCase() + nomMois(b.mois).slice(1), sous: `Reçu ${$(b.recu ?? 0)}${b.note ? ` · ${b.note}` : ""}`, valeur: $(b.depense ?? 0),
+        return { titre: nomMois(b.mois)[0].toUpperCase() + nomMois(b.mois).slice(1), sous: [b.recu != null ? `Reçu ${$(b.recu)}` : "", b.note || ""].filter(Boolean).join(" · ") || null, valeur: $(b.depense ?? 0),
           valeurSous: `${signe(e)} sur le budget`, action: () => feuilleBilan(b.mois) }; })));
+    }
+    const rep = reportParCategorie();
+    if (rep.length) {
+      z.appendChild(el("h3", "sous-titre", "Report par catégorie"));
+      z.appendChild(rangees(el("div"), rep.map(c => ({ titre: c.cat, sous: `${c.mois} mois noté${c.mois > 1 ? "s" : ""}`, valeur: signe(c.marge),
+        valeurCls: c.marge < 0 ? "negatif" : "positif", valeurSous: c.marge < 0 ? "dépassement" : "non dépensé" }))));
     }
     const a = el("div", "actions"), bt = el("button", "bouton secondaire", (S.bilans || []).some(b => b.mois === passe && (b.recu != null || b.depense != null)) ? `Revoir le bilan de ${nomMois(passe)}` : `Faire le bilan de ${nomMois(passe)}`);
     bt.type = "button"; bt.addEventListener("click", () => feuilleBilan(passe)); a.appendChild(bt); z.appendChild(a);
@@ -2400,6 +2451,68 @@
       ["Paiements de dettes", R.dettesMoi * 12, SERIES[1]], ["Épargne", R.epargneMoi * 12, SERIES[2]], ["Surplus", Math.max(0, R.surplusMoi * 12), SERIES[3]]].filter(([, v]) => v > 0.5);
     return { sources, T, milieu, net, fin };
   }
+  /* ============================================================
+     TRÉSORERIE DES 12 PROCHAINS MOIS : votre compte, mois par mois. Les paies de la RAMQ
+     arrivent aux deux semaines (ici, en moyenne par mois) ; certains montants arrivent d'un
+     coup : forfait d'inscription en mai (EP 40, par. 4.08), forfait des patients vulnérables
+     chaque trimestre (par. 6.01 G), montants liés au volume et pratique polyvalente en juin
+     (par. 4.17, 15.07 et 16.05). Impôt : acomptes les 15 mars, juin, septembre et décembre ;
+     en première année, tout l'impôt le 30 avril suivant. Le surplus reste dans le compte.
+     ============================================================ */
+  function tresorerie(R) {
+    const g = R.rev[R.mode], soc = R.societeActive, part = S.menage.partCommunMoi / 100, t = soc ? 0 : R.impot.total;
+    const auj = new Date(), an0 = auj.getFullYear(), m0 = auj.getMonth();
+    const premiere = S.revenu.annee === "premiere", anImpot = (+String(S.strategie.debut).slice(0, 4) || an0) + 1;
+    // Montants versés d'un coup (en société, la RAMQ paie la société : ils n'arrivent pas dans votre compte).
+    const inscription = soc ? 0 : g.forfaitInscription, vulnerables = soc ? 0 : g.forfaitVulnerable, juin = soc ? 0 : (g.volume || 0) + (g.polyvalence || 0);
+    // Dépenses annuelles à un mois précis (votre part) ; celles de la pratique, si vous les payez vous-même.
+    const qui = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0;
+    const annuelles = lignesAnnuelles().filter(x => x.mois > 0 && (!x.pro || !soc))
+      .map(x => ({ nom: x.nom, mois: x.mois, pro: x.pro, montant: x.montant * (x.pro ? 1 : qui(S.budget[x.i] || {})) })).filter(x => x.montant > 0);
+    const somme = l => l.reduce((s, x) => s + x.montant, 0);
+    const proAnnuelles = somme(annuelles.filter(x => x.pro)), budgetAnnuelles = somme(annuelles.filter(x => !x.pro));
+    // Revenu avant impôt, après dépenses professionnelles et frais de cabinet, hors montants versés d'un coup.
+    const revenuAnnuel = soc ? R.travailMoi * 12 + R.primeMoi : R.travailMoi * 12 + t + R.primeMoi + proAnnuelles;
+    const entreeReguliere = (revenuAnnuel - inscription - vulnerables - juin) / 12 + R.allocMoi;
+    const sortieReguliere = R.depMoi - budgetAnnuelles / 12 + R.dettesMoi + R.epargneMoi;
+    let encaisse = S.epargne.encaisse || 0, ecart = 0, pireEcart = 0;
+    const mois = [];
+    for (let k = 0; k < 12; k++) {
+      const d = new Date(an0, m0 + k, 1), m = d.getMonth() + 1, an = d.getFullYear(), ev = [];
+      if (m === 5 && inscription > 0) ev.push(["Forfait d'inscription", inscription]);
+      if (m % 3 === 0 && vulnerables > 0) ev.push(["Forfait des patients vulnérables, trimestre", vulnerables / 4]);
+      if (m === 6 && juin > 0) ev.push(["Volume de patients et pratique polyvalente", juin]);
+      if (t > 0 && m % 3 === 0 && (!premiere || an >= anImpot)) ev.push(["Acompte provisionnel", -t / 4]);
+      if (t > 0 && premiere && m === 4 && an === anImpot) ev.push(["Solde de l'impôt de la première année", -t]);
+      if (m === 4 && R.primeMoi > 0) ev.push(["Prime d'assurance médicaments", -R.primeMoi]);
+      annuelles.filter(x => x.mois === m).forEach(x => ev.push([x.nom, -x.montant]));
+      const ponctuel = ev.reduce((s, [, v]) => s + v, 0), solde = entreeReguliere - sortieReguliere + ponctuel;
+      encaisse += solde; ecart += solde - R.surplusMoi; pireEcart = Math.min(pireEcart, ecart);
+      mois.push({ date: d, entrees: entreeReguliere + ev.filter(([, v]) => v > 0).reduce((s, [, v]) => s + v, 0),
+        sorties: sortieReguliere - ev.filter(([, v]) => v < 0).reduce((s, [, v]) => s + v, 0), solde, encaisse, ev });
+    }
+    // Réserve : ce qu'il faut garder pour les mois qui coûtent plus que la moyenne, si le surplus moyen part chaque mois.
+    return { mois, reserve: -pireEcart, depart: S.epargne.encaisse || 0, plusSerre: mois.reduce((a, x) => x.solde < a.solde ? x : a, mois[0]) };
+  }
+  function rendreTresorerie(R) {
+    const T = tresorerie(R), nomMois = d => { const s = d.toLocaleDateString("fr-CA", { month: "long", year: "numeric" }); return s[0].toUpperCase() + s.slice(1); };
+    document.getElementById("bu-tresorerie-resume").textContent = T.reserve >= 100
+      ? `Gardez une réserve d'environ ${$(T.reserve)} : certains mois coûtent plus que la moyenne. Le plus serré : ${nomMois(T.plusSerre.date).toLowerCase()} (${signe(T.plusSerre.solde)}).`
+      : "Aucun mois serré : chaque mois couvre ses sorties, impôt et dépenses annuelles compris.";
+    graphiqueLignes(document.getElementById("bu-tresorerie-graph"), null, [{ nom: "Encaisse", couleur: SERIES[2], valeurs: [T.depart, ...T.mois.map(x => x.encaisse)] }],
+      ["Auj.", ...T.mois.map(x => x.date.toLocaleDateString("fr-CA", { month: "short" }).replace(".", ""))],
+      { titre: "Encaisse à la fin de chaque mois", aire: true, hauteur: 160, baseLibre: true, titreX: i => i === 0 ? "Aujourd'hui" : nomMois(T.mois[i - 1].date) });
+    rangees("bu-tresorerie", T.mois.map(x => ({
+      titre: nomMois(x.date),
+      sous: x.ev.length ? x.ev.map(([n, v]) => `${n} ${signe(v)}`).join(" · ") : `Entrées ${$(x.entrees)} · sorties ${$(x.sorties)}`,
+      valeur: signe(x.solde), valeurCls: x.solde < 0 ? "negatif" : null, valeurSous: `Encaisse ${$(x.encaisse)}`,
+    })));
+    document.getElementById("bu-tresorerie-note").textContent = (R.societeActive
+      ? "En société, la RAMQ paie la société : ce calendrier suit ce qu'elle vous verse, net d'impôt. "
+      : "Paies de la RAMQ aux deux semaines, en moyenne par mois ; forfait d'inscription en mai, patients vulnérables chaque trimestre, volume et pratique polyvalente en juin. ")
+      + "Le surplus du mois reste dans le compte ; s'il va aux dettes ou à l'épargne, gardez la réserve indiquée.";
+  }
+
   function rendreFlux(R) {
     const boite = document.getElementById("bu-flux"); if (!boite) return;
     const F = fluxAnnee(R);
@@ -3244,7 +3357,7 @@
       VERIFICATION.forEach(v => { const b = casCalcul(v); CHAMPS_VERIF.forEach(([k]) => { const e = Math.abs(Math.round(b[k]) - v.officiel[k]); total++; if (e <= 1) egaux++; pire = Math.max(pire, e); }); });
       return { total, egaux, pire, cas: VERIFICATION.length };
     },
-    outils: { depensesEffectives, annuelLigne, nomLigne, estPro, ITEMS_PRO, analyseDossier, independance, $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, ACTIVITES, nomActivite, frequenceTexte, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
+    outils: { depensesEffectives, annuelLigne, nomLigne, estPro, ITEMS_PRO, analyseDossier, independance, tresorerie, $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, ACTIVITES, nomActivite, frequenceTexte, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
   };
 
   /* Application installable (PWA) : fonctionne hors ligne. */

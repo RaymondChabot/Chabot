@@ -85,9 +85,16 @@ Revenu affiche tous les détails.
   documents et personnes-ressources ; une page du rapport PDF.
 - **L'année en un coup d'œil** : diagramme de flux, des revenus aux impôts
   et frais, puis aux dépenses, aux dettes, à l'épargne et au surplus.
+- **Trésorerie des 12 prochains mois** : votre compte mois par mois, avec
+  les paies de la RAMQ, le forfait d'inscription de mai, les forfaits des
+  patients vulnérables chaque trimestre, les montants de juin, les
+  acomptes provisionnels, l'impôt d'avril et les dépenses annuelles ; la
+  réserve à garder pour les mois serrés.
 - **Reste à dépenser librement** : revenu net moins les dépenses fixes, les
-  dépenses annuelles, les dettes et l'épargne. **Bilan du mois** : revenu
-  reçu et dépenses réelles comparés au budget, avec un rappel mensuel.
+  dépenses annuelles, les dettes et l'épargne, aussi par jour et par
+  semaine. **Bilan du mois** : revenu reçu et dépenses réelles comparés au
+  budget, avec un rappel mensuel ; au choix, le réel par catégorie et le
+  report du non-dépensé (ou du dépassement) d'un mois à l'autre.
 - **Probabilité de réussite** : 300 simulations où le rendement varie
   chaque année ; valeur nette dans 8 cas sur 10 et chances d'atteindre
   l'indépendance financière.
