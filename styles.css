@@ -264,7 +264,7 @@ a.tuile:hover { border-color: var(--trait); }
 .segment { display: flex; gap: 2px; padding: 3px; background: var(--surface-3); border-radius: 999px; }
 .segment:empty { display: none; }
 .segment button {
-  flex: 1 1 auto; min-width: 0; border: 0; background: transparent; color: var(--encre-2); cursor: pointer;
+  flex: 1 1 0; min-width: 0; border: 0; background: transparent; color: var(--encre-2); cursor: pointer;
   padding: 9px 10px; border-radius: 999px; font: 500 0.9rem var(--police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .segment button[aria-checked="true"] { background: var(--surface); color: var(--encre); font-weight: 600; box-shadow: 0 1px 3px rgba(18, 18, 17, 0.12); }

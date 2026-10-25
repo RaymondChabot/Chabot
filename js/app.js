@@ -23,10 +23,13 @@
       tarifHoraire: 99.48, forfaitHoraireMixte: 59.68, pctMixte: 60, acteSupervision: 114.20, pctSupervision: 60, supervisionMaxH: 3.5,
       perDiemResident: 39.65, forfaitInscription: 10, forfaitVulnerable: 55,
       suppNonVulnerable: 18.90, suppVulnerableHorsGuichet: 58.10, suppVulnerableGuichet: 124.50,
+      pctActe: 100, pctSupervisionActe: 100,
       modeBudget: "horaire",
     },
-    impot: { depensesPro: 3000 },
-    conjointe: { active: false, salaire: 0, rpa: 0, syndicat: 0, autresRevenus: 0, medicamentsPublic: false, partMaison: 0, epargne: 0, epargneMensuelle: 0, voiture: 0 },
+    impot: { depensesPro: 3000, structure: "particulier" },
+    // Partenaire de vie : désignation au choix, salarié ou à son compte.
+    conjointe: { active: false, designation: "partenaire", statut: "salarie", salaire: 0, rpa: 0, syndicat: 0, revenuAutonome: 0, depensesAutonome: 0,
+      autresRevenus: 0, medicamentsPublic: false, partMaison: 0, epargne: 0, epargneMensuelle: 0, voiture: 0 },
     // Hypothèses de l'avenir. Le scénario réaliste suit les Normes d'hypothèses de
     // projection 2026 (Institut de planification financière et FP Canada).
     scenarios: {
@@ -36,7 +39,7 @@
       optimiste: { rendement: 6.5, croissanceMaison: 4.5, depreciationAuto: 12, ecartTaux: -0.5, inflation: 2, hausseRevenus: 3.5 },
     },
     famille: { calculAuto: true, versementA: "moi", medicamentsPublicMoi: true },
-    societe: { tauxSociete: 20.5, fraisSociete: 4000 },
+    societe: { tauxSociete: 20.5, fraisSociete: 4000, retrait: "tout", retraitFixe: 120000, solde: 0 },
     menage: { conjointNetMensuel: 0, allocationsAnnuelles: 2400, autresRevenusMensuels: 0, partCommunMoi: 100 },
     // Valeurs fictives ; les autres cases du catalogue partent à 0.
     budget: [
@@ -209,6 +212,11 @@
   const pct = (v, d = 1) => nb(v * 100, d) + " %";
   const signe = v => (v >= 0 ? "+" : "−") + $(Math.abs(v));
   const k$ = v => nb(v / 1000, 0) + " k$";
+  // Désignation de la personne avec qui vit le médecin : partenaire, conjointe ou conjoint.
+  const pn = () => ({ partenaire: "partenaire", conjointe: "conjointe", conjoint: "conjoint" })[S.conjointe.designation] || "partenaire";
+  const Pn = () => pn().charAt(0).toUpperCase() + pn().slice(1);
+  const votreP = () => "votre " + pn();
+  const texteDe = x => typeof x === "function" ? x() : x;
   const moisAn = d => d ? d.toLocaleDateString("fr-CA", { month: "long", year: "numeric" }) : "jamais";
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
 
@@ -249,7 +257,10 @@
       { p: "revenu.acteSupervision", l: "Acte de supervision, tarif à 100 %", u: "$/h", s: 0.01 },
       { p: "revenu.pctSupervision", l: "Part versée de l'acte de supervision", u: "%" },
       { p: "revenu.supervisionMaxH", l: "Heures de supervision payées au plus", u: "h/d.-j.", s: 0.25 },
-      { g: "Payés dans les deux modes" },
+      { g: "À l'acte" },
+      { p: "revenu.pctActe", l: "Part du tarif des visites payée à l'acte", u: "%", h: "100 % : chaque visite au tarif de l'onglet B. Vérifiez votre entente." },
+      { p: "revenu.pctSupervisionActe", l: "Part de l'acte de supervision payée à l'acte", u: "%" },
+      { g: "Payés dans tous les modes" },
       { p: "revenu.perDiemResident", l: "Demi-per diem de supervision, par résident", u: "$", s: 0.01 },
       { p: "revenu.forfaitInscription", l: "Forfait d'inscription générale", u: "$/pat.", s: 0.01 },
       { p: "revenu.forfaitVulnerable", l: "Forfait annuel moyen, patient vulnérable", u: "$/pat.", s: 0.01 },
@@ -257,36 +268,45 @@
       { p: "revenu.suppVulnerableHorsGuichet", l: "Supplément, patient vulnérable hors guichet", u: "$", s: 0.01 },
       { p: "revenu.suppVulnerableGuichet", l: "Supplément, patient vulnérable du guichet", u: "$", s: 0.01 },
       { g: "Pour le budget" },
-      { p: "revenu.modeBudget", l: "Mode de rémunération utilisé", t: "select", o: [["horaire", "Taux horaire"], ["mixte", "Taux mixte"]] },
+      { p: "revenu.modeBudget", l: "Mode de rémunération utilisé", t: "select", o: [["horaire", "Taux horaire"], ["mixte", "Taux mixte"], ["acte", "À l'acte"]] },
     ],
     impot: [
+      { g: "Votre pratique" },
+      { p: "impot.structure", l: "Les paiements de la RAMQ sont versés", t: "select", o: [["particulier", "À vous : travail autonome, sans société"], ["societe", "À votre société (pratique incorporée)"]] },
       { g: "Déductions" },
-      { p: "impot.depensesPro", l: "Dépenses professionnelles", u: "$/an", s: 100, h: "Collège des médecins, FMOQ, formation, assurance responsabilité non remboursée." },
+      { p: "impot.depensesPro", l: "Dépenses professionnelles", u: "$/an", s: 100, h: "Collège des médecins, FMOQ, formation, assurance responsabilité non remboursée. Payées par la société si vous êtes incorporé ou incorporée." },
       { p: "epargne.reer.cotisationAnnuelle", l: "Cotisation REER de l'année", u: "$/an", s: 100 },
-      { g: "Comparaison avec une société" },
-      { p: "societe.tauxSociete", l: "Taux d'impôt de la société", u: "%", s: 0.1, h: "9 % fédéral et 11,5 % Québec : une société de médecin a rarement droit à la déduction québécoise des PME." },
+      { g: "Société" },
+      { p: "societe.tauxSociete", l: "Taux d'impôt de la société", u: "%", s: 0.1, h: "9 % fédéral et 11,5 % Québec : une société de médecin a rarement droit à la déduction québécoise pour petite entreprise." },
       { p: "societe.fraisSociete", l: "Frais annuels de la société", u: "$/an", s: 100, h: "Comptable, déclarations, frais juridiques." },
+      { p: "societe.retrait", l: "Ce que la société vous verse", t: "select", o: [["tout", "Tout le bénéfice, en dividendes"], ["fixe", "Un montant fixe par année, en dividendes"]], si: "impot.structure=societe" },
+      { p: "societe.retraitFixe", l: "Dividendes versés par année", u: "$/an", s: 1000, si: "impot.structure=societe&societe.retrait=fixe", h: "Le reste demeure dans la société et y est placé." },
+      { p: "societe.solde", l: "Placements déjà dans la société", u: "$", s: 1000, si: "impot.structure=societe" },
     ],
     menage: [
       { g: "Revenus du ménage" },
       { p: "menage.autresRevenusMensuels", l: "Autres revenus nets du ménage", u: "$/mois", s: 50 },
-      { p: "menage.partCommunMoi", l: "Votre part des dépenses partagées", u: "%", h: "Le reste des dépenses partagées est payé par votre conjointe, ou par quelqu'un d'autre. Sans partage, laissez 100 %." },
-      { g: "Conjointe" },
-      { p: "conjointe.active", l: "Inclure ma conjointe", t: "check", h: "Ses revenus, son impôt, ses dépenses et sa part de la maison. Vous êtes alors conjoints au sens de l'impôt." },
-      { p: "conjointe.salaire", l: "Son salaire brut", u: "$/an", s: 500, si: "conjointe.active" },
-      { p: "conjointe.rpa", l: "Ses cotisations au régime de retraite de l'employeur", u: "$/an", s: 100, si: "conjointe.active" },
-      { p: "conjointe.syndicat", l: "Ses cotisations syndicales ou professionnelles", u: "$/an", s: 50, si: "conjointe.active" },
+      { p: "menage.partCommunMoi", l: "Votre part des dépenses partagées", u: "%", h: "Le reste des dépenses partagées est payé par l'autre personne du ménage. Sans partage, laissez 100 %." },
+      { g: "Couple" },
+      { p: "conjointe.active", l: "Vous vivez en couple", t: "check", h: "Conjoints mariés ou de fait, au sens de l'impôt : revenus, impôt, dépenses et part de la maison de l'autre personne." },
+      { p: "conjointe.designation", l: "Désigner cette personne comme", t: "select", o: [["partenaire", "Partenaire"], ["conjointe", "Conjointe"], ["conjoint", "Conjoint"]], si: "conjointe.active" },
+      { p: "conjointe.statut", l: "Son travail", t: "select", o: [["salarie", "Salarié ou salariée"], ["autonome", "À son compte : travail autonome, médecin…"]], si: "conjointe.active" },
+      { p: "conjointe.salaire", l: "Son salaire brut", u: "$/an", s: 500, si: "conjointe.active&conjointe.statut=salarie" },
+      { p: "conjointe.rpa", l: "Ses cotisations au régime de retraite de l'employeur", u: "$/an", s: 100, si: "conjointe.active&conjointe.statut=salarie" },
+      { p: "conjointe.syndicat", l: "Ses cotisations syndicales ou professionnelles", u: "$/an", s: 50, si: "conjointe.active&conjointe.statut=salarie" },
+      { p: "conjointe.revenuAutonome", l: "Son revenu brut d'entreprise", u: "$/an", s: 500, si: "conjointe.active&conjointe.statut=autonome", h: "Pour un ou une médecin : paiements de la RAMQ et autres honoraires." },
+      { p: "conjointe.depensesAutonome", l: "Ses dépenses d'entreprise déductibles", u: "$/an", s: 100, si: "conjointe.active&conjointe.statut=autonome" },
       { p: "conjointe.autresRevenus", l: "Ses autres revenus imposables", u: "$/an", s: 100, si: "conjointe.active" },
-      { p: "conjointe.medicamentsPublic", l: "Couverte par le régime public d'assurance médicaments", t: "check", si: "conjointe.active", h: "Non si elle a une assurance collective au travail." },
+      { p: "conjointe.medicamentsPublic", l: "Son assurance médicaments : régime public", t: "check", si: "conjointe.active", h: "La prime se paie avec l'impôt du Québec. Décochez en cas d'assurance collective au travail." },
       { p: "conjointe.partMaison", l: "Sa part de propriété de la maison", u: "%", si: "conjointe.active" },
       { p: "conjointe.epargne", l: "Son épargne : REER, CELI, comptes", u: "$", s: 100, si: "conjointe.active" },
-      { p: "conjointe.epargneMensuelle", l: "Ce qu'elle épargne chaque mois", u: "$/mois", s: 50, si: "conjointe.active", h: "REER, CELI ou autre ; compté dans la valeur nette du couple et retiré de son surplus." },
+      { p: "conjointe.epargneMensuelle", l: "Son épargne chaque mois", u: "$/mois", s: 50, si: "conjointe.active", h: "REER, CELI ou autre ; comptée dans la valeur nette du couple et retirée de son surplus." },
       { p: "conjointe.voiture", l: "Valeur de son auto", u: "$", s: 500, si: "conjointe.active" },
       { g: "Famille" },
       { p: "famille.calculAuto", l: "Calculer les allocations familiales selon vos revenus", t: "check", h: "Allocation canadienne pour enfants, Allocation famille et supplément pour fournitures scolaires. Les enfants et leur âge viennent de la page Avenir." },
       { p: "menage.allocationsAnnuelles", l: "Allocations familiales reçues", u: "$/an", s: 50, si: "!famille.calculAuto" },
-      { p: "famille.versementA", l: "Allocations versées à", t: "select", o: [["moi", "Moi"], ["conjointe", "Ma conjointe"]], si: "conjointe.active" },
-      { p: "famille.medicamentsPublicMoi", l: "Vous êtes couvert par le régime public d'assurance médicaments", t: "check", h: "La prime se paie avec l'impôt du Québec. Non si vous avez une assurance collective." },
+      { p: "famille.versementA", l: "Allocations versées à", t: "select", o: [["moi", "Vous"], ["conjointe", () => Pn()]], si: "conjointe.active" },
+      { p: "famille.medicamentsPublicMoi", l: "Votre assurance médicaments : régime public", t: "check", h: "La prime se paie avec l'impôt du Québec. Décochez si vous avez une assurance collective." },
     ],
     strategie: [
       { g: "Stratégie de remboursement" },
@@ -334,7 +354,7 @@
   function creerChamp(c, id, lier, confirmable) {
     const ligne = el("div", "champ" + (c.t === "check" ? " case" : c.t === "select" || c.t === "month" || c.t === "date" ? " large" : ""));
     if (c.si) ligne.dataset.si = c.si;
-    const lab = el("label", null, c.l); lab.htmlFor = id;
+    const lab = el("label", null, texteDe(c.l)); lab.htmlFor = id;
     let inp;
     if (c.t === "check") {
       inp = el("input", "interrupteur"); inp.type = "checkbox"; inp.setAttribute("role", "switch");
@@ -343,7 +363,7 @@
       const boite = el("div", "saisie");
       if (c.t === "select") {
         inp = el("select");
-        for (const [v, t] of c.o) { const o = el("option", null, t); o.value = v; inp.appendChild(o); }
+        for (const [v, t] of c.o) { const o = el("option", null, texteDe(t)); o.value = v; inp.appendChild(o); }
       } else {
         inp = el("input"); inp.type = c.t === "month" || c.t === "date" ? c.t : "number";
         if (inp.type === "number") { inp.step = c.s || 1; inp.inputMode = "decimal"; if (c.neg) { inp.dataset.neg = "1"; inp.inputMode = "text"; } else inp.min = "0"; }
@@ -355,7 +375,7 @@
     inp.id = id; lier(inp);
     if (confirmable) {
       const b = el("button", "conf", "✓"); b.type = "button"; b.dataset.conf = c.p;
-      b.title = "Valeur confirmée par un document"; b.setAttribute("aria-label", "Confirmée : " + c.l);
+      b.title = "Valeur confirmée par un document"; b.setAttribute("aria-label", "Confirmée : " + texteDe(c.l));
       ligne.appendChild(b);
     } else ligne.appendChild(el("span"));
     if (c.h) ligne.appendChild(el("p", "aide", c.h));
@@ -384,10 +404,13 @@
   }
   // Champs qui ne s'affichent que selon un autre champ (« !chemin » pour l'inverse).
   function majVisibilite() {
-    document.querySelectorAll("[data-si]").forEach(l => {
-      const neg = l.dataset.si.startsWith("!"), v = !!lire(l.dataset.si.replace("!", ""));
-      l.hidden = neg ? v : !v;
-    });
+    const vrai = cond => {
+      const neg = cond.startsWith("!"), [chemin, attendu] = cond.replace("!", "").split("=");
+      const v = attendu === undefined ? !!lire(chemin) : String(lire(chemin)) === attendu;
+      return neg ? !v : v;
+    };
+    // Conditions séparées par « & » ; « chemin=valeur » compare ; « !chemin » inverse.
+    document.querySelectorAll("[data-si]").forEach(l => { l.hidden = !l.dataset.si.split("&").every(vrai); });
   }
   // Champ d'une liste (dépense, dette, enfant) : lié par data-l, data-i et data-k.
   const lierListe = (liste, i, k) => inp => { inp.dataset.l = liste; inp.dataset.i = i; inp.dataset.k = k; };
@@ -419,7 +442,7 @@
   const FEUILLES = {
     revenu: ["Revenu GMF-U", CHAMPS.revenu],
     impot: ["Impôt", CHAMPS.impot],
-    menage: ["Ménage et conjointe", CHAMPS.menage],
+    menage: ["Ménage et couple", CHAMPS.menage],
     strategie: ["Plan de remboursement", CHAMPS.strategie],
     epargne: ["Épargne et biens", CHAMPS.epargne],
     hypotheses: ["Hypothèses de l'avenir", CHAMPS.hypotheses],
@@ -480,7 +503,7 @@
     per.value = b.periode; per.setAttribute("aria-label", "Période : " + nomDepense(b)); lierListe("budget", i, "periode")(per);
     boiteP.appendChild(per);
     const boiteQ = el("div", "saisie");
-    const qui = el("select"); [["moi", "Moi"], ["commun", "Partagée"], ["conjoint", S.conjointe.active ? "Conjointe" : "Autre"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; qui.appendChild(o); });
+    const qui = el("select"); [["moi", "Moi"], ["commun", "Partagée"], ["conjoint", S.conjointe.active ? Pn() : "Autre"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; qui.appendChild(o); });
     qui.value = b.qui; qui.setAttribute("aria-label", "Qui paie : " + nomDepense(b)); lierListe("budget", i, "qui")(qui);
     boiteQ.appendChild(qui);
     l.append(nom, boiteM, boiteP, boiteQ);
@@ -569,6 +592,7 @@
      ============================================================ */
   const mensuel = b => b.periode === "an" ? b.montant / 12 : b.montant;
   const SCENARIOS = { prudent: "Prudent", realiste: "Réaliste", optimiste: "Optimiste" };
+  const MODES = ["horaire", "mixte", "acte"];
   const METHODES = ["avalanche", "hybride", "boule", "minimum"];
   const NOMS_METHODES = { avalanche: "Avalanche", hybride: "Hybride", boule: "Boule de neige", minimum: "Minimums seulement" };
   const AVEC_ARTICLE = { avalanche: "l'avalanche", hybride: "l'hybride", boule: "la boule de neige", minimum: "les minimums" };
@@ -577,35 +601,52 @@
   function calculer() {
     const R = {};
     R.gmfu = C.revenuGmfu(S.revenu);
-    const mode = S.revenu.modeBudget === "mixte" ? "mixte" : "horaire";
+    const mode = MODES.includes(S.revenu.modeBudget) ? S.revenu.modeBudget : "horaire";
     R.mode = mode;
     R.brut = R.gmfu[mode].total;
     R.couple = !!S.conjointe.active;
     R.interetsEtudes = S.dettes.filter(d => d.creditImpot > 0).reduce((a, d) => a + d.solde * d.taux / 100, 0);
     const base = { depensesPro: S.impot.depensesPro, reer: S.epargne.reer.cotisationAnnuelle, interetsEtudes: R.interetsEtudes };
-    const salariee = R.couple ? C.impotSalarie({ salaire: S.conjointe.salaire, rpa: S.conjointe.rpa, syndicat: S.conjointe.syndicat, autresRevenus: S.conjointe.autresRevenus }) : null;
-    // Conjoints : transferts de crédits, calculés pour chacun des deux modes.
+    // Partenaire : salarié, ou à son compte (même calcul que le médecin travailleur autonome).
+    // reel : facteur de revenu en dollars d'aujourd'hui (années futures).
+    R.autonomeP = R.couple && S.conjointe.statut === "autonome";
+    const impotPartenaire = (reel = 1) => !R.couple ? null : R.autonomeP
+      ? C.impotParticulier({ revenu: ((S.conjointe.revenuAutonome || 0) + (S.conjointe.autresRevenus || 0)) * reel, depensesPro: S.conjointe.depensesAutonome || 0 })
+      : C.impotSalarie({ salaire: S.conjointe.salaire * reel, rpa: S.conjointe.rpa, syndicat: S.conjointe.syndicat, autresRevenus: S.conjointe.autresRevenus * reel });
+    R.depensesPartenaire = R.autonomeP ? S.conjointe.depensesAutonome || 0 : 0;
+    const salariee = impotPartenaire();
+    // Pratique incorporée : la société reçoit les revenus et verse des dividendes ;
+    // sinon, travail autonome. f : facteur des dividendes fixes en dollars d'aujourd'hui.
+    R.societeActive = S.impot.structure === "societe";
+    R.dproPerso = R.societeActive ? 0 : S.impot.depensesPro;
+    const impotDe = (o, f = 1) => R.societeActive
+      ? C.impotSociete({ ...o, fraisSociete: S.societe.fraisSociete, tauxSociete: S.societe.tauxSociete / 100, retrait: S.societe.retrait, retraitFixe: S.societe.retraitFixe * f })
+      : C.impotParticulier(o);
+    // Conjoints : transferts de crédits, calculés pour chaque mode.
     const avec = r => R.couple ? C.transfertsConjoints(r, salariee) : [r, null];
-    const [h, hc] = avec(C.impotParticulier({ ...base, revenu: R.gmfu.horaire.total }));
-    const [mx, mc] = avec(C.impotParticulier({ ...base, revenu: R.gmfu.mixte.total }));
-    R.impots = { horaire: h, mixte: mx };
+    R.impots = {}; const partenaires = {};
+    for (const md of MODES) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, revenu: R.gmfu[md].total }));
     R.impot = R.impots[mode];
-    R.conjointe = R.couple ? (mode === "mixte" ? mc : hc) : null;
-    R.tauxMarginal = C.tauxMarginal({ ...base, revenu: R.brut });
+    R.conjointe = R.couple ? partenaires[mode] : null;
+    const totalDe = x => x.totalGlobal ?? x.total;
+    // Taux marginal : impôt (société comprise) sur 1 000 $ de plus.
+    R.tauxMarginal = (totalDe(impotDe({ ...base, revenu: R.brut + 1000 })) - totalDe(impotDe({ ...base, revenu: R.brut }))) / 1000;
     // Revenu net d'impôt pour un autre revenu brut (mêmes déductions, mêmes transferts entre conjoints).
-    R.netPour = rev => avec(C.impotParticulier({ ...base, revenu: rev }))[0].net;
+    R.netPour = rev => avec(impotDe({ ...base, revenu: rev }))[0].net;
     const sens = (k, valeurs) => valeurs.map(v => {
       const g = C.revenuGmfu({ ...S.revenu, [k]: v });
-      return { v, h: g.horaire.total, m: g.mixte.total, hn: R.netPour(g.horaire.total), mn: R.netPour(g.mixte.total) };
+      const x = { v };
+      for (const md of MODES) { x[md] = g[md].total; x[md + "Net"] = R.netPour(g[md].total); }
+      return x;
     });
     const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ;
     R.sensDJ = sens("demiJournees", [...new Set([4, 5, 6, 7, 8, 9, 10, dj])].filter(n => n >= Math.max(1, S.revenu.enseignement)).sort((a, b) => a - b));
     R.sensPat = sens("patientsParDJ", [...new Set([3, 4, 5, 6, 7, 8, pat])].sort((a, b) => a - b));
     // REER : impôt sans cotisation, et avec une cotisation donnée (au revenu de l'année).
-    R.impotSansReer = C.impotParticulier({ ...base, reer: 0, revenu: R.brut }).total;
-    R.impotAvecReer = m => C.impotParticulier({ ...base, reer: m, revenu: R.brut }).total;
+    R.impotSansReer = impotDe({ ...base, reer: 0, revenu: R.brut }).total;
+    R.impotAvecReer = m => impotDe({ ...base, reer: m, revenu: R.brut }).total;
     R.remboursementReer = S.epargne.reer.cotisationAnnuelle > 0
-      ? C.impotParticulier({ ...base, reer: 0, revenu: R.brut }).total - C.impotParticulier({ ...base, revenu: R.brut }).total : 0;
+      ? impotDe({ ...base, reer: 0, revenu: R.brut }).total - impotDe({ ...base, revenu: R.brut }).total : 0;
 
     // Famille : allocations et assurance médicaments, sur le revenu net familial.
     R.ages = S.epargne.reee.enfants.map(x => +x.age).filter(a => a < 18);
@@ -620,10 +661,10 @@
 
     // Budget mensuel
     const part = S.menage.partCommunMoi / 100;
-    R.travailMoi = (R.impot.net - S.impot.depensesPro - R.primeMoi) / 12;
+    R.travailMoi = (R.impot.net - R.dproPerso - R.primeMoi) / 12;
     R.allocMoi = allocMoi / 12;
     R.netMoi = R.travailMoi + R.allocMoi;
-    R.travailConjointe = R.couple ? (R.conjointe.net - R.primeConjointe) / 12 : 0;
+    R.travailConjointe = R.couple ? (R.conjointe.net - R.depensesPartenaire - R.primeConjointe) / 12 : 0;
     R.allocConjointe = R.couple ? (R.allocations - allocMoi) / 12 : 0;
     R.netConjointe = R.travailConjointe + R.allocConjointe;
     R.depMoi = 0; R.depConjointe = 0; R.depMenage = 0;
@@ -666,10 +707,10 @@
       if (cacheAnnee.has(cle)) return cacheAnnee.get(cle);
       const I = Math.pow(1 + h.inflation / 100, a), reel = Math.pow(1 + h.hausseRevenus / 100, a) / I;
       let res;
-      if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, epargne: R.epargneMoi * 12 };
+      if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, epargne: R.epargneMoi * 12, retenu: R.impot.societe ? R.impot.societe.retenu : 0 };
       else {
-        const conj = R.couple ? C.impotSalarie({ salaire: S.conjointe.salaire * reel, rpa: S.conjointe.rpa, syndicat: S.conjointe.syndicat, autresRevenus: S.conjointe.autresRevenus * reel }) : null;
-        let moi = C.impotParticulier({ ...base, revenu: R.gmfuType[mode].total * reel });
+        const conj = impotPartenaire(reel);
+        let moi = impotDe({ ...base, revenu: R.gmfuType[mode].total * reel }, 1 / I);
         if (R.couple) moi = C.transfertsConjoints(moi, conj)[0];
         const ages = S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x < 18);
         const nf = moi.revenuNetFed + (conj ? conj.revenuNetFed : 0), nq = moi.revenuNetQc + (conj ? conj.revenuNetQc : 0);
@@ -677,7 +718,8 @@
         const alloc = S.famille.calculAuto ? C.prestationsFamille({ revenuNetFed: nf, revenuNetQc: nq, ages, couple: R.couple }).total * I : S.menage.allocationsAnnuelles;
         const enf = S.epargne.reee.enfants.filter(x => +x.age + a < 17).length;
         res = {
-          travail: (moi.net - S.impot.depensesPro - prime) * I,
+          travail: (moi.net - R.dproPerso - prime) * I,
+          retenu: moi.societe ? moi.societe.retenu * I : 0,
           alloc: !R.couple || S.famille.versementA !== "conjointe" ? alloc : 0,
           epargne: enf * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle,
         };
@@ -717,6 +759,7 @@
       actifsConjoint: R.couple ? S.conjointe.epargne : 0, dettes: S.dettes,
       epargneConjointe: R.epargneConjointe, hausseEpargneConjointe: h.hausseRevenus, inflation: h.inflation,
       remplacementAutos: S.actifs.voiture.remplacementAns > 0 ? { ans: S.actifs.voiture.remplacementAns, prix: S.actifs.voiture.prixNeuf } : null,
+      societe: R.societeActive ? { solde: S.societe.solde || 0, retenuAnnee: a => R.annee(h, a).retenu, impotPlacement: 0.5 } : null,
       ajoutMensuel: m === "minimum" ? surplusAnnee(h) : null,
     }, sim);
     // Méthodes comparées sur la valeur nette à l'horizon : elle tient compte des intérêts, de l'argent
@@ -961,8 +1004,10 @@
   /* ============================================================
      RENDUS
      ============================================================ */
-  const NOM_MODE = { horaire: "Taux horaire", mixte: "Taux mixte" };
-  const choixMode = id => segment(id, [["horaire", "Taux horaire"], ["mixte", "Taux mixte"]], R.mode, v => changer("revenu.modeBudget", v), "Mode de rémunération utilisé");
+  const NOM_MODE = { horaire: "Taux horaire", mixte: "Taux mixte", acte: "À l'acte" };
+  const AU_MODE = { horaire: "au taux horaire", mixte: "au taux mixte", acte: "à l'acte" };
+  const COULEUR_MODE = { horaire: SERIES[0], mixte: SERIES[1], acte: SERIES[2] };
+  const choixMode = id => segment(id, [["horaire", "Horaire"], ["mixte", "Mixte"], ["acte", "À l'acte"]], R.mode, v => changer("revenu.modeBudget", v), "Mode de rémunération utilisé");
 
   function rendreApercu(R) {
     document.getElementById("ap-exemple").hidden = !S.meta.exemple;
@@ -1008,11 +1053,12 @@
       const txt = el("span"); txt.append(lib, document.createTextNode(texte));
       li.append(ico, txt); a.appendChild(li);
     };
-    action("important", `Mettez ${pct(R.impot.total / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$(R.impot.total / 12)} par mois.`);
+    if (R.societeActive) action("important", `La société garde environ ${$(R.impot.societe.impotSociete / 12)} par mois pour son impôt ; vous, environ ${$(R.impot.total / 12)} par mois pour l'impôt sur vos dividendes.`);
+    else action("important", `Mettez ${pct(R.impot.total / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$(R.impot.total / 12)} par mois.`);
     if (S.revenu.annee === "premiere") action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total)} seront à payer d'un coup le 30 avril.`);
-    if (R.couple && !S.conjointe.salaire) action("important", "Inscrivez le salaire brut de votre conjointe (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.");
+    if (R.couple && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
-      action("info", `Confirmez qui est couvert par le régime public d'assurance médicaments : la prime, jusqu'à 766 $ par adulte en 2026, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
+      action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 766 $ par adulte en 2026, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
     const auj = new Date(S.strategie.debut + "-01T00:00:00");
     S.dettes.filter(d => d.type === "hypotheque" && d.finTerme).forEach(d => {
       const f = new Date(d.finTerme + "T00:00:00"); const mois = (f - auj) / 2.63e9;
@@ -1097,17 +1143,18 @@
   }
 
   function rendreRevenu(R) {
-    const g = R.gmfu, autre = R.mode === "mixte" ? "horaire" : "mixte";
+    const g = R.gmfu, autres = MODES.filter(m => m !== R.mode);
+    const meilleur = autres.reduce((a, m) => g[m].total > g[a].total ? m : a, autres[0]);
     choixMode("rv-mode");
-    const diff = g[R.mode].total - g[autre].total;
+    const diff = g[R.mode].total - g[meilleur].total;
     hero("rv-hero", "Revenu brut de l'année", $(g[R.mode].total), [
       `Net après impôt : ${$(R.impots[R.mode].net)}`,
-      puce(`${signe(diff)} par rapport au ${NOM_MODE[autre].toLowerCase()}`, diff >= 0 ? "haut" : "bas", diff >= 0),
+      puce(`${signe(diff)} par rapport ${AU_MODE[meilleur]}`, diff >= 0 ? "haut" : "bas", diff >= 0),
     ], g[R.mode].total);
 
     const comp = document.getElementById("rv-comparaison"); comp.textContent = ""; comp.className = "barres";
-    const max = Math.max(g.horaire.total, g.mixte.total, 1);
-    ["horaire", "mixte"].forEach(k => {
+    const max = Math.max(...MODES.map(m => g[m].total), 1);
+    MODES.forEach(k => {
       const b = el("div", "barre-bloc");
       const tete = el("div", "barre-tete");
       const nom = el("span", "barre-nom", NOM_MODE[k]);
@@ -1117,28 +1164,35 @@
       const sp = el("span"); sp.style.background = R.mode === k ? "var(--encre)" : "var(--trait)"; barre.appendChild(sp);
       barre.style.width = (g[k].total / max * 100) + "%";
       piste.appendChild(barre);
-      b.append(tete, piste, el("div", "aide", `Net après impôt : ${$(R.impots[k].net)}`));
+      b.append(tete, piste, el("div", "aide", R.societeActive
+        ? `Pour vous : ${$(R.impots[k].net)} · laissé dans la société : ${$(R.impots[k].societe.retenu)}`
+        : `Net après impôt : ${$(R.impots[k].net)}`));
       comp.appendChild(b);
     });
-    comp.appendChild(rangees(el("div"), [{ titre: "Écart mixte − horaire", sous: `Après impôt : ${signe(R.impots.mixte.net - R.impots.horaire.net)}`, valeur: signe(g.ecart), cls: "total" }]));
-    document.getElementById("rv-seuil").textContent = g.seuilPatients != null
-      ? `En clinique, le mixte paie plus que l'horaire au-delà de ${nb(g.seuilPatients)} patients par demi-journée. Vous en voyez ${nb(S.revenu.patientsParDJ)}.`
-      : "Sans pourcentage sur les visites, le mixte paie toujours moins en clinique.";
+    comp.appendChild(rangees(el("div"), autres.map((m, i) => ({ titre: `${NOM_MODE[m]} par rapport ${AU_MODE[R.mode]}`,
+      sous: R.societeActive ? `Laissé dans la société : ${signe(R.impots[m].societe.retenu - R.impots[R.mode].societe.retenu)}` : `Après impôt : ${signe(R.impots[m].net - R.impots[R.mode].net)}`,
+      valeur: signe(g[m].total - g[R.mode].total), cls: i === 0 ? "total" : null }))));
+    const pat = nb(S.revenu.patientsParDJ);
+    document.getElementById("rv-seuil").textContent = [
+      g.seuilPatients != null ? `En clinique, le mixte paie plus que l'horaire au-delà de ${nb(g.seuilPatients)} patients par demi-journée` : "Sans pourcentage sur les visites, le mixte paie toujours moins en clinique",
+      g.seuilActe != null ? ` ; l'acte, au-delà de ${nb(g.seuilActe)}.` : ".",
+      ` Vous en voyez ${pat}.`,
+    ].join("");
 
     rendreSensibilite(R);
 
     const parts = [
-      ["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire],
-      ["Visites (mixte)", x => x.visites || 0],
-      ["Acte de supervision (mixte)", x => x.supervision || 0],
+      ["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire ?? 0],
+      ["Visites", x => x.visites || 0],
+      ["Acte de supervision", x => x.supervision || 0],
       ["Demi-per diem de supervision", x => x.perDiem],
       ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable],
       ["Suppléments sans médecin", x => x.supplements],
       ["Autres revenus", x => x.autres],
     ];
     const zone = document.getElementById("rv-barres"); zone.textContent = ""; zone.className = "barres";
-    const maxB = Math.max(g.horaire.total, g.mixte.total, 1);
-    ["horaire", "mixte"].forEach(k => {
+    const maxB = Math.max(...MODES.map(m => g[m].total), 1);
+    MODES.forEach(k => {
       const x = g[k], b = el("div", "barre-bloc"), tete = el("div", "barre-tete");
       tete.append(el("span", "barre-nom", NOM_MODE[k]), el("span", "barre-total", $(x.total)));
       const piste = el("div", "barre-piste"), barre = el("div", "barre");
@@ -1147,10 +1201,10 @@
       piste.appendChild(barre); b.append(tete, piste); zone.appendChild(b);
     });
     const lg = document.getElementById("rv-legende"); lg.textContent = "";
-    parts.forEach(([n, f], i) => { if (f(g.horaire) > 0 || f(g.mixte) > 0) { const sp = el("span"); const k = el("i"); k.style.background = SERIES[i % SERIES.length]; sp.append(k, document.createTextNode(n)); lg.appendChild(sp); } });
-    lignes(document.getElementById("rv-detail"), ["", "Horaire", "Mixte"], [
-      ...parts.filter(([, f]) => f(g.horaire) > 0 || f(g.mixte) > 0).map(([n, f]) => ({ cellules: [n, $(f(g.horaire)), $(f(g.mixte))] })),
-      { cls: "total", cellules: ["Total brut", $(g.horaire.total), $(g.mixte.total)] },
+    parts.forEach(([n, f], i) => { if (MODES.some(m => f(g[m]) > 0)) { const sp = el("span"); const k = el("i"); k.style.background = SERIES[i % SERIES.length]; sp.append(k, document.createTextNode(n)); lg.appendChild(sp); } });
+    lignes(document.getElementById("rv-detail"), ["", "Horaire", "Mixte", "À l'acte"], [
+      ...parts.filter(([, f]) => MODES.some(m => f(g[m]) > 0)).map(([n, f]) => ({ cellules: [n, ...MODES.map(m => $(f(g[m])))] })),
+      { cls: "total", cellules: ["Total brut", ...MODES.map(m => $(g[m].total))] },
     ]);
     rangees("rv-faits", [
       { titre: "Heures travaillées", valeur: nb(g.heures, 0) + " h" },
@@ -1164,33 +1218,35 @@
   // Selon le nombre de demi-journées et de patients : brut ou net, horaire et mixte.
   function rendreSensibilite(R) {
     segment("rv-sens-vue", [["net", "Net"], ["brut", "Brut"]], U.sensVue, v => { U.sensVue = v; tout(); }, "Montants bruts ou nets");
-    const net = U.sensVue === "net", H = x => net ? x.hn : x.h, M = x => net ? x.mn : x.m;
+    const net = U.sensVue === "net", val = (x, md) => net ? x[md + "Net"] : x[md];
     const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ;
-    graphiqueLignes(document.getElementById("rv-sens-graph"), document.getElementById("rv-sens-legende"), [
-      { nom: "Taux horaire", couleur: SERIES[0], valeurs: R.sensDJ.map(H) },
-      { nom: "Taux mixte", couleur: SERIES[1], valeurs: R.sensDJ.map(M) },
-    ], R.sensDJ.map(x => String(x.v)), { titre: `Revenu ${net ? "net" : "brut"} selon les demi-journées par semaine`, baseLibre: true, hauteur: 200,
+    graphiqueLignes(document.getElementById("rv-sens-graph"), document.getElementById("rv-sens-legende"),
+      MODES.map(md => ({ nom: NOM_MODE[md], couleur: COULEUR_MODE[md], valeurs: R.sensDJ.map(x => val(x, md)) })),
+      R.sensDJ.map(x => String(x.v)), { titre: `Revenu ${net ? "net" : "brut"} selon les demi-journées par semaine`, baseLibre: true, hauteur: 200,
       titreX: i => `${R.sensDJ[i].v} demi-journées par semaine` });
-    const ligneSens = (x, actuel, nom) => ({ cls: actuel ? "choisi" : null, cellules: [nom, $(H(x)), $(M(x)), signe(M(x) - H(x))] });
-    lignes(document.getElementById("rv-sens-dj"), ["Demi-journées", "Horaire", "Mixte", "Écart"],
+    const ligneSens = (x, actuel, nom) => ({ cls: actuel ? "choisi" : null, cellules: [nom, ...MODES.map(md => $(val(x, md)))] });
+    lignes(document.getElementById("rv-sens-dj"), ["Demi-journées", "Horaire", "Mixte", "À l'acte"],
       R.sensDJ.map(x => ligneSens(x, x.v === dj, `${x.v}${x.v === dj ? " (vous)" : ""}`)));
-    lignes(document.getElementById("rv-sens-pat"), ["Patients", "Horaire", "Mixte", "Écart"],
+    lignes(document.getElementById("rv-sens-pat"), ["Patients", "Horaire", "Mixte", "À l'acte"],
       R.sensPat.map(x => ligneSens(x, x.v === pat, `${nb(x.v)}${x.v === pat ? " (vous)" : ""}`)));
-    document.getElementById("rv-sens-note").textContent = `${net ? "Après impôt et cotisations, avec vos déductions." : "Avant impôt."} L'enseignement reste à ${nb(S.revenu.enseignement)} demi-journée${S.revenu.enseignement > 1 ? "s" : ""} ; les autres demi-journées sont en clinique, à ${nb(pat)} patients chacune. Au taux horaire, le nombre de patients ne change pas le revenu.`;
+    document.getElementById("rv-sens-note").textContent = `${net ? (R.societeActive ? "Net pour vous : dividendes après impôt ; le reste demeure dans la société." : "Après impôt et cotisations, avec vos déductions.") : "Avant impôt."} L'enseignement reste à ${nb(S.revenu.enseignement)} demi-journée${S.revenu.enseignement > 1 ? "s" : ""} ; les autres demi-journées sont en clinique, à ${nb(pat)} patients chacune. Au taux horaire, le nombre de patients ne change pas le revenu.`;
   }
 
   function rendreImpot(R) {
-    const h = R.impots.horaire, m = R.impots.mixte, t = R.impot.total;
+    const soc = R.societeActive, t = R.impot.totalGlobal ?? R.impot.total, perso = R.impot.total;
     choixMode("im-mode");
-    hero("im-hero", "Impôt et cotisations de l'année", $(t), [
+    hero("im-hero", soc ? "Impôt de l'année : société et vous" : "Impôt et cotisations de l'année", $(t), [
       puce(`Taux moyen ${pct(R.impot.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`),
     ], t);
 
     // Sur chaque 100 $ gagnés : où va le revenu brut.
     const brut = Math.max(1, R.impot.revenu), cotis = R.impot.rrq + R.impot.rqap + R.impot.fss;
-    const dpro = Math.min(S.impot.depensesPro, brut);
-    const morceaux = [["Impôt fédéral", R.impot.fed, SERIES[0]], ["Impôt du Québec", R.impot.qc, SERIES[1]], ["RRQ, RQAP et Fonds des services de santé", cotis, SERIES[2]],
-      ["Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", R.impot.net - dpro, SERIES[4]]];
+    const dpro = Math.min(S.impot.depensesPro, brut), x = R.impot.societe;
+    const morceaux = soc
+      ? [["Impôt de la société", x.impotSociete, SERIES[0]], ["Votre impôt sur les dividendes", R.impot.fed + R.impot.qc + R.impot.fss, SERIES[1]],
+         ["Dépenses et frais de la société", x.depenses + x.frais, SERIES[3]], ["Laissé dans la société", x.retenu, SERIES[5]], ["Reste pour vous", R.impot.net, SERIES[4]]]
+      : [["Impôt fédéral", R.impot.fed, SERIES[0]], ["Impôt du Québec", R.impot.qc, SERIES[1]], ["RRQ, RQAP et Fonds des services de santé", cotis, SERIES[2]],
+         ["Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", R.impot.net - dpro, SERIES[4]]];
     const cent = document.getElementById("im-cent"); cent.textContent = "";
     const barre = el("div", "flux-barre"); barre.setAttribute("role", "img");
     barre.setAttribute("aria-label", morceaux.map(([n, v]) => `${n} ${$2(v / brut * 100)}`).join(", "));
@@ -1199,29 +1255,44 @@
     cent.appendChild(rangees(el("div"), morceaux.map(([n, v, c]) => ({ titre: n, couleur: c, valeur: $2(v / brut * 100), valeurSous: $(v) + " par année" }))));
 
     const a = document.getElementById("im-acomptes"); a.textContent = "";
-    a.appendChild(el("p", "resume", `Mettez de côté ${pct(t / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$(t / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est ce que coûte chaque dollar de plus, et ce que rapporte chaque dollar cotisé au REER.`));
+    a.appendChild(el("p", "resume", soc
+      ? `La société garde environ ${$(x.impotSociete / 12)} par mois pour son impôt. Vous, mettez de côté environ ${$(perso / 12)} par mois pour l'impôt sur vos dividendes. Votre taux marginal, société comprise, est de ${pct(R.tauxMarginal, 0)}.`
+      : `Mettez de côté ${pct(t / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$(t / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est ce que coûte chaque dollar de plus, et ce que rapporte chaque dollar cotisé au REER.`));
     const premiere = S.revenu.annee === "premiere";
     const an = (+String(S.strategie.debut).slice(0, 4) || 2026) + 1;
-    a.appendChild(rangees(el("div"), premiere
-      ? [{ titre: `30 avril ${an}`, sous: "Solde de l'impôt de la première année", valeur: $(t), ico: "!" },
-         { titre: `Puis acomptes de ${an}`, sous: "15 mars, 15 juin, 15 septembre et 15 décembre", valeur: $(t / 4), valeurSous: "chacun" }]
-      : ["15 mars", "15 juin", "15 septembre", "15 décembre"].map(d => ({ titre: d, sous: "Acompte provisionnel", valeur: $(t / 4) }))));
+    a.appendChild(rangees(el("div"), [
+      soc && { titre: "Société : acomptes mensuels", sous: "Impôt de la société, le dernier jour de chaque mois", valeur: $(x.impotSociete / 12), valeurSous: "par mois" },
+      ...(premiere
+        ? [{ titre: `30 avril ${an}`, sous: "Solde de votre impôt de la première année", valeur: $(perso), ico: "!" },
+           { titre: `Puis acomptes de ${an}`, sous: "15 mars, 15 juin, 15 septembre et 15 décembre", valeur: $(perso / 4), valeurSous: "chacun" }]
+        : ["15 mars", "15 juin", "15 septembre", "15 décembre"].map(d => ({ titre: d, sous: "Votre acompte provisionnel", valeur: $(perso / 4) }))),
+    ]));
     a.appendChild(el("p", "aide", premiere
       ? "La première année, l'impôt de l'année précédente (résidence) était faible : aucun acompte n'est exigé. Tout le solde arrive le 30 avril, et les acomptes commencent l'année suivante."
       : "Acomptes trimestriels, calculés sur l'impôt de l'année. Payer les montants que l'Agence du revenu et Revenu Québec vous envoient évite les intérêts."));
 
-    lignes(document.getElementById("im-tableau"), ["", "Horaire", "Mixte"], [
-      { cellules: ["Revenu brut", $(h.revenu), $(m.revenu)] },
-      { cls: "sous", cellules: ["Revenu imposable", $(h.imposable), $(m.imposable)] },
-      { cellules: ["Impôt fédéral", $(h.fed), $(m.fed)] },
-      { cellules: ["Impôt du Québec", $(h.qc), $(m.qc)] },
-      { cellules: ["RRQ (deux parts)", $(h.rrq), $(m.rrq)] },
-      { cellules: ["RQAP", $(h.rqap), $(m.rqap)] },
-      { cellules: ["Fonds des services de santé", $(h.fss), $(m.fss)] },
-      ...(R.couple && (h.transferts > 0 || m.transferts > 0) ? [{ cellules: ["Crédits transférés par votre conjointe", moins(h.transferts), moins(m.transferts)] }] : []),
-      { cls: "total", cellules: ["Net après impôt", $(h.net), $(m.net)] },
-      { cls: "sous", cellules: ["Taux moyen", pct(h.tauxMoyen), pct(m.tauxMoyen)] },
+    // Détail selon le mode : une colonne par mode de rémunération.
+    const I3 = MODES.map(md => R.impots[md]), ligne = (nom, f, cls) => ({ cls, cellules: [nom, ...I3.map(f)] });
+    lignes(document.getElementById("im-tableau"), ["", "Horaire", "Mixte", "À l'acte"], [
+      ligne(soc ? "Revenu brut, versé à la société" : "Revenu brut", x => $(x.revenu)),
+      ...(soc ? [
+        ligne("Dépenses et frais de la société", x => moins(x.societe.depenses + x.societe.frais)),
+        ligne("Impôt de la société", x => moins(x.societe.impotSociete)),
+        ligne("Dividendes versés", x => $(x.societe.dividendes)),
+        ligne("Laissé dans la société", x => $(x.societe.retenu), "sous"),
+      ] : [ligne("Revenu imposable", x => $(x.imposable), "sous")]),
+      ligne("Impôt fédéral", x => $(x.fed)),
+      ligne("Impôt du Québec", x => $(x.qc)),
+      ...(soc ? [] : [ligne("RRQ (deux parts)", x => $(x.rrq)), ligne("RQAP", x => $(x.rqap))]),
+      ligne("Fonds des services de santé", x => $(x.fss)),
+      ...(R.couple && I3.some(x => x.transferts > 0) ? [ligne(`Crédits transférés par ${votreP()}`, x => moins(x.transferts))] : []),
+      ligne(soc ? "Net pour vous" : "Net après impôt", x => $(x.net), "total"),
+      ligne(soc ? "Taux moyen, société comprise" : "Taux moyen", x => pct(x.tauxMoyen), "sous"),
     ]);
+    document.getElementById("im-tableau-note").textContent = soc
+      ? "Pratique incorporée : la société paie les dépenses, les frais et son impôt, puis vous verse des dividendes non déterminés (majorés de 15 %, avec crédit d'impôt pour dividendes). Pas de RRQ ni de RQAP sur les dividendes, donc pas de rente RRQ ni de droits REER pour ces revenus. Crédit pour les intérêts d'un prêt étudiant et déduction REER inclus."
+      : "Travail autonome, sans société : impôt fédéral (après l'abattement du Québec), impôt du Québec, RRQ des deux parts, RQAP et Fonds des services de santé. Crédits de base, crédit pour les intérêts d'un prêt de l'aide financière aux études, déduction REER et dépenses professionnelles.";
+    document.getElementById("im-societe").closest(".carte").hidden = soc;
 
     rendreFamille(R);
     rendreVerification();
@@ -1248,7 +1319,7 @@
     z.appendChild(el("p", "resume", (S.famille.calculAuto
       ? `Allocations familiales : ${$(R.allocations)} par année, soit ${$(R.allocations / 12)} par mois, sur un revenu net familial de ${$(R.netFedFamille)}${nEnf ? ` et ${nEnf} enfant${nEnf > 1 ? "s" : ""}` : ""}.`
       : `Allocations familiales : montant inscrit à la main, ${$(R.allocations)} par année.`) +
-      (R.couple ? (S.famille.versementA === "conjointe" ? " Elles sont versées à votre conjointe." : " Elles vous sont versées.") : "")));
+      (R.couple ? (S.famille.versementA === "conjointe" ? ` Elles sont versées à ${votreP()}.` : " Elles vous sont versées.") : "")));
     if (S.famille.calculAuto) {
       if (!nEnf) z.appendChild(el("p", "aide", "Ajoutez les enfants et leur âge dans la page Avenir pour calculer les allocations."));
       else z.appendChild(rangees(el("div"), [
@@ -1261,24 +1332,25 @@
     z.appendChild(el("h3", null, "Assurance médicaments"));
     z.appendChild(rangees(el("div"), [
       { titre: "Votre prime du régime public", sous: S.famille.medicamentsPublicMoi ? "Payée avec l'impôt du Québec" : "Assurance collective : pas de prime", valeur: $(R.primeMoi) },
-      R.couple && { titre: "Prime de votre conjointe", sous: S.conjointe.medicamentsPublic ? "Payée avec l'impôt du Québec" : "Assurance collective : pas de prime", valeur: $(R.primeConjointe) },
+      R.couple && { titre: `Prime de ${votreP()}`, sous: S.conjointe.medicamentsPublic ? "Payée avec l'impôt du Québec" : "Assurance collective : pas de prime", valeur: $(R.primeConjointe) },
     ]));
     z.appendChild(el("p", "aide", "La prime dépend du revenu net familial ; les enfants sont couverts sans prime."));
     if (!R.couple) return;
     const c = R.conjointe;
-    z.appendChild(el("h3", null, "Impôt de votre conjointe"));
+    z.appendChild(el("h3", null, `Impôt de ${votreP()}`));
     z.appendChild(rangees(el("div"), [
-      { titre: "Salaire et autres revenus", valeur: $(c.revenu) },
+      { titre: R.autonomeP ? "Revenu d'entreprise et autres revenus" : "Salaire et autres revenus", valeur: $(c.revenu) },
+      R.autonomeP && R.depensesPartenaire > 0 && { titre: "Dépenses d'entreprise", valeur: moins(R.depensesPartenaire) },
       { titre: "Impôt fédéral", valeur: moins(c.fed) },
       { titre: "Impôt du Québec", valeur: moins(c.qc) },
-      { titre: "RRQ, RQAP et assurance-emploi", valeur: moins(c.rrq + c.rqap + c.ae) },
-      S.conjointe.rpa + S.conjointe.syndicat > 0 && { titre: "Régime de retraite et cotisations syndicales", valeur: moins(S.conjointe.rpa + S.conjointe.syndicat) },
+      { titre: R.autonomeP ? "RRQ (deux parts), RQAP et Fonds des services de santé" : "RRQ, RQAP et assurance-emploi", valeur: moins(c.rrq + c.rqap + c.ae + (c.fss || 0)) },
+      !R.autonomeP && S.conjointe.rpa + S.conjointe.syndicat > 0 && { titre: "Régime de retraite et cotisations syndicales", valeur: moins(S.conjointe.rpa + S.conjointe.syndicat) },
       c.transferts > 0 && { titre: "Crédits transférés par vous", valeur: $(c.transferts) },
-      { titre: "Net après impôt", cls: "total", valeur: $(c.net) },
+      { titre: R.autonomeP ? "Net après impôt et dépenses" : "Net après impôt", cls: "total", valeur: $(c.net - R.depensesPartenaire) },
     ]));
     const recu = R.impot.transferts + c.transferts;
     z.appendChild(el("p", "aide", recu > 0
-      ? `Conjoints au sens de l'impôt : ${$(recu)} de crédits non utilisés passent de ${R.impot.transferts > 0 ? "votre conjointe à vous" : "vous à votre conjointe"} (montant pour conjoint au fédéral, transfert de crédits au Québec).`
+      ? `Conjoints au sens de l'impôt : ${$(recu)} de crédits non utilisés passent de ${R.impot.transferts > 0 ? `${votreP()} à vous` : `vous à ${votreP()}`} (montant pour conjoint au fédéral, transfert de crédits au Québec).`
       : "Conjoints au sens de l'impôt : aucun crédit à transférer, chacun utilise ses propres crédits."));
   }
 
@@ -1325,7 +1397,7 @@
   function rendreBudget(R) {
     const cj = R.couple;
     if (!cj && U.vueBudget === "conjointe") U.vueBudget = "moi";
-    segment("bu-vue", cj ? [["moi", "Vous"], ["conjointe", "Conjointe"], ["menage", "Ménage"]] : [["moi", "Vous"], ["menage", "Ménage"]], U.vueBudget, v => { U.vueBudget = v; tout(); }, "Budget de qui");
+    segment("bu-vue", cj ? [["moi", "Vous"], ["conjointe", Pn()], ["menage", "Ménage"]] : [["moi", "Vous"], ["menage", "Ménage"]], U.vueBudget, v => { U.vueBudget = v; tout(); }, "Budget de qui");
     const vue = U.vueBudget, part = S.menage.partCommunMoi / 100;
     const qui = b => vue === "menage" ? 1 : vue === "moi" ? (b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0) : (b.qui === "conjoint" ? 1 : b.qui === "commun" ? 1 - part : 0);
     const partDette = d => vue === "menage" ? 1 : vue === "moi" ? (d.paiementMoi ?? 100) / 100 : 1 - (d.paiementMoi ?? 100) / 100;
@@ -1334,13 +1406,13 @@
       conjointe: { travail: R.travailConjointe, alloc: R.allocConjointe, autres: 0, rev: R.netConjointe, dep: R.depConjointe, dettes: R.dettesConjointe, epargne: R.epargneConjointe, surplus: R.surplusConjointe },
       menage: { travail: R.travailMoi + R.travailConjointe, alloc: R.allocMoi + R.allocConjointe, autres: S.menage.autresRevenusMensuels, rev: R.revenusMenage, dep: R.depMenage, dettes: R.dettesMenage, epargne: R.epargneMoi + R.epargneConjointe, surplus: R.surplusMenage },
     }[vue];
-    const nomVue = { moi: "Votre surplus mensuel", conjointe: "Surplus de votre conjointe", menage: "Surplus du ménage" }[vue];
+    const nomVue = { moi: "Votre surplus mensuel", conjointe: `Surplus de ${votreP()}`, menage: "Surplus du ménage" }[vue];
     hero("bu-hero", nomVue, $(V.surplus), [
       `${$(V.rev)} de revenus, ${$(V.dep + V.dettes + V.epargne)} de sorties`,
       V.surplus < 0 && puce("Budget négatif", "bas", false),
     ], V.surplus);
     rangees("bu-revenus", [
-      { titre: "Revenu net de travail", sous: vue === "conjointe" ? "Salaire après impôt et cotisations" : "Après impôt, prime d'assurance médicaments et dépenses pro", valeur: $(V.travail) },
+      { titre: "Revenu net de travail", sous: vue === "conjointe" ? (S.conjointe.statut === "autonome" ? "Après impôt, cotisations et dépenses d'entreprise" : "Salaire après impôt et cotisations") : "Après impôt, prime d'assurance médicaments et dépenses pro", valeur: $(V.travail) },
       (R.allocations > 0 || vue !== "conjointe") && { titre: "Allocations familiales", sous: S.famille.calculAuto ? "Calculées selon vos revenus" : "Montant inscrit", valeur: $(V.alloc) },
       V.autres > 0 && { titre: "Autres revenus", valeur: $(V.autres) },
       { titre: "Total", cls: "total", valeur: $(V.rev) },
@@ -1354,7 +1426,7 @@
         const v = l.reduce((s, b) => s + mensuel(b) * qui(b), 0);
         return { titre: g, sous: n ? `${n} dépense${n > 1 ? "s" : ""}` : "Rien d'inscrit", valeur: n ? $(v) : "—", cls: n ? null : "vide", action: () => feuilleCategorie(g) };
       }),
-      { titre: vue === "conjointe" ? "Son épargne" : "Épargne : REEE, REER, CELI", sous: vue === "conjointe" ? "Bouton Ménage" : vue === "menage" && R.epargneConjointe ? "La vôtre et celle de votre conjointe" : "Bouton Modifier de la page Avenir", valeur: $(V.epargne) },
+      { titre: vue === "conjointe" ? "Son épargne" : "Épargne : REEE, REER, CELI", sous: vue === "conjointe" ? "Bouton Ménage" : vue === "menage" && R.epargneConjointe ? `La vôtre et celle de ${votreP()}` : "Bouton Modifier de la page Avenir", valeur: $(V.epargne) },
       { titre: "Total des dépenses et de l'épargne", cls: "total", valeur: $(V.dep + V.epargne) },
     ]);
     rangees("bu-dettes", [
@@ -1477,16 +1549,16 @@
     const hypD = S.dettes.filter(d => d.type === "hypotheque");
     const surplusCopro = hypD.reduce((a, d) => a + Math.max(0, ((d.paiementMoi ?? 100) - (d.partMoi ?? 100)) / 100), 0);
     document.getElementById("vn-note").textContent = "Chaque paiement d'hypothèque réduit la dette : le capital remboursé devient de l'équité dans la maison, dont la valeur croît chaque année. Une fois les dettes remboursées, le même budget mensuel est placé. Glissez sur le graphique pour voir chaque année." +
-      (surplusCopro > 0 && !couple ? ` Vous payez une plus grande part de l'hypothèque que votre part de la maison : le capital que vous remboursez enrichit aussi ${cj ? "votre conjointe" : "l'autre copropriétaire"}, sauf entente écrite ou mariage.` : "");
+      (surplusCopro > 0 && !couple ? ` Vous payez une plus grande part de l'hypothèque que votre part de la maison : le capital que vous remboursez enrichit aussi ${cj ? votreP() : "l'autre copropriétaire"}, sauf entente écrite ou mariage.` : "");
 
     // De quoi elle est faite : aujourd'hui, dans 10 ans, dans 20 ans.
     const fin = p.length - 1, cols = [0, Math.round(fin / 2), fin];
     const v = (i, f) => f(p[i]) / def(i);
     const L = couple
       ? [["Maison, part du couple", x => x.maisonMenage], ["Hypothèques", x => -x.hypMenage], ["Équité dans la maison", x => x.equiteMenage, "sous-total"],
-         ["Placements : REER, CELI, comptes", x => x.placements + x.conjointe], ["Autos", x => x.voitureMenage], ["Autres dettes", x => -x.autresMenage]]
+         ["Placements : REER, CELI, comptes", x => x.placements + x.conjointe], ...(R.societeActive ? [["Placements dans la société", x => x.societe]] : []), ["Autos", x => x.voitureMenage], ["Autres dettes", x => -x.autresMenage]]
       : [["Maison, votre part", x => x.maisonMoi], ["Hypothèques, votre part", x => -x.hypMoi], ["Équité dans la maison", x => x.equiteMoi, "sous-total"],
-         ["Placements : REER, CELI, comptes", x => x.placements], ["Auto", x => x.voitureMoi], ["Autres dettes, votre part", x => -x.autresMoi]];
+         ["Placements : REER, CELI, comptes", x => x.placements], ...(R.societeActive ? [["Placements dans la société", x => x.societe]] : []), ["Auto", x => x.voitureMoi], ["Autres dettes, votre part", x => -x.autresMoi]];
     // Sur téléphone, montants abrégés (k$, M$) pour que les trois colonnes tiennent.
     const tableComp = document.getElementById("vn-composition");
     const court = (tableComp.closest(".carte").clientWidth || 600) < 520;
@@ -1496,6 +1568,7 @@
       { cls: "total", cellules: ["Valeur nette", ...cols.map(i => m$(v(i, x => x[cle])))] },
     ]);
     document.getElementById("vn-composition-note").textContent = `Valeur de la maison : ${$(p[0].valeurMaison)} aujourd'hui, ${$(p[cols[cols.length - 1]].valeurMaison / def(cols[cols.length - 1]))} en ${p[cols[cols.length - 1]].annee} (${signePct(h.croissanceMaison)} par année).` +
+      (R.societeActive ? " Les placements de la société sont comptés avant l'impôt personnel au retrait ; leur rendement est réduit de moitié par l'impôt de la société sur le revenu de placement." : "") +
       (S.scenarios.dollarsAujourdhui ? " Montants en dollars d'aujourd'hui." : "");
 
     rangees("vn-scenarios", Object.entries(SCENARIOS).map(([k, nom]) => {
@@ -1541,7 +1614,7 @@
     document.getElementById("fiabilite").textContent = `${n} sur ${uniques.length}`;
     document.querySelector("#fiabilite-jauge span").style.width = (n / Math.max(1, uniques.length) * 100) + "%";
     const l = document.getElementById("liste-a-confirmer"); l.textContent = "";
-    Object.values(CHAMPS).flat().filter(c => c.p && !S.confirmes[c.p]).filter((c, i, a) => a.findIndex(x => x.p === c.p) === i).forEach(c => l.appendChild(el("li", null, c.l)));
+    Object.values(CHAMPS).flat().filter(c => c.p && !S.confirmes[c.p]).filter((c, i, a) => a.findIndex(x => x.p === c.p) === i).forEach(c => l.appendChild(el("li", null, texteDe(c.l))));
     document.getElementById("donnees-maj").textContent = S.meta.misAJour ? `Dernière modification : ${new Date(S.meta.misAJour).toLocaleString("fr-CA")}` : "";
   }
 
@@ -1567,7 +1640,8 @@
     if (inp.dataset.p) {
       const v = valeur(inp); if (v === null) return;
       ecrire(inp.dataset.p, v); S.meta.exemple = false;
-      if (inp.dataset.p === "conjointe.active" || inp.dataset.p === "famille.calculAuto") majVisibilite();
+      majVisibilite();   // un champ peut en afficher ou en cacher d'autres
+      if (inp.dataset.p === "conjointe.designation") { S.conjointe.designation = v; reconstruireFeuille(); }
       plusTard();
     } else if (inp.dataset.l) {
       const v = valeur(inp); if (v === null) return;

@@ -140,13 +140,24 @@
       perDiem, forfaitInscription, forfaitVulnerable, supplements, autres: r.autresRevenus || 0,
     };
     mixte.total = mixte.forfaitHoraire + mixte.visites + mixte.supervision + commun;
+    // À l'acte : chaque visite et l'acte de supervision au tarif de l'entente (100 % par défaut),
+    // sans forfait horaire ; forfaits d'inscription, suppléments et demi-per diem comme ailleurs.
+    const pctActe = r.pctActe ?? 100, pctSupActe = r.pctSupervisionActe ?? 100;
+    const acte = {
+      visites: visitesMixte * pctActe / 100,
+      supervision: W * T * heuresSup * r.acteSupervision * pctSupActe / 100,
+      perDiem, forfaitInscription, forfaitVulnerable, supplements, autres: r.autresRevenus || 0,
+    };
+    acte.total = acte.visites + acte.supervision + commun;
 
     // Seuil : nombre de patients par demi-journée clinique où le mixte égale l'horaire.
     const parVisite = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0) * r.pctMixte / 100;
     const seuil = parVisite > 0 ? (r.tarifHoraire - r.forfaitHoraireMixte) * H / parVisite : null;
+    const parVisiteActe = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0) * pctActe / 100;
+    const seuilActe = parVisiteActe > 0 ? r.tarifHoraire * H / parVisiteActe : null;
 
     return { heures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, semainesPalierHaut,
-      horaire, mixte, ecart: mixte.total - horaire.total, seuilPatients: seuil };
+      horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
   }
 
   /* ============================================================
@@ -196,7 +207,7 @@
     const cotisationFss = fss(revenuNetAffaires);
     const total = fed + qc + c.rrq + c.rqap + cotisationFss;
     return { revenu: o.revenu, imposable: imposableFed, imposableQc, revenuNetFed: imposableFed, revenuNetQc: imposableQc,
-      fed, qc, rrq: c.rrq, rqap: c.rqap, ae: 0, fss: cotisationFss, total,
+      fed, qc, rrq: c.rrq, rqap: c.rqap, ae: 0, fss: cotisationFss, total, totalGlobal: total,
       net: o.revenu - total, tauxMoyen: o.revenu > 0 ? total / o.revenu : 0 };
   }
 
@@ -234,7 +245,8 @@
     const montantConjoint = Math.min(haut.fed, Math.max(0, bpaHaut - bas.revenuNetFed) * f.tauxCredit * (1 - f.abattementQc));
     const inutilises = Math.min(haut.qc, Math.max(0, q.montantBase * q.tauxCredit - parTranches(bas.revenuNetQc, q.tranches)));
     const ajuste = r => r === haut
-      ? { ...r, fed: r.fed - montantConjoint, qc: r.qc - inutilises, total: r.total - montantConjoint - inutilises, net: r.net + montantConjoint + inutilises, transferts: montantConjoint + inutilises }
+      ? { ...r, fed: r.fed - montantConjoint, qc: r.qc - inutilises, total: r.total - montantConjoint - inutilises,
+          totalGlobal: (r.totalGlobal ?? r.total) - montantConjoint - inutilises, net: r.net + montantConjoint + inutilises, transferts: montantConjoint + inutilises }
       : { ...r, transferts: 0 };
     return [ajuste(a), ajuste(b)];
   }
@@ -284,6 +296,30 @@
     const { fed, qc } = impotsDeBase(imposable, imposable, 0, 0, majore * d.creditFederal, majore * d.creditQuebec);
     return { fed, qc, total: fed + qc, net: dividendes - fed - qc };
   }
+  /* Médecin incorporé : la société reçoit les paiements de la RAMQ, paie les dépenses
+     et son impôt (taux combiné ; au Québec, la déduction pour petite entreprise exige
+     5 500 heures rémunérées, rare pour une société de médecin), puis verse des
+     dividendes non déterminés : tout le bénéfice après impôt, ou un montant fixe. Le
+     reste demeure dans la société. Même format que impotParticulier, pour la personne ;
+     totalGlobal ajoute l'impôt de la société. */
+  function impotSociete(o) {
+    const profit = Math.max(0, o.revenu - (o.depensesPro || 0) - (o.fraisSociete || 0));
+    const impotSoc = profit * o.tauxSociete;
+    const disponible = profit - impotSoc;
+    const dividendes = o.retrait === "fixe" ? Math.min(disponible, Math.max(0, o.retraitFixe || 0)) : disponible;
+    const d = P2026.dividendes, majore = dividendes * (1 + d.majoration);
+    const imposable = Math.max(0, majore - (o.reer || 0));
+    const ie = o.interetsEtudes || 0;
+    const { fed, qc } = impotsDeBase(imposable, imposable, 0, 0,
+      majore * d.creditFederal + ie * P2026.creditInteretsEtudes.federal, majore * d.creditQuebec + ie * P2026.creditInteretsEtudes.quebec);
+    const cotisationFss = fss(majore);
+    const total = fed + qc + cotisationFss;
+    return { revenu: o.revenu, dividendes, imposable, imposableQc: imposable, revenuNetFed: imposable, revenuNetQc: imposable,
+      fed, qc, rrq: 0, rqap: 0, ae: 0, fss: cotisationFss, total, totalGlobal: total + impotSoc,
+      net: dividendes - total, tauxMoyen: o.revenu > 0 ? (total + impotSoc) / o.revenu : 0,
+      societe: { profit, impotSociete: impotSoc, disponible, dividendes, retenu: disponible - dividendes, frais: o.fraisSociete || 0, depenses: o.depensesPro || 0 } };
+  }
+
   /* Compare le particulier et une société qui verse seulement les
      dividendes nécessaires pour fournir `besoinNet` au ménage. Le reste
      reste dans la société, imposé au taux des PME : c'est un report, pas
@@ -474,7 +510,9 @@
   function projeterValeurNette(o, simulation) {
     const ans = o.annees || 20, r = o.rendement / 100, rm = Math.pow(1 + r, 1 / 12) - 1;
     const voitures = o.voitures || [];
-    let reer = o.reer.solde, celi = o.celi.solde, conj = o.actifsConjoint || 0;
+    let reer = o.reer.solde, celi = o.celi.solde, conj = o.actifsConjoint || 0, soc = o.societe ? o.societe.solde || 0 : 0;
+    // Placements de la société : rendement après l'impôt de la société sur le revenu de placement.
+    const rmSoc = o.societe ? Math.pow(1 + r * (1 - (o.societe.impotPlacement ?? 0.5)), 1 / 12) - 1 : 0;
     // Autos : chacune perd de la valeur chaque année ; si un remplacement est prévu, une auto
     // neuve est achetée tous les N ans (prix indexé à l'inflation), payée avec l'épargne.
     const autos = voitures.map(v => ({ ...v, valeurCourante: v.valeur, age: 0 }));
@@ -494,6 +532,7 @@
           // Sans remboursement accéléré (minimums seulement), le surplus du mois est épargné.
           celi = celi * (1 + rm) + o.celi.cotisationAnnuelle / 12 + (libre || 0) + (o.ajoutMensuel ? Math.max(0, o.ajoutMensuel(a - 1)) : 0);
           conj = conj * (1 + rm) + (o.epargneConjointe || 0) * Math.pow(1 + (o.hausseEpargneConjointe || 0) / 100, a - 1);
+          if (o.societe) soc = soc * (1 + rmSoc) + Math.max(0, o.societe.retenuAnnee(a - 1)) / 12;
         }
         for (const v of autos) {
           v.valeurCourante *= 1 - v.depreciation / 100; v.age++;
@@ -521,18 +560,18 @@
       const vMoi = autos.filter(v => !v.conjointe).reduce((s, v) => s + v.valeurCourante, 0);
       const vMenage = autos.reduce((s, v) => s + v.valeurCourante, 0);
       const placements = reer + celi + encaisse + attente;
-      const moi = maisonMoi - hypMoi + vMoi + placements - autresMoi;
-      const menage = maisonMenage - hypMenage + vMenage + placements + conj - autresMenage;
+      const moi = maisonMoi - hypMoi + vMoi + placements + soc - autresMoi;
+      const menage = maisonMenage - hypMenage + vMenage + placements + conj + soc - autresMenage;
       res.push({ annee: o.anneeDepart + a, moi, menage, valeurMaison, maisonMoi, maisonMenage, hypMoi, hypMenage,
         equiteMoi: maisonMoi - hypMoi, equiteMenage: maisonMenage - hypMenage, autresMoi, autresMenage,
-        voitureMoi: vMoi, voitureMenage: vMenage, reer, celi, encaisse, attente, placements, conjointe: conj,
+        voitureMoi: vMoi, voitureMenage: vMenage, reer, celi, encaisse, attente, placements, societe: soc, conjointe: conj,
         hypotheque: hypMenage, dettes: hypMenage + autresMenage });
     }
     return res;
   }
 
   const Calc = { P2026, VISITES, PRISE_EN_CHARGE, tarifVisite, revenuGmfu, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
-    remboursementReer, impotDividendes, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
+    remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;
 })(typeof window !== "undefined" ? window : globalThis);

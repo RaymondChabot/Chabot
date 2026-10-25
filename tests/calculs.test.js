@@ -76,5 +76,30 @@ verifier("auto −15 %/an", proche(p[2].voitureMoi, 20000 * 0.85 * 0.85, 0.01));
 const reee = C.projeterReee({ enfants: [{ age: 0, solde: 0 }], cotisationAnnuelle: 2500 }, 0);
 verifier("REEE : subventions 500 $ + 250 $ par an, plafonnées à vie", proche(reee[0].subventions, 7200 + 3600, 0.01), reee[0].subventions);
 
+/* 6. Pratique incorporée : tout l'argent est compté (impôts, dépenses, dividendes, société). */
+for (const retrait of ["tout", "fixe"]) {
+  const s = C.impotSociete({ revenu: 200000, depensesPro: 3000, fraisSociete: 4000, tauxSociete: 0.205, retrait, retraitFixe: 100000 });
+  const somme = s.societe.impotSociete + s.total + s.net + s.societe.depenses + s.societe.frais + s.societe.retenu;
+  verifier(`société ${retrait} : rien ne se perd`, proche(somme, 200000, 0.01), somme.toFixed(2));
+  verifier(`société ${retrait} : dividendes`, retrait === "tout" ? proche(s.societe.retenu, 0, 0.01) : proche(s.dividendes, 100000, 0.01));
+  verifier(`société ${retrait} : pas de RRQ sur les dividendes`, s.rrq === 0 && s.rqap === 0);
+}
+// Intégration imparfaite des dividendes non déterminés : tout verser coûte un peu plus que sans société.
+const sTout = C.impotSociete({ revenu: 200000, depensesPro: 3000, fraisSociete: 0, tauxSociete: 0.205, retrait: "tout" });
+const sansSoc = C.impotParticulier({ revenu: 200000, depensesPro: 3000 });
+verifier("société, tout versé : impôt total proche du particulier (± 10 %)", Math.abs(sTout.totalGlobal - sansSoc.total) < 0.1 * sansSoc.total, `${Math.round(sTout.totalGlobal)} contre ${Math.round(sansSoc.total)}`);
+
+/* 7. À l'acte : visites et supervision à 100 %, sans forfait horaire. */
+const rev = { annee: "type", demiJournees: 9, enseignement: 3, heuresParDJ: 4, semaines: 46, patientsParDJ: 5, residents: 1, patientsPendantSupervision: 0, autresRevenus: 0,
+  inscritsDebut: 500, nouveauxGuichet: 0, nouveauxSansMedecin: 0, nouveauxTransferes: 0, semainesArrivee: 46, partVulnerable: 20, quatrePremieresAnnees: true,
+  mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 }, tarifHoraire: 99.48, forfaitHoraireMixte: 59.68, pctMixte: 60, acteSupervision: 114.2, pctSupervision: 60,
+  supervisionMaxH: 3.5, perDiemResident: 39.65, forfaitInscription: 10, forfaitVulnerable: 55, suppNonVulnerable: 18.9, suppVulnerableHorsGuichet: 58.1, suppVulnerableGuichet: 124.5 };
+const g = C.revenuGmfu(rev);
+verifier("à l'acte : visites = mixte × 100 / 60", proche(g.acte.visites, g.mixte.visites * 100 / 60, 0.01));
+verifier("à l'acte : supervision = mixte × 100 / 60", proche(g.acte.supervision, g.mixte.supervision * 100 / 60, 0.01));
+verifier("à l'acte : pas de forfait horaire", g.acte.forfaitHoraire === undefined && g.acte.heures === undefined);
+const g10 = C.revenuGmfu({ ...rev, patientsParDJ: g.seuilActe });
+verifier("à l'acte : au seuil, la clinique paie comme l'horaire", proche(g10.acte.visites, 6 * 46 * 99.48 * 4, 1), `${Math.round(g10.acte.visites)}`);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);
