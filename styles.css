@@ -249,3 +249,17 @@ main { max-width: 1240px; margin: 0 auto; padding-block: 18px 40px; }
 @media (prefers-reduced-motion: no-preference) {
   .bouton, .onglets button, .conf { transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
 }
+
+/* ---------- Catégories de dépenses ---------- */
+.categorie { border: 1px solid var(--ligne); border-radius: 10px; padding: 0 10px; }
+.categorie > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 10px 0; }
+.categorie > summary::-webkit-details-marker { display: none; }
+.categorie > summary::before { content: "+"; font-weight: 600; color: var(--discret); width: 12px; flex: none; }
+.categorie[open] > summary::before { content: "\2013"; }
+.categorie[open] > summary { border-bottom: 1px solid var(--grille); margin-bottom: 8px; }
+.cat-nom { font-weight: 600; font-size: 0.9rem; flex: 1; }
+.cat-total { font-size: 0.8rem; color: var(--discret); font-variant-numeric: tabular-nums; text-align: right; }
+.categorie > .aide { margin-bottom: 8px; }
+.categorie > .bouton { margin: 4px 0 10px; }
+.nom-depense { font-size: 0.86rem; }
+.ligne-budget.remplie .nom-depense { font-weight: 600; }

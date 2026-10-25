@@ -28,16 +28,19 @@
     impot: { depensesPro: 3000 },
     societe: { tauxSociete: 20.5, fraisSociete: 4000 },
     menage: { conjointNetMensuel: 4000, allocationsAnnuelles: 2400, autresRevenusMensuels: 0, partCommunMoi: 50 },
+    // Valeurs fictives ; les autres cases du catalogue partent à 0.
     budget: [
-      { id: "b1", nom: "Épicerie et maison", montant: 1400, periode: "mois", qui: "commun" },
-      { id: "b2", nom: "Garderie", montant: 400, periode: "mois", qui: "commun" },
-      { id: "b3", nom: "Taxes municipales et scolaires", montant: 5000, periode: "an", qui: "commun" },
-      { id: "b4", nom: "Assurance habitation", montant: 1200, periode: "an", qui: "commun" },
-      { id: "b5", nom: "Électricité", montant: 150, periode: "mois", qui: "commun" },
-      { id: "b6", nom: "Voiture : assurance, essence, entretien", montant: 400, periode: "mois", qui: "moi" },
-      { id: "b7", nom: "Assurances invalidité et vie", montant: 300, periode: "mois", qui: "moi" },
-      { id: "b8", nom: "Téléphone et internet", montant: 150, periode: "mois", qui: "moi" },
-      { id: "b9", nom: "Vêtements, loisirs, imprévus", montant: 700, periode: "mois", qui: "commun" },
+      { id: "epicerie", k: "epicerie", nom: "", montant: 1300, periode: "mois", qui: "commun" },
+      { id: "garderie", k: "garderie", nom: "", montant: 400, periode: "mois", qui: "commun" },
+      { id: "taxesMunicipales", k: "taxesMunicipales", nom: "", montant: 4200, periode: "an", qui: "commun" },
+      { id: "taxesScolaires", k: "taxesScolaires", nom: "", montant: 500, periode: "an", qui: "commun" },
+      { id: "assuranceHabitation", k: "assuranceHabitation", nom: "", montant: 1200, periode: "an", qui: "commun" },
+      { id: "electricite", k: "electricite", nom: "", montant: 150, periode: "mois", qui: "commun" },
+      { id: "assuranceAuto", k: "assuranceAuto", nom: "", montant: 100, periode: "mois", qui: "moi" },
+      { id: "essence", k: "essence", nom: "", montant: 180, periode: "mois", qui: "moi" },
+      { id: "cellulaires", k: "cellulaires", nom: "", montant: 100, periode: "mois", qui: "moi" },
+      { id: "internet", k: "internet", nom: "", montant: 80, periode: "mois", qui: "commun" },
+      { id: "loisirs", k: "loisirs", nom: "", montant: 200, periode: "mois", qui: "commun" },
     ],
     dettes: [
       { id: "d1", nom: "Marge de crédit", type: "marge", solde: 150000, limite: 200000, taux: 4.5, paiement: 0, frequence: "mois", interetsSeulement: true, finTerme: "", tauxRenouvellement: 0, privilege: 0, creditImpot: 0, partMoi: 100, paiementMoi: 100 },
@@ -53,6 +56,110 @@
     },
     actifs: { maison: { valeur: 500000, part: 50, croissance: 3 }, voiture: { valeur: 15000, depreciation: 15 }, actifsConjoint: 0 },
   };
+
+  /* ============================================================
+     CATALOGUE DES DÉPENSES RÉCURRENTES : une case par dépense possible.
+     Chaque case garde son montant, sa période et qui la paie ; les
+     paiements de dettes et l'épargne viennent de leurs propres sections.
+     ============================================================ */
+  const CATALOGUE = [
+    { cat: "Logement", items: [
+      ["taxesMunicipales", "Taxes municipales", "an", "commun"],
+      ["taxesScolaires", "Taxe scolaire", "an", "commun"],
+      ["assuranceHabitation", "Assurance habitation", "an", "commun"],
+      ["electricite", "Électricité", "mois", "commun"],
+      ["chauffage", "Chauffage : gaz, mazout ou bois", "mois", "commun"],
+      ["eau", "Eau et égouts, si facturés à part", "an", "commun"],
+      ["entretienMaison", "Entretien et réparations de la maison", "mois", "commun"],
+      ["deneigement", "Déneigement", "an", "commun"],
+      ["terrain", "Terrain, piscine, paysagement", "an", "commun"],
+      ["alarme", "Système d'alarme", "mois", "commun"],
+      ["meubles", "Meubles et électroménagers", "an", "commun"],
+    ] },
+    { cat: "Alimentation", items: [
+      ["epicerie", "Épicerie", "mois", "commun"],
+      ["restaurants", "Restaurants et commandes", "mois", "commun"],
+      ["lunchs", "Lunchs et cafés au travail", "mois", "moi"],
+    ] },
+    { cat: "Transport", items: [
+      ["assuranceAuto", "Assurance auto", "mois", "moi"],
+      ["essence", "Essence ou recharge", "mois", "moi"],
+      ["entretienAuto", "Entretien et pneus", "mois", "moi"],
+      ["immatriculation", "Immatriculation et permis de conduire", "an", "moi"],
+      ["stationnement", "Stationnement", "mois", "moi"],
+      ["transportCommun", "Transport en commun et taxi", "mois", "moi"],
+      ["voitureConjoint", "Voiture de l'autre parent, tous les frais", "mois", "conjoint"],
+    ] },
+    { cat: "Enfants", items: [
+      ["garderie", "Garderie ou CPE", "mois", "commun"],
+      ["couches", "Couches, lait et soins", "mois", "commun"],
+      ["vetementsEnfants", "Vêtements et chaussures", "mois", "commun"],
+      ["activitesEnfants", "Activités, sports et cours", "mois", "commun"],
+      ["campsJour", "Camps de jour et semaine de relâche", "an", "commun"],
+      ["gardiennage", "Gardiennage", "mois", "commun"],
+      ["jouets", "Jouets, livres, fêtes d'amis", "mois", "commun"],
+      ["ecole", "Fournitures et frais scolaires", "an", "commun"],
+    ] },
+    { cat: "Santé", items: [
+      ["assuranceMedicaments", "Assurance médicaments", "an", "moi"],
+      ["medicaments", "Médicaments et pharmacie", "mois", "commun"],
+      ["dentiste", "Dentiste", "an", "commun"],
+      ["lunettes", "Optométriste et lunettes", "an", "commun"],
+      ["therapies", "Physiothérapie, psychologue et autres soins", "an", "commun"],
+    ] },
+    { cat: "Assurances personnelles", items: [
+      ["assuranceInvalidite", "Assurance invalidité", "mois", "moi"],
+      ["assuranceVie", "Assurance vie", "mois", "moi"],
+      ["maladiesGraves", "Assurance maladies graves", "mois", "moi"],
+      ["assurancesConjoint", "Assurances de l'autre parent", "mois", "conjoint"],
+    ] },
+    { cat: "Télécom et abonnements", items: [
+      ["cellulaires", "Cellulaires", "mois", "moi"],
+      ["internet", "Internet", "mois", "commun"],
+      ["television", "Télévision et diffusion en continu", "mois", "commun"],
+      ["abonnements", "Autres abonnements : applications, journaux", "mois", "moi"],
+    ] },
+    { cat: "Personnel et loisirs", items: [
+      ["vetementsAdultes", "Vêtements des adultes", "mois", "commun"],
+      ["soinsPersonnels", "Coiffure et soins personnels", "mois", "commun"],
+      ["sport", "Gym et sports", "mois", "moi"],
+      ["loisirs", "Sorties et loisirs", "mois", "commun"],
+      ["vacances", "Vacances et voyages", "an", "commun"],
+      ["cadeaux", "Cadeaux et fêtes", "an", "commun"],
+      ["animaux", "Animaux", "mois", "commun"],
+      ["dons", "Dons", "an", "moi"],
+    ] },
+    { cat: "Finances", items: [
+      ["fraisBancaires", "Frais bancaires", "mois", "moi"],
+      ["comptable", "Comptable et déclarations de revenus", "an", "moi"],
+      ["pensionAlimentaire", "Pension alimentaire", "mois", "moi"],
+    ] },
+    { cat: "Imprévus", items: [
+      ["imprevus", "Imprévus", "mois", "commun"],
+    ] },
+  ];
+  const ITEMS = new Map(CATALOGUE.flatMap(c => c.items.map(([k, nom, periode, qui]) => [k, { k, nom, periode, qui, cat: c.cat }])));
+  const AIDE_CATEGORIE = {
+    "Santé": "Sans assurance collective, la prime du régime public d'assurance médicaments se paie avec l'impôt du Québec : inscrivez-la ici.",
+    "Finances": "Les cotisations professionnelles sont dans l'onglet Impôt, avec les dépenses déductibles.",
+    "Logement": "Les paiements d'hypothèque viennent de la section Dettes.",
+  };
+
+  /* Une case par dépense du catalogue, dans l'ordre du catalogue, puis les
+     dépenses ajoutées à la main. Une ancienne ligne sans clé devient une
+     dépense ajoutée. */
+  function normaliserBudget(budget) {
+    const parCle = new Map((budget || []).filter(b => b.k && ITEMS.has(b.k)).map(b => [b.k, b]));
+    const resultat = [];
+    for (const [k, it] of ITEMS) {
+      const b = parCle.get(k);
+      resultat.push({ id: k, k, nom: "", montant: b ? +b.montant || 0 : 0, periode: b ? b.periode : it.periode, qui: b ? b.qui : it.qui });
+    }
+    for (const b of budget || []) if (!b.k || !ITEMS.has(b.k)) resultat.push({ id: b.id || nouvelId("b"), k: null, nom: b.nom || "Dépense", montant: +b.montant || 0, periode: b.periode || "mois", qui: b.qui || "commun" });
+    return resultat;
+  }
+  const nomDepense = b => b.k ? ITEMS.get(b.k).nom : b.nom;
+  const categorie = b => b.k ? ITEMS.get(b.k).cat : "Autres dépenses";
 
   /* ---------- État ---------- */
   const clone = o => JSON.parse(JSON.stringify(o));
@@ -70,6 +177,7 @@
     return clone(EXEMPLE);
   }
   let S = charger();
+  S.budget = normaliserBudget(S.budget);
   function sauver() {
     S.meta.misAJour = new Date().toISOString();
     try { localStorage.setItem(CLE, JSON.stringify(S)); } catch (e) { /* le calcul fonctionne quand même */ }
@@ -230,20 +338,56 @@
   }
 
   /* ---------- Listes : dépenses, dettes, enfants ---------- */
+  const ouvertes = new Set();
   function listeBudget() {
-    const c = document.getElementById("liste-budget"); c.textContent = "";
-    c.className = "liste";
-    S.budget.forEach((b, i) => {
-      const l = el("div", "ligne-budget");
-      const nom = el("input"); nom.value = b.nom; nom.setAttribute("aria-label", "Dépense"); nom.dataset.l = "budget"; nom.dataset.i = i; nom.dataset.k = "nom";
-      const mnt = el("input"); mnt.type = "number"; mnt.step = "10"; mnt.min = "0"; mnt.inputMode = "decimal"; mnt.value = b.montant; mnt.setAttribute("aria-label", "Montant : " + b.nom); mnt.dataset.l = "budget"; mnt.dataset.i = i; mnt.dataset.k = "montant";
-      const per = el("select", "periode"); [["mois", "/ mois"], ["an", "/ an"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; per.appendChild(o); });
-      per.value = b.periode; per.setAttribute("aria-label", "Période : " + b.nom); per.dataset.l = "budget"; per.dataset.i = i; per.dataset.k = "periode";
-      const qui = el("select", "qui"); [["moi", "Moi"], ["commun", "Commun"], ["conjoint", "L'autre parent"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; qui.appendChild(o); });
-      qui.value = b.qui; qui.setAttribute("aria-label", "Qui paie : " + b.nom); qui.dataset.l = "budget"; qui.dataset.i = i; qui.dataset.k = "qui";
-      const x = el("button", "supprimer", "×"); x.type = "button"; x.setAttribute("aria-label", "Supprimer : " + b.nom); x.dataset.suppr = "budget"; x.dataset.i = i;
-      l.append(nom, mnt, per, qui, x);
-      c.appendChild(l);
+    const c = document.getElementById("liste-budget"); c.textContent = ""; c.className = "liste";
+    const part = S.menage.partCommunMoi / 100;
+    const groupes = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
+    for (const g of groupes) {
+      const indices = S.budget.map((b, i) => [b, i]).filter(([b]) => categorie(b) === g);
+      const det = el("details", "categorie"); det.open = ouvertes.has(g);
+      det.addEventListener("toggle", () => { if (det.open) ouvertes.add(g); else ouvertes.delete(g); });
+      const resume = el("summary");
+      const total = indices.reduce((a, [b]) => a + mensuel(b), 0);
+      const totalMoi = indices.reduce((a, [b]) => a + (b.qui === "moi" ? mensuel(b) : b.qui === "commun" ? mensuel(b) * part : 0), 0);
+      const remplies = indices.filter(([b]) => b.montant > 0).length;
+      resume.append(el("span", "cat-nom", g), el("span", "cat-total", total > 0 ? `${$(total)} / mois · vous ${$(totalMoi)}` : (indices.length ? `${indices.length} cases` : "Aucune")));
+      resume.dataset.cat = g;
+      det.appendChild(resume);
+      if (AIDE_CATEGORIE[g]) det.appendChild(el("p", "aide", AIDE_CATEGORIE[g]));
+      for (const [b, i] of indices) {
+        const l = el("div", "ligne-budget" + (b.montant > 0 ? " remplie" : ""));
+        let nom;
+        if (b.k) { nom = el("label", "nom-depense", nomDepense(b)); nom.htmlFor = `bu-${b.id}-montant`; }
+        else { nom = el("input"); nom.value = b.nom; nom.setAttribute("aria-label", "Nom de la dépense"); nom.dataset.l = "budget"; nom.dataset.i = i; nom.dataset.k = "nom"; }
+        const mnt = el("input"); mnt.type = "number"; mnt.step = "1"; mnt.min = "0"; mnt.inputMode = "decimal"; mnt.value = b.montant || ""; mnt.placeholder = "0";
+        mnt.id = `bu-${b.id}-montant`; mnt.dataset.l = "budget"; mnt.dataset.i = i; mnt.dataset.k = "montant";
+        if (!b.k) mnt.setAttribute("aria-label", "Montant : " + b.nom);
+        const per = el("select", "periode"); [["mois", "/ mois"], ["an", "/ an"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; per.appendChild(o); });
+        per.value = b.periode; per.setAttribute("aria-label", "Période : " + nomDepense(b)); per.dataset.l = "budget"; per.dataset.i = i; per.dataset.k = "periode";
+        const qui = el("select", "qui"); [["moi", "Moi"], ["commun", "Commun"], ["conjoint", "L'autre parent"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; qui.appendChild(o); });
+        qui.value = b.qui; qui.setAttribute("aria-label", "Qui paie : " + nomDepense(b)); qui.dataset.l = "budget"; qui.dataset.i = i; qui.dataset.k = "qui";
+        l.append(nom, mnt, per, qui);
+        if (!b.k) { const x = el("button", "supprimer", "×"); x.type = "button"; x.setAttribute("aria-label", "Supprimer : " + b.nom); x.dataset.suppr = "budget"; x.dataset.i = i; l.appendChild(x); }
+        else l.appendChild(el("span"));
+        det.appendChild(l);
+      }
+      if (g === "Autres dépenses") {
+        const b = el("button", "bouton secondaire", "Ajouter une dépense"); b.type = "button"; b.id = "ajout-budget";
+        b.addEventListener("click", () => { S.budget.push({ id: nouvelId("b"), k: null, nom: "Nouvelle dépense", montant: 0, periode: "mois", qui: "commun" }); ouvertes.add("Autres dépenses"); sauver(); listeBudget(); tout(); });
+        det.appendChild(b);
+      }
+      c.appendChild(det);
+    }
+  }
+  // Met à jour les totaux des catégories sans reconstruire les champs (garde le focus).
+  function totauxCategories() {
+    const part = S.menage.partCommunMoi / 100;
+    document.querySelectorAll("#liste-budget summary[data-cat]").forEach(s => {
+      const lignes = S.budget.filter(b => categorie(b) === s.dataset.cat);
+      const total = lignes.reduce((a, b) => a + mensuel(b), 0);
+      const totalMoi = lignes.reduce((a, b) => a + (b.qui === "moi" ? mensuel(b) : b.qui === "commun" ? mensuel(b) * part : 0), 0);
+      s.querySelector(".cat-total").textContent = total > 0 ? `${$(total)} / mois · vous ${$(totalMoi)}` : (lignes.length ? `${lignes.length} cases` : "Aucune");
     });
   }
   const CHAMPS_DETTE = [
@@ -456,7 +600,8 @@
   function seriesDettes(sim, cumul) {
     const pts = sim.mois.filter((m, i) => i === 0 || m.date.getMonth() === 0);
     const fin = sim.mois[sim.mois.length - 1];
-    if (pts[pts.length - 1] !== fin) pts.push(fin);
+    // Le dernier mois remplace le janvier de la même année, pour ne pas répéter l'année sur l'axe.
+    if (pts[pts.length - 1] !== fin) { if (pts[pts.length - 1].date.getFullYear() === fin.date.getFullYear()) pts[pts.length - 1] = fin; else pts.push(fin); }
     const etiquettes = pts.map(p => String(p.date.getFullYear()));
     if (cumul) return { etiquettes, series: [{ nom: "Total des dettes", couleur: SERIES[0], valeurs: pts.map(p => p.total) }], pts };
     return { etiquettes, series: S.dettes.map((d, j) => ({ nom: d.nom, couleur: SERIES[j % SERIES.length], valeurs: pts.map(p => p.soldes[j]) })), pts };
@@ -591,7 +736,12 @@
       { cellules: ["Votre revenu net (après impôt et dépenses pro)", $(R.netMoi), $(R.netMoi)] },
       { cellules: ["Revenu de l'autre parent, allocations et autres", "—", $(R.revenusMenage - R.netMoi)] },
       { cls: "sous", cellules: ["Revenus", $(R.netMoi), $(R.revenusMenage)] },
-      ...S.budget.map(b => ({ cellules: [b.nom, b.qui === "conjoint" ? "—" : $(-(b.qui === "moi" ? mensuel(b) : mensuel(b) * part)), $(-mensuel(b))] })),
+      ...[...CATALOGUE.map(x => x.cat), "Autres dépenses"].map(g => {
+        const l = S.budget.filter(b => categorie(b) === g);
+        const moi = l.reduce((s, b) => s + (b.qui === "moi" ? mensuel(b) : b.qui === "commun" ? mensuel(b) * part : 0), 0);
+        const tot = l.reduce((s, b) => s + mensuel(b), 0);
+        return tot > 0 ? { cellules: [g, $(-moi), $(-tot)] } : null;
+      }).filter(Boolean),
       ...S.dettes.map(d => ({ cellules: [`Paiement : ${d.nom}`, $(-minimumDette(d) * (d.paiementMoi ?? 100) / 100), $(-minimumDette(d))] })),
       { cellules: ["Épargne : REEE, REER, CELI", $(-R.epargneMoi), $(-R.epargneMoi)] },
       { cls: "total", cellules: ["Surplus par mois", $(R.surplusMoi), $(R.surplusMenage)], classes: [null, R.surplusMoi >= 0 ? "positif" : "negatif", R.surplusMenage >= 0 ? "positif" : "negatif"] },
@@ -657,6 +807,7 @@
   function tout() {
     R = calculer();
     rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreEpargne(R); rendreFiabilite();
+    totauxCategories();
   }
 
   /* ============================================================
@@ -699,8 +850,7 @@
     } else if (b.dataset.onglet) ouvrir(b.dataset.onglet);
     else if (b.dataset.aller) ouvrir(b.dataset.aller);
   });
-  document.getElementById("ajout-budget").addEventListener("click", () => { S.budget.push({ id: nouvelId("b"), nom: "Nouvelle dépense", montant: 0, periode: "mois", qui: "commun" }); sauver(); listeBudget(); tout(); });
-  document.getElementById("ajout-dette").addEventListener("click", () => { S.dettes.push({ id: nouvelId("d"), nom: "Nouvelle dette", type: "pret", solde: 0, limite: 0, taux: 5, paiement: 0, frequence: "mois", interetsSeulement: false, finTerme: "", tauxRenouvellement: 0, dureeTerme: 5, privilege: 0, creditImpot: 0, partMoi: 100, paiementMoi: 100 }); sauver(); listeDettes(); tout(); });
+    document.getElementById("ajout-dette").addEventListener("click", () => { S.dettes.push({ id: nouvelId("d"), nom: "Nouvelle dette", type: "pret", solde: 0, limite: 0, taux: 5, paiement: 0, frequence: "mois", interetsSeulement: false, finTerme: "", tauxRenouvellement: 0, dureeTerme: 5, privilege: 0, creditImpot: 0, partMoi: 100, paiementMoi: 100 }); sauver(); listeDettes(); tout(); });
   document.getElementById("ajout-enfant").addEventListener("click", () => { S.epargne.reee.enfants.push({ id: nouvelId("e"), nom: "Enfant", age: 0, solde: 0 }); sauver(); listeEnfants(); tout(); });
   document.getElementById("fiabilite").addEventListener("click", () => ouvrir("donnees"));
 
@@ -731,7 +881,7 @@
       try {
         const d = JSON.parse(lecteur.result);
         if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
-        S = fusion(clone(EXEMPLE), d); S.meta.exemple = false; sauver();
+        S = fusion(clone(EXEMPLE), d); S.budget = normaliserBudget(S.budget); S.meta.exemple = false; sauver();
         construireTout(); message(`Données importées : ${S.dettes.length} dettes, ${S.budget.length} dépenses.`);
       } catch (err) { message("Ce fichier n'est pas un fichier de données Boussole. Rien n'a été changé."); }
     };
@@ -739,7 +889,7 @@
   });
   const reinit = document.getElementById("reinitialiser"), confirmer = document.getElementById("confirmer-reinit");
   reinit.addEventListener("click", () => { confirmer.hidden = false; confirmer.focus(); });
-  confirmer.addEventListener("click", () => { S = clone(EXEMPLE); sauver(); construireTout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
+  confirmer.addEventListener("click", () => { S = clone(EXEMPLE); S.budget = normaliserBudget(S.budget); sauver(); construireTout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
 
   function construireTout() {
     construireChamps(document.getElementById("f-revenu"), CHAMPS.revenu);
