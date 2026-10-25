@@ -140,5 +140,14 @@ verifier("majoration : +15 % sur les heures, pas sur les forfaits", proche(gmaj.
 const pBase = C.impotParticulier({ revenu: 200000, depensesPro: 3000 }), pAutres = C.impotParticulier({ revenu: 200000, depensesPro: 3000, autresImposables: 10000 });
 verifier("autres revenus : même RRQ, plus d'impôt, net plus élevé", pAutres.rrq === pBase.rrq && pAutres.fed + pAutres.qc > pBase.fed + pBase.qc && pAutres.net > pBase.net && pAutres.net - pBase.net < 10000);
 
+/* 12. Patrimoine : autres actifs et objectifs d'épargne dans la projection. */
+const baseVN = { annees: 5, anneeDepart: 2026, rendement: 5, reer: { solde: 0, cotisationAnnuelle: 0 }, celi: { solde: 0, cotisationAnnuelle: 0 },
+  maison: { valeur: 0, part: 0, croissance: 0 }, voitures: [], dettes: [dettes[1]] };
+const pA = C.projeterValeurNette({ ...baseVN, autresActifs: [{ valeur: 100000, croissance: 3, part: 50, partMenage: 100 }] }, sim);
+const p0 = C.projeterValeurNette(baseVN, sim);
+verifier("autres actifs : votre part, +3 %/an", proche(pA[4].moi - p0[4].moi, 50000 * Math.pow(1.03, 4), 0.01) && proche(pA[4].menage - p0[4].menage, 100000 * Math.pow(1.03, 4), 0.01));
+const pG = C.projeterValeurNette({ ...baseVN, objectifs: [{ solde: 500, mensuel: 100, mois: 18, depenser: false }, { solde: 0, mensuel: 200, mois: 12, depenser: true }] }, sim);
+verifier("objectifs : versements jusqu'à la date, puis dépensé ou gardé", proche(pG[1].objectifs, 500 + 1200, 1e-9) && proche(pG[2].objectifs, 500 + 1800, 1e-9) && proche(pG[2].moi - p0[2].moi, 2300, 0.01));
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

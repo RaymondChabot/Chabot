@@ -51,7 +51,7 @@
     <a href="#revenu" data-onglet="revenu"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="13" rx="2.5"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7M12 11.5v4M10 13.5h4"/></svg><span>Revenu</span></a>
     <a href="#impot" data-onglet="impot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4Z"/><path d="M9.5 9.5h.01M14.5 14.5h.01M15 9l-6 6"/></svg><span>Impôt</span></a>
     <a href="#budget" data-onglet="budget"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16.5" height="11.5" rx="2.5"/><path d="M16 13.75h.01"/></svg><span>Budget</span></a>
-    <a href="#avenir" data-onglet="avenir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 17.5 9 12l3.5 3.5 8-8"/><path d="M15 7.5h5.5V13"/></svg><span>Avenir</span></a>
+    <a href="#avenir" data-onglet="avenir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 17.5 9 12l3.5 3.5 8-8"/><path d="M15 7.5h5.5V13"/></svg><span>Patrimoine</span></a>
     <button type="button" class="nav-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer l'app</span></button>
     <a href="#donnees" data-onglet="donnees" class="nav-donnees"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg><span>Données</span></a>
   </nav>
@@ -93,7 +93,7 @@
         <div class="rangees" id="ap-echeances"></div>
       </div>
       <div class="carte demi">
-        <div class="carte-tete"><h2>Vos jalons</h2><a class="lien-carte" href="#avenir">Avenir</a></div>
+        <div class="carte-tete"><h2>Vos jalons</h2><a class="lien-carte" href="#avenir">Patrimoine</a></div>
         <div class="rangees" id="ap-jalons"></div>
       </div>
       <div class="carte">
@@ -208,6 +208,10 @@
         <div class="rangees" id="bu-depenses"></div>
       </div>
       <div class="carte">
+        <div class="carte-tete"><h2>Dépenses annuelles</h2><button type="button" class="lien-carte" id="bu-annuelles-modifier">Calendrier</button></div>
+        <div id="bu-annuelles"></div>
+      </div>
+      <div class="carte">
         <div class="carte-tete"><h2>Dettes</h2><span class="carte-sous">Solde</span></div>
         <div class="rangees" id="bu-dettes"></div>
       </div>
@@ -233,16 +237,32 @@
 
     <!-- ============ AVENIR : ÉPARGNE ET VALEUR NETTE ============ -->
     <section class="vue" id="v-avenir" aria-labelledby="h-avenir" hidden>
-      <header class="tete-page"><h1 id="h-avenir">Avenir</h1><button type="button" class="bouton-modifier" data-feuille="epargne">Modifier</button></header>
+      <header class="tete-page"><h1 id="h-avenir">Patrimoine</h1><button type="button" class="bouton-modifier" data-feuille="epargne">Modifier</button></header>
       <div class="segment" id="vn-scenario"></div>
       <p class="aide hyp-ligne" id="vn-hyp"></p>
       <div class="hero" id="vn-hero"></div>
+      <div class="carte">
+        <div class="carte-tete"><h2>Bilan d'aujourd'hui</h2><span class="carte-sous" id="pa-bilan-sous"></span></div>
+        <div class="bilan" id="pa-bilan"></div>
+      </div>
       <div class="carte">
         <div class="carte-tete"><h2>Valeur nette projetée</h2><div class="segment petit compact" id="vn-vue"></div></div>
         <div class="legende" id="vn-legende"></div>
         <div class="graphique" id="vn-graph"></div>
         <div class="segment petit compact horizon" id="vn-horizon"></div>
         <p class="aide" id="vn-note"></p>
+      </div>
+      <div class="carte">
+        <div class="carte-tete"><h2>Réel comparé au plan</h2></div>
+        <div id="pa-reel"></div>
+      </div>
+      <div class="carte demi">
+        <div class="carte-tete"><h2>Vos objectifs</h2></div>
+        <div id="pa-objectifs"></div>
+      </div>
+      <div class="carte demi">
+        <div class="carte-tete"><h2>Où mettre le prochain 1 000 $ ?</h2><span class="carte-sous">Dans 10 ans</span></div>
+        <div id="pa-prochain"></div>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>De quoi elle est faite</h2></div>

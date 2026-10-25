@@ -65,9 +65,16 @@ Revenu affiche tous les détails.
   hybride ou boule de neige ; hypothèques à intérêt composé deux fois par
   année, paiement recalculé au renouvellement, droit annuel de
   remboursement anticipé.
-- **Avenir** : scénarios prudent, réaliste et optimiste ; chaque année en
-  dollars de l'année (paliers d'impôt indexés, enfants qui vieillissent) ;
-  équité de la maison, autos, placements, valeur nette sur 10 à 30 ans.
+- **Patrimoine** : bilan d'aujourd'hui (ce que vous possédez, ce que vous
+  devez, autres actifs libres comme un chalet ou des parts de clinique) ;
+  scénarios prudent, réaliste et optimiste, chaque année en dollars de
+  l'année (paliers d'impôt indexés, enfants qui vieillissent) ; valeur
+  nette sur 10 à 30 ans ; relevés de la valeur nette comparés à un plan de
+  référence ; objectifs d'épargne datés (fonds d'urgence, mise de fonds,
+  auto, congé) ; où mettre le prochain 1 000 $ (REER, CELI, CELIAPP, REEE
+  ou dettes).
+- **Dépenses annuelles** : le mois de chaque dépense annuelle, le montant à
+  mettre de côté chaque mois et les échéances à venir.
 
 - **Rapport PDF** : 7 pages mises en page (couverture et chiffres clés,
   revenu, impôt, budget, dettes, avenir, hypothèses et sources), avec

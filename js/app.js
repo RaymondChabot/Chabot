@@ -79,11 +79,16 @@
       celi: { solde: 0, cotisationAnnuelle: 0 },
       // CELIAPP : 8 000 $ par année, 40 000 $ à vie ; déductible ; retrait sans impôt pour une première propriété.
       celiapp: { solde: 0, cotisationAnnuelle: 0 },
+      // Taux d'imposition prévu au retrait du REER, pour le comparer au CELI.
+      tauxRetrait: 35,
     },
     // Catégories du budget où l'on inscrit un seul total plutôt que le détail.
     budgetTotaux: {},
+    // Objectifs d'épargne (montant et date) ; relevés de la valeur nette et plan de référence.
+    objectifs: [],
+    suivi: { reference: null, instantanes: [] },
     // Logement : propriétaire (maison et hypothèque) ou locataire (loyer au budget, pas de maison).
-    actifs: { logement: "locataire", maison: { valeur: 0, part: 0, croissance: 3 }, voiture: { valeur: 0, depreciation: 15, remplacementAns: 0, prixNeuf: 40000 }, actifsConjoint: 0 },
+    actifs: { logement: "locataire", maison: { valeur: 0, part: 0, croissance: 3 }, voiture: { valeur: 0, depreciation: 15, remplacementAns: 0, prixNeuf: 40000 }, actifsConjoint: 0, autres: [] },
   };
 
   /* ============================================================
@@ -225,7 +230,7 @@
     ["autres", "Autres dépenses professionnelles", ""],
   ];
   const ITEMS_PRO = new Map(CATALOGUE_PRO.map(([k, nom, aide]) => [k, { k, nom, aide }]));
-  const normaliserPro = l => { const m = new Map((l || []).map(x => [x.k, x])); return CATALOGUE_PRO.map(([k]) => ({ k, montant: m.has(k) ? +m.get(k).montant || 0 : 0, periode: m.has(k) ? m.get(k).periode || "an" : "an" })); };
+  const normaliserPro = l => { const m = new Map((l || []).map(x => [x.k, x])); return CATALOGUE_PRO.map(([k]) => ({ k, montant: m.has(k) ? +m.get(k).montant || 0 : 0, periode: m.has(k) ? m.get(k).periode || "an" : "an", mois: m.has(k) ? +m.get(k).mois || 0 : 0 })); };
   const ITEMS = new Map(CATALOGUE.flatMap(c => c.items.map(([k, nom, periode, qui]) => [k, { k, nom, periode, qui, cat: c.cat }])));
   const AIDE_CATEGORIE = {
     "Santé": "Sans assurance collective, la prime du régime public d'assurance médicaments se paie avec l'impôt du Québec : inscrivez-la ici.",
@@ -241,9 +246,9 @@
     const resultat = [];
     for (const [k, it] of ITEMS) {
       const b = parCle.get(k);
-      resultat.push({ id: k, k, nom: "", montant: b ? +b.montant || 0 : 0, periode: b ? b.periode : it.periode, qui: b ? b.qui : it.qui });
+      resultat.push({ id: k, k, nom: "", montant: b ? +b.montant || 0 : 0, periode: b ? b.periode : it.periode, qui: b ? b.qui : it.qui, mois: b ? +b.mois || 0 : 0 });
     }
-    for (const b of budget || []) if (!b.k || !ITEMS.has(b.k)) resultat.push({ id: b.id || nouvelId("b"), k: null, nom: b.nom || "Dépense", montant: +b.montant || 0, periode: b.periode || "mois", qui: b.qui || "commun" });
+    for (const b of budget || []) if (!b.k || !ITEMS.has(b.k)) resultat.push({ id: b.id || nouvelId("b"), k: null, nom: b.nom || "Dépense", montant: +b.montant || 0, periode: b.periode || "mois", qui: b.qui || "commun", mois: +b.mois || 0 });
     return resultat;
   }
   const nomDepense = b => b.k ? ITEMS.get(b.k).nom : b.nom;
@@ -491,6 +496,7 @@
       { p: "epargne.celiapp.solde", l: "Solde CELIAPP", u: "$", s: 100, h: "Compte d'épargne libre d'impôt pour l'achat d'une première propriété." },
       { p: "epargne.celiapp.cotisationAnnuelle", l: "Cotisation CELIAPP par année", u: "$/an", s: 100, h: "8 000 $ par année au plus, 40 000 $ à vie ; déductible comme un REER ; retrait sans impôt pour acheter une première propriété." },
       { p: "epargne.encaisse", l: "Comptes et encaisse", u: "$", s: 100 },
+      { p: "epargne.tauxRetrait", l: "Taux d'imposition prévu au retrait du REER", u: "%", s: 1, h: "Pour comparer le REER au CELI : s'il est plus bas que votre taux marginal d'aujourd'hui, le REER rapporte plus." },
       { g: "Biens" },
       { p: "actifs.logement", l: "Votre logement", t: "select", o: [["proprietaire", "Propriétaire"], ["locataire", "Locataire"]], h: "Locataire : le loyer va au budget (Logement) ; aucune maison dans la valeur nette." },
       { p: "actifs.maison.valeur", l: "Valeur de la maison", u: "$", s: 1000, si: "actifs.logement=proprietaire" },
@@ -584,7 +590,8 @@
   }
   // Champ d'une liste (dépense, dette, enfant) : lié par data-l, data-i et data-k.
   const lierListe = (liste, i, k) => inp => { inp.dataset.l = liste; inp.dataset.i = i; inp.dataset.k = k; };
-  const tableau = nom => nom === "enfants" ? S.epargne.reee.enfants : nom === "activites" ? S.revenu.activites : nom === "lignes" ? S.revenu.lignes : nom === "depensesPro" ? S.impot.depensesProDetail : S[nom];
+  const tableau = nom => nom === "enfants" ? S.epargne.reee.enfants : nom === "activites" ? S.revenu.activites : nom === "lignes" ? S.revenu.lignes
+    : nom === "depensesPro" ? S.impot.depensesProDetail : nom === "actifsAutres" ? (S.actifs.autres = S.actifs.autres || []) : nom === "objectifs" ? (S.objectifs = S.objectifs || []) : S[nom];
   // Essentiel ou tous les détails (Optimiser) : préférence de cet appareil.
   const detailsAffiches = () => { try { return localStorage.getItem("wm.details") === "1"; } catch (e) { return false; } };
   function boutonDetails(c) {
@@ -804,6 +811,20 @@
   const AVEC_ARTICLE = { avalanche: "l'avalanche", hybride: "l'hybride", boule: "la boule de neige", minimum: "les minimums" };
   const minimumDette = d => d.interetsSeulement ? d.solde * d.taux / 100 / 12 : (d.frequence === "2sem" ? d.paiement * 26 / 12 : d.paiement);
 
+  // Objectifs d'épargne : ce qu'il faut mettre de côté chaque mois pour atteindre la cible à la date visée.
+  const COMPTES_OBJECTIF = { dedie: "Un compte à part", celi: "CELI", celiapp: "CELIAPP", encaisse: "Comptes et encaisse", reer: "REER" };
+  const moisEntre = (debut, fin) => { const [a, b] = String(debut).split("-").map(Number), [c, d] = String(fin || "").split("-").map(Number); return c && d ? (c - a) * 12 + (d - b) : 0; };
+  function calculerObjectifs(R) {
+    const e = S.epargne, ca = e.celiapp || { solde: 0 };
+    const solde = { celi: e.celi.solde, celiapp: ca.solde || 0, encaisse: e.encaisse, reer: e.reer.solde };
+    const cotisation = { celi: e.celi.cotisationAnnuelle, celiapp: R.celiappAnnee(0), encaisse: 0, reer: e.reer.cotisationAnnuelle };
+    return (S.objectifs || []).map(o => {
+      const dedie = !(o.compte in solde), mois = Math.max(0, moisEntre(S.strategie.debut, o.date));
+      const s = dedie ? +o.deja || 0 : +solde[o.compte] || 0, manque = Math.max(0, (+o.cible || 0) - s);
+      const mensuel = mois > 0 ? manque / mois : 0;
+      return { ...o, dedie, mois, solde: s, manque, mensuel, prevu: dedie ? mensuel : (cotisation[o.compte] || 0) / 12, atteint: manque <= 0 };
+    });
+  }
   function calculer() {
     const R = {};
     // Pratique principale : GMF ou clinique (à l'acte), GMF-U ou CLSC (trois modes), plus les activités.
@@ -887,6 +908,9 @@
     R.impotSansReer = impotDe({ ...baseMode, reer: 0 }).total;
     R.impotAvecReer = m => impotDe({ ...baseMode, reer: m }).total;
     R.remboursementReer = S.epargne.reer.cotisationAnnuelle > 0 ? impotDe({ ...baseMode, reer: 0 }).total - impotDe(baseMode).total : 0;
+    // Taux de déduction : ce que rapporte 1 000 $ cotisés au REER (sur le revenu imposable). Il dépasse
+    // le taux marginal par dollar facturé quand une part de chaque dollar va aux frais de cabinet.
+    R.tauxDeduction = (R.impotSansReer - R.impotAvecReer(1000)) / 1000;
 
     // Famille : allocations et assurance médicaments, sur le revenu net familial.
     R.ages = S.epargne.reee.enfants.map(x => +x.age).filter(a => a < 18);
@@ -924,7 +948,11 @@
       if (R.couple) R.dettesConjointe += m * (100 - (d.paiementMoi ?? 100)) / 100;
     }
     const enfants = S.epargne.reee.enfants.filter(x => x.age < 17).length;
-    R.epargneMoi = (enfants * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle + R.celiappAnnee(0)) / 12;
+    // Objectifs d'épargne dans un compte à part : leur montant mensuel s'ajoute à l'épargne.
+    R.objectifs = calculerObjectifs(R);
+    R.objectifsMois = R.objectifs.filter(o => o.dedie && o.mois > 0).reduce((t, o) => t + o.mensuel, 0);
+    R.objectifsAnnee = a => R.objectifs.filter(o => o.dedie).reduce((t, o) => t + o.mensuel * Math.max(0, Math.min(12, o.mois - 12 * a)), 0);
+    R.epargneMoi = (enfants * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle + R.celiappAnnee(0)) / 12 + R.objectifsMois;
     R.surplusMoi = R.netMoi - R.depMoi - R.dettesMoi - R.epargneMoi;
     R.epargneConjointe = R.couple ? S.conjointe.epargneMensuelle || 0 : 0;
     R.surplusConjointe = R.netConjointe - R.depConjointe - R.dettesConjointe - R.epargneConjointe;
@@ -949,7 +977,7 @@
       if (cacheAnnee.has(cle)) return cacheAnnee.get(cle);
       const I = Math.pow(1 + h.inflation / 100, a), reel = Math.pow(1 + h.hausseRevenus / 100, a) / I;
       let res;
-      if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, epargne: R.epargneMoi * 12, retenu: R.impot.societe ? R.impot.societe.retenu : 0 };
+      if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, epargne: (R.epargneMoi - R.objectifsMois) * 12 + R.objectifsAnnee(0), retenu: R.impot.societe ? R.impot.societe.retenu : 0 };
       else {
         const conj = impotPartenaire(reel);
         const fraisA = fraisCabinet(R.revType[mode].total * reel, mode, reel);
@@ -966,7 +994,7 @@
           travail: (moi.net - (R.societeActive ? 0 : R.depensesPro + fraisA) - prime) * I,
           retenu: moi.societe ? moi.societe.retenu * I : 0,
           alloc: !R.couple || S.famille.versementA !== "conjointe" ? alloc : 0,
-          epargne: enf * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle + R.celiappAnnee(a),
+          epargne: enf * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle + R.celiappAnnee(a) + R.objectifsAnnee(a),
         };
       }
       cacheAnnee.set(cle, res);
@@ -1007,6 +1035,8 @@
       remplacementAutos: S.actifs.voiture.remplacementAns > 0 ? { ans: S.actifs.voiture.remplacementAns, prix: S.actifs.voiture.prixNeuf } : null,
       societe: R.societeActive ? { solde: S.societe.solde || 0, retenuAnnee: a => R.annee(h, a).retenu, impotPlacement: 0.5 } : null,
       ajoutMensuel: m === "minimum" ? surplusAnnee(h) : null,
+      autresActifs: (S.actifs.autres || []).map(x => ({ valeur: +x.valeur || 0, croissance: +x.croissance || 0, part: x.partMoi ?? 100, partMenage: R.couple ? 100 : x.partMoi ?? 100 })),
+      objectifs: R.objectifs.filter(o => o.dedie).map(o => ({ solde: o.solde, mensuel: o.mensuel, mois: o.mois, depenser: !!o.depenser })),
     }, sim);
     // Méthodes comparées sur la valeur nette à l'horizon : elle tient compte des intérêts, de l'argent
     // en attente d'un renouvellement et des placements faits après la dernière dette.
@@ -1182,7 +1212,7 @@
     const W = Math.max(260, boite.clientWidth || 600), H = options.hauteur || (W < 480 ? 210 : 250);
     const m = { l: 50, r: 8, t: 10, b: 26 };
     const iw = W - m.l - m.r, ih = H - m.t - m.b, n = etiquettesX.length;
-    const tous = series.flatMap(s => s.valeurs).concat(options.bande ? [...options.bande.bas, ...options.bande.haut] : []);
+    const tous = series.flatMap(s => s.valeurs).concat(options.bande ? [...options.bande.bas, ...options.bande.haut] : [], (options.points || []).map(p => p.v));
     let min = options.baseLibre ? Math.min(...tous) : Math.min(0, ...tous), max = Math.max(1, ...tous);
     const pas = pasJoli((max - min) / 4);
     min = Math.floor(min / pas) * pas; max = Math.ceil(max / pas) * pas;
@@ -1208,6 +1238,8 @@
       if (options.aire && series.length === 1) s += `<path class="aire" d="${d}L${x(n - 1).toFixed(1)},${y(Math.max(min, 0)).toFixed(1)}L${x(0).toFixed(1)},${y(Math.max(min, 0)).toFixed(1)}Z" style="fill:${se.couleur}"/>`;
       s += `<path class="serie" d="${d}" style="stroke:${se.couleur}"/>`;
     });
+    // Points fixes, placés n'importe où sur l'axe (index fractionnaire) : valeurs notées.
+    (options.points || []).forEach(p => { s += `<circle class="point-fixe" r="4.5" cx="${x(Math.min(n - 1, p.i)).toFixed(1)}" cy="${y(p.v).toFixed(1)}" style="fill:${p.couleur}"/>`; });
     s += `<line class="reticule" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" visibility="hidden"/>`;
     series.forEach((se, j) => { s += `<circle class="point" r="5" cx="0" cy="0" visibility="hidden" data-j="${j}" style="fill:${se.couleur}"/>`; });
     s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" tabindex="0" data-zone="1" role="slider" aria-valuemin="0" aria-valuemax="${n - 1}" aria-valuenow="${n - 1}" aria-label="${options.titre} : glissez ou utilisez les flèches pour les valeurs"/>`;
@@ -1319,8 +1351,14 @@
       if (depensesEffectives().filter(b => b.montant > 0 && b.k !== "loyer").length < 3) action("important", "Entrez vos dépenses du mois (page Budget, « Remplir pas à pas ») : épicerie, électricité, assurances, transport… Sans elles, le surplus est surestimé.");
       if ((S.revenu.activites || []).some(x => x.calcul !== "patients" && ACTIVITES[x.type] && x.parJour === ACTIVITES[x.type].parJour))
         action("info", "Vérifiez le revenu par jour de vos activités en établissement (page Revenu) : les valeurs de départ sont indicatives.");
-      if (!S.epargne.encaisse && !S.epargne.reer.solde && !S.epargne.celi.solde && !S.epargne.reer.droits) action("info", "Ajoutez votre épargne et vos droits REER (page Avenir, bouton Modifier).");
+      if (!S.epargne.encaisse && !S.epargne.reer.solde && !S.epargne.celi.solde && !S.epargne.reer.droits) action("info", "Ajoutez votre épargne et vos droits REER (page Patrimoine, bouton Modifier).");
     }
+    if (!S.meta.exemple) {
+      const notes = (S.suivi || {}).instantanes || [], derniere = notes.length ? Math.floor((Date.now() - new Date(notes[notes.length - 1].date + "T00:00:00")) / 864e5) : null;
+      if (derniere === null) action("info", "Notez votre valeur nette d'aujourd'hui (page Patrimoine) : vous pourrez ensuite comparer le réel au plan.");
+      else if (derniere > 90) action("info", `Votre dernier relevé de patrimoine date de ${derniere} jours : mettez vos soldes à jour et notez votre situation (page Patrimoine).`);
+    }
+    R.objectifs.filter(o => !o.atteint && !o.mois).forEach(o => action("important", `L'objectif « ${o.nom || "sans nom"} » n'est pas atteint à la date visée : choisissez une nouvelle date (page Patrimoine).`));
     if (S.revenu.annee === "premiere") action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total)} seront à payer d'un coup le 30 avril.`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
@@ -1332,7 +1370,7 @@
     });
     S.dettes.filter(d => d.type === "marge" && d.limite > 0).forEach(d => action("info", `Disponible sur « ${d.nom} » : ${$(d.limite - d.solde)}. Gardez cet espace comme fonds d'urgence plutôt que de l'argent qui dort.`));
     if (S.epargne.reee.enfants.filter(e => e.age < 17).length > 0 && S.epargne.reee.cotisationAnnuelle < 2500) action("info", "Cotisez 2 500 $ par enfant par année au REEE pour obtenir toutes les subventions (30 %).");
-    if (S.epargne.reer.droits > 0 && S.epargne.reer.cotisationAnnuelle === 0) action("info", `Vous avez ${$(S.epargne.reer.droits)} de droits REER. À votre taux marginal de ${pct(R.tauxMarginal, 0)}, chaque 1 000 $ cotisés vous remet environ ${$(R.tauxMarginal * 1000)}.`);
+    if (S.epargne.reer.droits > 0 && S.epargne.reer.cotisationAnnuelle === 0) action("info", `Vous avez ${$(S.epargne.reer.droits)} de droits REER. Chaque 1 000 $ cotisés vous remet environ ${$(R.tauxDeduction * 1000)} d'impôt (${pct(R.tauxDeduction, 0)}).`);
     if (!S.meta.exemple) {
       const jours = S.meta.dernierExport ? Math.floor((Date.now() - new Date(S.meta.dernierExport)) / 864e5) : Infinity;
       if (jours > 30) action("info", jours === Infinity
@@ -1381,6 +1419,7 @@
     });
     if (S.epargne.reee.enfants.some(e => e.age < 17) && S.epargne.reee.cotisationAnnuelle > 0)
       l.push({ date: prochaine(11, 31), titre: "Cotisation REEE de l'année", sous: "Pour recevoir les subventions de l'année (30 %)", valeur: $(S.epargne.reee.cotisationAnnuelle * S.epargne.reee.enfants.filter(e => e.age < 17).length) });
+    lignesAnnuelles().filter(x => x.mois && x.montant >= 200).forEach(x => l.push({ date: prochaine(x.mois - 1, 1), titre: x.nom, sous: "Dépense annuelle", valeur: $(x.montant) }));
     const jours = d => Math.round((d - auj) / 864e5);
     return l.filter(x => x.date >= auj).sort((a, b) => a.date - b.date).slice(0, 5).map(x => {
       const j = jours(x.date);
@@ -1694,7 +1733,7 @@
     const a = document.getElementById("im-acomptes"); a.textContent = "";
     a.appendChild(el("p", "resume", soc
       ? `La société garde environ ${$(x.impotSociete / 12)} par mois pour son impôt. Vous, mettez de côté environ ${$(perso / 12)} par mois pour l'impôt sur vos dividendes. Votre taux marginal, société comprise, est de ${pct(R.tauxMarginal, 0)}.`
-      : `Mettez de côté ${pct(t / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$(t / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est ce que coûte chaque dollar de plus, et ce que rapporte chaque dollar cotisé au REER.`));
+      : `Mettez de côté ${pct(t / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$(t / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est l'impôt sur chaque dollar de plus facturé${Math.abs(R.tauxDeduction - R.tauxMarginal) > 0.01 ? `, après les frais de cabinet ; chaque dollar cotisé au REER vous rapporte ${pct(R.tauxDeduction, 0)}` : ", et ce que rapporte chaque dollar cotisé au REER"}.`));
     const premiere = S.revenu.annee === "premiere";
     const an = (+String(S.strategie.debut).slice(0, 4) || 2026) + 1;
     a.appendChild(rangees(el("div"), [
@@ -1764,7 +1803,7 @@
       (R.couple ? (S.famille.versementA === "conjointe" ? ` Elles sont versées à ${votreP()}.` : " Elles vous sont versées.") : "")));
     if (R.couple && !R.coupleFiscal) z.appendChild(el("p", "aide", `Conjoints de fait depuis moins de 12 mois, sans enfant commun : pour l'impôt de cette année, vous et ${votreP()} êtes imposés comme des personnes seules. Pas de transfert de crédits ; allocations et prime d'assurance médicaments selon le revenu de chacun. Dès l'an prochain, après 12 mois de vie commune, vous formerez un couple pour l'impôt : l'avenir en tient compte.`));
     if (S.famille.calculAuto) {
-      if (!nEnf) z.appendChild(el("p", "aide", "Ajoutez les enfants et leur âge dans la page Avenir pour calculer les allocations."));
+      if (!nEnf) z.appendChild(el("p", "aide", "Ajoutez les enfants et leur âge dans la page Patrimoine pour calculer les allocations."));
       else z.appendChild(rangees(el("div"), [
         { titre: "Allocation canadienne pour enfants", sous: "Fédéral", valeur: $(f.ace) },
         { titre: "Allocation famille", sous: "Québec", valeur: $(f.allocationFamille) },
@@ -1860,6 +1899,7 @@
       V.autres > 0 && { titre: "Autres revenus", valeur: $(V.autres) },
       { titre: "Total", cls: "total", valeur: $(V.rev) },
     ]);
+    rendreAnnuelles();
     // Dépenses : une rangée par catégorie ; toucher ouvre ses cases.
     const cats = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
     rangees("bu-depenses", [
@@ -1871,7 +1911,7 @@
         const v = l.reduce((s, b) => s + mensuel(b) * qui(b), 0);
         return { titre: g, sous: n ? `${n} dépense${n > 1 ? "s" : ""}` : "Rien d'inscrit", valeur: n ? $(v) : "—", cls: n ? null : "vide", action: () => feuilleCategorie(g) };
       }),
-      { titre: vue === "conjointe" ? "Son épargne" : "Épargne : REEE, REER, CELI", sous: vue === "conjointe" ? "Bouton Ménage" : vue === "menage" && R.epargneConjointe ? `La vôtre et celle de ${votreP()}` : "Bouton Modifier de la page Avenir", valeur: $(V.epargne) },
+      { titre: vue === "conjointe" ? "Son épargne" : "Épargne : REEE, REER, CELI, objectifs", sous: vue === "conjointe" ? "Bouton Ménage" : vue === "menage" && R.epargneConjointe ? `La vôtre et celle de ${votreP()}` : "Page Patrimoine", valeur: $(V.epargne) },
       { titre: "Total des dépenses et de l'épargne", cls: "total", valeur: $(V.dep + V.epargne) },
     ]);
     rangees("bu-dettes", [
@@ -1999,12 +2039,14 @@
 
     // De quoi elle est faite : aujourd'hui, dans 10 ans, dans 20 ans.
     const fin = p.length - 1, cols = [0, Math.round(fin / 2), fin];
-    const v = (i, f) => f(p[i]) / def(i);
+    const v = (i, f) => f(p[i]) / def(i), autresActifs = (S.actifs.autres || []).length > 0;
     const L = (couple
       ? [["Maison, part du couple", x => x.maisonMenage], ["Hypothèques", x => -x.hypMenage], ["Équité dans la maison", x => x.equiteMenage, "sous-total"],
-         ["Placements : REER, CELI, comptes", x => x.placements + x.conjointe], ...(R.societeActive ? [["Placements dans la société", x => x.societe]] : []), ["Autos", x => x.voitureMenage], ["Autres dettes", x => -x.autresMenage]]
+         ["Placements : REER, CELI, CELIAPP, comptes", x => x.placements + x.conjointe], ...(R.societeActive ? [["Placements dans la société", x => x.societe]] : []), ["Autos", x => x.voitureMenage],
+         ...(autresActifs ? [["Autres actifs", x => x.autresActifsMenage]] : []), ["Autres dettes", x => -x.autresMenage]]
       : [["Maison, votre part", x => x.maisonMoi], ["Hypothèques, votre part", x => -x.hypMoi], ["Équité dans la maison", x => x.equiteMoi, "sous-total"],
-         ["Placements : REER, CELI, comptes", x => x.placements], ...(R.societeActive ? [["Placements dans la société", x => x.societe]] : []), ["Auto", x => x.voitureMoi], ["Autres dettes, votre part", x => -x.autresMoi]])
+         ["Placements : REER, CELI, CELIAPP, comptes", x => x.placements], ...(R.societeActive ? [["Placements dans la société", x => x.societe]] : []), ["Auto", x => x.voitureMoi],
+         ...(autresActifs ? [["Autres actifs", x => x.autresActifsMoi]] : []), ["Autres dettes, votre part", x => -x.autresMoi]])
       .filter(([n]) => !R.locataire || !/Maison|Hypoth|Équité/.test(n) || S.dettes.some(d => d.type === "hypotheque"));
     // Sur téléphone, montants abrégés (k$, M$) pour que les trois colonnes tiennent.
     const tableComp = document.getElementById("vn-composition");
@@ -2027,6 +2069,7 @@
         action: k === R.scenario ? null : () => changer("scenarios.choisi", k) };
     }));
 
+    rendreBilan(R, couple); rendreReel(R, couple); rendreObjectifs(R); rendreProchain(R);
     rangees("ep-reee", [
       ...R.reee.map((x, i) => {
         const e = S.epargne.reee.enfants[i];
@@ -2038,7 +2081,7 @@
     const c = S.epargne.reer.cotisationAnnuelle;
     z.appendChild(el("p", "resume", c > 0
       ? `Cotiser ${$(c)} au REER vous rembourse environ ${$(R.remboursementReer)} d'impôt (${pct(R.remboursementReer / c, 0)}).${S.strategie.reerSurDettes ? " Ce remboursement est versé sur vos dettes chaque avril." : ""}`
-      : `Aucune cotisation REER prévue. À votre taux marginal, 10 000 $ cotisés rapporteraient environ ${$(R.tauxMarginal * 10000)} de remboursement.`));
+      : `Aucune cotisation REER prévue. 10 000 $ cotisés rapporteraient environ ${$(R.impotSansReer - R.impotAvecReer(10000))} de remboursement.`));
     // Remboursement selon la cotisation : votre taux marginal baisse à mesure que le revenu imposable diminue.
     const droits = S.epargne.reer.droits, montants = [5000, 10000, 20000, 30000].filter(m => !droits || m < droits);
     if (droits > 0) montants.push(droits);
@@ -2071,6 +2114,314 @@
     R = calculer();
     rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
     if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
+  }
+
+  /* ============================================================
+     PATRIMOINE : bilan d'aujourd'hui, réel comparé au plan, objectifs
+     d'épargne et « où mettre le prochain 1 000 $ ».
+     ============================================================ */
+  const TYPES_ACTIF = {
+    immobilier: { nom: "Immobilier : chalet, terrain, immeuble", croissance: 3 },
+    placement: { nom: "Placements non enregistrés", croissance: 5 },
+    entreprise: { nom: "Parts d'une entreprise ou d'une clinique", croissance: 0 },
+    vehicule: { nom: "Véhicule, bateau, roulotte", croissance: -15 },
+    equipement: { nom: "Équipement professionnel", croissance: -20 },
+    autre: { nom: "Autre bien", croissance: 0 },
+  };
+  const CHAMPS_ACTIF = [
+    { k: "nom", l: "Nom", t: "text", ph: "Chalet, terrain, bateau…" },
+    { k: "type", l: "Type", t: "select", o: Object.entries(TYPES_ACTIF).map(([k, t]) => [k, t.nom]) },
+    { k: "valeur", l: "Valeur aujourd'hui", u: "$", s: 1000 },
+    { k: "croissance", l: "Hausse ou baisse de valeur par année", u: "%/an", s: 0.5, neg: true, h: "Négatif pour un bien qui perd de la valeur. Une dette liée, comme l'hypothèque du chalet, s'inscrit dans les dettes (page Budget)." },
+    { k: "partMoi", l: "Votre part", u: "%", s: 1 },
+  ];
+  const TYPES_OBJECTIF = {
+    urgence: { nom: "Fonds d'urgence", sous: "Environ 3 mois de dépenses et de paiements", depenser: false },
+    maison: { nom: "Mise de fonds pour une maison", sous: "Avec le CELIAPP : déduction et retrait sans impôt", depenser: false },
+    auto: { nom: "Prochaine auto", sous: "Payée comptant plutôt qu'à crédit", depenser: true },
+    conge: { nom: "Congé parental ou sabbatique", sous: "Vos dépenses pendant l'arrêt de travail", depenser: true },
+    voyage: { nom: "Voyage", sous: "Mis de côté chaque mois plutôt que sur la carte", depenser: true },
+    autre: { nom: "Autre objectif", sous: "Montant et date de votre choix", depenser: false },
+  };
+  const CHAMPS_OBJECTIF = [
+    { k: "nom", l: "Nom", t: "text", ph: "Fonds d'urgence, voyage…" },
+    { k: "cible", l: "Montant visé", u: "$", s: 500 },
+    { k: "date", l: "Date visée", t: "month" },
+    { k: "compte", l: "Où l'argent s'accumule", t: "select", o: Object.entries(COMPTES_OBJECTIF) },
+    { k: "deja", l: "Déjà accumulé", u: "$", s: 100, seul: o => o.compte === "dedie" },
+    { k: "depenser", l: "L'argent sera dépensé à cette date", t: "check", seul: o => o.compte === "dedie", h: "Auto, voyage, congé : l'argent sort de la valeur nette à la date visée. Sinon, il reste placé (fonds d'urgence, mise de fonds)." },
+  ];
+  const dateMois = ym => { const [y, m] = String(ym || "").split("-").map(Number); return y && m ? new Date(y, m - 1, 1) : null; };
+  const dansMois = n => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+  const dateLongue = iso => new Date(iso + "T00:00:00").toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" });
+
+  // Champs d'un élément de liste (actif, objectif) : nom libre, nombres, listes, cases.
+  function champsElement(c, nomListe, i, defs) {
+    const x = tableau(nomListe)[i];
+    for (const ch of defs) {
+      if (ch.seul && !ch.seul(x)) continue;
+      const id = `${nomListe}-${x.id}-${ch.k}`;
+      let ligne;
+      if (ch.t === "text") {
+        ligne = el("div", "champ large"); const lab = el("label", null, ch.l); lab.htmlFor = id;
+        const boite = el("div", "saisie"), inp = el("input"); inp.type = "text"; inp.id = id; inp.value = x[ch.k] || ""; if (ch.ph) inp.placeholder = ch.ph;
+        lierListe(nomListe, i, ch.k)(inp); boite.appendChild(inp); ligne.append(lab, boite, el("span"));
+      } else {
+        ligne = creerChamp(ch, id, lierListe(nomListe, i, ch.k), false);
+        const inp = ligne.querySelector("input, select");
+        if (inp.type === "checkbox") inp.checked = !!x[ch.k]; else inp.value = x[ch.k] ?? "";
+      }
+      c.appendChild(ligne);
+    }
+  }
+  function boutonRetirer(c, nomListe, i, texte) {
+    const ac = el("div", "feuille-actions");
+    const x = el("button", "bouton danger large", texte); x.type = "button"; x.dataset.suppr = nomListe; x.dataset.i = i;
+    ac.appendChild(x); c.appendChild(ac);
+  }
+  function feuilleActif(i) {
+    ouvrirFeuille(S.actifs.autres[i].nom || "Actif", c => {
+      champsElement(c, "actifsAutres", i, CHAMPS_ACTIF);
+      boutonRetirer(c, "actifsAutres", i, "Retirer cet actif");
+    });
+  }
+  function ajouterActif() {
+    S.actifs.autres = S.actifs.autres || [];
+    S.actifs.autres.push({ id: nouvelId("x"), nom: "", type: "immobilier", valeur: 0, croissance: TYPES_ACTIF.immobilier.croissance, partMoi: 100 });
+    S.meta.exemple = false; sauver(); tout();
+    feuilleActif(S.actifs.autres.length - 1);
+  }
+  function feuilleObjectif(i) {
+    ouvrirFeuille(S.objectifs[i].nom || "Objectif", c => {
+      const total = el("div", "feuille-total"); c.appendChild(total);
+      feuilleCourante.maj = () => {
+        const o = R && R.objectifs[i]; if (!o) return;
+        total.textContent = "";
+        total.append(el("span", null, o.atteint ? "Objectif atteint" : o.mois ? "À mettre de côté" : "Date passée"), el("strong", null, o.atteint || !o.mois ? $(o.solde) : `${$(o.mensuel)} / mois`));
+      };
+      feuilleCourante.maj();
+      champsElement(c, "objectifs", i, CHAMPS_OBJECTIF);
+      c.appendChild(el("p", "aide", "Compte à part : le montant mensuel s'ajoute à l'épargne du budget et à la valeur nette. CELI, CELIAPP, REER ou comptes : on compare plutôt vos cotisations prévues au montant nécessaire."));
+      boutonRetirer(c, "objectifs", i, "Retirer cet objectif");
+    });
+  }
+  function feuilleNouvelObjectif() {
+    ouvrirFeuille("Nouvel objectif", c => {
+      c.appendChild(el("p", "aide feuille-intro", "Choisissez un point de départ : le montant et la date se modifient ensuite."));
+      c.appendChild(rangees(el("div"), Object.entries(TYPES_OBJECTIF).map(([k, t]) => ({ titre: t.nom, sous: t.sous, action: () => ajouterObjectif(k) }))));
+    });
+  }
+  function ajouterObjectif(type) {
+    const besoin = Math.round((R.depMoi + R.dettesMoi) / 100) * 100;
+    const [cible, n] = { urgence: [3 * besoin, 12], maison: [50000, 36], auto: [S.actifs.voiture.prixNeuf || 40000, 36], conge: [6 * besoin, 24], voyage: [8000, 12], autre: [10000, 24] }[type];
+    S.objectifs = S.objectifs || [];
+    S.objectifs.push({ id: nouvelId("o"), type, nom: type === "autre" ? "" : TYPES_OBJECTIF[type].nom, cible: Math.max(500, cible), date: dansMois(n),
+      compte: type === "maison" && R.locataire ? "celiapp" : "dedie", deja: 0, depenser: TYPES_OBJECTIF[type].depenser });
+    S.meta.exemple = false; sauver(); tout();
+    feuilleObjectif(S.objectifs.length - 1);
+  }
+
+  // Bilan d'aujourd'hui : ce que vous possédez, ce que vous devez.
+  function rendreBilan(R, couple) {
+    const x = R.projection[0], e = S.epargne, z = document.getElementById("pa-bilan"); z.textContent = "";
+    const epargne = () => ouvrirSection("epargne");
+    const actifs = [
+      { titre: "Comptes et encaisse", valeur: e.encaisse, action: epargne, garder: true },
+      { titre: "REER", valeur: e.reer.solde, action: epargne, garder: true },
+      { titre: "CELI", valeur: e.celi.solde, action: epargne, garder: true },
+      { titre: "CELIAPP", valeur: (e.celiapp || {}).solde || 0, action: epargne },
+      ...R.objectifs.map((o, i) => o.dedie && o.solde > 0 && { titre: o.nom || "Objectif", sous: "Épargne d'un objectif", valeur: o.solde, action: () => feuilleObjectif(i) }),
+      couple && { titre: `Épargne de ${votreP()}`, valeur: x.conjointe, action: () => ouvrirSection("menage") },
+      R.societeActive && { titre: "Placements dans la société", valeur: x.societe, action: () => ouvrirSection("impot") },
+      !R.locataire && { titre: couple ? "Maison, part du couple" : "Maison, votre part", valeur: couple ? x.maisonMenage : x.maisonMoi, action: epargne, garder: true },
+      { titre: couple ? "Autos" : "Auto", valeur: couple ? x.voitureMenage : x.voitureMoi, action: epargne },
+      ...(S.actifs.autres || []).map((a, i) => ({ titre: a.nom || "Actif sans nom", sous: (TYPES_ACTIF[a.type] || TYPES_ACTIF.autre).nom,
+        valeur: (+a.valeur || 0) * (couple ? 1 : (a.partMoi ?? 100) / 100), action: () => feuilleActif(i), garder: true })),
+    ].filter(a => a && (a.garder || Math.abs(a.valeur) >= 0.5));
+    const passifs = S.dettes.map((d, i) => ({ titre: d.nom, sous: `${nb(d.taux, 2)} %${!couple && (d.partMoi ?? 100) < 100 ? ` · votre part : ${nb(d.partMoi)} %` : ""}`,
+      valeur: d.solde * (couple ? 1 : (d.partMoi ?? 100) / 100), action: () => feuilleDette(i) }));
+    const tA = actifs.reduce((t, a) => t + a.valeur, 0), tP = passifs.reduce((t, a) => t + a.valeur, 0);
+    const bloc = (titre, lignes, total, plus) => {
+      const b = el("div", "bilan-bloc"); b.appendChild(el("h3", null, titre));
+      b.appendChild(rangees(el("div"), [...lignes.map(l => ({ ...l, valeur: $(l.valeur) })), plus, { titre: "Total", cls: "total", valeur: $(total) }]));
+      return b;
+    };
+    z.append(
+      bloc("Ce que vous possédez", actifs, tA, { titre: "Ajouter un actif", sous: "Chalet, terrain, placements, parts de clinique…", ico: "plus", cls: "ajout", action: ajouterActif }),
+      bloc("Ce que vous devez", passifs, tP, null),
+    );
+    const vn = el("div", "bilan-net"); vn.append(el("span", null, couple ? "Valeur nette du couple" : "Votre valeur nette"), el("strong", null, $(x[couple ? "menage" : "moi"])));
+    z.appendChild(vn);
+    document.getElementById("pa-bilan-sous").textContent = (S.suivi && S.suivi.instantanes.length) ? `Notée le ${dateLongue(S.suivi.instantanes[S.suivi.instantanes.length - 1].date)}` : "";
+  }
+
+  // Réel comparé au plan : la valeur nette notée de temps en temps, sur le plan de référence.
+  function feuilleNoter() {
+    ouvrirFeuille("Noter ma situation", c => {
+      c.appendChild(el("p", "aide feuille-intro", "Mettez vos soldes à jour d'après vos relevés, puis notez. La valeur nette se recalcule à mesure."));
+      const total = el("div", "feuille-total"); c.appendChild(total);
+      feuilleCourante.maj = () => { total.textContent = ""; total.append(el("span", null, "Votre valeur nette"), el("strong", null, $(R.projection[0].moi))); };
+      feuilleCourante.maj();
+      construireChamps(c, [{ g: "Comptes et biens" }, ...CHAMPS.epargne.filter(ch => ["epargne.encaisse", "epargne.reer.solde", "epargne.celi.solde", "epargne.celiapp.solde", "actifs.maison.valeur", "actifs.voiture.valeur"].includes(ch.p))]);
+      // Une liste (actifs, objectifs, dettes) : un champ par élément retenu, lié à sa place dans la liste.
+      const liste = (titre, nomListe, garder, k, nom) => {
+        const l = (tableau(nomListe) || []).map((x, i) => [x, i]).filter(([x]) => garder(x));
+        if (!l.length) return;
+        const g = el("div", "groupe"); g.appendChild(el("h3", null, titre)); c.appendChild(g);
+        l.forEach(([x, i]) => { const ligne = creerChamp({ l: nom(x), u: "$", s: 100 }, `nt-${nomListe}-${x.id}`, lierListe(nomListe, i, k), false); ligne.querySelector("input").value = x[k] ?? ""; g.appendChild(ligne); });
+      };
+      liste("Autres actifs", "actifsAutres", () => true, "valeur", x => x.nom || "Actif");
+      liste("Objectifs : déjà accumulé", "objectifs", o => o.compte === "dedie", "deja", x => x.nom || "Objectif");
+      liste("Dettes : solde", "dettes", () => true, "solde", x => x.nom);
+      const a = el("div", "feuille-actions"), b = el("button", "bouton large", "Noter cette situation"); b.type = "button";
+      b.addEventListener("click", () => { feuille.close(); noterSituation(); });
+      a.appendChild(b); c.appendChild(a);
+    });
+  }
+  function referenceDe(R) {
+    const p = R.projection;
+    return { date: new Date().toISOString().slice(0, 10), scenario: R.scenario, annees: p.map(y => y.annee), moi: p.map(y => Math.round(y.moi)), menage: p.map(y => Math.round(y.menage)) };
+  }
+  function noterSituation() {
+    R = calculer();
+    const auj = new Date().toISOString().slice(0, 10), x = R.projection[0];
+    S.suivi = S.suivi || { reference: null, instantanes: [] };
+    // Un seul relevé par jour : le plus récent remplace celui du même jour.
+    S.suivi.instantanes = S.suivi.instantanes.filter(i => i.date !== auj).concat({ date: auj, moi: Math.round(x.moi), menage: Math.round(x.menage) })
+      .sort((a, b) => a.date < b.date ? -1 : 1);
+    if (!S.suivi.reference) S.suivi.reference = referenceDe(R);
+    S.meta.exemple = false; sauver(); tout();
+    toast("Situation notée. Revenez dans quelques mois, après avoir mis vos soldes à jour.");
+  }
+  function rendreReel(R, couple) {
+    const z = document.getElementById("pa-reel"); z.textContent = "";
+    const su = S.suivi || { reference: null, instantanes: [] }, cle = couple ? "menage" : "moi";
+    const bouton = (texte, cls, f) => { const b = el("button", "bouton " + cls, texte); b.type = "button"; b.addEventListener("click", f); return b; };
+    const actions = el("div", "actions");
+    if (!su.instantanes.length || !su.reference) {
+      z.appendChild(el("p", "aide", "Notez votre valeur nette aujourd'hui : elle devient votre point de départ, et la projection, votre plan de référence. Dans quelques mois, mettez vos soldes à jour et notez-la de nouveau : vous verrez si vous êtes en avance ou en retard sur le plan."));
+      actions.appendChild(bouton("Noter ma situation aujourd'hui", "", feuilleNoter)); z.appendChild(actions); return;
+    }
+    const ref = su.reference, d0 = new Date(ref.date + "T00:00:00");
+    const ans = d => Math.max(0, (new Date(d + "T00:00:00") - d0) / (365.25 * 864e5));
+    const plan = f => { const v = ref[cle] || ref.moi, i = Math.min(v.length - 1, f), a = Math.floor(i), b = Math.min(v.length - 1, a + 1); return v[a] + (v[b] - v[a]) * (i - a); };
+    const dern = su.instantanes[su.instantanes.length - 1], ecart = dern[cle] - plan(ans(dern.date));
+    const res = el("p", "resume");
+    res.append(document.createTextNode(`Le ${dateLongue(dern.date)}, ${couple ? "la valeur nette du couple" : "votre valeur nette"} était de `), el("strong", null, $(dern[cle])),
+      document.createTextNode(su.instantanes.length > 1 || ans(dern.date) > 0.02 ? `, ${ecart >= 0 ? "en avance" : "en retard"} de ${$(Math.abs(ecart))} sur le plan du ${dateLongue(ref.date)}.` : ". C'est votre point de départ : notez-la de nouveau dans quelques mois."));
+    z.appendChild(res);
+    const n = Math.min(ref.annees.length - 1, Math.max(3, Math.ceil(ans(dern.date)) + 2));
+    const leg = el("div", "legende"), g = el("div", "graphique"); z.append(leg, g);
+    graphiqueLignes(g, leg, [{ nom: "Plan de référence", couleur: SERIES[0], valeurs: (ref[cle] || ref.moi).slice(0, n + 1) }], ref.annees.slice(0, n + 1).map(String), {
+      titre: "Valeur nette notée et plan de référence", hauteur: 190, baseLibre: true,
+      points: su.instantanes.map(x => ({ i: ans(x.date), v: x[cle], couleur: SERIES[2] })),
+      legende: [{ nom: "Plan de référence", couleur: SERIES[0] }, { nom: "Valeur nette notée", couleur: SERIES[2] }],
+    });
+    z.appendChild(rangees(el("div"), su.instantanes.slice(-5).reverse().map(x => {
+      const p = plan(ans(x.date)), e = x[cle] - p;
+      return { titre: dateLongue(x.date), sous: `Plan : ${$(p)}`, valeur: $(x[cle]), valeurSous: `${signe(e)} sur le plan` };
+    })));
+    actions.append(bouton("Noter ma situation aujourd'hui", "", feuilleNoter), bouton("Repartir d'un nouveau plan", "secondaire", () => {
+      const avant = S.suivi.reference; S.suivi.reference = referenceDe(R); sauver(); tout();
+      toast("Nouveau plan de référence : la projection d'aujourd'hui.", () => { S.suivi.reference = avant; sauver(); tout(); });
+    }));
+    z.appendChild(actions);
+  }
+
+  // Objectifs : progression et montant à mettre de côté chaque mois.
+  function rendreObjectifs(R) {
+    const z = document.getElementById("pa-objectifs"); z.textContent = "";
+    R.objectifs.forEach((o, i) => {
+      const b = el("button", "objectif" + (o.atteint ? " atteint" : "")); b.type = "button"; b.addEventListener("click", () => feuilleObjectif(i));
+      const tete = el("span", "objectif-tete"); tete.append(el("strong", null, o.nom || "Objectif"), el("span", null, `${$(o.solde)} sur ${$(+o.cible || 0)}`));
+      const j = el("span", "jauge"), sp = el("span"); sp.style.width = `${Math.min(100, (+o.cible ? o.solde / o.cible : 1) * 100)}%`; j.appendChild(sp);
+      const d = dateMois(o.date), quand = d ? `D'ici ${moisAn(d)}` : "Date à préciser";
+      const compte = COMPTES_OBJECTIF[o.compte] || COMPTES_OBJECTIF.dedie;
+      const etat = o.atteint ? "Atteint"
+        : !o.mois ? "Date passée : choisissez une nouvelle date"
+        : o.dedie ? `${$(o.mensuel)} par mois, compté dans l'épargne du budget`
+        : o.prevu + 0.5 >= o.mensuel ? `Vos cotisations ${compte} (${$(o.prevu)} par mois) suffisent`
+        : `Il manque ${$(o.mensuel - o.prevu)} par mois dans votre ${compte}`;
+      b.append(tete, j, el("span", "objectif-sous", `${quand} · ${etat}`));
+      z.appendChild(b);
+    });
+    if (!R.objectifs.length) z.appendChild(el("p", "aide", "Fonds d'urgence, mise de fonds, prochaine auto, congé parental, voyage : un montant et une date donnent ce qu'il faut mettre de côté chaque mois."));
+    z.appendChild(rangees(el("div"), [{ titre: "Ajouter un objectif", ico: "plus", cls: "ajout", action: feuilleNouvelObjectif }]));
+  }
+
+  // Où mettre le prochain 1 000 $ : valeur dans 10 ans de chaque choix, après impôt.
+  function optionsProchain(R) {
+    const N = 10, r = R.hyp.rendement / 100, f = Math.pow(1 + r, N), t = R.tauxDeduction, tr = (S.epargne.tauxRetrait ?? 35) / 100;
+    const o = [
+      { titre: "CELI", sous: "Croissance et retraits sans impôt", v: 1000 * f },
+      { titre: "REER", sous: `Remboursement de ${pct(t, 0)} placé au CELI ; retrait imposé à ${pct(tr, 0)}`, v: 1000 * f * (1 - tr + t) },
+    ];
+    const ca = S.epargne.celiapp || {};
+    if (R.locataire && (ca.solde || 0) < 40000 && (ca.cotisationAnnuelle || 0) < 8000)
+      o.push({ titre: "CELIAPP", sous: `Déduction de ${pct(t, 0)} et retrait sans impôt pour une première maison`, v: 1000 * f * (1 + t) });
+    if (S.epargne.reee.enfants.some(e => e.age < 17) && S.epargne.reee.cotisationAnnuelle < 2500)
+      o.push({ titre: "REEE", sous: "Subventions de 30 % jusqu'à 2 500 $ par enfant par année ; retraits imposés au nom de l'étudiant", v: 1300 * f });
+    S.dettes.forEach(d => {
+      if (!(d.solde > 0) || !(d.taux > 0)) return;
+      const eff = d.taux / 100 * (1 - (d.creditImpot || 0) / 100);
+      o.push({ titre: `Rembourser : ${d.nom}`, sous: `${nb(eff * 100, 2)} % d'intérêt évité, sans risque${d.creditImpot ? " (après le crédit d'impôt)" : ""}${d.type === "hypotheque" ? " ; dans la limite du remboursement anticipé" : ""}`, v: 1000 * Math.pow(1 + eff, N) });
+    });
+    return o.sort((a, b) => b.v - a.v);
+  }
+  function rendreProchain(R) {
+    const z = document.getElementById("pa-prochain"); z.textContent = "";
+    const reserve = S.epargne.encaisse + S.epargne.celi.solde, besoin = 3 * (R.depMoi + R.dettesMoi);
+    if (reserve < besoin && !(S.objectifs || []).some(o => o.type === "urgence"))
+      z.appendChild(el("p", "aide avertissement", `D'abord, un fonds d'urgence : environ ${$(besoin)}, soit 3 mois de dépenses et de paiements. Ajoutez-le dans « Vos objectifs ».`));
+    const o = optionsProchain(R);
+    z.appendChild(rangees(el("div"), o.map((x, i) => ({ titre: x.titre, sous: x.sous, ico: i === 0 ? "ok" : String(i + 1), cls: i === 0 ? "choisi" : null,
+      valeur: $(x.v), valeurSous: `${pct(Math.pow(x.v / 1000, 1 / 10) - 1, 1)} par année` }))));
+    z.appendChild(el("p", "aide", `Valeur dans 10 ans de 1 000 $ mis aujourd'hui, au rendement du scénario ${SCENARIOS[R.scenario].toLowerCase()} (${nb(R.hyp.rendement, 1)} %). Le rendement des placements n'est pas garanti ; l'intérêt évité en remboursant une dette, oui. Le REER passe devant le CELI quand votre taux d'imposition au retrait (${pct((S.epargne.tauxRetrait ?? 35) / 100, 0)}, modifiable dans Modifier) est plus bas que votre taux d'imposition d'aujourd'hui (${pct(R.tauxDeduction, 0)}).`));
+  }
+
+  /* Dépenses annuelles : quand elles tombent, et ce qu'il faut mettre de côté chaque mois. */
+  const MOIS_LONGS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  function lignesAnnuelles() {
+    const l = depensesEffectives().filter(b => b.periode === "an" && b.montant > 0 && !String(b.id).startsWith("total-"))
+      .map(b => ({ nom: nomDepense(b), montant: +b.montant, mois: +b.mois || 0, liste: "budget", i: S.budget.indexOf(b) }));
+    if (S.impot.depensesProMode === "detail") S.impot.depensesProDetail.forEach((x, i) => {
+      if (x.periode === "an" && x.montant > 0) l.push({ nom: ITEMS_PRO.get(x.k).nom, montant: +x.montant, mois: +x.mois || 0, liste: "depensesPro", i, pro: true });
+    });
+    return l;
+  }
+  function rendreAnnuelles() {
+    const z = document.getElementById("bu-annuelles"); z.textContent = "";
+    const l = lignesAnnuelles();
+    if (!l.length) { z.appendChild(el("p", "aide", "Aucune dépense annuelle. Assurance auto, taxes, cotisation du Collège, vacances : inscrivez-les « / an » dans leur catégorie, puis choisissez leur mois ici.")); return; }
+    const total = l.reduce((t, x) => t + x.montant, 0), mc = new Date().getMonth();
+    const res = el("p", "resume");
+    res.append(document.createTextNode(`${$(total)} par année : mettez `), el("strong", null, `${$(total / 12)} de côté chaque mois`), document.createTextNode(" dans un compte à part, pour les payer sans toucher à la marge."));
+    z.appendChild(res);
+    // Les douze mois, à partir de ce mois-ci.
+    const parMois = Array(12).fill(0); l.forEach(x => { if (x.mois) parMois[x.mois - 1] += x.montant; });
+    const max = Math.max(1, ...parMois), barres = el("div", "mois-barres"); barres.setAttribute("role", "img");
+    barres.setAttribute("aria-label", parMois.map((v, m) => v ? `${MOIS_LONGS[m]} ${$(v)}` : null).filter(Boolean).join(", ") || "Mois à préciser");
+    for (let k = 0; k < 12; k++) {
+      const m = (mc + k) % 12, col = el("div", "col" + (k === 0 ? " courant" : "")), b = el("span", "b");
+      b.style.height = `${Math.max(2, parMois[m] / max * 100)}%`; if (parMois[m]) b.title = `${MOIS_LONGS[m]} : ${$(parMois[m])}`;
+      col.append(b, el("span", "l", MOIS_LONGS[m].slice(0, 1).toUpperCase())); barres.appendChild(col);
+    }
+    z.appendChild(barres);
+    const ordre = x => x.mois ? (x.mois - 1 - mc + 12) % 12 : 99;
+    const tries = [...l].sort((a, b) => ordre(a) - ordre(b));
+    rangees(z.appendChild(el("div")), [...tries.slice(0, 6).map(x => ({ titre: x.nom, sous: `${x.mois ? `En ${MOIS_LONGS[x.mois - 1]}` : "Mois à préciser"}${x.pro ? " · professionnelle" : ""}`, valeur: $(x.montant), action: feuilleAnnuelles })),
+      tries.length > 6 ? { titre: `${tries.length - 6} autre${tries.length > 7 ? "s" : ""}`, action: feuilleAnnuelles } : null]);
+  }
+  function feuilleAnnuelles() {
+    ouvrirFeuille("Dépenses annuelles", c => {
+      c.appendChild(el("p", "aide feuille-intro", "Le mois où chaque dépense annuelle est payée : elles apparaissent dans les échéances de l'aperçu."));
+      lignesAnnuelles().forEach(x => {
+        const ligne = creerChamp({ l: `${x.nom} · ${$(x.montant)}`, t: "select", o: [["", "Mois à préciser"], ...MOIS_LONGS.map((m, k) => [String(k + 1), m[0].toUpperCase() + m.slice(1)])] },
+          `an-${x.liste}-${x.i}`, lierListe(x.liste, x.i, "mois"), false);
+        ligne.querySelector("select").value = x.mois ? String(x.mois) : "";
+        c.appendChild(ligne);
+      });
+    });
   }
 
   /* ============================================================
@@ -2146,7 +2497,7 @@
       ]);
     };
     feuilleCourante.maj();
-    c.appendChild(el("p", "aide", "Les dettes se précisent dans la page Budget ; l'épargne (REER, CELI, CELIAPP, REEE), dans la page Avenir, bouton Modifier."));
+    c.appendChild(el("p", "aide", "Les dettes se précisent dans la page Budget ; l'épargne (REER, CELI, CELIAPP, REEE) et les objectifs, dans la page Patrimoine."));
   }
   const INTRO_CATEGORIE = {
     "Logement": "Loyer ou taxes, assurance habitation, électricité, chauffage, entretien. L'hypothèque se gère dans les dettes.",
@@ -2237,7 +2588,7 @@
       { titre: "Votre situation", sous: "Famille, pratique, logement, dettes", f: S.meta.exemple ? 0 : 1, poids: 15, action: ouvrirAssistant },
       { titre: "Vos revenus, pas à pas", sous: `${nRev} écran${nRev > 1 ? "s" : ""} sur ${rev.length}`, f: nRev / rev.length, poids: 35, action: () => ouvrirParcours("revenus") },
       { titre: "Votre budget, pas à pas", sous: `${nCat} catégorie${nCat > 1 ? "s" : ""} sur ${cats.length}`, f: nCat / cats.length, poids: 35, action: () => ouvrirParcours("budget") },
-      { titre: "Votre épargne", sous: "REER, CELI, CELIAPP, REEE", f: epargne ? 1 : 0, poids: 10, action: () => { marquer("autres", "epargne"); ouvrirSection("epargne"); } },
+      { titre: "Votre patrimoine", sous: "Épargne, biens et objectifs", f: epargne ? 1 : 0, poids: 10, action: () => { marquer("autres", "epargne"); ouvrir("avenir"); } },
       { titre: "Une copie de sauvegarde", sous: "Vos données ne vivent que dans ce navigateur", f: S.meta.dernierExport ? 1 : 0, poids: 5, action: () => ouvrir("donnees") },
     ];
     const total = items.reduce((t, x) => t + x.poids, 0);
@@ -2260,6 +2611,7 @@
     document.getElementById("ap-portrait-suite").textContent = suite ? `Continuer : ${suite.titre.replace(", pas à pas", "").toLowerCase()}` : "Continuer";
     document.getElementById("ap-portrait-suite").onclick = suite ? suite.action : null;
   }
+  document.getElementById("bu-annuelles-modifier").addEventListener("click", feuilleAnnuelles);
   document.getElementById("ap-portrait-masquer").addEventListener("click", () => {
     try { sessionStorage.setItem("wm.portrait", "masque"); } catch (e) { /* rien à garder */ }
     rendrePortrait(); toast("Carte masquée jusqu'à la prochaine ouverture de l'app.");
@@ -2288,10 +2640,16 @@
       const v = valeur(inp); if (v === null) return;
       const item = tableau(inp.dataset.l)[+inp.dataset.i];
       item[inp.dataset.k] = v; S.meta.exemple = false;
-      if (inp.dataset.k === "nom" && ["dettes", "enfants", "activites"].includes(inp.dataset.l) && feuilleCourante && !parcours) { feuilleCourante.titre = inp.dataset.l === "activites" ? nomActivite(item) : v || "Sans nom"; titreFeuille.textContent = feuilleCourante.titre; }
+      if (inp.dataset.k === "nom" && ["dettes", "enfants", "activites", "actifsAutres", "objectifs"].includes(inp.dataset.l) && feuilleCourante && !parcours) { feuilleCourante.titre = inp.dataset.l === "activites" ? nomActivite(item) : v || "Sans nom"; titreFeuille.textContent = feuilleCourante.titre; }
       if (inp.dataset.bool) item[inp.dataset.k] = v === "true";
       if (["budget", "lignes", "depensesPro"].includes(inp.dataset.l) && inp.dataset.k === "montant") inp.closest(".ligne-depense").classList.toggle("remplie", v > 0);
       if (inp.dataset.l === "dettes" && (inp.dataset.k === "type" || inp.dataset.k === "interetsSeulement")) { sauver(); reconstruireFeuille(); tout(); return; }
+      // Nouveau type d'actif : sa hausse de valeur de départ, sauf si on l'a déjà changée.
+      if (inp.dataset.l === "actifsAutres" && inp.dataset.k === "type") {
+        if (TYPES_ACTIF[v] && Object.values(TYPES_ACTIF).some(t => t.croissance === +item.croissance)) item.croissance = TYPES_ACTIF[v].croissance;
+        sauver(); reconstruireFeuille(); tout(); return;
+      }
+      if (inp.dataset.l === "objectifs" && inp.dataset.k === "compte") { sauver(); reconstruireFeuille(); tout(); return; }
       if (inp.dataset.l === "activites" && ["type", "frequence", "calcul"].includes(inp.dataset.k)) {
         // Nouveau type : ses valeurs de départ, sauf celles déjà modifiées (égales à celles d'un autre type).
         if (inp.dataset.k === "type" && ACTIVITES[v]) for (const k of ["parJour", "patients", "parPatient"])
@@ -2341,7 +2699,7 @@
   });
 
   /* Pages, avec la page ouverte dans l'adresse (#revenu, #impot…). */
-  const ALIAS = { epargne: "avenir" };
+  const ALIAS = { epargne: "avenir", patrimoine: "avenir" };
   function ouvrir(nom, sansRendu) {
     nom = ALIAS[nom] || nom;
     if (!document.getElementById("v-" + nom)) nom = "apercu";
@@ -2682,11 +3040,12 @@
     s.menage = { conjointNetMensuel: 0, allocationsAnnuelles: 0, autresRevenusMensuels: 0, partCommunMoi: couple ? 50 : 100 };
     s.famille = { calculAuto: true, versementA: "moi", medicamentsPublicMoi: true };
     s.epargne = { rendement: 5, encaisse: 0, reer: { solde: 0, droits: 0, cotisationAnnuelle: 0 }, celi: { solde: 0, cotisationAnnuelle: 0 },
+      celiapp: { solde: 0, cotisationAnnuelle: 0 }, tauxRetrait: 35,
       reee: { cotisationAnnuelle: 0, enfants: A.enfants.map((age, i) => ({ id: "e" + (i + 1), nom: `Enfant ${i + 1}`, age, solde: 0 })) } };
     // Logement
     const part = proprio ? (couple ? A.partMaison : 100) : 0;
     s.actifs = { logement: proprio ? "proprietaire" : "locataire", maison: { valeur: proprio ? A.maison : 0, part, croissance: 3 },
-      voiture: { valeur: 0, depreciation: 15, remplacementAns: 0, prixNeuf: 40000 }, actifsConjoint: 0 };
+      voiture: { valeur: 0, depreciation: 15, remplacementAns: 0, prixNeuf: 40000 }, actifsConjoint: 0, autres: [] };
     s.budget = normaliserBudget([]);
     if (!proprio && A.loyer > 0) Object.assign(s.budget.find(b => b.k === "loyer"), { montant: A.loyer, qui: couple ? "commun" : "moi" });
     // Dettes

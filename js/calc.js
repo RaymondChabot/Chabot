@@ -585,6 +585,11 @@
     const autos = voitures.map(v => ({ ...v, valeurCourante: v.valeur, age: 0 }));
     const inflation = (o.inflation || 0) / 100, remplacement = o.remplacementAutos || null;
     const encaisse = o.encaisse || 0;
+    // Autres actifs (chalet, terrain, équipement…) : leur valeur croît, ou baisse, chaque année.
+    const autresActifs = o.autresActifs || [];
+    // Objectifs d'épargne dans un compte dédié : versements jusqu'au mois visé ; l'argent d'un
+    // objectif à dépenser (auto, voyage, congé) sort ce mois-là, celui d'un fonds d'urgence reste.
+    const objectifs = (o.objectifs || []).map(x => ({ ...x, s: x.solde || 0 }));
     const res = [];
     const soldesAu = a => {
       if (a === 0) return o.dettes.map(d => Math.max(0, +d.solde || 0));
@@ -602,6 +607,7 @@
           const cCeliapp = k % 12 === 0 ? Math.min(ca.cotisationAnnuelle || 0, Math.max(0, 40000 - cumulCeliapp)) : 0;
           if (k % 12 === 0) cumulCeliapp += cCeliapp;
           celiapp = celiapp * (1 + rm) + cCeliapp;
+          for (const ob of objectifs) { if (k < ob.mois) ob.s += ob.mensuel; if (ob.depenser && k + 1 === ob.mois) ob.s = 0; }
           if (o.societe) soc = soc * (1 + rmSoc) + Math.max(0, o.societe.retenuAnnee(a - 1)) / 12;
         }
         for (const v of autos) {
@@ -629,12 +635,17 @@
       const maisonMenage = valeurMaison * (o.maison.partMenage ?? o.maison.part) / 100;
       const vMoi = autos.filter(v => !v.conjointe).reduce((s, v) => s + v.valeurCourante, 0);
       const vMenage = autos.reduce((s, v) => s + v.valeurCourante, 0);
-      const placements = reer + celi + celiapp + encaisse + attente;
-      const moi = maisonMoi - hypMoi + vMoi + placements + soc - autresMoi;
-      const menage = maisonMenage - hypMenage + vMenage + placements + conj + soc - autresMenage;
+      const objectifsSolde = objectifs.reduce((t, ob) => t + ob.s, 0);
+      const valeurActif = x => x.valeur * Math.pow(1 + (x.croissance || 0) / 100, a);
+      const actifsMoi = autresActifs.reduce((t, x) => t + valeurActif(x) * (x.part ?? 100) / 100, 0);
+      const actifsMenage = autresActifs.reduce((t, x) => t + valeurActif(x) * (x.partMenage ?? x.part ?? 100) / 100, 0);
+      const placements = reer + celi + celiapp + encaisse + attente + objectifsSolde;
+      const moi = maisonMoi - hypMoi + vMoi + placements + soc + actifsMoi - autresMoi;
+      const menage = maisonMenage - hypMenage + vMenage + placements + conj + soc + actifsMenage - autresMenage;
       res.push({ annee: o.anneeDepart + a, moi, menage, valeurMaison, maisonMoi, maisonMenage, hypMoi, hypMenage,
         equiteMoi: maisonMoi - hypMoi, equiteMenage: maisonMenage - hypMenage, autresMoi, autresMenage,
-        voitureMoi: vMoi, voitureMenage: vMenage, reer, celi, celiapp, encaisse, attente, placements, societe: soc, conjointe: conj,
+        voitureMoi: vMoi, voitureMenage: vMenage, reer, celi, celiapp, encaisse, attente, objectifs: objectifsSolde, placements, societe: soc, conjointe: conj,
+        autresActifsMoi: actifsMoi, autresActifsMenage: actifsMenage,
         hypotheque: hypMenage, dettes: hypMenage + autresMenage });
     }
     return res;

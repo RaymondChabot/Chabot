@@ -208,7 +208,7 @@
       <div class="rp-kpis rp-kpis-4">
         ${kpi("Impôt de l'année", $(totalImpot), soc ? "Société et vous" : "Impôt et cotisations")}
         ${kpi("Taux moyen", pct(R.impot.tauxMoyen, 1), "Du revenu brut")}
-        ${kpi("Taux marginal", pct(R.tauxMarginal, 0), "Sur 1 000 $ de plus")}
+        ${kpi("Taux marginal", pct(R.tauxMarginal, 0), "Sur 1 000 $ de plus facturés")}
         ${kpi("À mettre de côté", $(R.impot.total / 12), "Par mois, pour vous")}
       </div>
       <div class="rp-carte"><h2>Sur chaque 100 $ gagnés</h2>${empilee(cent, R.impot.revenu, v => O.$2(v / Math.max(1, R.impot.revenu) * 100))}</div>
@@ -264,10 +264,12 @@
     /* 6. Avenir */
     const cols = [0, Math.round(fin / 2), fin], v = (i, f) => f(p[i]) / def(i);
     const L = [["Maison, votre part", y => y.maisonMoi], ["Hypothèques, votre part", y => -y.hypMoi], ["Équité dans la maison", y => y.equiteMoi, "sous-total"],
-      ["Placements : REER, CELI, CELIAPP, comptes", y => y.placements], ...(soc ? [["Placements dans la société", y => y.societe]] : []), ["Auto", y => y.voitureMoi], ["Autres dettes, votre part", y => -y.autresMoi]]
+      ["Placements : REER, CELI, CELIAPP, comptes", y => y.placements], ...(soc ? [["Placements dans la société", y => y.societe]] : []), ["Auto", y => y.voitureMoi],
+      ...((S.actifs.autres || []).length ? [["Autres actifs", y => y.autresActifsMoi]] : []), ["Autres dettes, votre part", y => -y.autresMoi]]
       .filter(([n]) => !R.locataire || !/Maison|Hypoth|Équité/.test(n) || S.dettes.some(d => d.type === "hypotheque"));
     const jal = O.jalons(R);
-    pages.push(page("Avenir", `Scénario ${scen} : placements ${nb(R.hyp.rendement, 1)} %${R.locataire ? "" : `, maison ${O.signePct(R.hyp.croissanceMaison)}`}, autos −${nb(R.hyp.depreciationAuto, 0)} %, inflation ${nb(R.hyp.inflation, 1)} % par année${S.scenarios.dollarsAujourdhui ? " ; montants en dollars d'aujourd'hui" : ""}.`, `
+    const objs = R.objectifs || [];
+    pages.push(page("Patrimoine", `Scénario ${scen} : placements ${nb(R.hyp.rendement, 1)} %${R.locataire ? "" : `, maison ${O.signePct(R.hyp.croissanceMaison)}`}, autos −${nb(R.hyp.depreciationAuto, 0)} %, inflation ${nb(R.hyp.inflation, 1)} % par année${S.scenarios.dollarsAujourdhui ? " ; montants en dollars d'aujourd'hui" : ""}.`, `
       <div class="rp-carte"><h2>Valeur nette projetée</h2>
         ${legende([{ nom: `Scénario ${scen}`, couleur: C(0), ligne: true }, { nom: "Du prudent à l'optimiste", couleur: C(0), zone: true }])}
         ${lignes({ x: p.map(y => String(y.annee)), series: [{ nom: "Valeur nette", couleur: C(0), valeurs: vals }], bande: { bas, haut, couleur: C(0) }, hauteur: 175, titre: "Valeur nette projetée" })}
@@ -279,6 +281,7 @@
         <div class="rp-colonne">
           <div class="rp-carte"><h2>Selon le scénario</h2>${tableau(["Scénario", "Sans dettes", String(p[fin].annee)], Object.entries(SCENARIOS).map(([k, nom]) => ({ cls: k === R.scenario ? "choisi" : "", c: [nom, R.libres[k] ? moisAn(R.libres[k]) : "jamais", court(R.projections[k][fin].moi / def(fin))] })), "compact")}</div>
           ${R.reee.length ? `<div class="rp-carte"><h2>REEE à 17 ans</h2>${tableau(["Enfant", "Subventions", "À 17 ans"], R.reee.map((r, i) => ({ c: [`${S.epargne.reee.enfants[i].nom}, ${nb(S.epargne.reee.enfants[i].age, 0)} ans`, $(r.subventions), $(r.solde)] })), "compact")}</div>` : ""}
+          ${objs.length ? `<div class="rp-carte"><h2>Objectifs d'épargne</h2>${tableau(["Objectif", "Visé", "Par mois"], objs.map(o => ({ c: [`${o.nom || "Objectif"}${o.date ? ` · ${o.date}` : ""}`, $(+o.cible || 0), o.atteint ? "atteint" : $(o.dedie ? o.mensuel : Math.max(0, o.mensuel - o.prevu))] })), "compact")}</div>` : ""}
         </div>
         <div class="rp-carte"><h2>Vos jalons</h2><ul class="rp-jalons">${jal.map(j => `<li><b>${esc(j.jalon.mois ? `${j.jalon.mois} ${j.jalon.annee}` : j.jalon.annee)}</b><span>${esc(j.titre)}</span></li>`).join("")}</ul></div>
       </div>`));

@@ -815,3 +815,24 @@ button.as-option:hover { border-color: var(--encre); }
 .guide.fait { background: transparent; border: 1px solid var(--ligne); }
 .guide.fait .bouton { background: transparent; color: var(--encre); border-color: var(--trait); }
 @media print { .guide, .portrait, .feuille-pied { display: none !important; } }
+
+/* ============================================================
+   PATRIMOINE : bilan, réel comparé au plan, objectifs ; dépenses annuelles
+   ============================================================ */
+.bilan { display: grid; gap: 16px; }
+.bilan-bloc h3 { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--discret); padding-bottom: 2px; }
+.bilan-net { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 16px; border-radius: var(--rayon-petit); background: var(--surface-2); font-weight: 600; }
+.bilan-net strong { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+@media (min-width: 760px) { .bilan { grid-template-columns: 1fr 1fr; align-items: start; } .bilan-net { grid-column: 1 / -1; } }
+.point-fixe { stroke: var(--surface); stroke-width: 2; }
+.objectif { display: flex; flex-direction: column; gap: 7px; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px solid var(--grille); padding: 12px 0; cursor: pointer; }
+.objectif-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.objectif-tete span { font-variant-numeric: tabular-nums; color: var(--encre-2); font-size: 0.9rem; }
+.objectif .jauge span { background: var(--marque); }
+.objectif.atteint .jauge span { background: var(--bon); }
+.objectif-sous { font-size: 0.84rem; color: var(--discret); }
+.mois-barres { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; height: 92px; margin: 2px 0 4px; }
+.mois-barres .col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; min-width: 0; }
+.mois-barres .b { width: 100%; max-width: 26px; border-radius: 4px 4px 0 0; background: var(--s3); }
+.mois-barres .l { font-size: 0.68rem; color: var(--discret); }
+.mois-barres .col.courant .l { color: var(--encre); font-weight: 650; }
