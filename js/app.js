@@ -26,7 +26,7 @@
       modeBudget: "horaire",
     },
     impot: { depensesPro: 3000 },
-    conjointe: { active: false, salaire: 0, rpa: 0, syndicat: 0, autresRevenus: 0, medicamentsPublic: false, partMaison: 0, epargne: 0, voiture: 0 },
+    conjointe: { active: false, salaire: 0, rpa: 0, syndicat: 0, autresRevenus: 0, medicamentsPublic: false, partMaison: 0, epargne: 0, epargneMensuelle: 0, voiture: 0 },
     // Hypothèses de l'avenir. Le scénario réaliste suit les Normes d'hypothèses de
     // projection 2026 (Institut de planification financière et FP Canada).
     scenarios: {
@@ -64,7 +64,7 @@
       reer: { solde: 0, droits: 20000, cotisationAnnuelle: 0 },
       celi: { solde: 0, cotisationAnnuelle: 0 },
     },
-    actifs: { maison: { valeur: 500000, part: 50, croissance: 3 }, voiture: { valeur: 15000, depreciation: 15 }, actifsConjoint: 0 },
+    actifs: { maison: { valeur: 500000, part: 50, croissance: 3 }, voiture: { valeur: 15000, depreciation: 15, remplacementAns: 0, prixNeuf: 40000 }, actifsConjoint: 0 },
   };
 
   /* ============================================================
@@ -280,6 +280,7 @@
       { p: "conjointe.medicamentsPublic", l: "Couverte par le régime public d'assurance médicaments", t: "check", si: "conjointe.active", h: "Non si elle a une assurance collective au travail." },
       { p: "conjointe.partMaison", l: "Sa part de propriété de la maison", u: "%", si: "conjointe.active" },
       { p: "conjointe.epargne", l: "Son épargne : REER, CELI, comptes", u: "$", s: 100, si: "conjointe.active" },
+      { p: "conjointe.epargneMensuelle", l: "Ce qu'elle épargne chaque mois", u: "$/mois", s: 50, si: "conjointe.active", h: "REER, CELI ou autre ; compté dans la valeur nette du couple et retiré de son surplus." },
       { p: "conjointe.voiture", l: "Valeur de son auto", u: "$", s: 500, si: "conjointe.active" },
       { g: "Famille" },
       { p: "famille.calculAuto", l: "Calculer les allocations familiales selon vos revenus", t: "check", h: "Allocation canadienne pour enfants, Allocation famille et supplément pour fournitures scolaires. Les enfants et leur âge viennent de la page Avenir." },
@@ -308,6 +309,8 @@
       { p: "actifs.maison.valeur", l: "Valeur de la maison", u: "$", s: 1000 },
       { p: "actifs.maison.part", l: "Votre part de propriété", u: "%" },
       { p: "actifs.voiture.valeur", l: "Valeur de votre auto", u: "$", s: 100, h: "Rendement, hausse de la valeur de la maison et perte de valeur des autos : bouton Hypothèses." },
+      { p: "actifs.voiture.remplacementAns", l: "Remplacer les autos tous les", u: "ans", s: 1, h: "0 : jamais. Chaque auto est échangée à sa valeur ; la différence sort de l'épargne." },
+      { p: "actifs.voiture.prixNeuf", l: "Prix d'une auto neuve, en dollars d'aujourd'hui", u: "$", s: 1000 },
     ],
     hypotheses: [
       { g: "Affichage" },
@@ -598,6 +601,9 @@
     const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ;
     R.sensDJ = sens("demiJournees", [...new Set([4, 5, 6, 7, 8, 9, 10, dj])].filter(n => n >= Math.max(1, S.revenu.enseignement)).sort((a, b) => a - b));
     R.sensPat = sens("patientsParDJ", [...new Set([3, 4, 5, 6, 7, 8, pat])].sort((a, b) => a - b));
+    // REER : impôt sans cotisation, et avec une cotisation donnée (au revenu de l'année).
+    R.impotSansReer = C.impotParticulier({ ...base, reer: 0, revenu: R.brut }).total;
+    R.impotAvecReer = m => C.impotParticulier({ ...base, reer: m, revenu: R.brut }).total;
     R.remboursementReer = S.epargne.reer.cotisationAnnuelle > 0
       ? C.impotParticulier({ ...base, reer: 0, revenu: R.brut }).total - C.impotParticulier({ ...base, revenu: R.brut }).total : 0;
 
@@ -637,9 +643,10 @@
     const enfants = S.epargne.reee.enfants.filter(x => x.age < 17).length;
     R.epargneMoi = (enfants * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle) / 12;
     R.surplusMoi = R.netMoi - R.depMoi - R.dettesMoi - R.epargneMoi;
-    R.surplusConjointe = R.netConjointe - R.depConjointe - R.dettesConjointe;
+    R.epargneConjointe = R.couple ? S.conjointe.epargneMensuelle || 0 : 0;
+    R.surplusConjointe = R.netConjointe - R.depConjointe - R.dettesConjointe - R.epargneConjointe;
     R.revenusMenage = R.netMoi + R.netConjointe + S.menage.autresRevenusMensuels;
-    R.surplusMenage = R.revenusMenage - R.depMenage - R.dettesMenage - R.epargneMoi;
+    R.surplusMenage = R.revenusMenage - R.depMenage - R.dettesMenage - R.epargneMoi - R.epargneConjointe;
 
     // Années suivantes : la première année de pratique fait place à une année type
     // (clientèle complète toute l'année), puis les revenus et les dépenses évoluent
@@ -679,6 +686,8 @@
       voitures: [{ valeur: S.actifs.voiture.valeur, depreciation: h.depreciationAuto },
         ...(R.couple && S.conjointe.voiture > 0 ? [{ valeur: S.conjointe.voiture, depreciation: h.depreciationAuto, conjointe: true }] : [])],
       actifsConjoint: R.couple ? S.conjointe.epargne : 0, dettes: S.dettes,
+      epargneConjointe: R.epargneConjointe, hausseEpargneConjointe: h.hausseRevenus, inflation: h.inflation,
+      remplacementAutos: S.actifs.voiture.remplacementAns > 0 ? { ans: S.actifs.voiture.remplacementAns, prix: S.actifs.voiture.prixNeuf } : null,
       ajoutMensuel: m === "minimum" ? surplusAnnee(h) : null,
     }, sim);
     // Méthodes comparées sur la valeur nette à l'horizon : elle tient compte des intérêts, de l'argent
@@ -873,7 +882,7 @@
     });
     s += `<line class="reticule" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" visibility="hidden"/>`;
     series.forEach((se, j) => { s += `<circle class="point" r="5" cx="0" cy="0" visibility="hidden" data-j="${j}" style="fill:${se.couleur}"/>`; });
-    s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" tabindex="0" data-zone="1" aria-label="${options.titre} : glissez ou utilisez les flèches pour les valeurs"/>`;
+    s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" tabindex="0" data-zone="1" role="slider" aria-valuemin="0" aria-valuemax="${n - 1}" aria-valuenow="${n - 1}" aria-label="${options.titre} : glissez ou utilisez les flèches pour les valeurs"/>`;
     s += "</svg>";
     boite.innerHTML = s;
     const bulle = el("div", "bulle"); bulle.hidden = true; boite.appendChild(bulle);
@@ -882,6 +891,8 @@
       i = Math.max(0, Math.min(n - 1, i));
       ret.setAttribute("x1", x(i)); ret.setAttribute("x2", x(i)); ret.setAttribute("visibility", "visible");
       points.forEach(p => { const se = series[+p.dataset.j]; p.setAttribute("cx", x(i)); p.setAttribute("cy", y(se.valeurs[i])); p.setAttribute("visibility", "visible"); });
+      zone.setAttribute("aria-valuenow", i);
+      zone.setAttribute("aria-valuetext", `${options.titreX ? options.titreX(i) : etiquettesX[i]} : ${series.map(se => `${se.nom} ${$(se.valeurs[i])}`).join(", ")}`);
       if (options.surPoint) { options.surPoint(i); return; }
       bulle.textContent = "";
       bulle.appendChild(el("div", "titre", options.titreX ? options.titreX(i) : etiquettesX[i]));
@@ -1250,8 +1261,8 @@
     const partDette = d => vue === "menage" ? 1 : vue === "moi" ? (d.paiementMoi ?? 100) / 100 : 1 - (d.paiementMoi ?? 100) / 100;
     const V = {
       moi: { travail: R.travailMoi, alloc: R.allocMoi, autres: 0, rev: R.netMoi, dep: R.depMoi, dettes: R.dettesMoi, epargne: R.epargneMoi, surplus: R.surplusMoi },
-      conjointe: { travail: R.travailConjointe, alloc: R.allocConjointe, autres: 0, rev: R.netConjointe, dep: R.depConjointe, dettes: R.dettesConjointe, epargne: 0, surplus: R.surplusConjointe },
-      menage: { travail: R.travailMoi + R.travailConjointe, alloc: R.allocMoi + R.allocConjointe, autres: S.menage.autresRevenusMensuels, rev: R.revenusMenage, dep: R.depMenage, dettes: R.dettesMenage, epargne: R.epargneMoi, surplus: R.surplusMenage },
+      conjointe: { travail: R.travailConjointe, alloc: R.allocConjointe, autres: 0, rev: R.netConjointe, dep: R.depConjointe, dettes: R.dettesConjointe, epargne: R.epargneConjointe, surplus: R.surplusConjointe },
+      menage: { travail: R.travailMoi + R.travailConjointe, alloc: R.allocMoi + R.allocConjointe, autres: S.menage.autresRevenusMensuels, rev: R.revenusMenage, dep: R.depMenage, dettes: R.dettesMenage, epargne: R.epargneMoi + R.epargneConjointe, surplus: R.surplusMenage },
     }[vue];
     const nomVue = { moi: "Votre surplus mensuel", conjointe: "Surplus de votre conjointe", menage: "Surplus du ménage" }[vue];
     hero("bu-hero", nomVue, $(V.surplus), [
@@ -1273,7 +1284,7 @@
         const v = l.reduce((s, b) => s + mensuel(b) * qui(b), 0);
         return { titre: g, sous: n ? `${n} dépense${n > 1 ? "s" : ""}` : "Rien d'inscrit", valeur: n ? $(v) : "—", cls: n ? null : "vide", action: () => feuilleCategorie(g) };
       }),
-      { titre: "Épargne : REEE, REER, CELI", sous: "Bouton Modifier de la page Avenir", valeur: $(V.epargne) },
+      { titre: vue === "conjointe" ? "Son épargne" : "Épargne : REEE, REER, CELI", sous: vue === "conjointe" ? "Bouton Ménage" : vue === "menage" && R.epargneConjointe ? "La vôtre et celle de votre conjointe" : "Bouton Modifier de la page Avenir", valeur: $(V.epargne) },
       { titre: "Total des dépenses et de l'épargne", cls: "total", valeur: $(V.dep + V.epargne) },
     ]);
     rangees("bu-dettes", [
@@ -1409,6 +1420,16 @@
     z.appendChild(el("p", "resume", c > 0
       ? `Cotiser ${$(c)} au REER vous rembourse environ ${$(R.remboursementReer)} d'impôt (${pct(R.remboursementReer / c, 0)}).${S.strategie.reerSurDettes ? " Ce remboursement est versé sur vos dettes chaque avril." : ""}`
       : `Aucune cotisation REER prévue. À votre taux marginal, 10 000 $ cotisés rapporteraient environ ${$(R.tauxMarginal * 10000)} de remboursement.`));
+    // Remboursement selon la cotisation : votre taux marginal baisse à mesure que le revenu imposable diminue.
+    const droits = S.epargne.reer.droits, montants = [5000, 10000, 20000, 30000].filter(m => !droits || m < droits);
+    if (droits > 0) montants.push(droits);
+    if (montants.length) {
+      z.appendChild(el("h3", null, "Remboursement selon la cotisation"));
+      z.appendChild(rangees(el("div"), montants.map(m => {
+        const rb = R.impotSansReer - R.impotAvecReer(m);
+        return { titre: `Cotiser ${$(m)}`, sous: m === droits ? "Tous vos droits inutilisés" : `Coût réel : ${$(m - rb)}`, valeur: $(rb), valeurSous: `${pct(rb / m, 0)} remboursé` };
+      })));
+    }
     z.appendChild(rangees(el("div"), [
       { titre: "Solde REER", valeur: $(S.epargne.reer.solde) },
       { titre: "Droits inutilisés", sous: "Sur votre avis de cotisation fédéral", valeur: $(S.epargne.reer.droits) },
@@ -1495,14 +1516,14 @@
 
   /* Pages, avec la page ouverte dans l'adresse (#revenu, #impot…). */
   const ALIAS = { epargne: "avenir" };
-  function ouvrir(nom) {
+  function ouvrir(nom, sansRendu) {
     nom = ALIAS[nom] || nom;
     if (!document.getElementById("v-" + nom)) nom = "apercu";
     document.querySelectorAll(".nav [data-onglet], .barre-haut [data-onglet]").forEach(a => { if (a.dataset.onglet === nom) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     document.querySelectorAll(".vue").forEach(v => { v.hidden = v.id !== "v-" + nom; });
     if (location.hash !== "#" + nom) history.replaceState(null, "", "#" + nom);
     window.scrollTo(0, 0);
-    if (R) tout();   // les graphiques prennent la largeur de la page visible
+    if (R && !sansRendu) tout();   // les graphiques prennent la largeur de la page visible
   }
   window.addEventListener("hashchange", () => ouvrir(location.hash.slice(1)));
 
@@ -1561,10 +1582,11 @@
   boutonInstaller.addEventListener("click", async () => { if (!invite) return; invite.prompt(); await invite.userChoice; invite = null; boutonInstaller.hidden = true; });
   if (window.matchMedia("(display-mode: standalone)").matches || navigator.standalone) document.getElementById("carte-installer").hidden = true;
 
+  ouvrir((location.hash || "#apercu").slice(1), true);
   tout();
-  ouvrir((location.hash || "#apercu").slice(1));
+  document.documentElement.classList.add("pret");
   if (typeof ResizeObserver !== "undefined") {
-    let largeur = 0;
+    let largeur = document.querySelector("main").clientWidth;
     new ResizeObserver(() => { const w = document.querySelector("main").clientWidth; if (Math.abs(w - largeur) > 4) { largeur = w; if (R) tout(); } }).observe(document.querySelector("main"));
   }
 })();

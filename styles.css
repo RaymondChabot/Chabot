@@ -108,6 +108,8 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+/* Le contenu apparaît une fois calculé : pas de saut de mise en page au chargement. */
+html:not(.pret) main { visibility: hidden; }
 html, body { margin: 0; }
 html { -webkit-text-size-adjust: 100%; scroll-padding-top: 72px; }
 body {
@@ -518,7 +520,7 @@ a.tuile:hover { border-color: var(--trait); }
 /* Date d'échéance : jour en gros, mois en petit */
 .rangee-date { flex: none; width: 46px; height: 48px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
 .rangee-date .jour { font-size: 1.1rem; font-weight: 650; font-variant-numeric: tabular-nums; }
-.rangee-date .mois { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--discret); margin-top: 3px; }
+.rangee-date .mois { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--encre-2); margin-top: 3px; }
 
 /* Message en bas de l'écran, avec « Annuler » */
 .toast {

@@ -475,6 +475,10 @@
     const ans = o.annees || 20, r = o.rendement / 100, rm = Math.pow(1 + r, 1 / 12) - 1;
     const voitures = o.voitures || [];
     let reer = o.reer.solde, celi = o.celi.solde, conj = o.actifsConjoint || 0;
+    // Autos : chacune perd de la valeur chaque année ; si un remplacement est prévu, une auto
+    // neuve est achetée tous les N ans (prix indexé à l'inflation), payée avec l'épargne.
+    const autos = voitures.map(v => ({ ...v, valeurCourante: v.valeur, age: 0 }));
+    const inflation = (o.inflation || 0) / 100, remplacement = o.remplacementAutos || null;
     const encaisse = o.encaisse || 0;
     const res = [];
     const soldesAu = a => {
@@ -489,7 +493,17 @@
           reer = reer * (1 + rm) + o.reer.cotisationAnnuelle / 12;
           // Sans remboursement accéléré (minimums seulement), le surplus du mois est épargné.
           celi = celi * (1 + rm) + o.celi.cotisationAnnuelle / 12 + (libre || 0) + (o.ajoutMensuel ? Math.max(0, o.ajoutMensuel(a - 1)) : 0);
-          conj = conj * (1 + rm);
+          conj = conj * (1 + rm) + (o.epargneConjointe || 0) * Math.pow(1 + (o.hausseEpargneConjointe || 0) / 100, a - 1);
+        }
+        for (const v of autos) {
+          v.valeurCourante *= 1 - v.depreciation / 100; v.age++;
+          if (remplacement && remplacement.ans > 0 && v.age >= remplacement.ans && a < ans + 1) {
+            const prix = remplacement.prix * Math.pow(1 + inflation, a);
+            // La vieille auto est échangée à sa valeur ; la différence sort de l'épargne.
+            const cout = prix - v.valeurCourante;
+            if (v.conjointe) conj -= cout; else celi -= cout;
+            v.valeurCourante = prix; v.age = 0; v.achats = (v.achats || 0) + 1;
+          }
         }
       }
       const soldes = soldesAu(a);
@@ -504,8 +518,8 @@
       const valeurMaison = o.maison.valeur * Math.pow(1 + o.maison.croissance / 100, a);
       const maisonMoi = valeurMaison * o.maison.part / 100;
       const maisonMenage = valeurMaison * (o.maison.partMenage ?? o.maison.part) / 100;
-      const vMoi = voitures.filter(v => !v.conjointe).reduce((s, v) => s + v.valeur * Math.pow(1 - v.depreciation / 100, a), 0);
-      const vMenage = voitures.reduce((s, v) => s + v.valeur * Math.pow(1 - v.depreciation / 100, a), 0);
+      const vMoi = autos.filter(v => !v.conjointe).reduce((s, v) => s + v.valeurCourante, 0);
+      const vMenage = autos.reduce((s, v) => s + v.valeurCourante, 0);
       const placements = reer + celi + encaisse + attente;
       const moi = maisonMoi - hypMoi + vMoi + placements - autresMoi;
       const menage = maisonMenage - hypMenage + vMenage + placements + conj - autresMenage;
