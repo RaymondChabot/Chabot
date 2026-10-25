@@ -435,7 +435,7 @@
       const total = el("p", "aide"); groupe.appendChild(total);
       feuilleCourante.maj = () => {
         const s = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
-        total.textContent = `Total : ${nb(s)} %` + (Math.abs(s - 100) > 0.5 ? " : le calcul le ramène à 100 %." : "");
+        total.textContent = `Total : ${nb(s)} %` + (Math.abs(s - 100) > 0.5 ? " : le calcul le ramène à 100 %." : "");
         total.classList.toggle("avertissement", Math.abs(s - 100) > 0.5);
       };
       feuilleCourante.maj();
@@ -538,10 +538,10 @@
     if (d.type === "hypotheque" && !d.interetsSeulement) {
       l.push({ titre: "Amortissement restant", sous: "Au paiement actuel, sans remboursement anticipé", valeur: duree(C.moisRestants(d.solde, C.tauxMensuel(d, d.taux), pm)) });
       const r = x.premierRenouvellement;
-      if (r) l.push({ titre: `Renouvellement en ${moisAn(r.date)}`, sous: `À ${nb(r.taux, 2)} %, scénario ${SCENARIOS[R.scenario].toLowerCase()} · solde de ${$(r.solde)}`, valeur: `${$(r.paiement)} / mois`, valeurSous: `aujourd'hui ${$(pm)}` });
+      if (r) l.push({ titre: `Renouvellement en ${moisAn(r.date)}`, sous: `À ${nb(r.taux, 2)} %, scénario ${SCENARIOS[R.scenario].toLowerCase()} · solde de ${$(r.solde)}`, valeur: `${$(r.paiement)} / mois`, valeurSous: `aujourd'hui ${$(pm)}` });
     }
     if (d.type === "marge") {
-      l.push({ titre: "Intérêts par mois", sous: `À ${nb(d.taux, 2)} %`, valeur: $(d.solde * d.taux / 1200) });
+      l.push({ titre: "Intérêts par mois", sous: `À ${nb(d.taux, 2)} %`, valeur: $(d.solde * d.taux / 1200) });
       if (d.limite > 0) l.push({ titre: "Crédit disponible", valeur: $(Math.max(0, d.limite - d.solde)) });
     }
     l.push({ titre: "Remboursée", sous: `Méthode ${NOMS_METHODES[R.methode].toLowerCase()}`, valeur: x.fin ? moisAn(x.fin) : "jamais", valeurSous: `${$(x.interetsNets)} d'intérêts nets` });
@@ -676,6 +676,7 @@
     const methode = R.sims[S.strategie.methode] ? S.strategie.methode : "avalanche";
     R.methode = methode;
     R.sim = R.sims[methode];
+    R.simulerAvecAjout = ajout => C.simulerDettes(S.dettes, { ...opt(R.hyp, methode), extraParAnnee: a => surplusAnnee(R.hyp)(a) + ajout });
     R.detteTotale = S.dettes.reduce((a, d) => a + d.solde, 0);
 
     // Valeur nette : maison (sa valeur croît, l'hypothèque payée devient de l'équité), autos, placements.
@@ -774,6 +775,10 @@
       const dt = el("span", "rangee-date");
       dt.append(el("span", "jour", String(o.date.getDate())), el("span", "mois", o.date.toLocaleDateString("fr-CA", { month: "short" }).replace(".", "")));
       r.appendChild(dt);
+    } else if (o.jalon) {
+      const dt = el("span", "rangee-date jalon");
+      dt.append(el("span", "mois", o.jalon.mois || ""), el("span", "jour", String(o.jalon.annee)));
+      r.appendChild(dt);
     } else if (o.couleur || o.ico) {
       const i = el("span", "rangee-ico" + (o.couleur ? " couleur" : ""));
       if (o.couleur) { const k = el("i"); k.style.background = o.couleur; i.appendChild(k); }
@@ -835,7 +840,7 @@
     table.appendChild(tb);
   }
   const moins = v => $(v > 0.5 ? -v : 0);  // évite « -0 $ »
-  const signePct = v => (v >= 0 ? "+" : "−") + nb(Math.abs(v), 1) + " %";
+  const signePct = v => (v >= 0 ? "+" : "−") + nb(Math.abs(v), 1) + "\u00a0%";
 
   /* ============================================================
      GRAPHIQUE EN LIGNES : réticule, et bulle ou chiffre principal qui suit
@@ -995,11 +1000,12 @@
         : `Votre dernière copie de sauvegarde date de ${jours} jours : exportez-en une nouvelle (page Données).`);
     }
     const mix = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
-    if (Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
+    if (Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
     if (R.surplusMoi < 0) action("important", `Votre budget est négatif de ${$(-R.surplusMoi)} par mois : revoyez les dépenses ou leur partage.`);
     else action("bon", `Votre surplus de ${$(R.surplusMoi)} par mois va sur les dettes, dans l'ordre de la méthode choisie.`);
 
     rangees("ap-echeances", echeances(R));
+    rangees("ap-jalons", jalons(R));
     document.getElementById("ap-dettes-sous").textContent = R.sim.libre
       ? `De ${$(R.detteTotale)} aujourd'hui à zéro en ${moisAn(R.sim.libre)}.`
       : "À ce rythme, la marge de crédit n'est jamais remboursée.";
@@ -1026,7 +1032,7 @@
     S.dettes.filter(d => d.type === "hypotheque" && d.finTerme).forEach((d, k) => {
       const f = new Date(d.finTerme + "T00:00:00");
       const x = R.sim.dettes[S.dettes.indexOf(d)], r = x && x.premierRenouvellement;
-      l.push({ date: f, titre: `Renouvellement : ${d.nom}`, sous: r ? `Paiement estimé ${$(r.paiement)} par mois à ${nb(r.taux, 2)} %` : "Comparez les offres ; ne rallongez pas l'amortissement" });
+      l.push({ date: f, titre: `Renouvellement : ${d.nom}`, sous: r ? `Paiement estimé ${$(r.paiement)} par mois à ${nb(r.taux, 2)} %` : "Comparez les offres ; ne rallongez pas l'amortissement" });
     });
     if (S.epargne.reee.enfants.some(e => e.age < 17) && S.epargne.reee.cotisationAnnuelle > 0)
       l.push({ date: prochaine(11, 31), titre: "Cotisation REEE de l'année", sous: "Pour recevoir les subventions de l'année (30 %)", valeur: $(S.epargne.reee.cotisationAnnuelle * S.epargne.reee.enfants.filter(e => e.age < 17).length) });
@@ -1036,6 +1042,25 @@
       const quand = j === 0 ? "aujourd'hui" : j < 31 ? `dans ${j} jour${j > 1 ? "s" : ""}` : `dans ${Math.round(j / 30.4)} mois`;
       return { date: x.date, titre: x.titre, sous: `${x.sous} · ${quand}`, valeur: x.valeur, valeurSous: x.date.getFullYear() !== an ? String(x.date.getFullYear()) : undefined };
     });
+  }
+
+  // Jalons : chaque dette remboursée, plus de dettes, valeur nette positive puis par paliers.
+  function jalons(R) {
+    const l = [], mois = d => d.toLocaleDateString("fr-CA", { month: "short" }).replace(".", "");
+    const derniere = R.sim.libre && S.dettes.length > 1 ? R.sim.libre.getTime() : null;
+    S.dettes.forEach((d, i) => {
+      const f = R.sim.dettes[i] && R.sim.dettes[i].fin;
+      // La dernière dette remboursée est annoncée par « Plus aucune dette ».
+      if (f && f.getTime() !== derniere) l.push({ t: f, jalon: { mois: mois(f), annee: f.getFullYear() }, titre: d.nom, sous: `Remboursement complet · ${$(d.solde)} aujourd'hui` });
+    });
+    if (R.sim.libre && S.dettes.length > 1) l.push({ t: R.sim.libre, jalon: { mois: mois(R.sim.libre), annee: R.sim.libre.getFullYear() }, titre: "Plus aucune dette", sous: `${$(R.detteTotale)} remboursés ; le budget des dettes est ensuite placé`, cls: "fort" });
+    const p = R.projection, debut = p[0].moi;
+    for (const seuil of [0, 250000, 500000, 1000000, 2000000]) {
+      if (debut >= seuil) continue;
+      const i = p.findIndex(x => x.moi >= seuil);
+      if (i > 0) l.push({ t: new Date(p[i].annee, 0, 1), jalon: { annee: p[i].annee }, titre: seuil === 0 ? "Valeur nette positive" : `Valeur nette de ${seuil >= 1e6 ? nb(seuil / 1e6, 0) + " M$" : nb(seuil / 1000, 0) + " k$"}`, sous: `Scénario ${SCENARIOS[R.scenario].toLowerCase()}` });
+    }
+    return l.sort((a, b) => a.t - b.t).slice(0, 8);
   }
 
   function rendreRevenu(R) {
@@ -1127,6 +1152,18 @@
     hero("im-hero", "Impôt et cotisations de l'année", $(t), [
       puce(`Taux moyen ${pct(R.impot.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`),
     ], t);
+
+    // Sur chaque 100 $ gagnés : où va le revenu brut.
+    const brut = Math.max(1, R.impot.revenu), cotis = R.impot.rrq + R.impot.rqap + R.impot.fss;
+    const dpro = Math.min(S.impot.depensesPro, brut);
+    const morceaux = [["Impôt fédéral", R.impot.fed, SERIES[0]], ["Impôt du Québec", R.impot.qc, SERIES[1]], ["RRQ, RQAP et Fonds des services de santé", cotis, SERIES[2]],
+      ["Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", R.impot.net - dpro, SERIES[4]]];
+    const cent = document.getElementById("im-cent"); cent.textContent = "";
+    const barre = el("div", "flux-barre"); barre.setAttribute("role", "img");
+    barre.setAttribute("aria-label", morceaux.map(([n, v]) => `${n} ${$2(v / brut * 100)}`).join(", "));
+    morceaux.forEach(([n, v, c]) => { if (v > 0) { const sp = el("span"); sp.style.flex = `${v} 0 0`; sp.style.background = c; sp.title = n; barre.appendChild(sp); } });
+    cent.appendChild(barre);
+    cent.appendChild(rangees(el("div"), morceaux.map(([n, v, c]) => ({ titre: n, couleur: c, valeur: $2(v / brut * 100), valeurSous: $(v) + " par année" }))));
 
     const a = document.getElementById("im-acomptes"); a.textContent = "";
     a.appendChild(el("p", "resume", `Mettez de côté ${pct(t / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$(t / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est ce que coûte chaque dollar de plus, et ce que rapporte chaque dollar cotisé au REER.`));
@@ -1290,7 +1327,7 @@
     rangees("bu-dettes", [
       ...S.dettes.map((d, i) => {
         const fin = R.sim.dettes[i] && R.sim.dettes[i].fin;
-        return { titre: d.nom, sous: `${nb(d.taux, 2)} % · ${fin ? "remboursée en " + moisAn(fin) : "jamais remboursée"}`, valeur: $(d.solde), valeurSous: `${$(minimumDette(d) * partDette(d))} / mois`, action: () => feuilleDette(i) };
+        return { titre: d.nom, sous: `${nb(d.taux, 2)} % · ${fin ? "remboursée en " + moisAn(fin) : "jamais remboursée"}`, valeur: $(d.solde), valeurSous: `${$(minimumDette(d) * partDette(d))} / mois`, action: () => feuilleDette(i) };
       }),
       { titre: "Ajouter une dette", ico: "plus", cls: "ajout", action: () => {
         S.dettes.push({ id: nouvelId("d"), nom: "Nouvelle dette", type: "pret", solde: 0, limite: 0, taux: 5, paiement: 0, frequence: "mois", interetsSeulement: false, finTerme: "", tauxRenouvellement: 0, dureeTerme: 5, privilege: 0, creditImpot: 0, partMoi: 100, paiementMoi: 100 });
@@ -1309,10 +1346,11 @@
     res.append(document.createTextNode(` Scénario ${SCENARIOS[R.scenario].toLowerCase()} : revenus ${signePct(R.hyp.hausseRevenus)} et dépenses ${signePct(R.hyp.inflation)} par année${R.hyp.ecartTaux ? `, taux variables et renouvellements ${R.hyp.ecartTaux > 0 ? "+" : "−"}${nb(Math.abs(R.hyp.ecartTaux), 2)} point` : ""}.`));
     const sd = seriesDettes(sim, false);
     graphiqueLignes(document.getElementById("de-graph"), document.getElementById("de-legende"), sd.series, sd.etiquettes, { titre: "Soldes des dettes par année" });
+    majSimulation();
     rangees("de-tableau", S.dettes.map((d, j) => {
       const x = sim.dettes[j], renouv = Math.abs(x.tauxFinal - d.taux) > 0.001;
       return { titre: d.nom, couleur: SERIES[j % SERIES.length],
-        sous: `Taux réel ${nb(C.tauxReel(d), 2)} %${renouv ? ` · ${nb(x.tauxFinal, 2)} % ensuite` : ""}`,
+        sous: `Taux réel ${nb(C.tauxReel(d), 2)} %${renouv ? ` · ${nb(x.tauxFinal, 2)} % ensuite` : ""}`,
         valeur: x.fin ? moisAn(x.fin) : "jamais", valeurSous: `${$(x.interetsNets)} d'intérêts nets` };
     }));
     // Choisir la méthode : chaque rangée se touche ; la recommandée maximise la valeur nette à l'horizon.
@@ -1340,14 +1378,28 @@
           : "";
       })() +
       " La date « sans dettes » suit les renouvellements : l'argent qui attend est placé à court terme (2,4 %) et compte dans la valeur nette." +
-      (placer ? ` Placer le surplus au lieu de rembourser donnerait plus dans ce scénario (rendement de ${nb(R.hyp.rendement, 1)} %), mais ce rendement n'est pas garanti, contrairement à l'intérêt économisé.` : "");
+      (placer ? ` Placer le surplus au lieu de rembourser donnerait plus dans ce scénario (rendement de ${nb(R.hyp.rendement, 1)} %), mais ce rendement n'est pas garanti, contrairement à l'intérêt économisé.` : "");
+  }
+
+  // Et si vous ajoutiez un montant chaque mois ? Simulation rapide, sans changer vos données.
+  function majSimulation() {
+    const curseur = document.getElementById("de-ajout"), sortie = document.getElementById("de-ajout-texte");
+    const ajout = +curseur.value;
+    document.getElementById("de-ajout-valeur").textContent = `+${$(ajout)} par mois`;
+    if (!R || S.strategie.methode === "minimum") { sortie.textContent = "Choisissez une méthode de remboursement accéléré pour simuler un ajout."; return; }
+    if (!ajout) { sortie.textContent = `Glissez pour voir l'effet d'un montant de plus chaque mois, en plus de votre surplus.`; return; }
+    const s = R.simulerAvecAjout(ajout), b = R.sim;
+    const mois = s.libre && b.libre ? (b.libre.getFullYear() - s.libre.getFullYear()) * 12 + b.libre.getMonth() - s.libre.getMonth() : 0;
+    sortie.textContent = s.libre
+      ? `Sans dettes en ${moisAn(s.libre)}${mois > 0 ? `, ${mois >= 12 ? `${Math.floor(mois / 12)} an${mois >= 24 ? "s" : ""}${mois % 12 ? ` et ${mois % 12} mois` : ""}` : `${mois} mois`} plus tôt` : " (les renouvellements fixent la date)"}, et ${$(Math.max(0, b.coutNet - s.coutNet))} d'intérêts nets en moins.`
+      : "Même avec cet ajout, la marge n'est jamais remboursée.";
   }
 
   function rendreAvenir(R) {
     const cj = R.couple;
     segment("vn-scenario", Object.entries(SCENARIOS), R.scenario, v => changer("scenarios.choisi", v), "Scénario");
     const h = R.hyp, hyp = document.getElementById("vn-hyp"); hyp.textContent = "";
-    hyp.append(document.createTextNode(`Placements ${nb(h.rendement, 1)} %, maison ${signePct(h.croissanceMaison)}, autos −${nb(h.depreciationAuto, 0)} %, inflation ${nb(h.inflation, 1)} % par année. `));
+    hyp.append(document.createTextNode(`Placements ${nb(h.rendement, 1)} %, maison ${signePct(h.croissanceMaison)}, autos −${nb(h.depreciationAuto, 0)} %, inflation ${nb(h.inflation, 1)} % par année. `));
     const lien = el("button", "lien-carte", "Modifier les hypothèses"); lien.type = "button"; lien.dataset.feuille = "hypotheses"; hyp.appendChild(lien);
     if (!cj) U.vueAvenir = "moi";
     if (cj) segment("vn-vue", [["moi", "Vous"], ["couple", "Couple"]], U.vueAvenir, v => { U.vueAvenir = v; tout(); }, "Valeur nette de qui");
@@ -1569,6 +1621,7 @@
   }
   appliquerTheme(lireTheme());
   document.getElementById("imprimer").addEventListener("click", () => window.print());
+  document.getElementById("de-ajout").addEventListener("input", majSimulation);
   window.addEventListener("beforeprint", () => {
     document.getElementById("impression-info").textContent = `Rapport du ${new Date().toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" })} · ${NOM_MODE[R.mode].toLowerCase()} · scénario ${SCENARIOS[R.scenario].toLowerCase()} · méthode ${NOMS_METHODES[R.methode].toLowerCase()}`;
   });

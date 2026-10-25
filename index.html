@@ -73,6 +73,10 @@
         <div class="rangees" id="ap-echeances"></div>
       </div>
       <div class="carte">
+        <div class="carte-tete"><h2>Vos jalons</h2><a class="lien-carte" href="#avenir">Avenir</a></div>
+        <div class="rangees" id="ap-jalons"></div>
+      </div>
+      <div class="carte">
         <div class="carte-tete"><h2>Total des dettes</h2><a class="lien-carte" href="#budget" data-onglet="budget">Voir le plan</a></div>
         <p class="aide" id="ap-dettes-sous"></p>
         <div class="graphique" id="ap-graph-dettes"></div>
@@ -115,6 +119,10 @@
       <header class="tete-page"><h1 id="h-impot">Impôt 2026</h1><button type="button" class="bouton-modifier" data-feuille="impot">Modifier</button></header>
       <div class="segment" id="im-mode"></div>
       <div class="hero" id="im-hero"></div>
+      <div class="carte">
+        <div class="carte-tete"><h2>Sur chaque 100 $ gagnés</h2></div>
+        <div id="im-cent"></div>
+      </div>
       <div class="carte">
         <div class="carte-tete"><h2>Mettre de côté et payer</h2></div>
         <div id="im-acomptes"></div>
@@ -161,6 +169,11 @@
         <div class="legende" id="de-legende"></div>
         <div class="graphique" id="de-graph"></div>
         <div class="rangees" id="de-tableau"></div>
+        <div class="simulation">
+          <div class="simulation-tete"><label for="de-ajout">Et si vous ajoutiez</label><strong id="de-ajout-valeur"></strong></div>
+          <input type="range" id="de-ajout" min="0" max="3000" step="100" value="0">
+          <p class="aide" id="de-ajout-texte" aria-live="polite"></p>
+        </div>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>Choisir la méthode</h2><span class="carte-sous">Valeur nette</span></div>

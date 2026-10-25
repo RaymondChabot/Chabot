@@ -559,3 +559,18 @@ a.tuile:hover { border-color: var(--trait); }
   .entete-impression .marque-nom { font-size: 14pt; color: #121211; }
   .pied { margin-top: 12px; }
 }
+
+/* Jalons : mois en petit, année en gros */
+.rangee-date.jalon { width: 52px; }
+.rangee-date.jalon .mois { margin: 0 0 3px; }
+.rangee-date.jalon .jour { font-size: 0.95rem; }
+.rangee.fort .rangee-titre { font-weight: 650; }
+.rangee.fort .rangee-date { background: var(--action); color: var(--sur-action); }
+.rangee.fort .rangee-date .mois { color: inherit; opacity: 0.75; }
+
+/* Simulation : et si vous ajoutiez… */
+.simulation { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: var(--rayon-petit); background: var(--surface-2); }
+.simulation-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 0.94rem; }
+.simulation-tete strong { font-variant-numeric: tabular-nums; }
+.simulation input[type="range"] { width: 100%; accent-color: var(--encre); margin: 4px 0; }
+@media print { .simulation { display: none; } }
