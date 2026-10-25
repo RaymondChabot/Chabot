@@ -129,18 +129,19 @@ dossier racine.
 
 ## Sources des paramètres
 
-- Tarifs de visite : RAMQ, tableaux de l'onglet B (août 2026), colonne
-  CLSC / GMF-U.
+- Tarifs de visite : RAMQ, Manuel des médecins omnipraticiens –
+  Rémunération à l'acte, onglet B (version Web consultée le 25 octobre
+  2026) : colonne « en cabinet » pour la clinique privée et le GMF,
+  « en CLSC ou en GMF-U en établissement » pour le CLSC et le GMF-U
+  (modifiable). Tarifs modifiables ; « Rétablir les tarifs de la RAMQ ».
 - Tarif horaire, mode mixte et supervision : EP 42 et annexe XXIII ; les
   montants par défaut sont les derniers publiés trouvés et doivent être
   confirmés.
 - Forfaits et suppléments d'inscription : EP 40. Supplément des patients
   très vulnérables (code 19960) : à confirmer selon le montant en vigueur.
-- Sans rendez-vous : visites ponctuelles mineures (15765 à 15772) et
-  complexes (15773 à 15780), seules facturables sans rendez-vous d'après
-  le tableau-synthèse des visites (P.G. 2.2.6 A, 25 juillet 2025) ; tarifs
-  de départ estimés d'après leur rapport au tarif du suivi au cabinet
-  (environ 48 % et 95 %), à vérifier.
+- Sans rendez-vous : visites ponctuelles mineures (15765, 15766) et
+  complexes (15773, 15774), seules facturables sans rendez-vous d'après
+  le tableau-synthèse des visites (P.G. 2.2.6 A, 25 juillet 2025).
 - Dépenses professionnelles : grille tarifaire 2026-2027 du Collège des
   médecins ; cotisations 2027 de l'ACPM au Québec.
 - CELIAPP : 8 000 $ par année, 40 000 $ à vie (Agence du revenu du Canada).

@@ -37,7 +37,9 @@
       partTresVulnerable: 0, forfaitTresVulnerable: 55, suppTresVulnerable: 124.50, primeInscription: 0,
       externes: 0, patientsParResident: 4.5, patientsParExterne: 2.5, supervisionFacturation: "acte", perDiemExterne: 0,
       pctSrvComplexe: 50, majorationPct: 0,
-      tarifs: JSON.parse(JSON.stringify(C.TARIFS_DEFAUT)),
+      // Tarifs de la colonne cabinet ou établissement (selon la pratique, ou lieuTarifs), sauf s'ils ont été modifiés.
+      lieuTarifs: "auto", tarifsModifies: false,
+      tarifs: JSON.parse(JSON.stringify(C.TARIFS_LIEU.cabinet)),
       // Autres revenus : une ligne par source (voir CATALOGUE_REVENUS) ; montants à 0 au départ.
       lignes: [],
       activites: [{ id: "a1", type: "hospitalisation", nom: "", nombre: 7, frequence: "cycle", cycle: 6, calcul: "patients", parJour: 960, patients: 16, parPatient: 60 }],
@@ -297,12 +299,15 @@
       d.revenu.demiJourneesSRV ??= 0; d.revenu.patientsSRV ??= 0; d.revenu.activites ??= [];
       if (!d.revenu.lignes && d.revenu.autresRevenus > 0) d.revenu.lignes = [{ k: "ramq", montant: d.revenu.autresRevenus, periode: "an" }];
       if (d.revenu.lignes) d.revenu.autresRevenus = 0;
-      // Sans rendez-vous : plus de supplément par demi-journée ; tarifs de départ d'avant octobre 2026 remplacés.
+      // Sans rendez-vous : plus de supplément par demi-journée.
       delete d.revenu.suppSRV10; delete d.revenu.suppSRV20;
+      // Tarifs enregistrés avant les deux colonnes (cabinet, établissement) : s'ils sont ceux de départ
+      // (anciens tarifs du sans rendez-vous compris), ils suivent désormais la colonne de la pratique.
       const t = d.revenu.tarifs;
-      if (t && String(t.srvMineure) === "32.25,36.95" && String(t.srvComplexe) === "40.5,45.2") {
-        t.srvMineure = [...C.TARIFS_DEFAUT.srvMineure]; t.srvComplexe = [...C.TARIFS_DEFAUT.srvComplexe];
-        if (!d.revenu.pctSrvComplexe) d.revenu.pctSrvComplexe = 50;
+      if (t && d.revenu.tarifsModifies === undefined) {
+        const E = C.TARIFS_LIEU.etablissement, srvAnciens = ["32.25,36.95", "40.5,45.2", "15.35,17.7", "30.7,35.35"];
+        d.revenu.tarifsModifies = Object.keys(t).some(k => String(t[k]) !== String(E[k]) && !(k.startsWith("srv") && srvAnciens.includes(String(t[k]))));
+        if (!d.revenu.tarifsModifies && !d.revenu.pctSrvComplexe) d.revenu.pctSrvComplexe = 50;
       }
     }
     if (d.actifs && !d.actifs.logement) d.actifs.logement = d.actifs.maison && d.actifs.maison.valeur > 0 ? "proprietaire" : "locataire";
@@ -313,12 +318,19 @@
     return clone(EXEMPLE);
   }
   // Une case par poste des catalogues : budget, autres revenus, dépenses professionnelles.
+  // Colonne de tarifs de la RAMQ : en cabinet (clinique privée, GMF) ou en établissement (CLSC, GMF-U).
+  const colonneTarifs = s => ["cabinet", "etablissement"].includes(s.revenu.lieuTarifs) ? s.revenu.lieuTarifs : s.revenu.milieu === "clinique" ? "cabinet" : "etablissement";
+  // Tant qu'on ne les a pas modifiés, les tarifs suivent la colonne de la pratique.
+  function synchroniserTarifs(s) {
+    if (!s.revenu.tarifsModifies) s.revenu.tarifs = clone(C.TARIFS_LIEU[colonneTarifs(s)]);
+    return s;
+  }
   function normaliser(s) {
     s.budget = normaliserBudget(s.budget);
     s.revenu.lignes = normaliserLignes(s.revenu.lignes);
     s.impot.depensesProDetail = normaliserPro(s.impot.depensesProDetail);
     s.plans = (s.plans || []).map(pl => ({ ...pl, donnees: normaliser(fusion(clone(EXEMPLE), migrer(pl.donnees))) }));
-    return s;
+    return synchroniserTarifs(s);
   }
   let S = normaliser(charger());
   // En modifiant un plan B, S est ce plan ; « principal » garde votre plan, enregistré avec ses plans.
@@ -421,6 +433,8 @@
       { g: "Sans rendez-vous : détails", si: "details&revenu.demiJourneesSRV" },
       { p: "revenu.pctSrvComplexe", l: "Visites ponctuelles complexes", u: "%", h: "Environ 95 % du tarif d'un suivi. Le reste : visites ponctuelles mineures, environ la moitié d'un suivi. Tarifs dans « Tarifs des visites »." },
       { g: "Tarifs des visites (onglet B)", si: "details" },
+      { p: "revenu.lieuTarifs", l: "Colonne de tarifs", t: "select", o: [["auto", "Selon la pratique principale"], ["cabinet", "En cabinet : clinique privée, GMF"], ["etablissement", "En établissement : CLSC, GMF-U"]],
+        h: "Les visites rapportent plus en cabinet, où le médecin assume ses frais. Un GMF-U situé dans une clinique privée facture en cabinet." },
       ...[["suivi", "Suivi"], ["suiviV", "Suivi, patient vulnérable"], ["perioV", "Visite périodique, patient vulnérable"], ["pedia", "Visite périodique pédiatrique"], ["gross", "Suivi de grossesse"],
         ["pecNonVuln", "Prise en charge, patient non vulnérable"], ["pecVuln", "Prise en charge, patient vulnérable"], ["srvMineure", "Sans rendez-vous : visite ponctuelle mineure"], ["srvComplexe", "Sans rendez-vous : visite ponctuelle complexe"]]
         .flatMap(([k, nom]) => [
@@ -669,6 +683,13 @@
         a.appendChild(b); c.querySelector(".groupe:nth-of-type(2)") ? c.querySelectorAll(".groupe")[1].appendChild(a) : c.appendChild(a);
       }
       if (nom !== "revenu") return;
+      // Tarifs modifiés : on peut revenir à ceux de la RAMQ (colonne de la pratique).
+      const gTarifs = [...c.querySelectorAll(".groupe")].find(g => g.firstChild.textContent.startsWith("Tarifs des visites"));
+      if (gTarifs) {
+        const a = el("div", "actions"), b = el("button", "bouton secondaire", "Rétablir les tarifs de la RAMQ"); b.type = "button";
+        b.addEventListener("click", () => { S.revenu.tarifsModifies = false; synchroniserTarifs(S); sauver(); remplirChamps(); tout(); toast("Tarifs de la RAMQ rétablis."); });
+        a.appendChild(b); gTarifs.appendChild(a);
+      }
       // Total des types de visites, qui doit faire 100 %.
       const groupe = [...c.querySelectorAll(".groupe")].find(g => g.firstChild.textContent.startsWith("Vos visites"));
       if (!groupe) return;
@@ -1221,7 +1242,7 @@
   // Changer de pratique principale.
   function choisirMilieu(v) {
     if (!MILIEUX[v]) return;
-    S.revenu.milieu = v; S.meta.exemple = false;
+    S.revenu.milieu = v; S.meta.exemple = false; synchroniserTarifs(S);
     sauver(); remplirChamps(); tout();
   }
   // Vues qui ne changent pas les données : budget de qui, valeur nette de qui.
@@ -2991,9 +3012,11 @@
     if (inp.dataset.p) {
       const v = valeur(inp); if (v === null) return;
       if (inp.dataset.p === "revenu.milieu") { choisirMilieu(v); return; }
+      if (inp.dataset.p.startsWith("revenu.tarifs.")) S.revenu.tarifsModifies = true;
       ecrire(inp.dataset.p, v); S.meta.exemple = false;
       majVisibilite();   // un champ peut en afficher ou en cacher d'autres
       if (inp.dataset.p === "conjointe.designation") { S.conjointe.designation = v; reconstruireFeuille(); }
+      if (inp.dataset.p === "revenu.lieuTarifs") { synchroniserTarifs(S); remplirChamps(); }
       plusTard();
     } else if (inp.dataset.l) {
       const v = valeur(inp); if (v === null) return;
@@ -3421,7 +3444,8 @@
       paiement: Math.round(C.paiementPour(A.pretSolde, 5 / 1200, 120)), creditImpot: 34 }));
     if (A.auto && A.autoSolde > 0) s.dettes.push(dette({ nom: "Prêt auto", type: "pret", solde: A.autoSolde, taux: 6.5, paiement: A.autoPaiement || Math.round(C.paiementPour(A.autoSolde, 6.5 / 1200, 60)) }));
     s.strategie = { ...s.strategie, debut: `${auj.getFullYear()}-${mm}` };
-    return s;
+    s.revenu.tarifsModifies = false;
+    return synchroniserTarifs(s);
   }
   function terminerAssistant() {
     sortirPlan(true); S = portraitDepuis(A); sauver(); fermerAssistant();

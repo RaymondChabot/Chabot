@@ -336,7 +336,7 @@
           <p class="rp-note">montants identiques, à 1 $ près, à ceux de l'outil de calcul du revenu disponible du ministère des Finances du Québec (mai 2026), sur ${ver.cas} cas ; plus grand écart : ${$(ver.pire)}.</p></div>
       </div>
       <div class="rp-carte"><h2>Sources</h2><ul class="rp-sources">
-        <li>RAMQ : tarifs de l'onglet B (août 2026), entente particulière 40 (inscription), EP 42 et annexe XXIII (taux horaire et mixte). À l'acte : règles d'avant la Loi 2. Tarifs et suppléments modifiables dans l'app.</li>
+        <li>RAMQ : tarifs de l'onglet B du manuel de rémunération à l'acte (consulté le 25 octobre 2026), en cabinet ou en établissement selon la pratique ; entente particulière 40 (inscription), EP 42 et annexe XXIII (taux horaire et mixte). À l'acte : règles d'avant la Loi 2. Tarifs et suppléments modifiables dans l'app.</li>
         <li>Collège des médecins du Québec : grille tarifaire 2026-2027 ; ACPM : cotisations 2027 au Québec ; FMOQ : infolettres sur l'entente.</li>
         <li>CELIAPP : Agence du revenu du Canada (8 000 $ par année, 40 000 $ à vie).</li>
         <li>Tables d'impôt fédérales et du Québec 2026 ; RRQ, RQAP, assurance-emploi et Fonds des services de santé 2026.</li>

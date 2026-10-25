@@ -132,7 +132,7 @@ verifier("apprenants : 4,5 + 2,5 visites par demi-journée d'enseignement", proc
 verifier("apprenants : acte de supervision par défaut", g.visitesApprenants === 0 && g.acte.supervision > 0);
 const gsrv = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, pctSrvComplexe: 50 });
 verifier("SRV : patient payé moins qu'une visite de rendez-vous", gsrv.tarifMoyenSrv < gsrv.tarifMoyenRdv && gsrv.tarifMoyenSrv > 0);
-verifier("SRV : visites ponctuelles à l'acte, sans supplément", proche(gsrv.acte.total - C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 0 }).acte.total, 46 * 12 * (0.5 * 17.70 + 0.5 * 35.35), 0.5) && gsrv.acte.supplementsSRV === undefined);
+verifier("SRV : visites ponctuelles à l'acte, sans supplément", proche(gsrv.acte.total - C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 0 }).acte.total, 46 * 12 * (0.5 * 17.70 + 0.5 * 35.40), 0.5) && gsrv.acte.supplementsSRV === undefined);
 const gmaj = C.revenuGmfu({ ...rev, majorationPct: 15 });
 verifier("majoration : +15 % sur les heures, pas sur les forfaits", proche(gmaj.horaire.heures, g.horaire.heures * 1.15, 0.01) && proche(gmaj.horaire.forfaitInscription, g.horaire.forfaitInscription, 1e-9));
 
@@ -152,6 +152,13 @@ verifier("objectifs : versements jusqu'à la date, puis dépensé ou gardé", pr
 const pR = C.projeterValeurNette({ ...baseVN, reer: { solde: 10000, cotisationAnnuelle: 0 }, rendements: [10, -10, 5, 5, 5] }, sim);
 const pC = C.projeterValeurNette({ ...baseVN, reer: { solde: 10000, cotisationAnnuelle: 0 } }, sim);
 verifier("rendements variables : +10 % puis −10 %", proche(pR[1].reer, 11000, 1e-6) && proche(pR[2].reer, 9900, 1e-6) && proche(pC[1].reer, 10500, 1e-6));
+
+/* 13. Tarifs de la RAMQ : en cabinet et en établissement (onglet B). */
+const TL = C.TARIFS_LIEU;
+verifier("tarifs : suivi 15803-15804, cabinet et établissement", String(TL.cabinet.suivi) === "42.85,49.15" && String(TL.etablissement.suivi) === "32.25,36.95");
+verifier("tarifs : visites ponctuelles du sans rendez-vous", String(TL.etablissement.srvMineure) === "15.3,17.7" && String(TL.cabinet.srvComplexe) === "40.8,47.05");
+const gCab = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, tarifs: TL.cabinet }), gEtab = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, tarifs: TL.etablissement });
+verifier("tarifs : le cabinet paie plus la visite que l'établissement", gCab.acte.visites > gEtab.acte.visites * 1.3 && gCab.tarifMoyenSrv > gEtab.tarifMoyenSrv);
 
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

@@ -43,28 +43,31 @@
     dividendes: { majoration: 0.15, creditFederal: 0.090301, creditQuebec: 0.0342 },
   };
 
-  /* ---------- Tarifs RAMQ, onglet B (6 août 2026), colonne CLSC / GMF-U ----------
-     [moins de 500 inscrits, 500 inscrits ou plus], patient de moins de 80 ans. */
-  const VISITES = [
-    { cle: "suivi",  nom: "Suivi",                                 tarifs: [32.25, 36.95] },
-    { cle: "suiviV", nom: "Suivi, patient vulnérable",             tarifs: [40.50, 45.20] },
-    { cle: "perioV", nom: "Visite périodique, patient vulnérable", tarifs: [72.65, 84.80] },
-    { cle: "pedia",  nom: "Visite périodique pédiatrique",         tarifs: [50.30, 57.00] },
-    { cle: "gross",  nom: "Suivi de grossesse",                    tarifs: [37.75, 42.85] },
-  ];
-  const PRISE_EN_CHARGE = { nonVuln: [64.50, 74.75], vuln: [72.65, 82.90] };
-  /* Tarifs de départ, tous modifiables dans les données (revenu.tarifs). Sans rendez-vous :
-     visites ponctuelles (urgences mineures), souvent de patients d'autres médecins, payées
-     moins qu'un suivi. Estimées d'après le rapport des tarifs au cabinet, patient non
-     vulnérable de moins de 80 ans : mineure (15765, 15766) environ 48 % du suivi (15803,
-     15804), complexe (15773, 15774) environ 95 %. À vérifier dans l'onglet B. Le tableau-synthèse des
-     visites (P.G. 2.2.6 A, 25 juillet 2025) confirme qu'au sans rendez-vous seules les visites ponctuelles
-     se facturent : la visite de suivi est réservée au rendez-vous ou à l'accès adapté. */
-  const TARIFS_DEFAUT = {
-    ...Object.fromEntries(VISITES.map(v => [v.cle, v.tarifs])),
-    pecNonVuln: PRISE_EN_CHARGE.nonVuln, pecVuln: PRISE_EN_CHARGE.vuln,
-    srvMineure: [15.35, 17.70], srvComplexe: [30.70, 35.35],
+  /* ---------- Tarifs RAMQ : Manuel des médecins omnipraticiens, rémunération à l'acte, onglet B
+     (version Web consultée le 25 octobre 2026). [moins de 500 inscrits, 500 inscrits ou plus],
+     patient non vulnérable de moins de 80 ans sauf indication. Deux colonnes : en cabinet (clinique
+     privée, GMF), et en CLSC ou en GMF-U en établissement. Codes : suivi 15803-15804 ; suivi d'un
+     patient vulnérable 15823-15824 ; périodique d'un patient vulnérable 15819-15820 ; périodique
+     pédiatrique 15813-15814 ; suivi de grossesse 15811-15812 ; prise en charge 15801-15802 et, patient
+     vulnérable, 15821-15822. Sans rendez-vous, seules les visites ponctuelles se facturent (tableau-
+     synthèse des visites, P.G. 2.2.6 A) : mineure 15765-15766, complexe 15773-15774. ---------- */
+  const TARIFS_LIEU = {
+    cabinet: { suivi: [42.85, 49.15], suiviV: [53.50, 59.80], perioV: [96.35, 112.40], pedia: [66.90, 75.85], gross: [50.20, 57.00],
+      pecNonVuln: [85.75, 99.40], pecVuln: [96.35, 110.00], srvMineure: [20.40, 23.55], srvComplexe: [40.80, 47.05] },
+    etablissement: { suivi: [32.25, 36.95], suiviV: [40.50, 45.20], perioV: [72.65, 84.80], pedia: [50.30, 57.00], gross: [37.75, 42.85],
+      pecNonVuln: [64.50, 74.75], pecVuln: [72.65, 82.90], srvMineure: [15.30, 17.70], srvComplexe: [30.65, 35.40] },
   };
+  const E = TARIFS_LIEU.etablissement;
+  const VISITES = [
+    { cle: "suivi",  nom: "Suivi",                                 tarifs: E.suivi },
+    { cle: "suiviV", nom: "Suivi, patient vulnérable",             tarifs: E.suiviV },
+    { cle: "perioV", nom: "Visite périodique, patient vulnérable", tarifs: E.perioV },
+    { cle: "pedia",  nom: "Visite périodique pédiatrique",         tarifs: E.pedia },
+    { cle: "gross",  nom: "Suivi de grossesse",                    tarifs: E.gross },
+  ];
+  const PRISE_EN_CHARGE = { nonVuln: E.pecNonVuln, vuln: E.pecVuln };
+  // Tarifs par défaut du moteur (colonne établissement) ; l'app passe ceux de la colonne choisie.
+  const TARIFS_DEFAUT = { ...E };
   const tarifsDe = r => ({ ...TARIFS_DEFAUT, ...(r.tarifs || {}) });
 
   /* ---------- Outils ---------- */
@@ -656,7 +659,7 @@
     return res;
   }
 
-  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;
