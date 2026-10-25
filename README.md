@@ -2,9 +2,9 @@
 
 Votre boussole financière.
 
-Application web statique pour estimer le revenu d'un médecin en GMF-U
-(taux horaire, mode mixte ou à l'acte), l'impôt, le budget du ménage, le
-remboursement des dettes et la valeur nette.
+Application web statique pour les médecins de famille en début de
+pratique : revenu, impôt, budget du ménage, remboursement des dettes et
+valeur nette.
 
 ## Confidentialité
 
@@ -20,12 +20,16 @@ remboursement des dettes et la valeur nette.
 
 ## Ce qu'elle calcule
 
-Pour tout médecin de famille en GMF-U au Québec : seul ou en couple,
-travail autonome ou pratique incorporée.
+Pour tout médecin de famille au Québec, dans tous les milieux : seul ou
+en couple, travail autonome ou pratique incorporée.
 
-- **Revenu GMF-U** : taux horaire, mode mixte ou à l'acte, selon les
-  demi-journées, les patients, la supervision et la prise en charge de
-  nouveaux patients.
+- **Revenu** : selon le milieu de pratique.
+  - GMF-U et CLSC : calcul détaillé avec les tarifs de la RAMQ (taux
+    horaire, mode mixte ou à l'acte), selon les demi-journées, les
+    patients, la supervision et la prise en charge de nouveaux patients.
+  - GMF ou clinique, hôpital, urgence : calcul simple, à partir des jours
+    et du revenu brut par jour (ou de la facturation annuelle), avec les
+    frais de cabinet et la montée de la clientèle la première année.
 - **Impôt 2026** : fédéral et Québec, RRQ, RQAP, Fonds des services de
   santé ; société et dividendes ; partenaire salarié ou à son compte et
   transferts de crédits ; allocations
@@ -61,7 +65,7 @@ REEE. Cas fictifs seulement.
 |---|---|
 | `index.html` | Structure de la page |
 | `styles.css` | Mise en page, thèmes clair et sombre |
-| `js/calc.js` | Calculs (revenu GMF-U, impôt 2026, dettes, épargne), sans accès à la page |
+| `js/calc.js` | Calculs (revenu détaillé ou simple, impôt 2026, dettes, épargne), sans accès à la page |
 | `js/app.js` | Interface, sauvegarde locale, import et export |
 | `js/rapport.js` | Rapport PDF mis en page |
 | `tests/calculs.test.js` | Tests des calculs (Node, sans dépendance) |

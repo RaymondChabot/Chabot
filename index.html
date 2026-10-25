@@ -92,30 +92,37 @@
       </div>
     </section>
 
-    <!-- ============ REVENU GMF-U ============ -->
+    <!-- ============ REVENU ============ -->
     <section class="vue" id="v-revenu" aria-labelledby="h-revenu" hidden>
-      <header class="tete-page"><h1 id="h-revenu">Revenu GMF-U</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
+      <header class="tete-page"><h1 id="h-revenu">Revenu</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
+      <div class="choix-milieu">
+        <label for="rv-milieu">Milieu de pratique</label>
+        <div class="saisie"><select id="rv-milieu"></select></div>
+        <p class="aide" id="rv-milieu-aide"></p>
+      </div>
       <div class="segment" id="rv-mode"></div>
       <div class="hero" id="rv-hero"></div>
-      <div class="carte demi">
+      <div class="carte demi" id="rv-carte-modes">
         <div class="carte-tete"><h2>Comparer les modes</h2></div>
         <div id="rv-comparaison"></div>
         <p class="aide" id="rv-seuil"></p>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" id="rv-carte-faits">
         <div class="carte-tete"><h2>Votre année en chiffres</h2></div>
         <div class="rangees" id="rv-faits"></div>
       </div>
-      <div class="carte">
-        <div class="carte-tete"><h2>Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>
+      <div class="carte" id="rv-carte-sens">
+        <div class="carte-tete"><h2 id="rv-sens-titre">Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>
         <div class="legende" id="rv-sens-legende"></div>
         <div class="graphique" id="rv-sens-graph"></div>
         <div class="tableau-defile"><table class="tableau" id="rv-sens-dj"></table></div>
-        <h3>Selon les patients par demi-journée</h3>
-        <div class="tableau-defile"><table class="tableau" id="rv-sens-pat"></table></div>
+        <div id="rv-sens-pat-bloc">
+          <h3>Selon les patients par demi-journée</h3>
+          <div class="tableau-defile"><table class="tableau" id="rv-sens-pat"></table></div>
+        </div>
         <p class="aide" id="rv-sens-note"></p>
       </div>
-      <div class="carte">
+      <div class="carte" id="rv-carte-source">
         <div class="carte-tete"><h2>D'où vient le revenu</h2></div>
         <div id="rv-barres"></div>
         <div class="legende" id="rv-legende"></div>
@@ -137,7 +144,7 @@
         <div id="im-acomptes"></div>
       </div>
       <div class="carte">
-        <div class="carte-tete"><h2>Détail selon le mode</h2></div>
+        <div class="carte-tete"><h2 id="im-tableau-titre">Détail selon le mode</h2></div>
         <div class="tableau-defile"><table class="tableau" id="im-tableau"></table></div>
         <p class="aide" id="im-tableau-note"></p>
       </div>

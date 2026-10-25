@@ -288,7 +288,7 @@ a.tuile:hover { border-color: var(--trait); }
 .segment button[aria-checked="true"] { background: var(--surface); color: var(--encre); font-weight: 600; box-shadow: 0 1px 3px rgba(18, 18, 17, 0.12); }
 .segment.petit button { padding: 7px 8px; font-size: 0.84rem; }
 .segment.compact { flex: none; }
-.segment.compact button { padding: 5px 12px; font-size: 0.8rem; }
+.segment.compact button { flex: 1 0 auto; padding: 5px 12px; font-size: 0.8rem; }
 .hyp-ligne { margin-top: -4px; padding: 0 4px; }
 .hyp-ligne .lien-carte { font-size: 0.84rem; }
 
@@ -600,6 +600,14 @@ a.tuile:hover { border-color: var(--trait); }
 .simulation-tete strong { font-variant-numeric: tabular-nums; }
 .simulation input[type="range"] { width: 100%; accent-color: var(--encre); margin: 4px 0; }
 @media print { .simulation { display: none; } }
+
+/* Revenu : milieu de pratique, en haut de la section */
+.choix-milieu { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 12px; }
+.choix-milieu > label { font-size: 0.9rem; font-weight: 600; color: var(--encre-2); }
+.choix-milieu .saisie { background: var(--surface); border-color: var(--ligne); box-shadow: var(--ombre); }
+.choix-milieu .aide { grid-column: 1 / -1; font-size: 0.8rem; }
+@media (max-width: 420px) { .choix-milieu { grid-template-columns: minmax(0, 1fr); } }
+@media print { .choix-milieu { display: none; } }
 
 /* Grand écran : certaines cartes côte à côte */
 @media (min-width: 1200px) {

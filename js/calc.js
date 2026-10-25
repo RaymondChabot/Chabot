@@ -78,7 +78,7 @@
   }
 
   /* ============================================================
-     REVENU GMF-U : taux horaire et mode mixte
+     REVENU GMF-U ET CLSC : taux horaire, mode mixte et à l'acte
      ============================================================
      Simulation semaine par semaine pour suivre l'arrivée des nouveaux
      patients : le palier de 500 inscrits change le tarif des visites, et
@@ -168,6 +168,32 @@
 
     return { heures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, semainesPalierHaut,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
+  }
+
+  /* ============================================================
+     REVENU SIMPLE : clinique, hôpital, urgence
+     ============================================================
+     Jours (ou quarts) par semaine × semaines × revenu brut par jour, ou la
+     facturation annuelle. La première année, l'activité part de debutPct % du
+     plein régime et l'atteint, en ligne droite, après moisMontee mois : la
+     clientèle se bâtit. Frais de cabinet : un pourcentage de la facturation
+     (hors autres revenus) et un montant fixe par mois. */
+  function facteurMontee(debutPct, moisMontee) {
+    const d = borne((debutPct ?? 100) / 100, 0, 1), m = Math.max(0, moisMontee || 0);
+    if (d >= 1 || m === 0) return 1;
+    let somme = 0;
+    for (let k = 0; k < 12; k++) somme += d + (1 - d) * Math.min(1, (k + 0.5) / m);
+    return somme / 12;
+  }
+  function revenuSimple(r) {
+    const s = r.simple || {}, W = Math.max(0, r.semaines || 0), parJour = s.calcul !== "annuel";
+    const jours = parJour ? Math.max(0, s.joursSemaine || 0) * W : null;
+    const plein = parJour ? jours * Math.max(0, s.parJour || 0) : Math.max(0, s.annuel || 0);
+    const facteur = r.annee === "premiere" ? facteurMontee(s.debutPct, s.moisMontee) : 1;
+    const activite = plein * facteur, autres = r.autresRevenus || 0;
+    const simple = { activite, autres, total: activite + autres,
+      fraisCabinet: Math.max(0, activite * (s.fraisPct || 0) / 100 + (s.fraisMois || 0) * 12) };
+    return { simple, plein, facteur, jours };
   }
 
   /* ============================================================
@@ -580,7 +606,7 @@
     return res;
   }
 
-  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, tarifVisite, revenuGmfu, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, tarifVisite, revenuGmfu, facteurMontee, revenuSimple, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

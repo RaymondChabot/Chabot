@@ -26,6 +26,9 @@
       pctActe: 100, pctSupervisionActe: 100,
       fraisCabinetPct: 30, fraisCabinetMois: 0, compensationCabinet: 0, fraisCabinetTousModes: false,
       modeBudget: "horaire",
+      // Milieu de pratique ; calcul simple pour la clinique, l'hôpital et l'urgence.
+      milieu: "gmfu",
+      simple: { calcul: "jour", joursSemaine: 4, parJour: 1600, annuel: 0, fraisPct: 30, fraisMois: 0, debutPct: 60, moisMontee: 12 },
     },
     impot: { depensesPro: 3000, structure: "particulier" },
     // Partenaire de vie : désignation au choix, salarié ou à son compte.
@@ -221,22 +224,47 @@
   const moisAn = d => d ? d.toLocaleDateString("fr-CA", { month: "long", year: "numeric" }) : "jamais";
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
 
+  /* Milieux de pratique. GMF-U et CLSC : calcul détaillé, avec les tarifs de la colonne
+     CLSC / GMF-U de la RAMQ. Clinique, hôpital, urgence : calcul simple, avec des valeurs
+     de départ indicatives (revenu brut par jour, frais, montée de la clientèle). */
+  const MILIEUX = {
+    gmfu: { nom: "GMF-U", long: "GMF-U", detaille: true },
+    clsc: { nom: "CLSC", long: "CLSC", detaille: true },
+    clinique: { nom: "GMF ou clinique", long: "GMF ou clinique privée", parJour: 1600, fraisPct: 30, debutPct: 60 },
+    hopital: { nom: "Hôpital", long: "Hôpital (hospitalisation)", parJour: 1400, fraisPct: 0, debutPct: 100 },
+    urgence: { nom: "Urgence", long: "Urgence", parJour: 1500, fraisPct: 0, debutPct: 100 },
+  };
+  const SI_DETAILLE = "revenu.milieu=gmfu|clsc", SI_SIMPLE = "revenu.milieu=clinique|hopital|urgence", SI_GMFU = "revenu.milieu=gmfu";
+
   /* ============================================================
      CHAMPS : chaque entrée décrit un champ lié à un chemin de l'état
      ============================================================ */
   const CHAMPS = {
     revenu: [
-      { g: "Votre semaine" },
-      { p: "revenu.demiJournees", l: "Demi-journées par semaine, enseignement inclus", u: "d.-j." },
-      { p: "revenu.enseignement", l: "Demi-journées d'enseignement", u: "d.-j." },
+      { g: "Votre pratique" },
+      { p: "revenu.milieu", l: "Milieu de pratique", t: "select", o: Object.entries(MILIEUX).map(([k, m]) => [k, m.long]), h: "GMF-U et CLSC : calcul détaillé, avec les tarifs de la RAMQ. Autres milieux : calcul simple, à partir de votre revenu par jour ou de votre facturation annuelle." },
+      { p: "revenu.annee", l: "Année calculée", t: "select", o: [["premiere", "Première année de pratique"], ["type", "Année type, plein régime"]], h: "Première année : arrivée des nouveaux patients (GMF-U, CLSC) ou montée de la clientèle (autres milieux)." },
+      { p: "revenu.semaines", l: "Semaines travaillées par année", u: "sem.", si: SI_DETAILLE + ",revenu.simple.calcul=jour" },
+      { p: "revenu.autresRevenus", l: "Autres revenus RAMQ (garde, hospitalisation, AMP)", u: "$/an", s: 100, h: "Activités hors de votre milieu principal, pour toute l'année." },
+      { g: "Votre activité", si: SI_SIMPLE },
+      { p: "revenu.simple.calcul", l: "Calculer à partir de", t: "select", o: [["jour", "Mon revenu brut par jour"], ["annuel", "Ma facturation annuelle"]] },
+      { p: "revenu.simple.joursSemaine", l: "Jours (ou quarts) par semaine", u: "jours", s: 0.5, si: "revenu.simple.calcul=jour" },
+      { p: "revenu.simple.parJour", l: "Revenu brut par jour (ou par quart)", u: "$", s: 50, si: "revenu.simple.calcul=jour", h: "Ce que la RAMQ vous paie pour une journée, avant les frais. La valeur de départ est indicative : remplacez-la par la vôtre (collègues, relevés de la RAMQ)." },
+      { p: "revenu.simple.annuel", l: "Facturation annuelle brute à la RAMQ", u: "$/an", s: 1000, si: "revenu.simple.calcul=annuel", h: "Une année complète au plein régime, avant les frais." },
+      { g: "Frais de cabinet", si: SI_SIMPLE },
+      { p: "revenu.simple.fraisPct", l: "Part de la facturation remise à la clinique", u: "%", s: 0.5, h: "Loyer, personnel, équipement, DMÉ. Souvent de 25 à 35 % en clinique privée ; en général aucun à l'hôpital et à l'urgence." },
+      { p: "revenu.simple.fraisMois", l: "Frais fixes : loyer et autres", u: "$/mois", s: 50 },
+      { g: "Montée de la clientèle", si: SI_SIMPLE + "&revenu.annee=premiere" },
+      { p: "revenu.simple.debutPct", l: "Activité du premier mois, par rapport au plein régime", u: "%", h: "En clinique, la clientèle se bâtit : on commence souvent entre 50 et 70 % du plein régime. 100 % : aucune montée." },
+      { p: "revenu.simple.moisMontee", l: "Plein régime atteint après", u: "mois" },
+      { g: "Votre semaine", si: SI_DETAILLE },
+      { p: "revenu.demiJournees", l: "Demi-journées par semaine", u: "d.-j.", h: "En GMF-U, enseignement compris." },
+      { p: "revenu.enseignement", l: "Demi-journées d'enseignement", u: "d.-j.", si: SI_GMFU },
       { p: "revenu.heuresParDJ", l: "Heures par demi-journée", u: "h", s: 0.25 },
-      { p: "revenu.semaines", l: "Semaines travaillées par année", u: "sem." },
       { p: "revenu.patientsParDJ", l: "Patients vus par demi-journée clinique", u: "pat.", s: 0.5 },
-      { p: "revenu.residents", l: "Résidents supervisés en même temps", u: "rés." },
-      { p: "revenu.patientsPendantSupervision", l: "Patients vus vous-même pendant la supervision", u: "pat.", s: 0.5, h: "Payés seulement au mode mixte." },
-      { p: "revenu.autresRevenus", l: "Autres revenus RAMQ (garde, hospitalisation)", u: "$/an", s: 100 },
-      { g: "Votre clientèle" },
-      { p: "revenu.annee", l: "Année calculée", t: "select", o: [["premiere", "Première année : arrivée des patients"], ["type", "Année type : clientèle stable"]] },
+      { p: "revenu.residents", l: "Résidents supervisés en même temps", u: "rés.", si: SI_GMFU },
+      { p: "revenu.patientsPendantSupervision", l: "Patients vus vous-même pendant la supervision", u: "pat.", s: 0.5, h: "Payés seulement au mode mixte.", si: SI_GMFU },
+      { g: "Votre clientèle", si: SI_DETAILLE },
       { p: "revenu.inscritsDebut", l: "Patients inscrits au départ", u: "pat." },
       { p: "revenu.nouveauxGuichet", l: "Nouveaux patients du guichet d'accès", u: "pat." },
       { p: "revenu.nouveauxSansMedecin", l: "Nouveaux patients sans médecin, hors guichet", u: "pat.", h: "Par exemple, les patients d'un médecin retraité qui a avisé la RAMQ. Ils donnent droit au supplément." },
@@ -244,35 +272,35 @@
       { p: "revenu.semainesArrivee", l: "Arrivée des nouveaux patients étalée sur", u: "sem." },
       { p: "revenu.partVulnerable", l: "Patients vulnérables", u: "%" },
       { p: "revenu.quatrePremieresAnnees", l: "Dans mes 4 premières années de pratique", t: "check", h: "Après 4 ans, le supplément majoré du guichet ne s'applique qu'à 150 patients par année." },
-      { g: "Vos visites, hors prise en charge (%)" },
+      { g: "Vos visites, hors prise en charge (%)", si: SI_DETAILLE },
       { p: "revenu.mix.suivi", l: "Suivis", u: "%" },
       { p: "revenu.mix.suiviV", l: "Suivis de patients vulnérables", u: "%" },
       { p: "revenu.mix.perioV", l: "Visites périodiques de patients vulnérables", u: "%" },
       { p: "revenu.mix.pedia", l: "Visites périodiques pédiatriques", u: "%" },
       { p: "revenu.mix.gross", l: "Suivis de grossesse", u: "%" },
-      { g: "Taux horaire (EP 42)" },
+      { g: "Taux horaire (EP 42)", si: SI_DETAILLE },
       { p: "revenu.tarifHoraire", l: "Tarif horaire", u: "$/h", s: 0.01 },
-      { g: "Taux mixte (annexe XXIII)" },
+      { g: "Taux mixte (annexe XXIII)", si: SI_DETAILLE },
       { p: "revenu.forfaitHoraireMixte", l: "Forfait horaire", u: "$/h", s: 0.01 },
       { p: "revenu.pctMixte", l: "Pourcentage du tarif des visites", u: "%" },
-      { p: "revenu.acteSupervision", l: "Acte de supervision, tarif à 100 %", u: "$/h", s: 0.01 },
-      { p: "revenu.pctSupervision", l: "Part versée de l'acte de supervision", u: "%" },
-      { p: "revenu.supervisionMaxH", l: "Heures de supervision payées au plus", u: "h/d.-j.", s: 0.25 },
-      { g: "À l'acte, règles d'avant la Loi 2" },
+      { p: "revenu.acteSupervision", l: "Acte de supervision, tarif à 100 %", u: "$/h", s: 0.01, si: SI_GMFU },
+      { p: "revenu.pctSupervision", l: "Part versée de l'acte de supervision", u: "%", si: SI_GMFU },
+      { p: "revenu.supervisionMaxH", l: "Heures de supervision payées au plus", u: "h/d.-j.", s: 0.25, si: SI_GMFU },
+      { g: "À l'acte, règles d'avant la Loi 2", si: SI_DETAILLE },
       { p: "revenu.pctActe", l: "Part du tarif des visites payée à l'acte", u: "%", h: "100 % : chaque visite au tarif de l'onglet B, avec les forfaits d'inscription et les suppléments. Le mode composé de la Loi 2 n'est pas en vigueur." },
-      { p: "revenu.pctSupervisionActe", l: "Part de l'acte de supervision payée à l'acte", u: "%" },
+      { p: "revenu.pctSupervisionActe", l: "Part de l'acte de supervision payée à l'acte", u: "%", si: SI_GMFU },
       { p: "revenu.fraisCabinetPct", l: "Frais de cabinet : part de la facturation remise à la clinique", u: "%", s: 0.5, h: "Loyer, personnel, équipement, DMÉ. Souvent de 25 à 35 % en clinique privée." },
       { p: "revenu.fraisCabinetMois", l: "Frais de cabinet fixes : loyer et autres", u: "$/mois", s: 50 },
       { p: "revenu.compensationCabinet", l: "Compensation des frais de cabinet par la RAMQ", u: "$/an", s: 100, h: "Entente particulière GMF (EP 40), s'il y a lieu." },
       { p: "revenu.fraisCabinetTousModes", l: "La clinique les exige aussi au taux horaire et au mixte", t: "check", h: "Non en GMF-U situé en CLSC ou à l'hôpital : l'établissement fournit les locaux." },
-      { g: "Payés dans tous les modes" },
-      { p: "revenu.perDiemResident", l: "Demi-per diem de supervision, par résident", u: "$", s: 0.01 },
+      { g: "Payés dans tous les modes", si: SI_DETAILLE },
+      { p: "revenu.perDiemResident", l: "Demi-per diem de supervision, par résident", u: "$", s: 0.01, si: SI_GMFU },
       { p: "revenu.forfaitInscription", l: "Forfait d'inscription générale", u: "$/pat.", s: 0.01 },
       { p: "revenu.forfaitVulnerable", l: "Forfait annuel moyen, patient vulnérable", u: "$/pat.", s: 0.01 },
       { p: "revenu.suppNonVulnerable", l: "Supplément, patient non vulnérable sans médecin", u: "$", s: 0.01 },
       { p: "revenu.suppVulnerableHorsGuichet", l: "Supplément, patient vulnérable hors guichet", u: "$", s: 0.01 },
       { p: "revenu.suppVulnerableGuichet", l: "Supplément, patient vulnérable du guichet", u: "$", s: 0.01 },
-      { g: "Pour le budget" },
+      { g: "Pour le budget", si: SI_DETAILLE },
       { p: "revenu.modeBudget", l: "Mode de rémunération utilisé", t: "select", o: [["horaire", "Taux horaire"], ["mixte", "Taux mixte"], ["acte", "À l'acte"]] },
     ],
     impot: [
@@ -391,6 +419,7 @@
     for (const c of champs) {
       if (c.g) {
         groupe = el("div", "groupe");
+        if (c.si) groupe.dataset.si = c.si;
         groupe.appendChild(el("h3", null, c.g));
         conteneur.appendChild(groupe);
         continue;
@@ -411,11 +440,12 @@
   function majVisibilite() {
     const vrai = cond => {
       const neg = cond.startsWith("!"), [chemin, attendu] = cond.replace("!", "").split("=");
-      const v = attendu === undefined ? !!lire(chemin) : String(lire(chemin)) === attendu;
+      const v = attendu === undefined ? !!lire(chemin) : attendu.split("|").includes(String(lire(chemin)));
       return neg ? !v : v;
     };
-    // Conditions séparées par « & » ; « chemin=valeur » compare ; « !chemin » inverse.
-    document.querySelectorAll("[data-si]").forEach(l => { l.hidden = !l.dataset.si.split("&").every(vrai); });
+    // « chemin=valeur » compare (« a|b » : l'une ou l'autre valeur) ; « !chemin » inverse ;
+    // « & » : toutes les conditions ; « , » : l'un ou l'autre des groupes de conditions.
+    document.querySelectorAll("[data-si]").forEach(l => { l.hidden = !l.dataset.si.split(",").some(gr => gr.split("&").every(vrai)); });
   }
   // Champ d'une liste (dépense, dette, enfant) : lié par data-l, data-i et data-k.
   const lierListe = (liste, i, k) => inp => { inp.dataset.l = liste; inp.dataset.i = i; inp.dataset.k = k; };
@@ -445,7 +475,7 @@
   document.getElementById("feuille-fermer").addEventListener("click", () => feuille.close());
 
   const FEUILLES = {
-    revenu: ["Revenu GMF-U", CHAMPS.revenu],
+    revenu: ["Revenu", CHAMPS.revenu],
     impot: ["Impôt", CHAMPS.impot],
     menage: ["Ménage et couple", CHAMPS.menage],
     strategie: ["Plan de remboursement", CHAMPS.strategie],
@@ -605,10 +635,17 @@
 
   function calculer() {
     const R = {};
-    R.gmfu = C.revenuGmfu(S.revenu);
-    const mode = MODES.includes(S.revenu.modeBudget) ? S.revenu.modeBudget : "horaire";
+    // Milieu : GMF-U et CLSC au calcul détaillé (trois modes), les autres au calcul simple (un seul).
+    R.milieu = MILIEUX[S.revenu.milieu] ? S.revenu.milieu : "gmfu";
+    R.detaille = !!MILIEUX[R.milieu].detaille;
+    // CLSC : le calcul du GMF-U, sans enseignement ni supervision de résidents.
+    const entree = (x = {}) => R.milieu === "clsc" ? { ...S.revenu, enseignement: 0, residents: 0, patientsPendantSupervision: 0, ...x } : { ...S.revenu, ...x };
+    const revenuDe = x => R.detaille ? C.revenuGmfu(entree(x)) : C.revenuSimple(entree(x));
+    R.rev = revenuDe();
+    R.modes = R.detaille ? MODES : ["simple"];
+    const mode = !R.detaille ? "simple" : MODES.includes(S.revenu.modeBudget) ? S.revenu.modeBudget : "horaire";
     R.mode = mode;
-    R.brut = R.gmfu[mode].total;
+    R.brut = R.rev[mode].total;
     R.couple = !!S.conjointe.active;
     R.interetsEtudes = S.dettes.filter(d => d.creditImpot > 0).reduce((a, d) => a + d.solde * d.taux / 100, 0);
     const base = { depensesPro: S.impot.depensesPro, reer: S.epargne.reer.cotisationAnnuelle, interetsEtudes: R.interetsEtudes };
@@ -623,7 +660,7 @@
     // Pratique incorporée : la société reçoit les revenus et verse des dividendes ;
     // sinon, travail autonome. f : facteur des dividendes fixes en dollars d'aujourd'hui.
     R.societeActive = S.impot.structure === "societe";
-    R.dproPerso = R.societeActive ? 0 : S.impot.depensesPro + R.gmfu[mode].fraisCabinet;
+    R.dproPerso = R.societeActive ? 0 : S.impot.depensesPro + R.rev[mode].fraisCabinet;
     const impotDe = (o, f = 1) => R.societeActive
       ? C.impotSociete({ ...o, fraisSociete: S.societe.fraisSociete, tauxSociete: S.societe.tauxSociete / 100, retrait: S.societe.retrait, retraitFixe: S.societe.retraitFixe * f })
       : C.impotParticulier(o);
@@ -631,13 +668,18 @@
     const avec = r => R.couple ? C.transfertsConjoints(r, salariee) : [r, null];
     R.impots = {}; const partenaires = {};
     // Frais de cabinet : déductibles (ou payés par la société) ; varient selon le mode.
-    const fraisCabinet = (total, md) => md === "acte" || S.revenu.fraisCabinetTousModes
-      ? Math.max(0, (total - (S.revenu.autresRevenus || 0)) * (S.revenu.fraisCabinetPct || 0) / 100 + (S.revenu.fraisCabinetMois || 0) * 12 - (S.revenu.compensationCabinet || 0)) : 0;
-    const depensesMode = md => S.impot.depensesPro + R.gmfu[md].fraisCabinet;
-    for (const md of MODES) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, depensesPro: depensesMode(md), revenu: R.gmfu[md].total }));
+    // Calcul simple : toujours, selon les frais du calcul simple.
+    const fraisCabinet = (total, md) => {
+      const facture = Math.max(0, total - (S.revenu.autresRevenus || 0)), sp = S.revenu.simple;
+      if (!R.detaille) return Math.max(0, facture * (sp.fraisPct || 0) / 100 + (sp.fraisMois || 0) * 12);
+      return md === "acte" || S.revenu.fraisCabinetTousModes
+        ? Math.max(0, facture * (S.revenu.fraisCabinetPct || 0) / 100 + (S.revenu.fraisCabinetMois || 0) * 12 - (S.revenu.compensationCabinet || 0)) : 0;
+    };
+    const depensesMode = md => S.impot.depensesPro + R.rev[md].fraisCabinet;
+    for (const md of R.modes) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, depensesPro: depensesMode(md), revenu: R.rev[md].total }));
     // Net après impôt et frais de cabinet (les dépenses professionnelles, égales dans tous les modes, à part).
     R.nets = {};
-    for (const md of MODES) R.nets[md] = R.impots[md].net - (R.societeActive ? 0 : R.gmfu[md].fraisCabinet);
+    for (const md of R.modes) R.nets[md] = R.impots[md].net - (R.societeActive ? 0 : R.rev[md].fraisCabinet);
     R.impot = R.impots[mode];
     R.conjointe = R.couple ? partenaires[mode] : null;
     const totalDe = x => x.totalGlobal ?? x.total;
@@ -646,15 +688,21 @@
       - totalDe(impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.brut }))) / 1000;
     // Revenu net d'impôt et de frais de cabinet pour un autre revenu brut (mêmes déductions, mêmes transferts).
     R.netPour = (rev, frais = 0) => avec(impotDe({ ...base, depensesPro: S.impot.depensesPro + frais, revenu: rev }))[0].net - (R.societeActive ? 0 : frais);
-    const sens = (k, valeurs) => valeurs.map(v => {
-      const g = C.revenuGmfu({ ...S.revenu, [k]: v });
-      const x = { v };
-      for (const md of MODES) { x[md] = g[md].total; x[md + "Net"] = R.netPour(g[md].total, g[md].fraisCabinet); }
-      return x;
+    // Sensibilité : revenu brut et net pour d'autres valeurs d'un champ (x : ce qui change).
+    const sens = (valeurs, x) => valeurs.map(v => {
+      const g = revenuDe(x(v)), o = { v };
+      for (const md of R.modes) { o[md] = g[md].total; o[md + "Net"] = R.netPour(g[md].total, g[md].fraisCabinet); }
+      return o;
     });
-    const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ;
-    R.sensDJ = sens("demiJournees", [...new Set([4, 5, 6, 7, 8, 9, 10, dj])].filter(n => n >= Math.max(1, S.revenu.enseignement)).sort((a, b) => a - b));
-    R.sensPat = sens("patientsParDJ", [...new Set([3, 4, 5, 6, 7, 8, pat])].sort((a, b) => a - b));
+    R.sensDJ = R.sensPat = R.sensJours = null;
+    if (R.detaille) {
+      const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ, ens = R.milieu === "clsc" ? 0 : S.revenu.enseignement;
+      R.sensDJ = sens([...new Set([4, 5, 6, 7, 8, 9, 10, dj])].filter(n => n >= Math.max(1, ens)).sort((a, b) => a - b), v => ({ demiJournees: v }));
+      R.sensPat = sens([...new Set([3, 4, 5, 6, 7, 8, pat])].sort((a, b) => a - b), v => ({ patientsParDJ: v }));
+    } else if (S.revenu.simple.calcul !== "annuel") {
+      const j = S.revenu.simple.joursSemaine;
+      R.sensJours = sens([...new Set([2, 3, 4, 5, j])].filter(n => n > 0).sort((a, b) => a - b), v => ({ simple: { ...S.revenu.simple, joursSemaine: v } }));
+    }
     // REER : impôt sans cotisation, et avec une cotisation donnée (au revenu de l'année).
     const baseMode = { ...base, depensesPro: depensesMode(mode), revenu: R.brut };
     R.impotSansReer = impotDe({ ...baseMode, reer: 0 }).total;
@@ -705,7 +753,7 @@
     // Années suivantes : la première année de pratique fait place à une année type
     // (clientèle complète toute l'année), puis les revenus et les dépenses évoluent
     // selon le scénario.
-    R.gmfuType = S.revenu.annee === "premiere" ? C.revenuGmfu({ ...S.revenu, annee: "type" }) : R.gmfu;
+    R.revType = S.revenu.annee === "premiere" ? revenuDe({ annee: "type" }) : R.rev;
     R.scenario = SCENARIOS[S.scenarios.choisi] ? S.scenarios.choisi : "realiste";
     R.hyp = S.scenarios[R.scenario];
     // Surplus de l'année a (0 = cette année), qui va sur les dettes.
@@ -723,8 +771,8 @@
       if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, epargne: R.epargneMoi * 12, retenu: R.impot.societe ? R.impot.societe.retenu : 0 };
       else {
         const conj = impotPartenaire(reel);
-        const fraisA = fraisCabinet(R.gmfuType[mode].total * reel, mode);
-        let moi = impotDe({ ...base, depensesPro: S.impot.depensesPro + fraisA, revenu: R.gmfuType[mode].total * reel }, 1 / I);
+        const fraisA = fraisCabinet(R.revType[mode].total * reel, mode);
+        let moi = impotDe({ ...base, depensesPro: S.impot.depensesPro + fraisA, revenu: R.revType[mode].total * reel }, 1 / I);
         if (R.couple) moi = C.transfertsConjoints(moi, conj)[0];
         const ages = S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x < 18);
         const nf = moi.revenuNetFed + (conj ? conj.revenuNetFed : 0), nq = moi.revenuNetQc + (conj ? conj.revenuNetQc : 0);
@@ -911,6 +959,16 @@
   }
   // Préférence d'affichage enregistrée (mode, méthode) : pas une donnée saisie.
   function changer(p, v) { ecrire(p, v); sauver(); remplirChamps(); tout(); }
+  // Changer de milieu : les valeurs de départ suivent, sauf celles que vous avez modifiées
+  // (une valeur égale à la valeur de départ d'un milieu est considérée comme non modifiée).
+  function choisirMilieu(v) {
+    if (!MILIEUX[v]) return;
+    const s = S.revenu.simple, m = MILIEUX[v];
+    if (!m.detaille) for (const k of ["parJour", "fraisPct", "debutPct"])
+      if (Object.values(MILIEUX).some(x => x[k] !== undefined && x[k] === s[k])) s[k] = m[k];
+    S.revenu.milieu = v; S.meta.exemple = false;
+    sauver(); remplirChamps(); tout();
+  }
   // Vues qui ne changent pas les données : budget de qui, valeur nette de qui.
   const U = { vueBudget: "moi", vueAvenir: "moi", sensVue: "net" };
   function tableauSimple(parent, entetes, lignesT) {
@@ -1020,8 +1078,15 @@
      ============================================================ */
   const NOM_MODE = { horaire: "Taux horaire", mixte: "Taux mixte", acte: "À l'acte" };
   const AU_MODE = { horaire: "au taux horaire", mixte: "au taux mixte", acte: "à l'acte" };
-  const COULEUR_MODE = { horaire: SERIES[0], mixte: SERIES[1], acte: SERIES[2] };
-  const choixMode = id => segment(id, [["horaire", "Horaire"], ["mixte", "Mixte"], ["acte", "À l'acte"]], R.mode, v => changer("revenu.modeBudget", v), "Mode de rémunération utilisé");
+  const COULEUR_MODE = { horaire: SERIES[0], mixte: SERIES[1], acte: SERIES[2], simple: SERIES[0] };
+  // Nom du mode (calcul détaillé) ou du milieu (calcul simple) ; libellé complet du revenu utilisé.
+  const nomMode = md => md === "simple" ? MILIEUX[R.milieu].nom : NOM_MODE[md];
+  const libelleRevenu = () => R.detaille ? `${MILIEUX[R.milieu].nom} · ${NOM_MODE[R.mode]}` : MILIEUX[R.milieu].nom;
+  // Choix du mode : seulement au calcul détaillé (un seul mode au calcul simple).
+  const choixMode = id => {
+    document.getElementById(id).hidden = !R.detaille;
+    if (R.detaille) segment(id, [["horaire", "Horaire"], ["mixte", "Mixte"], ["acte", "À l'acte"]], R.mode, v => changer("revenu.modeBudget", v), "Mode de rémunération utilisé");
+  };
 
   function rendreApercu(R) {
     document.getElementById("ap-exemple").hidden = !S.meta.exemple;
@@ -1053,7 +1118,7 @@
     };
     const p = R.projection, dix = p[Math.min(10, p.length - 1)];
     t.append(
-      tuileLien("revenu", "Revenu brut", $(R.brut), NOM_MODE[R.mode]),
+      tuileLien("revenu", "Revenu brut", $(R.brut), libelleRevenu()),
       tuileLien("impot", "Net après impôt", $(R.impot.net), `${$(R.impot.net / 12)} par mois`),
       tuileLien("budget", "Dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
       tuileLien("avenir", "Valeur nette", $(p[0].moi), `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}`),
@@ -1157,7 +1222,19 @@
   }
 
   function rendreRevenu(R) {
-    const g = R.gmfu, autres = MODES.filter(m => m !== R.mode);
+    // Milieu de pratique, en haut de la section.
+    const choix = document.getElementById("rv-milieu");
+    if (!choix.options.length) for (const [k, m] of Object.entries(MILIEUX)) { const o = el("option", null, m.long); o.value = k; choix.appendChild(o); }
+    choix.value = R.milieu;
+    document.getElementById("rv-milieu-aide").textContent = R.detaille
+      ? "Calcul détaillé avec les tarifs de la RAMQ : horaire, mixte et à l'acte."
+      : "Calcul simple : vos jours et votre revenu par jour, ou votre facturation annuelle.";
+    for (const id of ["rv-carte-modes", "rv-carte-source"]) document.getElementById(id).hidden = !R.detaille;
+    document.getElementById("rv-carte-faits").classList.toggle("demi", R.detaille);
+    document.getElementById("rv-carte-sens").hidden = !R.sensDJ && !R.sensJours;
+    choixMode("rv-mode");
+    if (!R.detaille) return rendreRevenuSimple(R);
+    const g = R.rev, autres = MODES.filter(m => m !== R.mode);
     const meilleur = autres.reduce((a, m) => g[m].total > g[a].total ? m : a, autres[0]);
     choixMode("rv-mode");
     const diff = g[R.mode].total - g[meilleur].total;
@@ -1231,11 +1308,50 @@
     ]);
   }
 
-  // Selon le nombre de demi-journées et de patients : brut ou net, horaire et mixte.
+  // Calcul simple (clinique, hôpital, urgence) : un seul mode ; la montée de la clientèle la première année.
+  function rendreRevenuSimple(R) {
+    const g = R.rev, x = g.simple, sp = S.revenu.simple, montee = S.revenu.annee === "premiere" && g.facteur < 1;
+    hero("rv-hero", "Revenu brut de l'année", $(x.total), [
+      `${R.societeActive ? "Pour vous" : `Net après impôt${x.fraisCabinet ? " et frais" : ""}`} : ${$(R.nets.simple)}`,
+      montee ? puce(`Première année : ${pct(g.facteur, 0)} d'une année complète`) : null,
+    ], x.total);
+    rangees("rv-faits", [
+      { titre: "Milieu de pratique", valeur: MILIEUX[R.milieu].nom },
+      ...(g.jours != null ? [
+        { titre: "Jours travaillés", sous: `${nb(sp.joursSemaine)} par semaine, ${nb(S.revenu.semaines, 0)} semaines`, valeur: nb(g.jours, 0) },
+        { titre: "Revenu brut par jour", valeur: $(sp.parJour) },
+      ] : []),
+      { titre: "Une année complète", sous: "Au plein régime", valeur: $(g.plein) },
+      montee ? { titre: "Cette année", sous: `Montée de la clientèle : de ${nb(sp.debutPct, 0)} % au plein régime en ${nb(sp.moisMontee, 0)} mois`, valeur: $(x.activite) } : null,
+      x.autres ? { titre: "Autres revenus RAMQ", valeur: $(x.autres) } : null,
+      x.fraisCabinet ? { titre: "Frais de cabinet", sous: `${nb(sp.fraisPct)} % de la facturation${sp.fraisMois ? ` et ${$(sp.fraisMois)} par mois` : ""}`, valeur: moins(x.fraisCabinet) } : null,
+      R.societeActive
+        ? { titre: "Pour vous", sous: `Laissé dans la société : ${$(R.impots.simple.societe.retenu)}`, valeur: $(R.nets.simple), cls: "total" }
+        : { titre: `Net après impôt${x.fraisCabinet ? " et frais" : ""}`, valeur: $(R.nets.simple), cls: "total" },
+    ]);
+    if (R.sensJours) rendreSensibilite(R);
+  }
+
+  // Selon le nombre de demi-journées et de patients (calcul détaillé), ou de jours (calcul simple) : brut ou net.
   function rendreSensibilite(R) {
     segment("rv-sens-vue", [["net", "Net"], ["brut", "Brut"]], U.sensVue, v => { U.sensVue = v; tout(); }, "Montants bruts ou nets");
     const net = U.sensVue === "net", val = (x, md) => net ? x[md + "Net"] : x[md];
-    const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ;
+    const simple = !R.detaille;
+    document.getElementById("rv-sens-titre").textContent = simple ? "Selon vos jours" : "Selon vos demi-journées";
+    document.getElementById("rv-sens-pat-bloc").hidden = simple;
+    const notePrefixe = net ? (R.societeActive ? "Net pour vous : dividendes après impôt ; le reste demeure dans la société." : "Après impôt et cotisations, avec vos déductions.") : "Avant impôt.";
+    if (simple) {
+      const L = R.sensJours, j = S.revenu.simple.joursSemaine;
+      graphiqueLignes(document.getElementById("rv-sens-graph"), document.getElementById("rv-sens-legende"),
+        [{ nom: MILIEUX[R.milieu].nom, couleur: COULEUR_MODE.simple, valeurs: L.map(x => val(x, "simple")) }],
+        L.map(x => nb(x.v)), { titre: `Revenu ${net ? "net" : "brut"} selon les jours par semaine`, baseLibre: true, hauteur: 200,
+        titreX: i => `${nb(L[i].v)} jour${L[i].v > 1 ? "s" : ""} par semaine` });
+      lignes(document.getElementById("rv-sens-dj"), ["Jours par semaine", "Brut", R.societeActive ? "Pour vous" : "Net"],
+        L.map(x => ({ cls: x.v === j ? "choisi" : null, cellules: [`${nb(x.v)}${x.v === j ? " (vous)" : ""}`, $(x.simple), $(x.simpleNet)] })));
+      document.getElementById("rv-sens-note").textContent = `${notePrefixe} Même revenu par jour, mêmes semaines et mêmes frais${S.revenu.annee === "premiere" && R.rev.facteur < 1 ? " ; montée de la clientèle comprise" : ""}.`;
+      return;
+    }
+    const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ, ens = R.milieu === "clsc" ? 0 : S.revenu.enseignement;
     graphiqueLignes(document.getElementById("rv-sens-graph"), document.getElementById("rv-sens-legende"),
       MODES.map(md => ({ nom: NOM_MODE[md], couleur: COULEUR_MODE[md], valeurs: R.sensDJ.map(x => val(x, md)) })),
       R.sensDJ.map(x => String(x.v)), { titre: `Revenu ${net ? "net" : "brut"} selon les demi-journées par semaine`, baseLibre: true, hauteur: 200,
@@ -1245,7 +1361,7 @@
       R.sensDJ.map(x => ligneSens(x, x.v === dj, `${x.v}${x.v === dj ? " (vous)" : ""}`)));
     lignes(document.getElementById("rv-sens-pat"), ["Patients", "Horaire", "Mixte", "À l'acte"],
       R.sensPat.map(x => ligneSens(x, x.v === pat, `${nb(x.v)}${x.v === pat ? " (vous)" : ""}`)));
-    document.getElementById("rv-sens-note").textContent = `${net ? (R.societeActive ? "Net pour vous : dividendes après impôt ; le reste demeure dans la société." : "Après impôt et cotisations, avec vos déductions.") : "Avant impôt."} L'enseignement reste à ${nb(S.revenu.enseignement)} demi-journée${S.revenu.enseignement > 1 ? "s" : ""} ; les autres demi-journées sont en clinique, à ${nb(pat)} patients chacune. Au taux horaire, le nombre de patients ne change pas le revenu.`;
+    document.getElementById("rv-sens-note").textContent = `${notePrefixe} ${ens ? `L'enseignement reste à ${nb(ens)} demi-journée${ens > 1 ? "s" : ""} ; les autres demi-journées sont en clinique` : "Toutes les demi-journées sont en clinique"}, à ${nb(pat)} patients chacune. Au taux horaire, le nombre de patients ne change pas le revenu.`;
   }
 
   function rendreImpot(R) {
@@ -1262,7 +1378,7 @@
       ? [["Impôt de la société", x.impotSociete, SERIES[0]], ["Votre impôt sur les dividendes", R.impot.fed + R.impot.qc + R.impot.fss, SERIES[1]],
          ["Dépenses et frais de la société", x.depenses + x.frais, SERIES[3]], ["Laissé dans la société", x.retenu, SERIES[5]], ["Reste pour vous", R.impot.net, SERIES[4]]]
       : [["Impôt fédéral", R.impot.fed, SERIES[0]], ["Impôt du Québec", R.impot.qc, SERIES[1]], ["RRQ, RQAP et Fonds des services de santé", cotis, SERIES[2]],
-         [R.gmfu[R.mode].fraisCabinet ? "Dépenses et frais de cabinet" : "Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", R.impot.net - dpro, SERIES[4]]];
+         [R.rev[R.mode].fraisCabinet ? "Dépenses et frais de cabinet" : "Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", R.impot.net - dpro, SERIES[4]]];
     const cent = document.getElementById("im-cent"); cent.textContent = "";
     const barre = el("div", "flux-barre"); barre.setAttribute("role", "img");
     barre.setAttribute("aria-label", morceaux.map(([n, v]) => `${n} ${$2(v / brut * 100)}`).join(", "));
@@ -1287,9 +1403,10 @@
       ? "La première année, l'impôt de l'année précédente (résidence) était faible : aucun acompte n'est exigé. Tout le solde arrive le 30 avril, et les acomptes commencent l'année suivante."
       : "Acomptes trimestriels, calculés sur l'impôt de l'année. Payer les montants que l'Agence du revenu et Revenu Québec vous envoient évite les intérêts."));
 
-    // Détail selon le mode : une colonne par mode de rémunération.
-    const I3 = MODES.map(md => R.impots[md]), ligne = (nom, f, cls) => ({ cls, cellules: [nom, ...I3.map(f)] });
-    lignes(document.getElementById("im-tableau"), ["", "Horaire", "Mixte", "À l'acte"], [
+    // Détail selon le mode : une colonne par mode de rémunération (une seule au calcul simple).
+    const I3 = R.modes.map(md => R.impots[md]), ligne = (nom, f, cls) => ({ cls, cellules: [nom, ...I3.map(f)] });
+    document.getElementById("im-tableau-titre").textContent = R.detaille ? "Détail selon le mode" : "Détail de l'impôt";
+    lignes(document.getElementById("im-tableau"), R.detaille ? ["", "Horaire", "Mixte", "À l'acte"] : ["", MILIEUX[R.milieu].nom], [
       ligne(soc ? "Revenu brut, versé à la société" : "Revenu brut", x => $(x.revenu)),
       ...(soc ? [
         ligne("Dépenses et frais de la société", x => moins(x.societe.depenses + x.societe.frais)),
@@ -1297,7 +1414,7 @@
         ligne("Dividendes versés", x => $(x.societe.dividendes)),
         ligne("Laissé dans la société", x => $(x.societe.retenu), "sous"),
       ] : [
-        ...(MODES.some(md => R.gmfu[md].fraisCabinet > 0) ? [{ cellules: ["Frais de cabinet", ...MODES.map(md => moins(R.gmfu[md].fraisCabinet))] }] : []),
+        ...(R.modes.some(md => R.rev[md].fraisCabinet > 0) ? [{ cellules: ["Frais de cabinet", ...R.modes.map(md => moins(R.rev[md].fraisCabinet))] }] : []),
         ligne("Revenu imposable", x => $(x.imposable), "sous"),
       ]),
       ligne("Impôt fédéral", x => $(x.fed)),
@@ -1305,7 +1422,7 @@
       ...(soc ? [] : [ligne("RRQ (deux parts)", x => $(x.rrq)), ligne("RQAP", x => $(x.rqap))]),
       ligne("Fonds des services de santé", x => $(x.fss)),
       ...(R.couple && I3.some(x => x.transferts > 0) ? [ligne(`Crédits transférés par ${votreP()}`, x => moins(x.transferts))] : []),
-      { cls: "total", cellules: [soc ? "Net pour vous" : "Net après impôt et frais", ...MODES.map(md => $(R.nets[md]))] },
+      { cls: "total", cellules: [soc ? "Net pour vous" : "Net après impôt et frais", ...R.modes.map(md => $(R.nets[md]))] },
       ligne(soc ? "Taux moyen, société comprise" : "Taux moyen", x => pct(x.tauxMoyen), "sous"),
     ]);
     document.getElementById("im-tableau-note").textContent = soc
@@ -1658,7 +1775,10 @@
     const inp = e.target;
     if (inp.dataset.p) {
       const v = valeur(inp); if (v === null) return;
+      if (inp.dataset.p === "revenu.milieu") { choisirMilieu(v); return; }
       ecrire(inp.dataset.p, v); S.meta.exemple = false;
+      // Passer à la facturation annuelle : on part de l'année complète calculée par jour.
+      if (inp.dataset.p === "revenu.simple.calcul" && v === "annuel" && !S.revenu.simple.annuel && R && R.rev.plein) { S.revenu.simple.annuel = Math.round(R.rev.plein / 1000) * 1000; remplirChamps(); }
       majVisibilite();   // un champ peut en afficher ou en cacher d'autres
       if (inp.dataset.p === "conjointe.designation") { S.conjointe.designation = v; reconstruireFeuille(); }
       plusTard();
@@ -1763,6 +1883,7 @@
   const rapportPdf = () => (window.Wealthnord.rapport ? window.Wealthnord.rapport.imprimer() : window.print());
   document.getElementById("imprimer").addEventListener("click", rapportPdf);
   document.getElementById("rapport-pdf").addEventListener("click", rapportPdf);
+  document.getElementById("rv-milieu").addEventListener("change", e => choisirMilieu(e.target.value));
   document.getElementById("de-ajout").addEventListener("input", majSimulation);
   // Plan de remboursement mois par mois, en CSV (séparateur « ; », virgule décimale, pour Excel en français).
   document.getElementById("exporter-plan").addEventListener("click", () => {
@@ -1780,7 +1901,7 @@
     toast("Plan de remboursement exporté (CSV).");
   });
   window.addEventListener("beforeprint", () => {
-    document.getElementById("impression-info").textContent = `Rapport du ${new Date().toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" })} · ${NOM_MODE[R.mode].toLowerCase()} · scénario ${SCENARIOS[R.scenario].toLowerCase()} · méthode ${NOMS_METHODES[R.methode].toLowerCase()}`;
+    document.getElementById("impression-info").textContent = `Rapport du ${new Date().toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" })} · ${libelleRevenu()} · scénario ${SCENARIOS[R.scenario].toLowerCase()} · méthode ${NOMS_METHODES[R.methode].toLowerCase()}`;
   });
 
   /* Outils pour le rapport PDF (js/rapport.js). */
@@ -1791,7 +1912,7 @@
       VERIFICATION.forEach(v => { const b = casCalcul(v); CHAMPS_VERIF.forEach(([k]) => { const e = Math.abs(Math.round(b[k]) - v.officiel[k]); total++; if (e <= 1) egaux++; pire = Math.max(pire, e); }); });
       return { total, egaux, pire, cas: VERIFICATION.length };
     },
-    outils: { $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
+    outils: { $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, nomMode, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
   };
 
   /* Application installable (PWA) : fonctionne hors ligne. */
