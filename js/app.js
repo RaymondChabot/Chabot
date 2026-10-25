@@ -1027,6 +1027,11 @@
         ? "Exportez une copie de vos données (page Données) : elles ne vivent que dans ce navigateur."
         : `Votre dernière copie de sauvegarde date de ${jours} jours : exportez-en une nouvelle (page Données).`);
     }
+    S.dettes.forEach(d => {
+      if (d.type === "marge" && d.limite > 0 && d.solde > d.limite) action("important", `« ${d.nom} » dépasse sa limite de ${$(d.solde - d.limite)} : vérifiez le solde et la limite.`);
+      const pm = d.frequence === "2sem" ? d.paiement * 26 / 12 : d.paiement;
+      if (!d.interetsSeulement && d.solde > 0 && pm <= d.solde * C.tauxMensuel(d, d.taux)) action("important", `Le paiement de « ${d.nom} » ne couvre pas les intérêts : vérifiez le montant, ou choisissez « Intérêts seulement ».`);
+    });
     const mix = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
     if (Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
     if (R.surplusMoi < 0) action("important", `Votre budget est négatif de ${$(-R.surplusMoi)} par mois : revoyez les dépenses ou leur partage.`);
@@ -1663,6 +1668,21 @@
   appliquerTheme(lireTheme());
   document.getElementById("imprimer").addEventListener("click", () => window.print());
   document.getElementById("de-ajout").addEventListener("input", majSimulation);
+  // Plan de remboursement mois par mois, en CSV (séparateur « ; », virgule décimale, pour Excel en français).
+  document.getElementById("exporter-plan").addEventListener("click", () => {
+    const sim = R.sim, fin = sim.iLibre >= 0 ? sim.iLibre + 1 : sim.mois.length;
+    const montant = v => v.toFixed(2).replace(".", ",");
+    const texte = c => `"${String(c).replace(/"/g, '""')}"`;
+    const lignesCsv = [["Mois", ...S.dettes.map(d => d.nom), "Total des dettes", "Mis de côté pour un renouvellement"].map(texte).join(";")];
+    sim.mois.slice(0, fin).forEach(m => lignesCsv.push([m.date.toISOString().slice(0, 7), ...m.soldes.map(montant), montant(m.total), montant(m.reserve || 0)].join(";")));
+    const blob = new Blob(["\ufeff" + lignesCsv.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `wealthnord-plan-${NOMS_METHODES[R.methode].toLowerCase().replace(/\s+/g, "-")}-${R.scenario}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast("Plan de remboursement exporté (CSV).");
+  });
   window.addEventListener("beforeprint", () => {
     document.getElementById("impression-info").textContent = `Rapport du ${new Date().toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" })} · ${NOM_MODE[R.mode].toLowerCase()} · scénario ${SCENARIOS[R.scenario].toLowerCase()} · méthode ${NOMS_METHODES[R.methode].toLowerCase()}`;
   });

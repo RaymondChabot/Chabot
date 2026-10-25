@@ -574,3 +574,13 @@ a.tuile:hover { border-color: var(--trait); }
 .simulation-tete strong { font-variant-numeric: tabular-nums; }
 .simulation input[type="range"] { width: 100%; accent-color: var(--encre); margin: 4px 0; }
 @media print { .simulation { display: none; } }
+
+/* Grand écran : certaines cartes côte à côte */
+@media (min-width: 1200px) {
+  main { max-width: 1000px; }
+  .vue { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  .vue > * { grid-column: 1 / -1; }
+  .vue > .carte.demi { grid-column: auto; }
+  .vue[hidden] { display: none; }
+}
+@media print { .vue > .carte.demi { grid-column: 1 / -1; } }

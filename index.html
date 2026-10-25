@@ -68,11 +68,11 @@
         <div class="carte-tete"><h2>À faire</h2></div>
         <ul class="a-faire" id="ap-actions"></ul>
       </div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>Prochaines échéances</h2></div>
         <div class="rangees" id="ap-echeances"></div>
       </div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>Vos jalons</h2><a class="lien-carte" href="#avenir">Avenir</a></div>
         <div class="rangees" id="ap-jalons"></div>
       </div>
@@ -88,10 +88,14 @@
       <header class="tete-page"><h1 id="h-revenu">Revenu GMF-U</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
       <div class="segment" id="rv-mode"></div>
       <div class="hero" id="rv-hero"></div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>Horaire ou mixte</h2></div>
         <div id="rv-comparaison"></div>
         <p class="aide" id="rv-seuil"></p>
+      </div>
+      <div class="carte demi">
+        <div class="carte-tete"><h2>Votre année en chiffres</h2></div>
+        <div class="rangees" id="rv-faits"></div>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>
@@ -108,10 +112,6 @@
         <div class="legende" id="rv-legende"></div>
         <div class="tableau-defile"><table class="tableau" id="rv-detail"></table></div>
       </div>
-      <div class="carte">
-        <div class="carte-tete"><h2>Votre année en chiffres</h2></div>
-        <div class="rangees" id="rv-faits"></div>
-      </div>
     </section>
 
     <!-- ============ IMPÔT ============ -->
@@ -119,11 +119,11 @@
       <header class="tete-page"><h1 id="h-impot">Impôt 2026</h1><button type="button" class="bouton-modifier" data-feuille="impot">Modifier</button></header>
       <div class="segment" id="im-mode"></div>
       <div class="hero" id="im-hero"></div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>Sur chaque 100 $ gagnés</h2></div>
         <div id="im-cent"></div>
       </div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>Mettre de côté et payer</h2></div>
         <div id="im-acomptes"></div>
       </div>
@@ -151,9 +151,15 @@
       <header class="tete-page"><h1 id="h-budget">Budget</h1><button type="button" class="bouton-modifier" data-feuille="menage">Ménage</button></header>
       <div class="segment" id="bu-vue"></div>
       <div class="hero" id="bu-hero"></div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>Revenus nets</h2><span class="carte-sous">Par mois</span></div>
         <div class="rangees" id="bu-revenus"></div>
+      </div>
+      <div class="carte demi">
+        <div class="carte-tete"><h2>Votre surplus au fil des ans</h2><span class="carte-sous">Par mois</span></div>
+        <div class="graphique" id="bu-surplus-graph"></div>
+        <div class="rangees" id="bu-surplus"></div>
+        <p class="aide" id="bu-surplus-note"></p>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>Dépenses</h2><span class="carte-sous">Par mois</span></div>
@@ -162,12 +168,6 @@
       <div class="carte">
         <div class="carte-tete"><h2>Dettes</h2><span class="carte-sous">Solde</span></div>
         <div class="rangees" id="bu-dettes"></div>
-      </div>
-      <div class="carte">
-        <div class="carte-tete"><h2>Votre surplus au fil des ans</h2><span class="carte-sous">Par mois</span></div>
-        <div class="graphique" id="bu-surplus-graph"></div>
-        <div class="rangees" id="bu-surplus"></div>
-        <p class="aide" id="bu-surplus-note"></p>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>Plan de remboursement</h2><button type="button" class="lien-carte" data-feuille="strategie">Modifier</button></div>
@@ -180,6 +180,7 @@
           <input type="range" id="de-ajout" min="0" max="3000" step="100" value="0">
           <p class="aide" id="de-ajout-texte" aria-live="polite"></p>
         </div>
+        <div class="actions"><button type="button" class="bouton secondaire petit" id="exporter-plan">Exporter le plan mois par mois (CSV)</button></div>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>Choisir la méthode</h2><span class="carte-sous">Valeur nette</span></div>
@@ -211,11 +212,11 @@
         <div class="rangees" id="vn-scenarios"></div>
         <p class="aide">Le scénario réaliste suit les Normes d'hypothèses de projection 2026 de l'Institut de planification financière et de FP Canada : inflation 2,1 %, immobilier résidentiel 3,1 %, salaires 3,1 %, actions de 6,3 à 7,5 % avant frais. Prudent et optimiste encadrent ces normes, comme le recommandent les planificateurs financiers.</p>
       </div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>REEE des enfants</h2><span class="carte-sous">À 17 ans</span></div>
         <div class="rangees" id="ep-reee"></div>
       </div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>REER</h2></div>
         <div id="ep-reer"></div>
       </div>
