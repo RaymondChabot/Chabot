@@ -1,4 +1,4 @@
-/* Boussole — interface. L'état vit dans le localStorage de ce navigateur ;
+/* Wealthnord — interface. L'état vit dans le localStorage de ce navigateur ;
    aucune donnée ne quitte l'appareil. Les calculs sont dans calc.js. */
 (function () {
   "use strict";
@@ -26,7 +26,15 @@
       modeBudget: "horaire",
     },
     impot: { depensesPro: 3000 },
-    conjointe: { active: false, salaire: 0, rpa: 0, syndicat: 0, autresRevenus: 0, medicamentsPublic: false, partMaison: 0, epargne: 0 },
+    conjointe: { active: false, salaire: 0, rpa: 0, syndicat: 0, autresRevenus: 0, medicamentsPublic: false, partMaison: 0, epargne: 0, voiture: 0 },
+    // Hypothèses de l'avenir. Le scénario réaliste suit les Normes d'hypothèses de
+    // projection 2026 (Institut de planification financière et FP Canada).
+    scenarios: {
+      choisi: "realiste", dollarsAujourdhui: false,
+      prudent: { rendement: 3.5, croissanceMaison: 1.5, depreciationAuto: 20, ecartTaux: 1, inflation: 3, hausseRevenus: 2 },
+      realiste: { rendement: 5, croissanceMaison: 3.1, depreciationAuto: 15, ecartTaux: 0, inflation: 2.1, hausseRevenus: 3.1 },
+      optimiste: { rendement: 6.5, croissanceMaison: 4.5, depreciationAuto: 12, ecartTaux: -0.5, inflation: 2, hausseRevenus: 3.5 },
+    },
     famille: { calculAuto: true, versementA: "moi", medicamentsPublicMoi: true },
     societe: { tauxSociete: 20.5, fraisSociete: 4000 },
     menage: { conjointNetMensuel: 0, allocationsAnnuelles: 2400, autresRevenusMensuels: 0, partCommunMoi: 100 },
@@ -86,6 +94,7 @@
     { cat: "Transport", items: [
       ["assuranceAuto", "Assurance auto", "mois", "moi"],
       ["essence", "Essence ou recharge", "mois", "moi"],
+      ["essence2", "Essence ou recharge, 2e véhicule", "mois", "conjoint"],
       ["entretienAuto", "Entretien et pneus", "mois", "moi"],
       ["immatriculation", "Immatriculation et permis de conduire", "an", "moi"],
       ["stationnement", "Stationnement", "mois", "moi"],
@@ -99,7 +108,7 @@
       ["campsJour", "Camps de jour et semaine de relâche", "an", "moi"],
       ["gardiennage", "Gardiennage", "mois", "moi"],
       ["jouets", "Jouets, livres, fêtes d'amis", "mois", "moi"],
-      ["ecole", "Fournitures et frais scolaires", "an", "moi"],
+      ["ecole", "École : frais, fournitures et service de garde", "mois", "moi"],
     ] },
     { cat: "Santé", items: [
       ["assuranceMedicaments", "Assurance médicaments", "an", "moi"],
@@ -141,7 +150,7 @@
   const ITEMS = new Map(CATALOGUE.flatMap(c => c.items.map(([k, nom, periode, qui]) => [k, { k, nom, periode, qui, cat: c.cat }])));
   const AIDE_CATEGORIE = {
     "Santé": "Sans assurance collective, la prime du régime public d'assurance médicaments se paie avec l'impôt du Québec : inscrivez-la ici.",
-    "Finances": "Les cotisations professionnelles sont dans l'onglet Impôt, avec les dépenses déductibles.",
+    "Finances": "Les dépenses professionnelles déductibles se saisissent dans Impôt, bouton Modifier.",
     "Logement": "Les paiements d'hypothèque viennent de la section Dettes.",
   };
 
@@ -163,7 +172,7 @@
 
   /* Résultats de l'outil de calcul du revenu disponible du ministère des Finances du
      Québec (version de mai 2026, revenus d'emploi), relevés le 25 octobre 2026.
-     Boussole recalcule les mêmes cas à chaque ouverture pour mesurer l'écart. */
+     Wealthnord recalcule les mêmes cas à chaque ouverture pour mesurer l'écart. */
   const VERIFICATION = [{"couple": true, "salaires": [190000, 60000], "ages": [4, 3], "officiel": {"qc": 40789, "fed": 34389, "rrq": 8455, "rqap": 701, "ae": 1676, "af": 2442, "fournitures": 127, "ace": 860, "prime": 1532}}, {"couple": true, "salaires": [100000, 0], "ages": [4, 3], "officiel": {"qc": 10487, "fed": 9131, "rrq": 4895, "rqap": 430, "ae": 896, "af": 4655, "fournitures": 127, "ace": 9378, "prime": 1532}}, {"couple": false, "salaires": [190000], "ages": [], "officiel": {"qc": 35143, "fed": 29962, "rrq": 4895, "rqap": 443, "ae": 896, "af": 0, "fournitures": 0, "ace": 0, "prime": 766}}, {"couple": true, "salaires": [80000, 40000], "ages": [4, 3], "officiel": {"qc": 12070, "fed": 9862, "rrq": 6995, "rqap": 516, "ae": 1416, "af": 3920, "fournitures": 127, "ace": 8248, "prime": 1532}}, {"couple": true, "salaires": [250000, 0], "ages": [4, 3], "officiel": {"qc": 47939, "fed": 42881, "rrq": 4895, "rqap": 443, "ae": 896, "af": 2442, "fournitures": 127, "ace": 828, "prime": 1532}}, {"couple": true, "salaires": [190000, 15000], "ages": [4, 3], "officiel": {"qc": 34447, "fed": 29797, "rrq": 5620, "rqap": 507, "ae": 1091, "af": 2442, "fournitures": 127, "ace": 3400, "prime": 1532}}, {"couple": false, "salaires": [60000], "ages": [], "officiel": {"qc": 5647, "fed": 4427, "rrq": 3560, "rqap": 258, "ae": 780, "af": 0, "fournitures": 0, "ace": 0, "prime": 766}}, {"couple": true, "salaires": [140000, 90000], "ages": [7, 3], "officiel": {"qc": 33507, "fed": 28249, "rrq": 9791, "rqap": 830, "ae": 1791, "af": 2442, "fournitures": 127, "ace": 758, "prime": 1532}}];
 
   /* ---------- État ---------- */
@@ -271,8 +280,9 @@
       { p: "conjointe.medicamentsPublic", l: "Couverte par le régime public d'assurance médicaments", t: "check", si: "conjointe.active", h: "Non si elle a une assurance collective au travail." },
       { p: "conjointe.partMaison", l: "Sa part de propriété de la maison", u: "%", si: "conjointe.active" },
       { p: "conjointe.epargne", l: "Son épargne : REER, CELI, comptes", u: "$", s: 100, si: "conjointe.active" },
+      { p: "conjointe.voiture", l: "Valeur de son auto", u: "$", s: 500, si: "conjointe.active" },
       { g: "Famille" },
-      { p: "famille.calculAuto", l: "Calculer les allocations familiales selon vos revenus", t: "check", h: "Allocation canadienne pour enfants, Allocation famille et supplément pour fournitures scolaires. Les enfants et leur âge viennent de l'onglet Épargne." },
+      { p: "famille.calculAuto", l: "Calculer les allocations familiales selon vos revenus", t: "check", h: "Allocation canadienne pour enfants, Allocation famille et supplément pour fournitures scolaires. Les enfants et leur âge viennent de la page Avenir." },
       { p: "menage.allocationsAnnuelles", l: "Allocations familiales reçues", u: "$/an", s: 50, si: "!famille.calculAuto" },
       { p: "famille.versementA", l: "Allocations versées à", t: "select", o: [["moi", "Moi"], ["conjointe", "Ma conjointe"]], si: "conjointe.active" },
       { p: "famille.medicamentsPublicMoi", l: "Vous êtes couvert par le régime public d'assurance médicaments", t: "check", h: "La prime se paie avec l'impôt du Québec. Non si vous avez une assurance collective." },
@@ -287,7 +297,6 @@
     ],
     epargne: [
       { g: "Placements" },
-      { p: "epargne.rendement", l: "Rendement annuel attendu", u: "%", s: 0.1 },
       { p: "epargne.reee.cotisationAnnuelle", l: "Cotisation REEE par enfant", u: "$/an", s: 50, h: "2 500 $ par enfant donnent le maximum de subventions : 30 %." },
       { p: "epargne.reer.solde", l: "Solde REER", u: "$", s: 100 },
       { p: "epargne.reer.droits", l: "Droits de cotisation REER inutilisés", u: "$", s: 100, h: "Sur votre avis de cotisation fédéral." },
@@ -298,14 +307,58 @@
       { g: "Biens" },
       { p: "actifs.maison.valeur", l: "Valeur de la maison", u: "$", s: 1000 },
       { p: "actifs.maison.part", l: "Votre part de propriété", u: "%" },
-      { p: "actifs.maison.croissance", l: "Hausse annuelle de la valeur", u: "%", s: 0.1 },
-      { p: "actifs.voiture.valeur", l: "Valeur de la voiture", u: "$", s: 100 },
-      { p: "actifs.voiture.depreciation", l: "Perte de valeur par année", u: "%" },
+      { p: "actifs.voiture.valeur", l: "Valeur de votre auto", u: "$", s: 100, h: "Rendement, hausse de la valeur de la maison et perte de valeur des autos : bouton Hypothèses." },
+    ],
+    hypotheses: [
+      { g: "Affichage" },
+      { p: "scenarios.dollarsAujourdhui", l: "Montrer l'avenir en dollars d'aujourd'hui", t: "check", h: "Retire l'inflation du scénario choisi : 100 000 $ dans 10 ans valent moins que 100 000 $ aujourd'hui." },
+      ...Object.entries({ prudent: "Prudent", realiste: "Réaliste", optimiste: "Optimiste" }).flatMap(([k, nom]) => [
+        { g: "Scénario " + nom.toLowerCase() + (k === "realiste" ? " · normes 2026" : "") },
+        { p: `scenarios.${k}.rendement`, l: "Rendement des placements, après frais", u: "%/an", s: 0.1 },
+        { p: `scenarios.${k}.croissanceMaison`, l: "Hausse de la valeur de la maison", u: "%/an", s: 0.1 },
+        { p: `scenarios.${k}.depreciationAuto`, l: "Perte de valeur des autos", u: "%/an", s: 1 },
+        { p: `scenarios.${k}.ecartTaux`, l: "Écart de taux : marge et renouvellements", u: "points", s: 0.25, neg: true },
+        { p: `scenarios.${k}.inflation`, l: "Hausse des dépenses (inflation)", u: "%/an", s: 0.1 },
+        { p: `scenarios.${k}.hausseRevenus`, l: "Hausse des revenus", u: "%/an", s: 0.1 },
+      ]),
     ],
   };
 
+  /* ============================================================
+     CHAMPS DE SAISIE : ils vivent dans le panneau « Modifier »
+     ============================================================ */
+  // Un champ : libellé, puis saisie (nombre, liste, mois, date) ou interrupteur.
+  function creerChamp(c, id, lier, confirmable) {
+    const ligne = el("div", "champ" + (c.t === "check" ? " case" : c.t === "select" || c.t === "month" || c.t === "date" ? " large" : ""));
+    if (c.si) ligne.dataset.si = c.si;
+    const lab = el("label", null, c.l); lab.htmlFor = id;
+    let inp;
+    if (c.t === "check") {
+      inp = el("input", "interrupteur"); inp.type = "checkbox"; inp.setAttribute("role", "switch");
+      ligne.append(lab, inp);
+    } else {
+      const boite = el("div", "saisie");
+      if (c.t === "select") {
+        inp = el("select");
+        for (const [v, t] of c.o) { const o = el("option", null, t); o.value = v; inp.appendChild(o); }
+      } else {
+        inp = el("input"); inp.type = c.t === "month" || c.t === "date" ? c.t : "number";
+        if (inp.type === "number") { inp.step = c.s || 1; inp.inputMode = "decimal"; if (c.neg) { inp.dataset.neg = "1"; inp.inputMode = "text"; } else inp.min = "0"; }
+      }
+      boite.appendChild(inp);
+      if (c.u) boite.appendChild(el("span", "unite", c.u));
+      ligne.append(lab, boite);
+    }
+    inp.id = id; lier(inp);
+    if (confirmable) {
+      const b = el("button", "conf", "✓"); b.type = "button"; b.dataset.conf = c.p;
+      b.title = "Valeur confirmée par un document"; b.setAttribute("aria-label", "Confirmée : " + c.l);
+      ligne.appendChild(b);
+    } else ligne.appendChild(el("span"));
+    if (c.h) ligne.appendChild(el("p", "aide", c.h));
+    return ligne;
+  }
   function construireChamps(conteneur, champs) {
-    conteneur.textContent = "";
     let groupe = null;
     for (const c of champs) {
       if (c.g) {
@@ -314,36 +367,8 @@
         conteneur.appendChild(groupe);
         continue;
       }
-      // Un même champ peut paraître dans deux onglets : l'id inclut le conteneur.
-      const id = conteneur.id + "-" + c.p.replace(/\./g, "-");
-      const ligne = el("div", "champ" + (c.t === "check" ? " case" : c.t === "select" || c.t === "month" ? " large" : ""));
-      if (c.si) ligne.dataset.si = c.si;
-      if (c.t === "check") {
-        const inp = el("input"); inp.type = "checkbox"; inp.id = id; inp.dataset.p = c.p;
-        const lab = el("label", null, c.l); lab.htmlFor = id;
-        ligne.append(inp, lab);
-      } else {
-        const lab = el("label", null, c.l); lab.htmlFor = id;
-        const boite = el("div", "saisie");
-        let inp;
-        if (c.t === "select") {
-          inp = el("select");
-          for (const [v, t] of c.o) { const o = el("option", null, t); o.value = v; inp.appendChild(o); }
-        } else {
-          inp = el("input"); inp.type = c.t === "month" ? "month" : "number";
-          if (inp.type === "number") { inp.step = c.s || 1; inp.min = "0"; inp.inputMode = "decimal"; }
-        }
-        inp.id = id; inp.dataset.p = c.p;
-        boite.appendChild(inp);
-        if (c.u) boite.appendChild(el("span", "unite", c.u));
-        if (c.t === "select" || c.t === "month") { ligne.append(lab); ligne.append(boite); }
-        else ligne.append(lab, boite);
-      }
-      const b = el("button", "conf", "✓"); b.type = "button"; b.dataset.conf = c.p;
-      b.title = "Valeur confirmée par un document"; b.setAttribute("aria-label", "Confirmée : " + c.l);
-      ligne.appendChild(b);
-      if (c.h) ligne.appendChild(el("p", "aide", c.h));
-      (groupe || conteneur).appendChild(ligne);
+      const id = "c-" + c.p.replace(/\./g, "-");
+      (groupe || conteneur).appendChild(creerChamp(c, id, inp => { inp.dataset.p = c.p; }, true));
     }
   }
   function remplirChamps() {
@@ -361,129 +386,150 @@
       l.hidden = neg ? v : !v;
     });
   }
-
-  /* ---------- Listes : dépenses, dettes, enfants ---------- */
-  const ouvertes = new Set();
-  function listeBudget() {
-    const c = document.getElementById("liste-budget"); c.textContent = ""; c.className = "liste";
-    const part = S.menage.partCommunMoi / 100;
-    const groupes = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
-    for (const g of groupes) {
-      const indices = S.budget.map((b, i) => [b, i]).filter(([b]) => categorie(b) === g);
-      const det = el("details", "categorie"); det.open = ouvertes.has(g);
-      det.addEventListener("toggle", () => { if (det.open) ouvertes.add(g); else ouvertes.delete(g); });
-      const resume = el("summary");
-      const total = indices.reduce((a, [b]) => a + mensuel(b), 0);
-      const totalMoi = indices.reduce((a, [b]) => a + (b.qui === "moi" ? mensuel(b) : b.qui === "commun" ? mensuel(b) * part : 0), 0);
-      const remplies = indices.filter(([b]) => b.montant > 0).length;
-      resume.append(el("span", "cat-nom", g), el("span", "cat-total", total > 0 ? `${$(total)} / mois · vous ${$(totalMoi)}` : (indices.length ? `${indices.length} cases` : "Aucune")));
-      resume.dataset.cat = g;
-      det.appendChild(resume);
-      if (AIDE_CATEGORIE[g]) det.appendChild(el("p", "aide", AIDE_CATEGORIE[g]));
-      for (const [b, i] of indices) {
-        const l = el("div", "ligne-budget" + (b.montant > 0 ? " remplie" : ""));
-        let nom;
-        if (b.k) { nom = el("label", "nom-depense", nomDepense(b)); nom.htmlFor = `bu-${b.id}-montant`; }
-        else { nom = el("input"); nom.value = b.nom; nom.setAttribute("aria-label", "Nom de la dépense"); nom.dataset.l = "budget"; nom.dataset.i = i; nom.dataset.k = "nom"; }
-        const mnt = el("input"); mnt.type = "number"; mnt.step = "1"; mnt.min = "0"; mnt.inputMode = "decimal"; mnt.value = b.montant || ""; mnt.placeholder = "0";
-        mnt.id = `bu-${b.id}-montant`; mnt.dataset.l = "budget"; mnt.dataset.i = i; mnt.dataset.k = "montant";
-        if (!b.k) mnt.setAttribute("aria-label", "Montant : " + b.nom);
-        const per = el("select", "periode"); [["mois", "/ mois"], ["an", "/ an"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; per.appendChild(o); });
-        per.value = b.periode; per.setAttribute("aria-label", "Période : " + nomDepense(b)); per.dataset.l = "budget"; per.dataset.i = i; per.dataset.k = "periode";
-        const qui = el("select", "qui"); [["moi", "Moi"], ["commun", "Partagée"], ["conjoint", S.conjointe.active ? "Conjointe" : "Quelqu'un d'autre"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; qui.appendChild(o); });
-        qui.value = b.qui; qui.setAttribute("aria-label", "Qui paie : " + nomDepense(b)); qui.dataset.l = "budget"; qui.dataset.i = i; qui.dataset.k = "qui";
-        l.append(nom, mnt, per, qui);
-        if (!b.k) { const x = el("button", "supprimer", "×"); x.type = "button"; x.setAttribute("aria-label", "Supprimer : " + b.nom); x.dataset.suppr = "budget"; x.dataset.i = i; l.appendChild(x); }
-        else l.appendChild(el("span"));
-        det.appendChild(l);
-      }
-      if (g === "Autres dépenses") {
-        const b = el("button", "bouton secondaire", "Ajouter une dépense"); b.type = "button"; b.id = "ajout-budget";
-        b.addEventListener("click", () => { S.budget.push({ id: nouvelId("b"), k: null, nom: "Nouvelle dépense", montant: 0, periode: "mois", qui: "moi" }); ouvertes.add("Autres dépenses"); sauver(); listeBudget(); tout(); });
-        det.appendChild(b);
-      }
-      c.appendChild(det);
-    }
-  }
-  // Met à jour les totaux des catégories sans reconstruire les champs (garde le focus).
-  function totauxCategories() {
-    const part = S.menage.partCommunMoi / 100;
-    document.querySelectorAll("#liste-budget summary[data-cat]").forEach(s => {
-      const lignes = S.budget.filter(b => categorie(b) === s.dataset.cat);
-      const total = lignes.reduce((a, b) => a + mensuel(b), 0);
-      const totalMoi = lignes.reduce((a, b) => a + (b.qui === "moi" ? mensuel(b) : b.qui === "commun" ? mensuel(b) * part : 0), 0);
-      s.querySelector(".cat-total").textContent = total > 0 ? `${$(total)} / mois · vous ${$(totalMoi)}` : (lignes.length ? `${lignes.length} cases` : "Aucune");
-    });
-  }
-  const CHAMPS_DETTE = [
-    ["type", "Type", "select", [["marge", "Marge de crédit"], ["hypotheque", "Hypothèque"], ["pret", "Prêt"], ["autre", "Autre"]]],
-    ["solde", "Solde ($)", "number", 100],
-    ["taux", "Taux (%)", "number", 0.01],
-    ["paiement", "Paiement ($)", "number", 0.01],
-    ["frequence", "Fréquence", "select", [["mois", "Chaque mois"], ["2sem", "Aux 2 semaines"]]],
-    ["limite", "Limite de crédit ($)", "number", 100],
-    ["finTerme", "Fin du terme", "date"],
-    ["tauxRenouvellement", "Taux au renouvellement (%)", "number", 0.01],
-    ["dureeTerme", "Durée des termes suivants (ans)", "number", 1],
-    ["privilege", "Remboursement anticipé permis (% par an)", "number", 1],
-    ["creditImpot", "Crédit d'impôt sur les intérêts (%)", "number", 1],
-    ["partMoi", "Part de la dette qui vous revient (%)", "number", 1],
-    ["paiementMoi", "Part des paiements que vous faites (%)", "number", 1],
-    ["interetsSeulement", "Intérêts seulement chaque mois", "check"],
-  ];
-  function listeDettes() {
-    const c = document.getElementById("liste-dettes"); c.textContent = ""; c.className = "liste";
-    S.dettes.forEach((d, i) => {
-      const it = el("div", "item");
-      const tete = el("div", "item-tete");
-      const nom = el("input"); nom.value = d.nom; nom.setAttribute("aria-label", "Nom de la dette"); nom.dataset.l = "dettes"; nom.dataset.i = i; nom.dataset.k = "nom";
-      const x = el("button", "supprimer", "×"); x.type = "button"; x.setAttribute("aria-label", "Supprimer : " + d.nom); x.dataset.suppr = "dettes"; x.dataset.i = i;
-      tete.append(nom, x);
-      const g = el("div", "item-grille");
-      for (const [k, lib, type, extra] of CHAMPS_DETTE) {
-        if (k === "limite" && d.type !== "marge") continue;
-        if ((k === "finTerme" || k === "tauxRenouvellement" || k === "privilege" || k === "dureeTerme") && d.type !== "hypotheque") continue;
-        if (k === "paiement" && d.interetsSeulement) continue;
-        if (k === "frequence" && d.interetsSeulement) continue;
-        const id = `d-${d.id}-${k}`;
-        const lab = el("label", "mini" + (type === "check" ? " case" : ""));
-        lab.htmlFor = id;
-        let inp;
-        if (type === "select") { inp = el("select"); extra.forEach(([v, t]) => { const o = el("option", null, t); o.value = v; inp.appendChild(o); }); inp.value = d[k]; }
-        else { inp = el("input"); inp.type = type === "check" ? "checkbox" : type; if (type === "number") { inp.step = extra; inp.min = "0"; inp.inputMode = "decimal"; } if (type === "check") inp.checked = !!d[k]; else inp.value = d[k] ?? ""; }
-        inp.id = id; inp.dataset.l = "dettes"; inp.dataset.i = i; inp.dataset.k = k;
-        if (type === "check") lab.append(inp, document.createTextNode(lib)); else lab.append(document.createTextNode(lib), inp);
-        g.appendChild(lab);
-      }
-      it.append(tete, g);
-      c.appendChild(it);
-    });
-  }
-  function listeEnfants() {
-    const c = document.getElementById("liste-enfants"); c.textContent = ""; c.className = "liste";
-    S.epargne.reee.enfants.forEach((e, i) => {
-      const it = el("div", "item");
-      const tete = el("div", "item-tete");
-      const nom = el("input"); nom.value = e.nom; nom.setAttribute("aria-label", "Nom ou surnom"); nom.dataset.l = "enfants"; nom.dataset.i = i; nom.dataset.k = "nom";
-      const x = el("button", "supprimer", "×"); x.type = "button"; x.setAttribute("aria-label", "Retirer : " + e.nom); x.dataset.suppr = "enfants"; x.dataset.i = i;
-      tete.append(nom, x);
-      const g = el("div", "item-grille");
-      [["age", "Âge", 1], ["solde", "Solde REEE ($)", 100]].forEach(([k, lib, st]) => {
-        const id = `e-${e.id}-${k}`;
-        const lab = el("label", "mini"); lab.htmlFor = id;
-        const inp = el("input"); inp.type = "number"; inp.step = st; inp.min = "0"; inp.inputMode = "decimal"; inp.value = e[k]; inp.id = id;
-        inp.dataset.l = "enfants"; inp.dataset.i = i; inp.dataset.k = k;
-        lab.append(document.createTextNode(lib), inp); g.appendChild(lab);
-      });
-      it.append(tete, g); c.appendChild(it);
-    });
-  }
+  // Champ d'une liste (dépense, dette, enfant) : lié par data-l, data-i et data-k.
+  const lierListe = (liste, i, k) => inp => { inp.dataset.l = liste; inp.dataset.i = i; inp.dataset.k = k; };
   const tableau = nom => nom === "enfants" ? S.epargne.reee.enfants : S[nom];
+
+  /* ============================================================
+     PANNEAU « MODIFIER » : glisse du bas (téléphone) ou de la droite
+     ============================================================ */
+  const feuille = document.getElementById("feuille"), corps = document.getElementById("feuille-corps"), titreFeuille = document.getElementById("feuille-titre");
+  let feuilleCourante = null;
+  function ouvrirFeuille(titre, construire) {
+    feuilleCourante = { titre, construire, maj: null };
+    titreFeuille.textContent = titre; corps.textContent = "";
+    construire(corps); remplirChamps();
+    if (!feuille.open) feuille.showModal();
+    corps.scrollTop = 0;
+  }
+  // Reconstruit le panneau ouvert (après un ajout, une suppression ou un changement de type).
+  function reconstruireFeuille() {
+    if (!feuilleCourante || !feuille.open) return;
+    const y = corps.scrollTop;
+    corps.textContent = ""; feuilleCourante.construire(corps); remplirChamps();
+    corps.scrollTop = y;
+  }
+  feuille.addEventListener("close", () => { feuilleCourante = null; corps.textContent = ""; tout(); });
+  feuille.addEventListener("click", e => { if (e.target === feuille) feuille.close(); });
+  document.getElementById("feuille-fermer").addEventListener("click", () => feuille.close());
+
+  const FEUILLES = {
+    revenu: ["Revenu GMF-U", CHAMPS.revenu],
+    impot: ["Impôt", CHAMPS.impot],
+    menage: ["Ménage et conjointe", CHAMPS.menage],
+    strategie: ["Plan de remboursement", CHAMPS.strategie],
+    epargne: ["Épargne et biens", CHAMPS.epargne],
+    hypotheses: ["Hypothèses de l'avenir", CHAMPS.hypotheses],
+  };
+  function ouvrirSection(nom) {
+    const [titre, champs] = FEUILLES[nom];
+    ouvrirFeuille(titre, c => construireChamps(c, champs));
+  }
+
+  // Une catégorie de dépenses : une ligne par dépense du catalogue.
+  function feuilleCategorie(g) {
+    ouvrirFeuille(g, c => {
+      const total = el("div", "feuille-total"); c.appendChild(total);
+      feuilleCourante.maj = () => {
+        const t = S.budget.filter(b => categorie(b) === g).reduce((a, b) => a + mensuel(b), 0);
+        total.textContent = ""; total.append(el("span", null, "Total par mois"), el("strong", null, $(t)));
+      };
+      feuilleCourante.maj();
+      c.appendChild(el("p", "aide", "Montant, période et qui paie. « Partagée » suit votre part des dépenses partagées (bouton Ménage du budget)." + (AIDE_CATEGORIE[g] ? " " + AIDE_CATEGORIE[g] : "")));
+      S.budget.forEach((b, i) => { if (categorie(b) === g) c.appendChild(ligneDepense(b, i)); });
+      if (g === "Autres dépenses") {
+        const a = el("div", "feuille-actions");
+        const bt = el("button", "bouton secondaire large", "Ajouter une dépense"); bt.type = "button";
+        bt.addEventListener("click", () => {
+          S.budget.push({ id: nouvelId("b"), k: null, nom: "Nouvelle dépense", montant: 0, periode: "mois", qui: "moi" });
+          sauver(); reconstruireFeuille(); tout();
+          const champs = corps.querySelectorAll('input[data-k="nom"]'); if (champs.length) { champs[champs.length - 1].focus(); champs[champs.length - 1].select(); }
+        });
+        a.appendChild(bt); c.appendChild(a);
+      }
+    });
+  }
+  function ligneDepense(b, i) {
+    const l = el("div", "ligne-depense" + (b.montant > 0 ? " remplie" : ""));
+    let nom;
+    if (b.k) { nom = el("label", null, nomDepense(b)); nom.htmlFor = `bu-${b.id}-montant`; }
+    else { nom = el("input"); nom.type = "text"; nom.value = b.nom; nom.setAttribute("aria-label", "Nom de la dépense"); lierListe("budget", i, "nom")(nom); }
+    const boiteM = el("div", "saisie");
+    const mnt = el("input"); mnt.type = "number"; mnt.step = "1"; mnt.min = "0"; mnt.inputMode = "decimal"; mnt.value = b.montant || ""; mnt.placeholder = "0";
+    mnt.id = `bu-${b.id}-montant`; lierListe("budget", i, "montant")(mnt);
+    if (!b.k) mnt.setAttribute("aria-label", "Montant : " + b.nom);
+    boiteM.append(mnt, el("span", "unite", "$"));
+    const boiteP = el("div", "saisie");
+    const per = el("select"); [["mois", "/ mois"], ["an", "/ an"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; per.appendChild(o); });
+    per.value = b.periode; per.setAttribute("aria-label", "Période : " + nomDepense(b)); lierListe("budget", i, "periode")(per);
+    boiteP.appendChild(per);
+    const boiteQ = el("div", "saisie");
+    const qui = el("select"); [["moi", "Moi"], ["commun", "Partagée"], ["conjoint", S.conjointe.active ? "Conjointe" : "Autre"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; qui.appendChild(o); });
+    qui.value = b.qui; qui.setAttribute("aria-label", "Qui paie : " + nomDepense(b)); lierListe("budget", i, "qui")(qui);
+    boiteQ.appendChild(qui);
+    l.append(nom, boiteM, boiteP, boiteQ);
+    if (!b.k) { const x = el("button", "supprimer", "×"); x.type = "button"; x.setAttribute("aria-label", "Supprimer : " + b.nom); x.dataset.suppr = "budget"; x.dataset.i = i; l.appendChild(x); }
+    else l.appendChild(el("span"));
+    return l;
+  }
+
+  const CHAMPS_DETTE = [
+    { k: "type", l: "Type", t: "select", o: [["marge", "Marge de crédit"], ["hypotheque", "Hypothèque"], ["pret", "Prêt"], ["autre", "Autre"]] },
+    { k: "solde", l: "Solde", u: "$", s: 100 },
+    { k: "taux", l: "Taux", u: "%", s: 0.01 },
+    { k: "interetsSeulement", l: "Intérêts seulement chaque mois", t: "check" },
+    { k: "paiement", l: "Paiement", u: "$", s: 0.01, sauf: d => d.interetsSeulement },
+    { k: "frequence", l: "Fréquence des paiements", t: "select", o: [["mois", "Chaque mois"], ["2sem", "Aux 2 semaines"]], sauf: d => d.interetsSeulement },
+    { k: "limite", l: "Limite de crédit", u: "$", s: 100, seul: "marge" },
+    { k: "finTerme", l: "Fin du terme", t: "date", seul: "hypotheque" },
+    { k: "tauxRenouvellement", l: "Taux au renouvellement", u: "%", s: 0.01, seul: "hypotheque" },
+    { k: "dureeTerme", l: "Durée des termes suivants", u: "ans", s: 1, seul: "hypotheque" },
+    { k: "privilege", l: "Remboursement anticipé permis", u: "%/an", s: 1, seul: "hypotheque" },
+    { k: "creditImpot", l: "Crédit d'impôt sur les intérêts", u: "%", s: 1, h: "34 % pour un prêt de l'aide financière aux études : 14 % fédéral et 20 % Québec." },
+    { k: "partMoi", l: "Part de la dette qui vous revient", u: "%", s: 1 },
+    { k: "paiementMoi", l: "Part des paiements que vous faites", u: "%", s: 1 },
+  ];
+  function feuilleDette(i) {
+    ouvrirFeuille(S.dettes[i].nom || "Dette", c => {
+      const d = S.dettes[i];
+      const nom = el("input", "nom-element"); nom.type = "text"; nom.value = d.nom; nom.setAttribute("aria-label", "Nom de la dette"); lierListe("dettes", i, "nom")(nom);
+      const g = el("div", "groupe"); g.appendChild(nom); c.appendChild(g);
+      for (const ch of CHAMPS_DETTE) {
+        if (ch.seul && d.type !== ch.seul) continue;
+        if (ch.sauf && ch.sauf(d)) continue;
+        const ligne = creerChamp(ch, `d-${d.id}-${ch.k}`, lierListe("dettes", i, ch.k), false);
+        const inp = ligne.querySelector("input, select");
+        if (inp.type === "checkbox") inp.checked = !!d[ch.k]; else inp.value = d[ch.k] ?? "";
+        c.appendChild(ligne);
+      }
+      const a = el("div", "feuille-actions");
+      const x = el("button", "bouton danger large", "Supprimer cette dette"); x.type = "button"; x.dataset.suppr = "dettes"; x.dataset.i = i;
+      a.appendChild(x); c.appendChild(a);
+    });
+  }
+  function feuilleEnfant(i) {
+    ouvrirFeuille(S.epargne.reee.enfants[i].nom || "Enfant", c => {
+      const e = S.epargne.reee.enfants[i];
+      const nom = el("input", "nom-element"); nom.type = "text"; nom.value = e.nom; nom.setAttribute("aria-label", "Nom ou surnom"); lierListe("enfants", i, "nom")(nom);
+      const g = el("div", "groupe"); g.appendChild(nom); c.appendChild(g);
+      [{ k: "age", l: "Âge", u: "ans", s: 1 }, { k: "solde", l: "Solde du REEE", u: "$", s: 100 }].forEach(ch => {
+        const ligne = creerChamp(ch, `e-${e.id}-${ch.k}`, lierListe("enfants", i, ch.k), false);
+        ligne.querySelector("input").value = e[ch.k];
+        c.appendChild(ligne);
+      });
+      c.appendChild(el("p", "aide", "L'âge sert aussi au calcul des allocations familiales et de la prime d'assurance médicaments."));
+      const a = el("div", "feuille-actions");
+      const x = el("button", "bouton danger large", "Retirer cet enfant"); x.type = "button"; x.dataset.suppr = "enfants"; x.dataset.i = i;
+      a.appendChild(x); c.appendChild(a);
+    });
+  }
 
   /* ============================================================
      CALCULS
      ============================================================ */
   const mensuel = b => b.periode === "an" ? b.montant / 12 : b.montant;
+  const ANNEES = 20;
+  const SCENARIOS = { prudent: "Prudent", realiste: "Réaliste", optimiste: "Optimiste" };
   const minimumDette = d => d.interetsSeulement ? d.solde * d.taux / 100 / 12 : (d.frequence === "2sem" ? d.paiement * 26 / 12 : d.paiement);
 
   function calculer() {
@@ -547,25 +593,53 @@
     R.revenusMenage = R.netMoi + R.netConjointe + S.menage.autresRevenusMensuels;
     R.surplusMenage = R.revenusMenage - R.depMenage - R.dettesMenage - R.epargneMoi;
 
-    // Dettes
-    R.extra = S.strategie.extraMode === "manuel" ? S.strategie.extraManuel : Math.max(0, R.surplusMoi);
+    // Années suivantes : la première année de pratique fait place à une année type
+    // (clientèle complète toute l'année), puis les revenus et les dépenses évoluent
+    // selon le scénario.
+    R.gmfuType = S.revenu.annee === "premiere" ? C.revenuGmfu({ ...S.revenu, annee: "type" }) : R.gmfu;
+    const impType = avec(C.impotParticulier({ ...base, revenu: R.gmfuType[mode].total }))[0];
+    R.travailMoiType = (impType.net - S.impot.depensesPro - R.primeMoi) / 12;
+    R.scenario = SCENARIOS[S.scenarios.choisi] ? S.scenarios.choisi : "realiste";
+    R.hyp = S.scenarios[R.scenario];
+    // Surplus de l'année a (0 = cette année), qui va sur les dettes.
+    const surplusAnnee = h => a => {
+      if (S.strategie.extraMode === "manuel") return S.strategie.extraManuel;
+      const travail = a === 0 ? R.travailMoi : R.travailMoiType * Math.pow(1 + h.hausseRevenus / 100, a);
+      return travail + R.allocMoi - R.depMoi * Math.pow(1 + h.inflation / 100, a) - R.dettesMoi - R.epargneMoi;
+    };
+    R.surplusAnnee = surplusAnnee(R.hyp);
+
+    // Dettes : simulation prolongée jusqu'à l'horizon pour suivre l'argent libéré.
+    R.extra = Math.max(0, R.surplusAnnee(0));
     const forfaits = S.strategie.reerSurDettes ? R.remboursementReer : 0;
-    const opt = m => ({ debut: S.strategie.debut, methode: m, extraMensuel: R.extra, forfaitsAnnuels: forfaits, moisForfait: 3 });
+    const opt = (h, m) => ({ debut: S.strategie.debut, methode: m, extraParAnnee: surplusAnnee(h), ecartTaux: h.ecartTaux,
+      forfaitsAnnuels: forfaits, moisForfait: 3, continuerApres: 12 * ANNEES, moisMax: 12 * Math.max(40, ANNEES) });
     R.sims = {};
-    for (const m of ["avalanche", "boule", "minimum"]) R.sims[m] = C.simulerDettes(S.dettes, opt(m));
-    R.sim = R.sims[S.strategie.methode] || R.sims.avalanche;
+    for (const m of ["avalanche", "boule", "minimum"]) R.sims[m] = C.simulerDettes(S.dettes, opt(R.hyp, m));
+    const methode = R.sims[S.strategie.methode] ? S.strategie.methode : "avalanche";
+    R.sim = R.sims[methode];
     R.detteTotale = S.dettes.reduce((a, d) => a + d.solde, 0);
 
-    // Valeur nette sur 20 ans
-    const budgetDettes = S.strategie.methode === "minimum" ? 0 : R.dettesMoi + R.extra;
-    R.projection = C.projeterValeurNette({
-      annees: 20, anneeDepart: +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear(),
-      rendement: S.epargne.rendement, reer: S.epargne.reer, celi: S.epargne.celi, encaisse: S.epargne.encaisse,
-      maison: { ...S.actifs.maison, partMenage: S.actifs.maison.part + (R.couple ? S.conjointe.partMaison : 0) },
-      voiture: S.actifs.voiture, actifsConjoint: R.couple ? S.conjointe.epargne : 0,
-      dettes: S.dettes, extraApresDettes: budgetDettes,
-    }, R.sim);
-    R.reee = C.projeterReee({ enfants: S.epargne.reee.enfants, cotisationAnnuelle: S.epargne.reee.cotisationAnnuelle }, S.epargne.rendement / 100);
+    // Valeur nette : maison (sa valeur croît, l'hypothèque payée devient de l'équité), autos, placements.
+    const projeter = (h, sim) => C.projeterValeurNette({
+      annees: ANNEES, anneeDepart: +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear(),
+      rendement: h.rendement, reer: S.epargne.reer, celi: S.epargne.celi, encaisse: S.epargne.encaisse,
+      maison: { ...S.actifs.maison, croissance: h.croissanceMaison, partMenage: S.actifs.maison.part + (R.couple ? S.conjointe.partMaison : 0) },
+      voitures: [{ valeur: S.actifs.voiture.valeur, depreciation: h.depreciationAuto },
+        ...(R.couple && S.conjointe.voiture > 0 ? [{ valeur: S.conjointe.voiture, depreciation: h.depreciationAuto, conjointe: true }] : [])],
+      actifsConjoint: R.couple ? S.conjointe.epargne : 0, dettes: S.dettes,
+      ajoutMensuel: methode === "minimum" ? surplusAnnee(h) : null,
+    }, sim);
+    R.projections = {}; R.libres = {};
+    for (const k of Object.keys(SCENARIOS)) {
+      const sim = k === R.scenario ? R.sim : C.simulerDettes(S.dettes, opt(S.scenarios[k], methode));
+      R.projections[k] = projeter(S.scenarios[k], sim);
+      R.libres[k] = sim.libre;
+    }
+    R.projection = R.projections[R.scenario];
+    // Dollars d'aujourd'hui : on retire l'inflation du scénario choisi.
+    R.deflateur = a => S.scenarios.dollarsAujourdhui ? Math.pow(1 + R.hyp.inflation / 100, a) : 1;
+    R.reee = C.projeterReee({ enfants: S.epargne.reee.enfants, cotisationAnnuelle: S.epargne.reee.cotisationAnnuelle }, R.hyp.rendement / 100);
 
     // Société : le ménage a besoin de vous de quoi couvrir votre part.
     R.besoinNet = Math.max(0, (R.depMoi + R.dettesMoi + R.extra + (enfants * S.epargne.reee.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle) / 12) * 12);
@@ -575,7 +649,110 @@
   }
 
   /* ============================================================
-     GRAPHIQUE EN LIGNES, avec réticule et bulle
+     PETITS COMPOSANTS
+     ============================================================ */
+  const NS = "http://www.w3.org/2000/svg";
+  const ICONES = {
+    chevron: '<path d="m9 6 6 6-6 6"/>',
+    haut: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+    bas: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    alerte: '<path d="M12 7v6M12 16.5h.01"/>',
+    info: '<path d="M12 11v6M12 7.5h.01"/>',
+    ok: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  };
+  function icone(nom, cls) {
+    const s = document.createElementNS(NS, "svg");
+    s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("aria-hidden", "true");
+    if (cls) s.setAttribute("class", cls);
+    s.innerHTML = ICONES[nom];
+    return s;
+  }
+  // Le chiffre principal d'une page, avec une ligne de contexte en dessous.
+  function hero(id, etiquette, valeur, sous) {
+    const h = document.getElementById(id); h.textContent = "";
+    h.append(el("div", "hero-etiquette", etiquette), el("div", "hero-valeur", valeur));
+    const s = el("div", "hero-sous");
+    (sous || []).filter(Boolean).forEach(x => s.appendChild(typeof x === "string" ? el("span", null, x) : x));
+    if (s.childNodes.length) h.appendChild(s);
+    return h;
+  }
+  // Pastille : flèche selon le sens, vert si c'est une bonne nouvelle, rouge sinon.
+  function puce(texte, sens, bon) {
+    const p = el("span", "puce" + (bon === true ? " bon" : bon === false ? " mauvais" : ""));
+    if (sens) p.appendChild(icone(sens));
+    p.appendChild(document.createTextNode(texte));
+    return p;
+  }
+  // Une rangée de liste : pastille de couleur ou icône, titre, sous-titre, valeur ; un chevron si on peut la toucher.
+  function rangee(o) {
+    const r = el(o.action ? "button" : "div", "rangee" + (o.cls ? " " + o.cls : ""));
+    if (o.action) { r.type = "button"; r.addEventListener("click", o.action); }
+    if (o.couleur || o.ico) {
+      const i = el("span", "rangee-ico" + (o.couleur ? " couleur" : ""));
+      if (o.couleur) { const k = el("i"); k.style.background = o.couleur; i.appendChild(k); }
+      else if (ICONES[o.ico]) i.appendChild(icone(o.ico));
+      else i.textContent = o.ico;
+      r.appendChild(i);
+    }
+    const t = el("span", "rangee-texte");
+    t.appendChild(el("span", "rangee-titre", o.titre));
+    if (o.sous) t.appendChild(el("span", "rangee-sous", o.sous));
+    r.appendChild(t);
+    if (o.valeur !== undefined) {
+      const d = el("span", "rangee-droite");
+      d.appendChild(el("span", "rangee-valeur" + (o.valeurCls ? " " + o.valeurCls : ""), o.valeur));
+      if (o.valeurSous) d.appendChild(el("span", "rangee-valeur-sous", o.valeurSous));
+      r.appendChild(d);
+    }
+    if (o.action) r.appendChild(icone("chevron", "chevron"));
+    return r;
+  }
+  function rangees(cible, liste) {
+    const c = typeof cible === "string" ? document.getElementById(cible) : cible;
+    c.textContent = ""; c.classList.add("rangees");
+    liste.filter(Boolean).forEach(x => c.appendChild(rangee(x)));
+    return c;
+  }
+  // Contrôle segmenté (boutons radio) ; garde les mêmes boutons d'un rendu à l'autre pour ne pas perdre le focus.
+  function segment(id, options, valeur, surChoix, etiquette) {
+    const c = document.getElementById(id);
+    const cle = options.map(o => o.join(":")).join("|");
+    if (c.dataset.cle !== cle) {
+      c.textContent = ""; c.dataset.cle = cle;
+      c.setAttribute("role", "radiogroup"); c.setAttribute("aria-label", etiquette);
+      options.forEach(([v, t]) => { const b = el("button", null, t); b.type = "button"; b.setAttribute("role", "radio"); b.dataset.v = v; c.appendChild(b); });
+      c.onclick = e => { const b = e.target.closest("button"); if (b) c.surChoix(b.dataset.v); };
+      c.onkeydown = e => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        const bs = [...c.querySelectorAll("button")], i = bs.findIndex(b => b.getAttribute("aria-checked") === "true");
+        const j = (i + (e.key === "ArrowRight" ? 1 : -1) + bs.length) % bs.length;
+        e.preventDefault(); c.surChoix(bs[j].dataset.v); bs[j].focus();
+      };
+    }
+    c.surChoix = surChoix;
+    c.querySelectorAll("button").forEach(b => { const on = b.dataset.v === valeur; b.setAttribute("aria-checked", on ? "true" : "false"); b.tabIndex = on ? 0 : -1; });
+  }
+  // Préférence d'affichage enregistrée (mode, méthode) : pas une donnée saisie.
+  function changer(p, v) { ecrire(p, v); sauver(); remplirChamps(); tout(); }
+  // Vues qui ne changent pas les données : budget de qui, valeur nette de qui.
+  const U = { vueBudget: "moi", vueAvenir: "moi" };
+  function tableauSimple(parent, entetes, lignesT) {
+    const t = el("table", "tableau"); lignes(t, entetes, lignesT);
+    const w = el("div", "tableau-defile"); w.appendChild(t); parent.appendChild(w); return t;
+  }
+  function lignes(table, entetes, rangeesT) {
+    table.textContent = "";
+    if (entetes) { const th = el("thead"); const tr = el("tr"); entetes.forEach(h => tr.appendChild(el("th", null, h))); th.appendChild(tr); table.appendChild(th); }
+    const tb = el("tbody");
+    rangeesT.forEach(r => { const tr = el("tr", r.cls || null); r.cellules.forEach((c, i) => tr.appendChild(el("td", r.classes && r.classes[i] || null, c))); tb.appendChild(tr); });
+    table.appendChild(tb);
+  }
+  const moins = v => $(v > 0.5 ? -v : 0);  // évite « -0 $ »
+  const signePct = v => (v >= 0 ? "+" : "−") + nb(Math.abs(v), 1) + " %";
+
+  /* ============================================================
+     GRAPHIQUE EN LIGNES : réticule, et bulle ou chiffre principal qui suit
      ============================================================ */
   function pasJoli(x) {
     if (x <= 0) return 1;
@@ -583,15 +760,19 @@
     return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
   }
   function graphiqueLignes(boite, legende, series, etiquettesX, options) {
-    legende.textContent = "";
-    series.forEach(s => { const sp = el("span"); const i = el("i"); i.style.background = s.couleur; sp.append(i, document.createTextNode(s.nom)); legende.appendChild(sp); });
-    const W = Math.max(280, boite.clientWidth || 600), H = options.hauteur || 260;
-    const m = { l: 56, r: 10, t: 10, b: 28 };
+    if (legende) {
+      legende.textContent = ""; legende.classList.add("lignes");
+      const entrees = options.legende || (series.length > 1 ? series.map(s => ({ nom: s.nom, couleur: s.couleur })) : []);
+      entrees.forEach(s => { const sp = el("span"); const i = el("i", s.zone ? "zone" : null); i.style.background = s.couleur; sp.append(i, document.createTextNode(s.nom)); legende.appendChild(sp); });
+    }
+    const W = Math.max(260, boite.clientWidth || 600), H = options.hauteur || (W < 480 ? 210 : 250);
+    const m = { l: 50, r: 8, t: 10, b: 26 };
     const iw = W - m.l - m.r, ih = H - m.t - m.b, n = etiquettesX.length;
-    let min = Math.min(0, ...series.flatMap(s => s.valeurs)), max = Math.max(1, ...series.flatMap(s => s.valeurs));
+    const tous = series.flatMap(s => s.valeurs).concat(options.bande ? [...options.bande.bas, ...options.bande.haut] : []);
+    let min = Math.min(0, ...tous), max = Math.max(1, ...tous);
     const pas = pasJoli((max - min) / 4);
     min = Math.floor(min / pas) * pas; max = Math.ceil(max / pas) * pas;
-    const axe = v => pas < 10000 ? nb(v / 1000, 1) + " k$" : k$(v);
+    const axe = v => Math.abs(v) < 1e-6 ? "0 $" : Math.abs(v) >= 1e6 ? nb(v / 1e6, 1) + " M$" : pas < 10000 ? nb(v / 1000, 1) + " k$" : k$(v);
     const x = i => m.l + (n <= 1 ? iw / 2 : (i / (n - 1)) * iw);
     const y = v => m.t + ih - ((v - min) / (max - min)) * ih;
     let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${options.titre}">`;
@@ -600,15 +781,22 @@
       s += `<line class="${Math.abs(v) < 1e-6 ? "base" : "grille"}" x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}"/>`;
       s += `<text class="etiquette" x="${m.l - 8}" y="${yy}" dy="0.32em" text-anchor="end">${axe(v)}</text>`;
     }
-    const chaque = Math.max(1, Math.ceil(n / Math.floor(iw / 48)));
-    etiquettesX.forEach((t, i) => { if (i % chaque === 0 || i === n - 1) s += `<text class="etiquette" x="${x(i)}" y="${H - 8}" text-anchor="middle">${t}</text>`; });
+    const chaque = Math.max(1, Math.ceil(n / Math.floor(iw / 44)));
+    etiquettesX.forEach((t, i) => { if (i % chaque === 0 && (n - 1 - i >= chaque / 2 || i === n - 1) || i === n - 1) s += `<text class="etiquette" x="${x(i)}" y="${H - 6}" text-anchor="${i === n - 1 ? "end" : i === 0 ? "start" : "middle"}">${t}</text>`; });
+    if (options.bande) {
+      const { bas, haut, couleur } = options.bande;
+      const d = haut.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("") +
+        bas.map((v, i) => [i, v]).reverse().map(([i, v]) => `L${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("") + "Z";
+      s += `<path class="bande" d="${d}" style="fill:${couleur}"/>`;
+    }
     series.forEach(se => {
       const d = se.valeurs.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+      if (options.aire && series.length === 1) s += `<path class="aire" d="${d}L${x(n - 1).toFixed(1)},${y(Math.max(min, 0)).toFixed(1)}L${x(0).toFixed(1)},${y(Math.max(min, 0)).toFixed(1)}Z" style="fill:${se.couleur}"/>`;
       s += `<path class="serie" d="${d}" style="stroke:${se.couleur}"/>`;
     });
-    s += `<line class="reticule" id="${boite.id}-ret" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" visibility="hidden"/>`;
-    series.forEach((se, j) => { s += `<circle class="point" r="4" cx="0" cy="0" visibility="hidden" data-j="${j}" style="fill:${se.couleur}"/>`; });
-    s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" tabindex="0" data-zone="1" aria-label="${options.titre} : survolez pour les valeurs"/>`;
+    s += `<line class="reticule" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" visibility="hidden"/>`;
+    series.forEach((se, j) => { s += `<circle class="point" r="5" cx="0" cy="0" visibility="hidden" data-j="${j}" style="fill:${se.couleur}"/>`; });
+    s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" tabindex="0" data-zone="1" aria-label="${options.titre} : glissez ou utilisez les flèches pour les valeurs"/>`;
     s += "</svg>";
     boite.innerHTML = s;
     const bulle = el("div", "bulle"); bulle.hidden = true; boite.appendChild(bulle);
@@ -617,6 +805,7 @@
       i = Math.max(0, Math.min(n - 1, i));
       ret.setAttribute("x1", x(i)); ret.setAttribute("x2", x(i)); ret.setAttribute("visibility", "visible");
       points.forEach(p => { const se = series[+p.dataset.j]; p.setAttribute("cx", x(i)); p.setAttribute("cy", y(se.valeurs[i])); p.setAttribute("visibility", "visible"); });
+      if (options.surPoint) { options.surPoint(i); return; }
       bulle.textContent = "";
       bulle.appendChild(el("div", "titre", options.titreX ? options.titreX(i) : etiquettesX[i]));
       series.forEach(se => { const r = el("div", "rang"); const k = el("i"); k.style.background = se.couleur; r.append(k, el("strong", null, $(se.valeurs[i])), el("span", null, se.nom)); bulle.appendChild(r); });
@@ -625,30 +814,22 @@
       let g = x(i) + 12; if (g + bw > W) g = x(i) - bw - 12;
       bulle.style.transform = `translate(${Math.max(0, g)}px, 6px)`;
     }
-    const cacher = () => { bulle.hidden = true; ret.setAttribute("visibility", "hidden"); points.forEach(p => p.setAttribute("visibility", "hidden")); };
+    const cacher = () => { bulle.hidden = true; ret.setAttribute("visibility", "hidden"); points.forEach(p => p.setAttribute("visibility", "hidden")); if (options.surPoint) options.surPoint(null); };
     let courant = n - 1;
-    zone.addEventListener("pointermove", e => { const r = svg.getBoundingClientRect(); const px = (e.clientX - r.left) * (W / r.width); courant = Math.round(((px - m.l) / iw) * (n - 1)); montrer(courant); });
+    const suivre = e => { const r = svg.getBoundingClientRect(); const px = (e.clientX - r.left) * (W / r.width); courant = Math.round(((px - m.l) / iw) * (n - 1)); montrer(courant); };
+    zone.addEventListener("pointerdown", suivre);
+    zone.addEventListener("pointermove", suivre);
     zone.addEventListener("pointerleave", cacher);
+    zone.addEventListener("pointercancel", cacher);
     zone.addEventListener("focus", () => montrer(courant));
     zone.addEventListener("blur", cacher);
     zone.addEventListener("keydown", e => { if (e.key === "ArrowRight") { courant = Math.min(n - 1, courant + 1); montrer(courant); } if (e.key === "ArrowLeft") { courant = Math.max(0, courant - 1); montrer(courant); } });
   }
-
-  /* ============================================================
-     RENDUS
-     ============================================================ */
-  const tuile = (titre, valeur, sous) => { const t = el("div", "tuile"); t.append(el("div", "tuile-titre", titre), el("div", "tuile-valeur", valeur)); if (sous) t.appendChild(el("div", "tuile-sous", sous)); return t; };
-  function lignes(table, entetes, rangees) {
-    table.textContent = "";
-    if (entetes) { const th = el("thead"); const tr = el("tr"); entetes.forEach(h => tr.appendChild(el("th", null, h))); th.appendChild(tr); table.appendChild(th); }
-    const tb = el("tbody");
-    rangees.forEach(r => { const tr = el("tr", r.cls || null); r.cellules.forEach((c, i) => { const td = el("td", r.classes && r.classes[i] || null, c); tr.appendChild(td); }); tb.appendChild(tr); });
-    table.appendChild(tb);
-  }
   // Séries annuelles des soldes de dettes (janvier de chaque année).
   function seriesDettes(sim, cumul) {
-    const pts = sim.mois.filter((m, i) => i === 0 || m.date.getMonth() === 0);
-    const fin = sim.mois[sim.mois.length - 1];
+    const mois = sim.iLibre >= 0 ? sim.mois.slice(0, sim.iLibre + 1) : sim.mois;
+    const pts = mois.filter((m, i) => i === 0 || m.date.getMonth() === 0);
+    const fin = mois[mois.length - 1];
     // Le dernier mois remplace le janvier de la même année, pour ne pas répéter l'année sur l'axe.
     if (pts[pts.length - 1] !== fin) { if (pts[pts.length - 1].date.getFullYear() === fin.date.getFullYear()) pts[pts.length - 1] = fin; else pts.push(fin); }
     const etiquettes = pts.map(p => String(p.date.getFullYear()));
@@ -656,51 +837,104 @@
     return { etiquettes, series: S.dettes.map((d, j) => ({ nom: d.nom, couleur: SERIES[j % SERIES.length], valeurs: pts.map(p => p.soldes[j]) })), pts };
   }
 
+  /* ============================================================
+     RENDUS
+     ============================================================ */
+  const NOM_MODE = { horaire: "Taux horaire", mixte: "Taux mixte" };
+  const choixMode = id => segment(id, [["horaire", "Taux horaire"], ["mixte", "Taux mixte"]], R.mode, v => changer("revenu.modeBudget", v), "Mode de rémunération utilisé");
+
   function rendreApercu(R) {
+    document.getElementById("ap-exemple").hidden = !S.meta.exemple;
+    hero("ap-hero", "Votre surplus mensuel", $(R.surplusMoi), [
+      R.surplusMoi >= 0 ? `Sur un revenu net de ${$(R.netMoi)} par mois` : puce("Vos sorties dépassent vos revenus", "bas", false),
+    ]);
+
+    // Ce mois-ci : où va votre revenu net.
+    const flux = document.getElementById("ap-flux"); flux.textContent = "";
+    const parts = [["Dépenses", R.depMoi, SERIES[0]], ["Paiements de dettes", R.dettesMoi, SERIES[1]], ["Épargne", R.epargneMoi, SERIES[2]], ["Surplus", Math.max(0, R.surplusMoi), SERIES[3]]];
+    const barre = el("div", "flux-barre");
+    barre.setAttribute("role", "img");
+    barre.setAttribute("aria-label", parts.map(([n, v]) => `${n} ${$(v)}`).join(", "));
+    parts.forEach(([n, v, c]) => { if (v > 0) { const sp = el("span"); sp.style.flex = `${v} 0 0`; sp.style.background = c; sp.title = `${n} : ${$(v)}`; barre.appendChild(sp); } });
+    flux.appendChild(barre);
+    if (R.surplusMoi < 0) { const mq = el("p", "flux-manque"); mq.append(icone("alerte"), document.createTextNode(`Il manque ${$(-R.surplusMoi)} par mois.`)); flux.appendChild(mq); }
+    const base = Math.max(1, R.netMoi);
+    flux.appendChild(rangees(el("div"), [
+      ...parts.map(([n, v, c]) => ({ titre: n, couleur: c, valeur: $(v), valeurSous: pct(v / base, 0) + " du revenu" })),
+      { titre: "Revenu net", cls: "total", valeur: $(R.netMoi) },
+    ]));
+
     const t = document.getElementById("ap-tuiles"); t.textContent = "";
-    const nomMode = R.mode === "mixte" ? "taux mixte" : "taux horaire";
+    const tuileLien = (onglet, titre, valeur, sous) => {
+      const a = el("a", "tuile"); a.href = "#" + onglet;
+      a.append(el("div", "tuile-titre", titre), el("div", "tuile-valeur", valeur));
+      if (sous) a.appendChild(el("div", "tuile-sous", sous));
+      return a;
+    };
+    const p = R.projection, dix = p[Math.min(10, p.length - 1)];
     t.append(
-      tuile("Revenu brut de l'année", $(R.brut), `Au ${nomMode}`),
-      tuile("Net après impôt", $(R.impot.net), `${$(R.impot.net / 12)} par mois`),
-      tuile("Votre surplus mensuel", $(R.surplusMoi), R.surplusMoi >= 0 ? "Après dépenses, dettes et épargne" : "Vos dépenses dépassent vos revenus"),
-      tuile("Dettes", $(R.detteTotale), R.sim.libre ? `Remboursées en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
-      tuile("Votre valeur nette", $(R.projection[0].moi), `Dans 10 ans : ${$(R.projection[Math.min(10, R.projection.length - 1)].moi)}`),
+      tuileLien("revenu", "Revenu brut", $(R.brut), NOM_MODE[R.mode]),
+      tuileLien("impot", "Net après impôt", $(R.impot.net), `${$(R.impot.net / 12)} par mois`),
+      tuileLien("budget", "Dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
+      tuileLien("avenir", "Valeur nette", $(p[0].moi), `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}`),
     );
+
     const a = document.getElementById("ap-actions"); a.textContent = "";
-    const action = (type, texte) => { const li = el("li"); li.append(el("span", "ico " + type, type === "important" ? "!" : type === "bon" ? "✓" : "i"), el("span", null, texte)); a.appendChild(li); };
+    const action = (type, texte) => {
+      const li = el("li"); const ico = el("span", "ico " + type);
+      ico.appendChild(icone(type === "important" ? "alerte" : type === "bon" ? "ok" : "info"));
+      const lib = el("span", "visuellement-cache", type === "important" ? "Important : " : type === "bon" ? "Bien : " : "À noter : ");
+      const txt = el("span"); txt.append(lib, document.createTextNode(texte));
+      li.append(ico, txt); a.appendChild(li);
+    };
     action("important", `Mettez ${pct(R.impot.total / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$(R.impot.total / 12)} par mois.`);
     if (S.revenu.annee === "premiere") action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total)} seront à payer d'un coup le 30 avril.`);
+    if (R.couple && !S.conjointe.salaire) action("important", "Inscrivez le salaire brut de votre conjointe (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.");
+    if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
+      action("info", `Confirmez qui est couvert par le régime public d'assurance médicaments : la prime, jusqu'à 766 $ par adulte en 2026, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
     const auj = new Date(S.strategie.debut + "-01T00:00:00");
     S.dettes.filter(d => d.type === "hypotheque" && d.finTerme).forEach(d => {
       const f = new Date(d.finTerme + "T00:00:00"); const mois = (f - auj) / 2.63e9;
       if (mois >= 0 && mois <= 18) action("info", `Renouvellement de « ${d.nom} » le ${f.toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" })} : versez un montant forfaitaire sans pénalité si possible, et ne rallongez pas l'amortissement.`);
     });
     S.dettes.filter(d => d.type === "marge" && d.limite > 0).forEach(d => action("info", `Disponible sur « ${d.nom} » : ${$(d.limite - d.solde)}. Gardez cet espace comme fonds d'urgence plutôt que de l'argent qui dort.`));
-    if (R.couple && !S.conjointe.salaire) action("important", "Inscrivez le salaire brut de votre conjointe (onglet Budget et dettes) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.");
-    if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
-      action("info", `Confirmez qui est couvert par le régime public d'assurance médicaments : la prime, jusqu'à 766 $ par adulte en 2026, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
-    const enfantsSousMax = S.epargne.reee.enfants.filter(e => e.age < 17).length > 0 && S.epargne.reee.cotisationAnnuelle < 2500;
-    if (enfantsSousMax) action("info", "Cotisez 2 500 $ par enfant par année au REEE pour obtenir toutes les subventions (30 %).");
+    if (S.epargne.reee.enfants.filter(e => e.age < 17).length > 0 && S.epargne.reee.cotisationAnnuelle < 2500) action("info", "Cotisez 2 500 $ par enfant par année au REEE pour obtenir toutes les subventions (30 %).");
     if (S.epargne.reer.droits > 0 && S.epargne.reer.cotisationAnnuelle === 0) action("info", `Vous avez ${$(S.epargne.reer.droits)} de droits REER. À votre taux marginal de ${pct(R.tauxMarginal, 0)}, chaque 1 000 $ cotisés vous remet environ ${$(R.tauxMarginal * 1000)}.`);
     if (R.surplusMoi < 0) action("important", `Votre budget est négatif de ${$(-R.surplusMoi)} par mois : revoyez les dépenses ou leur partage.`);
     else action("bon", `Votre surplus de ${$(R.surplusMoi)} par mois va sur les dettes, dans l'ordre de la méthode choisie.`);
-    const sd = seriesDettes(R.sim, false);
-    graphiqueLignes(document.getElementById("ap-graph-dettes"), document.getElementById("ap-legende-dettes"), sd.series, sd.etiquettes, { titre: "Soldes des dettes par année" });
+
+    document.getElementById("ap-dettes-sous").textContent = R.sim.libre
+      ? `De ${$(R.detteTotale)} aujourd'hui à zéro en ${moisAn(R.sim.libre)}.`
+      : "À ce rythme, la marge de crédit n'est jamais remboursée.";
+    const sd = seriesDettes(R.sim, true);
+    graphiqueLignes(document.getElementById("ap-graph-dettes"), null, sd.series, sd.etiquettes, { titre: "Total des dettes par année", aire: true });
   }
 
   function rendreRevenu(R) {
-    const g = R.gmfu;
-    const comp = document.getElementById("rv-comparaison"); comp.textContent = "";
-    [["horaire", "Taux horaire", SERIES[1]], ["mixte", "Taux mixte", SERIES[0]]].forEach(([k, nom, coul]) => {
-      const b = el("div", "mode" + (R.mode === k ? " choisi" : ""));
-      const n = el("div", "mode-nom"); const p = el("span", "pastille"); p.style.background = coul; n.append(p, document.createTextNode(nom));
-      b.append(n, el("div", "tuile-valeur", $(g[k].total)), el("div", "tuile-sous", `Net après impôt : ${$(R.impots[k].net)}`));
-      if (R.mode === k) b.appendChild(el("span", "pill", "Utilisé dans le budget"));
+    const g = R.gmfu, autre = R.mode === "mixte" ? "horaire" : "mixte";
+    choixMode("rv-mode");
+    const diff = g[R.mode].total - g[autre].total;
+    hero("rv-hero", "Revenu brut de l'année", $(g[R.mode].total), [
+      `Net après impôt : ${$(R.impots[R.mode].net)}`,
+      puce(`${signe(diff)} par rapport au ${NOM_MODE[autre].toLowerCase()}`, diff >= 0 ? "haut" : "bas", diff >= 0),
+    ]);
+
+    const comp = document.getElementById("rv-comparaison"); comp.textContent = ""; comp.className = "barres";
+    const max = Math.max(g.horaire.total, g.mixte.total, 1);
+    ["horaire", "mixte"].forEach(k => {
+      const b = el("div", "barre-bloc");
+      const tete = el("div", "barre-tete");
+      const nom = el("span", "barre-nom", NOM_MODE[k]);
+      if (R.mode === k) nom.appendChild(el("span", "etiquette-choix", "Utilisé dans le budget"));
+      tete.append(nom, el("span", "barre-total", $(g[k].total)));
+      const piste = el("div", "barre-piste"); const barre = el("div", "barre");
+      const sp = el("span"); sp.style.background = R.mode === k ? "var(--encre)" : "var(--trait)"; barre.appendChild(sp);
+      barre.style.width = (g[k].total / max * 100) + "%";
+      piste.appendChild(barre);
+      b.append(tete, piste, el("div", "aide", `Net après impôt : ${$(R.impots[k].net)}`));
       comp.appendChild(b);
     });
-    const ecart = el("div", "mode");
-    ecart.append(el("div", "mode-nom", "Écart mixte − horaire"), el("div", "tuile-valeur", signe(g.ecart)), el("div", "tuile-sous", `Après impôt : ${signe(R.impots.mixte.net - R.impots.horaire.net)}`));
-    comp.appendChild(ecart);
+    comp.appendChild(rangees(el("div"), [{ titre: "Écart mixte − horaire", sous: `Après impôt : ${signe(R.impots.mixte.net - R.impots.horaire.net)}`, valeur: signe(g.ecart), cls: "total" }]));
     document.getElementById("rv-seuil").textContent = g.seuilPatients != null
       ? `En clinique, le mixte paie plus que l'horaire au-delà de ${nb(g.seuilPatients)} patients par demi-journée. Vous en voyez ${nb(S.revenu.patientsParDJ)}.`
       : "Sans pourcentage sur les visites, le mixte paie toujours moins en clinique.";
@@ -714,32 +948,51 @@
       ["Suppléments sans médecin", x => x.supplements],
       ["Autres revenus", x => x.autres],
     ];
-    const lg = document.getElementById("rv-legende"); lg.textContent = "";
-    parts.forEach(([n], i) => { const sp = el("span"); const k = el("i"); k.style.cssText = `background:${SERIES[i % SERIES.length]};height:10px;width:10px;border-radius:2px`; sp.append(k, document.createTextNode(n)); lg.appendChild(sp); });
-    const zone = document.getElementById("rv-barres"); zone.textContent = "";
-    const max = Math.max(g.horaire.total, g.mixte.total);
-    [["Horaire", g.horaire], ["Mixte", g.mixte]].forEach(([nom, x]) => {
-      const l = el("div", "barre-ligne"); const barre = el("div", "barre");
-      barre.style.width = (x.total / max * 100) + "%";
+    const zone = document.getElementById("rv-barres"); zone.textContent = ""; zone.className = "barres";
+    const maxB = Math.max(g.horaire.total, g.mixte.total, 1);
+    ["horaire", "mixte"].forEach(k => {
+      const x = g[k], b = el("div", "barre-bloc"), tete = el("div", "barre-tete");
+      tete.append(el("span", "barre-nom", NOM_MODE[k]), el("span", "barre-total", $(x.total)));
+      const piste = el("div", "barre-piste"), barre = el("div", "barre");
+      barre.style.width = (x.total / maxB * 100) + "%";
       parts.forEach(([n, f], i) => { const v = f(x); if (v > 0) { const s = el("span"); s.style.flex = v + " 0 0"; s.style.background = SERIES[i % SERIES.length]; s.title = `${n} : ${$(v)}`; barre.appendChild(s); } });
-      const conteneur = el("div"); conteneur.appendChild(barre);
-      l.append(el("span", "nom", nom), conteneur, el("span", "total", $(x.total)));
-      zone.appendChild(l);
+      piste.appendChild(barre); b.append(tete, piste); zone.appendChild(b);
     });
+    const lg = document.getElementById("rv-legende"); lg.textContent = "";
+    parts.forEach(([n, f], i) => { if (f(g.horaire) > 0 || f(g.mixte) > 0) { const sp = el("span"); const k = el("i"); k.style.background = SERIES[i % SERIES.length]; sp.append(k, document.createTextNode(n)); lg.appendChild(sp); } });
     lignes(document.getElementById("rv-detail"), ["", "Horaire", "Mixte"], [
-      ...parts.map(([n, f]) => ({ cellules: [n, $(f(g.horaire)), $(f(g.mixte))] })),
+      ...parts.filter(([, f]) => f(g.horaire) > 0 || f(g.mixte) > 0).map(([n, f]) => ({ cellules: [n, $(f(g.horaire)), $(f(g.mixte))] })),
       { cls: "total", cellules: ["Total brut", $(g.horaire.total), $(g.mixte.total)] },
     ]);
-    const f = document.getElementById("rv-faits"); f.textContent = "";
-    [["Heures travaillées", nb(g.heures, 0) + " h"], ["Visites en clinique", nb(g.nbVisites, 0)], ["Visites de prise en charge", nb(g.nbPriseEnCharge, 0)],
-     ["Patients inscrits, début → fin", `${nb(g.inscritsDepart, 0)} → ${nb(g.inscritsFin, 0)}`],
-     ["Semaines au tarif de 500 patients et plus", `${g.semainesPalierHaut} sur ${S.revenu.semaines}`]]
-      .forEach(([dt, dd]) => f.append(el("dt", null, dt), el("dd", null, dd)));
+    rangees("rv-faits", [
+      { titre: "Heures travaillées", valeur: nb(g.heures, 0) + " h" },
+      { titre: "Visites en clinique", valeur: nb(g.nbVisites, 0) },
+      { titre: "Visites de prise en charge", valeur: nb(g.nbPriseEnCharge, 0) },
+      { titre: "Patients inscrits", sous: "Du début à la fin de l'année", valeur: `${nb(g.inscritsDepart, 0)} → ${nb(g.inscritsFin, 0)}` },
+      { titre: "Semaines au tarif de 500 patients et plus", valeur: `${g.semainesPalierHaut} sur ${S.revenu.semaines}` },
+    ]);
   }
 
   function rendreImpot(R) {
-    const h = R.impots.horaire, m = R.impots.mixte;
-    lignes(document.getElementById("im-tableau"), ["", "Taux horaire", "Taux mixte"], [
+    const h = R.impots.horaire, m = R.impots.mixte, t = R.impot.total;
+    choixMode("im-mode");
+    hero("im-hero", "Impôt et cotisations de l'année", $(t), [
+      puce(`Taux moyen ${pct(R.impot.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`),
+    ]);
+
+    const a = document.getElementById("im-acomptes"); a.textContent = "";
+    a.appendChild(el("p", "resume", `Mettez de côté ${pct(t / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$(t / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est ce que coûte chaque dollar de plus, et ce que rapporte chaque dollar cotisé au REER.`));
+    const premiere = S.revenu.annee === "premiere";
+    const an = (+String(S.strategie.debut).slice(0, 4) || 2026) + 1;
+    a.appendChild(rangees(el("div"), premiere
+      ? [{ titre: `30 avril ${an}`, sous: "Solde de l'impôt de la première année", valeur: $(t), ico: "!" },
+         { titre: `Puis acomptes de ${an}`, sous: "15 mars, 15 juin, 15 septembre et 15 décembre", valeur: $(t / 4), valeurSous: "chacun" }]
+      : ["15 mars", "15 juin", "15 septembre", "15 décembre"].map(d => ({ titre: d, sous: "Acompte provisionnel", valeur: $(t / 4) }))));
+    a.appendChild(el("p", "aide", premiere
+      ? "La première année, l'impôt de l'année précédente (résidence) était faible : aucun acompte n'est exigé. Tout le solde arrive le 30 avril, et les acomptes commencent l'année suivante."
+      : "Acomptes trimestriels, calculés sur l'impôt de l'année. Payer les montants que l'Agence du revenu et Revenu Québec vous envoient évite les intérêts."));
+
+    lignes(document.getElementById("im-tableau"), ["", "Horaire", "Mixte"], [
       { cellules: ["Revenu brut", $(h.revenu), $(m.revenu)] },
       { cls: "sous", cellules: ["Revenu imposable", $(h.imposable), $(m.imposable)] },
       { cellules: ["Impôt fédéral", $(h.fed), $(m.fed)] },
@@ -747,23 +1000,10 @@
       { cellules: ["RRQ (deux parts)", $(h.rrq), $(m.rrq)] },
       { cellules: ["RQAP", $(h.rqap), $(m.rqap)] },
       { cellules: ["Fonds des services de santé", $(h.fss), $(m.fss)] },
-      ...(R.couple && (h.transferts > 0 || m.transferts > 0) ? [{ cellules: ["Crédits transférés par votre conjointe", $(-h.transferts), $(-m.transferts)] }] : []),
+      ...(R.couple && (h.transferts > 0 || m.transferts > 0) ? [{ cellules: ["Crédits transférés par votre conjointe", moins(h.transferts), moins(m.transferts)] }] : []),
       { cls: "total", cellules: ["Net après impôt", $(h.net), $(m.net)] },
       { cls: "sous", cellules: ["Taux moyen", pct(h.tauxMoyen), pct(m.tauxMoyen)] },
     ]);
-    const a = document.getElementById("im-acomptes"); a.textContent = "";
-    const t = R.impot.total;
-    a.append(el("p", "resume", `Au ${R.mode === "mixte" ? "taux mixte" : "taux horaire"}, mettez de côté ${pct(t / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$(t / 12)} par mois. Votre taux marginal est de ${pct(R.tauxMarginal, 0)} : c'est ce que coûte en impôt chaque dollar de plus, et ce que rapporte chaque dollar cotisé au REER.`));
-    const tb = el("table", "tableau");
-    const premiere = S.revenu.annee === "premiere";
-    const an = (+String(S.strategie.debut).slice(0, 4) || 2026) + 1;
-    lignes(tb, ["Date", "À payer"], premiere
-      ? [{ cellules: [`30 avril ${an}`, $(t)] }, { cls: "sous", cellules: [`Ensuite, acomptes du 15 mars, 15 juin, 15 septembre et 15 décembre ${an}`, `${$(t / 4)} chacun`] }]
-      : ["15 mars", "15 juin", "15 septembre", "15 décembre"].map(d => ({ cellules: [d, $(t / 4)] })));
-    const w = el("div", "tableau-defile"); w.appendChild(tb); a.appendChild(w);
-    a.appendChild(el("p", "note", premiere
-      ? "La première année, l'impôt de l'année précédente (résidence) était faible : aucun acompte n'est exigé. Tout le solde arrive le 30 avril, et les acomptes commencent l'année suivante."
-      : "Acomptes trimestriels, calculés sur l'impôt de l'année. Payer les montants que l'Agence du revenu et Revenu Québec vous envoient évite les intérêts."));
 
     rendreFamille(R);
     rendreVerification();
@@ -772,9 +1012,8 @@
     z.appendChild(el("p", "resume", s.reportAnnuel > 0
       ? `Avec une société, vous paieriez environ ${$(s.reportAnnuel)} de moins cette année, après ${$(S.societe.fraisSociete)} de frais. C'est un report : les ${$(s.societe.retenu)} laissés dans la société seront imposés quand vous les retirerez.`
       : `Une société ne réduirait pas votre impôt cette année : presque tout votre revenu sert au ménage et aux dettes, et les frais (${$(S.societe.fraisSociete)}) dépassent le report possible.`));
-    const tb2 = el("table", "tableau");
-    lignes(tb2, ["", "Particulier", "Société"], [
-      { cellules: ["Besoin net du ménage (votre part, dettes et épargne)", $(R.besoinNet), $(R.besoinNet)] },
+    tableauSimple(z, ["", "Particulier", "Société"], [
+      { cellules: ["Besoin net (votre part, dettes et épargne)", $(R.besoinNet), $(R.besoinNet)] },
       { cellules: ["Impôt de la société", "—", $(s.societe.impotSociete)] },
       { cellules: ["Dividendes versés", "—", $(s.societe.dividendes)] },
       { cellules: ["Impôt personnel et cotisations", $(s.particulier.impot), $(s.societe.impotPerso)] },
@@ -782,55 +1021,53 @@
       { cls: "total", cellules: ["Impôt total cette année", $(s.particulier.impot), $(s.societe.impot + s.societe.fraisSociete)] },
       { cls: "sous", cellules: ["Laissé dans la société", "—", $(s.societe.retenu)] },
     ]);
-    const w2 = el("div", "tableau-defile"); w2.appendChild(tb2); z.appendChild(w2);
-    z.appendChild(el("p", "note", "Hypothèses : rémunération en dividendes non déterminés seulement, donc pas de RRQ ni de droits REER. Le revenu ne peut pas être versé à une autre personne sans travail réel de sa part dans la société. À valider avec un comptable avant toute décision."));
+    z.appendChild(el("p", "aide", "Hypothèses : rémunération en dividendes non déterminés seulement, donc pas de RRQ ni de droits REER. Le revenu ne peut pas être versé à une autre personne sans travail réel de sa part dans la société. À valider avec un comptable avant toute décision."));
   }
 
   function rendreFamille(R) {
     const z = document.getElementById("im-famille"); z.textContent = "";
     const f = R.famille, nEnf = R.ages.length;
-    const tableau = (entetes, rangees) => { const tb = el("table", "tableau"); lignes(tb, entetes, rangees); const w = el("div", "tableau-defile"); w.appendChild(tb); z.appendChild(w); };
     z.appendChild(el("p", "resume", (S.famille.calculAuto
-      ? `Allocations familiales : ${$(R.allocations)} par année (${$(R.allocations / 12)} par mois), calculées sur un revenu net familial de ${$(R.netFedFamille)}${nEnf ? ` pour ${nEnf} enfant${nEnf > 1 ? "s" : ""}` : ""}.`
+      ? `Allocations familiales : ${$(R.allocations)} par année, soit ${$(R.allocations / 12)} par mois, sur un revenu net familial de ${$(R.netFedFamille)}${nEnf ? ` et ${nEnf} enfant${nEnf > 1 ? "s" : ""}` : ""}.`
       : `Allocations familiales : montant inscrit à la main, ${$(R.allocations)} par année.`) +
       (R.couple ? (S.famille.versementA === "conjointe" ? " Elles sont versées à votre conjointe." : " Elles vous sont versées.") : "")));
     if (S.famille.calculAuto) {
-      if (!nEnf) z.appendChild(el("p", "note", "Ajoutez les enfants et leur âge dans l'onglet Épargne pour calculer les allocations."));
-      else tableau(["", "Par année"], [
-        { cellules: ["Allocation canadienne pour enfants (fédéral)", $(f.ace)] },
-        { cellules: ["Allocation famille (Québec)", $(f.allocationFamille)] },
-        { cellules: ["Supplément pour fournitures scolaires", $(f.fournitures)] },
-        { cls: "total", cellules: ["Total", $(f.total)] },
-      ]);
+      if (!nEnf) z.appendChild(el("p", "aide", "Ajoutez les enfants et leur âge dans la page Avenir pour calculer les allocations."));
+      else z.appendChild(rangees(el("div"), [
+        { titre: "Allocation canadienne pour enfants", sous: "Fédéral", valeur: $(f.ace) },
+        { titre: "Allocation famille", sous: "Québec", valeur: $(f.allocationFamille) },
+        { titre: "Supplément pour fournitures scolaires", sous: "Québec, de 4 à 16 ans", valeur: $(f.fournitures) },
+        { titre: "Total par année", cls: "total", valeur: $(f.total) },
+      ]));
     }
-    tableau(R.couple ? ["Assurance médicaments", "Vous", "Conjointe"] : ["Assurance médicaments", "Vous"], [
-      { cellules: ["Prime du régime public, payée avec l'impôt du Québec", $(R.primeMoi), ...(R.couple ? [$(R.primeConjointe)] : [])] },
-    ]);
-    z.appendChild(el("p", "note", "La prime dépend du revenu net familial ; les enfants sont couverts sans prime. Elle est nulle pour une personne couverte par une assurance collective."));
+    z.appendChild(el("h3", null, "Assurance médicaments"));
+    z.appendChild(rangees(el("div"), [
+      { titre: "Votre prime du régime public", sous: S.famille.medicamentsPublicMoi ? "Payée avec l'impôt du Québec" : "Assurance collective : pas de prime", valeur: $(R.primeMoi) },
+      R.couple && { titre: "Prime de votre conjointe", sous: S.conjointe.medicamentsPublic ? "Payée avec l'impôt du Québec" : "Assurance collective : pas de prime", valeur: $(R.primeConjointe) },
+    ]));
+    z.appendChild(el("p", "aide", "La prime dépend du revenu net familial ; les enfants sont couverts sans prime."));
     if (!R.couple) return;
     const c = R.conjointe;
-    z.appendChild(el("h4", null, "Impôt de votre conjointe (salariée)"));
-    tableau(["", "Par année"], [
-      { cellules: ["Salaire et autres revenus", $(c.revenu)] },
-      { cellules: ["Impôt fédéral", $(c.fed)] },
-      { cellules: ["Impôt du Québec", $(c.qc)] },
-      { cellules: ["RRQ", $(c.rrq)] },
-      { cellules: ["RQAP", $(c.rqap)] },
-      { cellules: ["Assurance-emploi", $(c.ae)] },
-      ...(S.conjointe.rpa + S.conjointe.syndicat > 0 ? [{ cellules: ["Régime de retraite et cotisations syndicales", $(S.conjointe.rpa + S.conjointe.syndicat)] }] : []),
-      ...(c.transferts > 0 ? [{ cellules: ["Crédits transférés par vous", $(-c.transferts)] }] : []),
-      { cls: "total", cellules: ["Net après impôt", $(c.net)] },
-    ]);
+    z.appendChild(el("h3", null, "Impôt de votre conjointe"));
+    z.appendChild(rangees(el("div"), [
+      { titre: "Salaire et autres revenus", valeur: $(c.revenu) },
+      { titre: "Impôt fédéral", valeur: moins(c.fed) },
+      { titre: "Impôt du Québec", valeur: moins(c.qc) },
+      { titre: "RRQ, RQAP et assurance-emploi", valeur: moins(c.rrq + c.rqap + c.ae) },
+      S.conjointe.rpa + S.conjointe.syndicat > 0 && { titre: "Régime de retraite et cotisations syndicales", valeur: moins(S.conjointe.rpa + S.conjointe.syndicat) },
+      c.transferts > 0 && { titre: "Crédits transférés par vous", valeur: $(c.transferts) },
+      { titre: "Net après impôt", cls: "total", valeur: $(c.net) },
+    ]));
     const recu = R.impot.transferts + c.transferts;
-    z.appendChild(el("p", "note", recu > 0
+    z.appendChild(el("p", "aide", recu > 0
       ? `Conjoints au sens de l'impôt : ${$(recu)} de crédits non utilisés passent de ${R.impot.transferts > 0 ? "votre conjointe à vous" : "vous à votre conjointe"} (montant pour conjoint au fédéral, transfert de crédits au Québec).`
       : "Conjoints au sens de l'impôt : aucun crédit à transférer, chacun utilise ses propres crédits."));
   }
 
-  // Refait les cas de l'outil officiel avec le calcul de Boussole et montre les écarts.
+  // Refait les cas de l'outil officiel avec le calcul de Wealthnord et montre les écarts.
   const CHAMPS_VERIF = [["qc", "Impôt du Québec"], ["fed", "Impôt fédéral"], ["rrq", "RRQ"], ["rqap", "RQAP"], ["ae", "Assurance-emploi"],
     ["af", "Allocation famille"], ["fournitures", "Fournitures scolaires"], ["ace", "Allocation canadienne pour enfants"], ["prime", "Prime d'assurance médicaments"]];
-  function casBoussole(v) {
+  function casCalcul(v) {
     let a = C.impotSalarie({ salaire: v.salaires[0] }), b = v.couple ? C.impotSalarie({ salaire: v.salaires[1] }) : null;
     if (v.couple) [a, b] = C.transfertsConjoints(a, b);
     const somme = k => a[k] + (b ? b[k] : 0);
@@ -846,117 +1083,204 @@
       (v.ages.length ? `, enfants de ${v.ages.join(" et ")} ans` : "");
     let total = 0, egaux = 0, pire = { e: 0 };
     const cas = VERIFICATION.map(v => {
-      const b = casBoussole(v);
-      const ecarts = CHAMPS_VERIF.map(([k, n]) => { const e = Math.round(b[k]) - v.officiel[k]; total++; if (Math.abs(e) <= 1) egaux++; if (Math.abs(e) > Math.abs(pire.e)) pire = { e, n, cas: nomCas(v) }; return { k, n, e, off: v.officiel[k], nous: Math.round(b[k]) }; });
+      const b = casCalcul(v);
+      const ecarts = CHAMPS_VERIF.map(([k, n]) => { const e = Math.round(b[k]) - v.officiel[k]; total++; if (Math.abs(e) <= 1) egaux++; if (Math.abs(e) > Math.abs(pire.e)) pire = { e, n, cas: nomCas(v) }; return { n, e, off: v.officiel[k], nous: Math.round(b[k]) }; });
       return { v, ecarts };
     });
-    z.appendChild(el("p", "resume", `Sur ${nb(total, 0)} montants, ${nb(egaux, 0)} sont identiques à ceux de l'outil officiel, à 1 $ près.` +
+    const tete = el("div", "hero-sous");
+    tete.append(puce(`${nb(egaux, 0)} sur ${nb(total, 0)} identiques`, "haut", true));
+    z.append(tete, el("p", "resume", `Wealthnord refait ${VERIFICATION.length} cas de l'outil officiel du ministère des Finances du Québec : ${nb(egaux, 0)} montants sur ${nb(total, 0)} sont identiques, à 1 $ près.` +
       (pire.e ? ` Le plus grand écart est de ${$(Math.abs(pire.e))} (${pire.n.toLowerCase()}, ${pire.cas.charAt(0).toLowerCase() + pire.cas.slice(1)}).` : "")));
-    const tb = el("table", "tableau");
-    lignes(tb, ["Cas", "Identiques", "Plus grand écart"], cas.map(({ v, ecarts }) => {
+    z.appendChild(rangees(el("div"), cas.map(({ v, ecarts }) => {
       const max = ecarts.reduce((m, x) => Math.abs(x.e) > Math.abs(m) ? x.e : m, 0);
-      return { cellules: [nomCas(v), `${ecarts.filter(x => Math.abs(x.e) <= 1).length} sur ${ecarts.length}`, max ? signe(max) : "Aucun"] };
-    }));
-    const w = el("div", "tableau-defile"); w.appendChild(tb); z.appendChild(w);
-    const d = el("details", "verif-detail"); d.appendChild(el("summary", null, "Voir chaque montant"));
+      return { titre: nomCas(v), sous: `${ecarts.filter(x => Math.abs(x.e) <= 1).length} sur ${ecarts.length} identiques`, valeur: max ? signe(max) : "Aucun écart" };
+    })));
+    const d = el("details", "plier"); d.appendChild(el("summary", null, "Voir chaque montant"));
     cas.forEach(({ v, ecarts }) => {
       d.appendChild(el("h4", null, nomCas(v)));
-      const t2 = el("table", "tableau");
-      lignes(t2, ["", "Outil officiel", "Boussole", "Écart"], ecarts.map(x => ({ cellules: [x.n, $(x.off), $(x.nous), x.e ? signe(x.e) : "—"] })));
-      const w2 = el("div", "tableau-defile"); w2.appendChild(t2); d.appendChild(w2);
+      tableauSimple(d, ["", "Officiel", "Wealthnord", "Écart"], ecarts.map(x => ({ cellules: [x.n, $(x.off), $(x.nous), x.e ? signe(x.e) : "—"] })));
     });
     z.appendChild(d);
-    z.appendChild(el("p", "note", "Comparaison avec l'outil de calcul du revenu disponible des familles du ministère des Finances du Québec (version de mai 2026, année 2026), consulté le 25 octobre 2026. L'outil ne traite que des revenus d'emploi : il valide les barèmes, les crédits, les transferts entre conjoints, les allocations et la prime d'assurance médicaments. Votre revenu de travailleur autonome (RRQ des deux parts, Fonds des services de santé) suit les mêmes barèmes, mais ne peut pas y être vérifié."));
+    z.appendChild(el("p", "aide", "Outil de calcul du revenu disponible des familles (version de mai 2026, année 2026), consulté le 25 octobre 2026. L'outil ne traite que des revenus d'emploi : il valide les barèmes, les crédits, les transferts entre conjoints, les allocations et la prime d'assurance médicaments. Votre revenu de travailleur autonome (RRQ des deux parts, Fonds des services de santé) suit les mêmes barèmes, mais ne peut pas y être vérifié."));
   }
 
   function rendreBudget(R) {
-    const part = S.menage.partCommunMoi / 100;
-    // Une colonne par personne : vous, votre conjointe (si incluse), le ménage.
     const cj = R.couple;
-    const ligne = (nom, moi, conj, men, cls, classes) => ({ cls, classes, cellules: [nom, moi, ...(cj ? [conj] : []), men] });
-    const signeCls = v => v >= 0 ? "positif" : "negatif";
-    const sortie = v => $(v > 0.5 ? -v : 0);  // évite « -0 $ »
-    const r = [
-      ligne("Revenu net de travail", $(R.travailMoi), $(R.travailConjointe), $(R.travailMoi + R.travailConjointe)),
-      ...(R.allocations > 0 ? [ligne("Allocations familiales", $(R.allocMoi), $(R.allocConjointe), $(R.allocMoi + R.allocConjointe))] : []),
-      ...(S.menage.autresRevenusMensuels > 0 ? [ligne("Autres revenus", "—", "—", $(S.menage.autresRevenusMensuels))] : []),
-      ligne("Revenus", $(R.netMoi), $(R.netConjointe), $(R.revenusMenage), "sous"),
-      ...[...CATALOGUE.map(x => x.cat), "Autres dépenses"].map(g => {
+    if (!cj && U.vueBudget === "conjointe") U.vueBudget = "moi";
+    segment("bu-vue", cj ? [["moi", "Vous"], ["conjointe", "Conjointe"], ["menage", "Ménage"]] : [["moi", "Vous"], ["menage", "Ménage"]], U.vueBudget, v => { U.vueBudget = v; tout(); }, "Budget de qui");
+    const vue = U.vueBudget, part = S.menage.partCommunMoi / 100;
+    const qui = b => vue === "menage" ? 1 : vue === "moi" ? (b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0) : (b.qui === "conjoint" ? 1 : b.qui === "commun" ? 1 - part : 0);
+    const partDette = d => vue === "menage" ? 1 : vue === "moi" ? (d.paiementMoi ?? 100) / 100 : 1 - (d.paiementMoi ?? 100) / 100;
+    const V = {
+      moi: { travail: R.travailMoi, alloc: R.allocMoi, autres: 0, rev: R.netMoi, dep: R.depMoi, dettes: R.dettesMoi, epargne: R.epargneMoi, surplus: R.surplusMoi },
+      conjointe: { travail: R.travailConjointe, alloc: R.allocConjointe, autres: 0, rev: R.netConjointe, dep: R.depConjointe, dettes: R.dettesConjointe, epargne: 0, surplus: R.surplusConjointe },
+      menage: { travail: R.travailMoi + R.travailConjointe, alloc: R.allocMoi + R.allocConjointe, autres: S.menage.autresRevenusMensuels, rev: R.revenusMenage, dep: R.depMenage, dettes: R.dettesMenage, epargne: R.epargneMoi, surplus: R.surplusMenage },
+    }[vue];
+    const nomVue = { moi: "Votre surplus mensuel", conjointe: "Surplus de votre conjointe", menage: "Surplus du ménage" }[vue];
+    hero("bu-hero", nomVue, $(V.surplus), [
+      `${$(V.rev)} de revenus, ${$(V.dep + V.dettes + V.epargne)} de sorties`,
+      V.surplus < 0 && puce("Budget négatif", "bas", false),
+    ]);
+    rangees("bu-revenus", [
+      { titre: "Revenu net de travail", sous: vue === "conjointe" ? "Salaire après impôt et cotisations" : "Après impôt, prime d'assurance médicaments et dépenses pro", valeur: $(V.travail) },
+      (R.allocations > 0 || vue !== "conjointe") && { titre: "Allocations familiales", sous: S.famille.calculAuto ? "Calculées selon vos revenus" : "Montant inscrit", valeur: $(V.alloc) },
+      V.autres > 0 && { titre: "Autres revenus", valeur: $(V.autres) },
+      { titre: "Total", cls: "total", valeur: $(V.rev) },
+    ]);
+    // Dépenses : une rangée par catégorie ; toucher ouvre ses cases.
+    const cats = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
+    rangees("bu-depenses", [
+      ...cats.map(g => {
         const l = S.budget.filter(b => categorie(b) === g);
-        const moi = l.reduce((s, b) => s + (b.qui === "moi" ? mensuel(b) : b.qui === "commun" ? mensuel(b) * part : 0), 0);
-        const conj = l.reduce((s, b) => s + (b.qui === "conjoint" ? mensuel(b) : b.qui === "commun" ? mensuel(b) * (1 - part) : 0), 0);
-        const tot = l.reduce((s, b) => s + mensuel(b), 0);
-        return tot > 0 ? ligne(g, sortie(moi), sortie(conj), sortie(tot)) : null;
-      }).filter(Boolean),
-      ...S.dettes.map(d => { const m = minimumDette(d), p = (d.paiementMoi ?? 100) / 100; return ligne(`Paiement : ${d.nom}`, sortie(m * p), sortie(m * (1 - p)), sortie(m)); }),
-      ligne("Épargne : REEE, REER, CELI", sortie(R.epargneMoi), "—", sortie(R.epargneMoi)),
-      ligne("Surplus par mois", $(R.surplusMoi), $(R.surplusConjointe), $(R.surplusMenage), "total",
-        [null, signeCls(R.surplusMoi), ...(cj ? [signeCls(R.surplusConjointe)] : []), signeCls(R.surplusMenage)]),
-    ];
-    lignes(document.getElementById("bu-tableau"), cj ? ["", "Vous", "Conjointe", "Ménage"] : ["", "Vous", "Ménage"], r);
+        const n = l.filter(b => b.montant > 0).length;
+        const v = l.reduce((s, b) => s + mensuel(b) * qui(b), 0);
+        return { titre: g, sous: n ? `${n} dépense${n > 1 ? "s" : ""}` : "Rien d'inscrit", valeur: n ? $(v) : "—", cls: n ? null : "vide", action: () => feuilleCategorie(g) };
+      }),
+      { titre: "Épargne : REEE, REER, CELI", sous: "Bouton Modifier de la page Avenir", valeur: $(V.epargne) },
+      { titre: "Total des dépenses et de l'épargne", cls: "total", valeur: $(V.dep + V.epargne) },
+    ]);
+    rangees("bu-dettes", [
+      ...S.dettes.map((d, i) => {
+        const fin = R.sim.dettes[i] && R.sim.dettes[i].fin;
+        return { titre: d.nom, sous: `${nb(d.taux, 2)} % · ${fin ? "remboursée en " + moisAn(fin) : "jamais remboursée"}`, valeur: $(d.solde), valeurSous: `${$(minimumDette(d) * partDette(d))} / mois`, action: () => feuilleDette(i) };
+      }),
+      { titre: "Ajouter une dette", ico: "plus", cls: "ajout", action: () => {
+        S.dettes.push({ id: nouvelId("d"), nom: "Nouvelle dette", type: "pret", solde: 0, limite: 0, taux: 5, paiement: 0, frequence: "mois", interetsSeulement: false, finTerme: "", tauxRenouvellement: 0, dureeTerme: 5, privilege: 0, creditImpot: 0, partMoi: 100, paiementMoi: 100 });
+        sauver(); tout(); feuilleDette(S.dettes.length - 1);
+      } },
+    ]);
 
+    segment("de-methode", [["avalanche", "Avalanche"], ["boule", "Boule de neige"], ["minimum", "Minimums"]], S.strategie.methode, v => changer("strategie.methode", v), "Méthode de remboursement");
     const sim = R.sim;
     const res = document.getElementById("de-resume"); res.textContent = "";
     if (S.strategie.methode === "minimum") res.textContent = sim.libre ? `En payant seulement les minimums, vos dettes sont remboursées en ${moisAn(sim.libre)}.` : "En payant seulement les minimums, la marge de crédit n'est jamais remboursée : ses paiements ne couvrent que les intérêts.";
     else {
       res.append(document.createTextNode(`Avec ${$(R.extra)} de plus par mois${S.strategie.reerSurDettes && R.remboursementReer > 0 ? ` et ${$(R.remboursementReer)} chaque avril (REER)` : ""}, toutes les dettes sont remboursées en `));
       res.appendChild(el("strong", null, moisAn(sim.libre)));
-      res.append(document.createTextNode(`, pour ${$(sim.interetsNetsTotaux)} d'intérêts au total, après les crédits d'impôt.`));
+      res.append(document.createTextNode(`, pour ${$(sim.interetsNetsTotaux)} d'intérêts au total, après les crédits d'impôt${sim.gainsAttente > 1 ? ` (moins ${$(sim.gainsAttente)} gagnés sur l'argent en attente d'un renouvellement)` : ""}.`));
     }
+    res.append(document.createTextNode(` Scénario ${SCENARIOS[R.scenario].toLowerCase()} : revenus ${signePct(R.hyp.hausseRevenus)} et dépenses ${signePct(R.hyp.inflation)} par année${R.hyp.ecartTaux ? `, taux variables et renouvellements ${R.hyp.ecartTaux > 0 ? "+" : "−"}${nb(Math.abs(R.hyp.ecartTaux), 2)} point` : ""}.`));
     const sd = seriesDettes(sim, false);
     graphiqueLignes(document.getElementById("de-graph"), document.getElementById("de-legende"), sd.series, sd.etiquettes, { titre: "Soldes des dettes par année" });
-    lignes(document.getElementById("de-tableau"), ["Dette", "Taux réel", "Remboursée", "Intérêts nets"],
-      S.dettes.map((d, j) => ({ cellules: [d.nom, nb(C.tauxReel(d), 2) + " %", moisAn(sim.dettes[j].fin), $(sim.dettes[j].interetsNets)] })));
+    rangees("de-tableau", S.dettes.map((d, j) => {
+      const x = sim.dettes[j], renouv = Math.abs(x.tauxFinal - d.taux) > 0.001;
+      return { titre: d.nom, couleur: SERIES[j % SERIES.length],
+        sous: `Taux réel ${nb(C.tauxReel(d), 2)} %${renouv ? ` · ${nb(x.tauxFinal, 2)} % ensuite` : ""}`,
+        valeur: x.fin ? moisAn(x.fin) : "jamais", valeurSous: `${$(x.interetsNets)} d'intérêts nets` };
+    }));
     const noms = { avalanche: "Avalanche", boule: "Boule de neige", minimum: "Minimums seulement" };
-    const av = R.sims.avalanche, bo = R.sims.boule, carte = document.getElementById("de-methodes").closest(".carte");
-    let note = carte.querySelector(".note"); if (!note) { note = el("p", "note"); carte.appendChild(note); }
-    note.textContent = av.libre && bo.libre && bo.libre < av.libre && av.interetsNetsTotaux <= bo.interetsNetsTotaux
-      ? `L'avalanche coûte ${$(bo.interetsNetsTotaux - av.interetsNetsTotaux)} de moins en intérêts, mais la boule de neige finit plus tôt : à la fin de l'avalanche, il ne reste que les hypothèques, dont le remboursement anticipé est limité à ${nb(Math.max(...S.dettes.filter(d => d.type === "hypotheque").map(d => d.privilege || 0)), 0)} % par année. L'argent qui dépasse attend le prochain renouvellement.`
-      : "L'avalanche paie d'abord la dette au taux réel le plus élevé : c'est elle qui coûte le moins d'intérêts.";
-    lignes(document.getElementById("de-methodes"), ["Méthode", "Sans dettes en", "Intérêts nets au total"],
-      ["avalanche", "boule", "minimum"].map(k => ({ cls: k === S.strategie.methode ? "choisi" : null, cellules: [noms[k], moisAn(R.sims[k].libre), R.sims[k].libre ? $(R.sims[k].interetsNetsTotaux) : "—"] })));
+    const av = R.sims.avalanche, bo = R.sims.boule;
+    const plafond = nb(Math.max(0, ...S.dettes.filter(d => d.type === "hypotheque").map(d => d.privilege || 0)), 0);
+    const ecartCout = bo.coutNet - av.coutNet;
+    document.getElementById("de-methodes-note").textContent = !av.libre || !bo.libre
+      ? "L'avalanche paie d'abord la dette au taux réel le plus élevé, la boule de neige le plus petit solde."
+      : ecartCout < -1
+        ? `Ici, la boule de neige coûte ${$(-ecartCout)} de moins. En réglant d'abord les petits soldes, elle utilise chaque année le droit de remboursement anticipé des hypothèques (${plafond} % par année, perdu s'il n'est pas utilisé). Avec l'avalanche, cet argent attend le renouvellement, placé à court terme à 2,4 %, moins que le taux des hypothèques.`
+        : bo.libre < av.libre
+          ? `L'avalanche coûte ${$(ecartCout)} de moins, mais la boule de neige finit plus tôt : le remboursement anticipé des hypothèques est limité à ${plafond} % par année, et l'argent qui dépasse attend le renouvellement.`
+          : `L'avalanche paie d'abord la dette au taux réel le plus élevé : elle coûte ${$(ecartCout)} de moins.`;
+    lignes(document.getElementById("de-methodes"), ["Méthode", "Sans dettes en", "Coût net"],
+      ["avalanche", "boule", "minimum"].map(k => ({ cls: k === S.strategie.methode ? "choisi" : null, cellules: [noms[k], moisAn(R.sims[k].libre), R.sims[k].libre ? $(R.sims[k].coutNet) : "—"] })));
   }
 
-  function rendreEpargne(R) {
-    const p = R.projection, dix = p[Math.min(10, p.length - 1)], vingt = p[p.length - 1];
-    const t = document.getElementById("vn-tuiles"); t.textContent = "";
-    const sous = x => R.couple ? `Couple : ${$(x.menage)}` : null;
-    t.append(tuile("Aujourd'hui", $(p[0].moi), sous(p[0])), tuile(`En ${dix.annee}`, $(dix.moi), sous(dix)), tuile(`En ${vingt.annee}`, $(vingt.moi), sous(vingt)));
+  function rendreAvenir(R) {
+    const cj = R.couple;
+    segment("vn-scenario", Object.entries(SCENARIOS), R.scenario, v => changer("scenarios.choisi", v), "Scénario");
+    const h = R.hyp, hyp = document.getElementById("vn-hyp"); hyp.textContent = "";
+    hyp.append(document.createTextNode(`Placements ${nb(h.rendement, 1)} %, maison ${signePct(h.croissanceMaison)}, autos −${nb(h.depreciationAuto, 0)} %, inflation ${nb(h.inflation, 1)} % par année. `));
+    const lien = el("button", "lien-carte", "Modifier les hypothèses"); lien.type = "button"; lien.dataset.feuille = "hypotheses"; hyp.appendChild(lien);
+    if (!cj) U.vueAvenir = "moi";
+    if (cj) segment("vn-vue", [["moi", "Vous"], ["couple", "Couple"]], U.vueAvenir, v => { U.vueAvenir = v; tout(); }, "Valeur nette de qui");
+    else { const c = document.getElementById("vn-vue"); c.textContent = ""; c.dataset.cle = ""; }
+    const couple = U.vueAvenir === "couple", cle = couple ? "menage" : "moi";
+    const p = R.projection, def = i => R.deflateur(i);
+    const val = p.map((x, i) => x[cle] / def(i));
+    const bas = p.map((x, i) => Math.min(...Object.keys(SCENARIOS).map(k => R.projections[k][i][cle])) / def(i));
+    const haut = p.map((x, i) => Math.max(...Object.keys(SCENARIOS).map(k => R.projections[k][i][cle])) / def(i));
+    const qui = couple ? "Valeur nette du couple" : "Votre valeur nette";
+    const unite = S.scenarios.dollarsAujourdhui ? " (dollars d'aujourd'hui)" : "";
+    const montrer = i => {
+      const d = val[i] - val[0];
+      hero("vn-hero", i === 0 ? `${qui} aujourd'hui` : `${qui} en ${p[i].annee}${unite}`, $(val[i]), [
+        i === 0 ? puce(`${signe(val[10] - val[0])} d'ici ${p[10].annee}`, val[10] >= val[0] ? "haut" : "bas", val[10] >= val[0]) : puce(`${signe(d)} par rapport à aujourd'hui`, d >= 0 ? "haut" : "bas", d >= 0),
+        i === 0 ? null : `Entre ${$(bas[i])} et ${$(haut[i])} selon le scénario`,
+      ]);
+    };
+    montrer(0);
+    // En glissant sur le graphique, le chiffre principal suit l'année touchée.
     graphiqueLignes(document.getElementById("vn-graph"), document.getElementById("vn-legende"), [
-      { nom: "Votre valeur nette", couleur: SERIES[0], valeurs: p.map(x => x.moi) },
-      ...(R.couple ? [{ nom: "Valeur nette du couple", couleur: SERIES[1], valeurs: p.map(x => x.menage) }] : []),
-    ], p.map(x => String(x.annee)), { titre: "Valeur nette projetée" });
-    const hyp = S.dettes.filter(d => d.type === "hypotheque");
-    const surplusCopro = hyp.reduce((a, d) => a + Math.max(0, ((d.paiementMoi ?? 100) - (d.partMoi ?? 100)) / 100), 0);
-    document.getElementById("vn-note").textContent = `Votre valeur nette compte ${nb(S.actifs.maison.part, 0)} % de la maison et la part de chaque dette qui vous revient. Rendement de ${nb(S.epargne.rendement)} % par an ; une fois les dettes remboursées, le même budget mensuel est investi.` +
-      (R.couple ? ` Le couple compte ${nb(S.actifs.maison.part + S.conjointe.partMaison, 0)} % de la maison, toutes les dettes et l'épargne de votre conjointe (${$(S.conjointe.epargne)}), au même rendement.` : "") +
-      (surplusCopro > 0 ? ` Vous payez une plus grande part de l'hypothèque que votre part de la maison : le capital que vous remboursez enrichit aussi ${R.couple ? "votre conjointe" : "l'autre copropriétaire"}, sauf entente écrite ou mariage.` : "");
-    lignes(document.getElementById("ep-reee"), ["Enfant", "Années restantes", "Vos cotisations", "Subventions", "Valeur à 17 ans"],
-      R.reee.map((x, i) => ({ cellules: [S.epargne.reee.enfants[i].nom, String(x.ans), $(x.cotisations), $(x.subventions), $(x.solde)] })));
+      { nom: qui, couleur: SERIES[0], valeurs: val },
+    ], p.map(x => String(x.annee)), {
+      titre: "Valeur nette projetée", surPoint: i => montrer(i == null ? 0 : i),
+      bande: { bas, haut, couleur: SERIES[0] },
+      legende: [{ nom: `Scénario ${SCENARIOS[R.scenario].toLowerCase()}`, couleur: SERIES[0] }, { nom: "Du prudent à l'optimiste", couleur: SERIES[0], zone: true }],
+    });
+    const hypD = S.dettes.filter(d => d.type === "hypotheque");
+    const surplusCopro = hypD.reduce((a, d) => a + Math.max(0, ((d.paiementMoi ?? 100) - (d.partMoi ?? 100)) / 100), 0);
+    document.getElementById("vn-note").textContent = "Chaque paiement d'hypothèque réduit la dette : le capital remboursé devient de l'équité dans la maison, dont la valeur croît chaque année. Une fois les dettes remboursées, le même budget mensuel est placé. Glissez sur le graphique pour voir chaque année." +
+      (surplusCopro > 0 && !couple ? ` Vous payez une plus grande part de l'hypothèque que votre part de la maison : le capital que vous remboursez enrichit aussi ${cj ? "votre conjointe" : "l'autre copropriétaire"}, sauf entente écrite ou mariage.` : "");
+
+    // De quoi elle est faite : aujourd'hui, dans 10 ans, dans 20 ans.
+    const cols = [0, 10, 20].filter(i => i < p.length);
+    const v = (i, f) => f(p[i]) / def(i);
+    const L = couple
+      ? [["Maison, part du couple", x => x.maisonMenage], ["Hypothèques", x => -x.hypMenage], ["Équité dans la maison", x => x.equiteMenage, "sous-total"],
+         ["Placements : REER, CELI, comptes", x => x.placements + x.conjointe], ["Autos", x => x.voitureMenage], ["Autres dettes", x => -x.autresMenage]]
+      : [["Maison, votre part", x => x.maisonMoi], ["Hypothèques, votre part", x => -x.hypMoi], ["Équité dans la maison", x => x.equiteMoi, "sous-total"],
+         ["Placements : REER, CELI, comptes", x => x.placements], ["Auto", x => x.voitureMoi], ["Autres dettes, votre part", x => -x.autresMoi]];
+    // Sur téléphone, montants abrégés (k$, M$) pour que les trois colonnes tiennent.
+    const tableComp = document.getElementById("vn-composition");
+    const court = (tableComp.closest(".carte").clientWidth || 600) < 520;
+    const m$ = x => !court ? $(x) : Math.abs(x) >= 1e6 ? nb(x / 1e6, 2) + " M$" : nb(x / 1000, Math.abs(x) >= 1e5 ? 0 : 1) + " k$";
+    lignes(tableComp, ["", ...cols.map(i => i === 0 ? "Aujourd'hui" : String(p[i].annee))], [
+      ...L.map(([n, f, cls]) => ({ cls: cls === "sous-total" ? "choix" : null, cellules: [n, ...cols.map(i => { const x = v(i, f); return Math.abs(x) < 0.5 ? "—" : m$(x); })] })),
+      { cls: "total", cellules: ["Valeur nette", ...cols.map(i => m$(v(i, x => x[cle])))] },
+    ]);
+    document.getElementById("vn-composition-note").textContent = `Valeur de la maison : ${$(p[0].valeurMaison)} aujourd'hui, ${$(p[cols[cols.length - 1]].valeurMaison / def(cols[cols.length - 1]))} en ${p[cols[cols.length - 1]].annee} (${signePct(h.croissanceMaison)} par année).` +
+      (S.scenarios.dollarsAujourdhui ? " Montants en dollars d'aujourd'hui." : "");
+
+    rangees("vn-scenarios", Object.entries(SCENARIOS).map(([k, nom]) => {
+      const pk = R.projections[k], fin = pk[pk.length - 1], dix = pk[Math.min(10, pk.length - 1)];
+      return { titre: nom, ico: k === R.scenario ? "ok" : " ", cls: k === R.scenario ? "choisi" : null,
+        sous: R.libres[k] ? `Sans dettes en ${moisAn(R.libres[k])}` : "Dettes jamais remboursées",
+        valeur: $(fin[cle] / def(pk.length - 1)), valeurSous: `${dix.annee} : ${$(dix[cle] / def(10))}`,
+        action: k === R.scenario ? null : () => changer("scenarios.choisi", k) };
+    }));
+
+    rangees("ep-reee", [
+      ...R.reee.map((x, i) => {
+        const e = S.epargne.reee.enfants[i];
+        return { titre: e.nom, sous: `${nb(e.age, 0)} ans · encore ${x.ans} an${x.ans > 1 ? "s" : ""} de cotisations`, valeur: $(x.solde), valeurSous: `dont ${$(x.subventions)} de subventions`, action: () => feuilleEnfant(i) };
+      }),
+      { titre: "Ajouter un enfant", ico: "plus", cls: "ajout", action: () => { S.epargne.reee.enfants.push({ id: nouvelId("e"), nom: "Enfant", age: 0, solde: 0 }); sauver(); tout(); feuilleEnfant(S.epargne.reee.enfants.length - 1); } },
+    ]);
     const z = document.getElementById("ep-reer"); z.textContent = "";
     const c = S.epargne.reer.cotisationAnnuelle;
     z.appendChild(el("p", "resume", c > 0
       ? `Cotiser ${$(c)} au REER vous rembourse environ ${$(R.remboursementReer)} d'impôt (${pct(R.remboursementReer / c, 0)}).${S.strategie.reerSurDettes ? " Ce remboursement est versé sur vos dettes chaque avril." : ""}`
       : `Aucune cotisation REER prévue. À votre taux marginal, 10 000 $ cotisés rapporteraient environ ${$(R.tauxMarginal * 10000)} de remboursement.`));
-    if (S.epargne.reer.droits > 0) z.appendChild(el("p", "note", `Droits inutilisés : ${$(S.epargne.reer.droits)}.`));
+    z.appendChild(rangees(el("div"), [
+      { titre: "Solde REER", valeur: $(S.epargne.reer.solde) },
+      { titre: "Droits inutilisés", sous: "Sur votre avis de cotisation fédéral", valeur: $(S.epargne.reer.droits) },
+      { titre: "Solde CELI", valeur: $(S.epargne.celi.solde) },
+    ]));
   }
 
   function rendreFiabilite() {
-    const tous = Object.values(CHAMPS).flat().filter(c => c.p).map(c => c.p);
-    const uniques = [...new Set(tous)];
+    const uniques = [...new Set(Object.values(CHAMPS).flat().filter(c => c.p).map(c => c.p))];
     const n = uniques.filter(p => S.confirmes[p]).length;
-    document.getElementById("fiabilite").textContent = `${n} sur ${uniques.length} valeurs confirmées`;
+    document.getElementById("fiabilite").textContent = `${n} sur ${uniques.length}`;
+    document.querySelector("#fiabilite-jauge span").style.width = (n / Math.max(1, uniques.length) * 100) + "%";
     const l = document.getElementById("liste-a-confirmer"); l.textContent = "";
-    Object.values(CHAMPS).flat().filter(c => c.p && !S.confirmes[c.p]).filter((c, i, a) => a.findIndex(x => x.p === c.p) === i).slice(0, 40).forEach(c => l.appendChild(el("li", null, c.l)));
-    document.getElementById("bandeau-exemple").hidden = !S.meta.exemple;
+    Object.values(CHAMPS).flat().filter(c => c.p && !S.confirmes[c.p]).filter((c, i, a) => a.findIndex(x => x.p === c.p) === i).forEach(c => l.appendChild(el("li", null, c.l)));
     document.getElementById("donnees-maj").textContent = S.meta.misAJour ? `Dernière modification : ${new Date(S.meta.misAJour).toLocaleString("fr-CA")}` : "";
   }
 
   let R = null;
   function tout() {
     R = calculer();
-    rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreEpargne(R); rendreFiabilite();
-    totauxCategories();
+    rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
+    if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
   }
 
   /* ============================================================
@@ -966,7 +1290,7 @@
   const plusTard = () => { clearTimeout(minuterie); minuterie = setTimeout(() => { sauver(); tout(); }, 120); };
   function valeur(inp) {
     if (inp.type === "checkbox") return inp.checked;
-    if (inp.type === "number") { const v = parseFloat(inp.value); return isFinite(v) ? Math.max(0, v) : null; }
+    if (inp.type === "number") { const v = parseFloat(String(inp.value).replace(",", ".")); return isFinite(v) ? (inp.dataset.neg ? v : Math.max(0, v)) : null; }
     return inp.value;
   }
   document.addEventListener("input", e => {
@@ -974,15 +1298,15 @@
     if (inp.dataset.p) {
       const v = valeur(inp); if (v === null) return;
       ecrire(inp.dataset.p, v); S.meta.exemple = false;
-      // Garde à jour la copie du même champ dans un autre onglet.
-      document.querySelectorAll(`[data-p="${inp.dataset.p}"]`).forEach(x => { if (x !== inp) { if (x.type === "checkbox") x.checked = !!v; else x.value = v; } });
-      if (inp.dataset.p === "conjointe.active" || inp.dataset.p === "famille.calculAuto") { majVisibilite(); listeBudget(); }
+      if (inp.dataset.p === "conjointe.active" || inp.dataset.p === "famille.calculAuto") majVisibilite();
       plusTard();
     } else if (inp.dataset.l) {
       const v = valeur(inp); if (v === null) return;
       const item = tableau(inp.dataset.l)[+inp.dataset.i];
       item[inp.dataset.k] = v; S.meta.exemple = false;
-      if (inp.dataset.l === "dettes" && (inp.dataset.k === "type" || inp.dataset.k === "interetsSeulement")) { sauver(); listeDettes(); tout(); return; }
+      if (inp.dataset.k === "nom" && inp.dataset.l !== "budget" && feuilleCourante) { feuilleCourante.titre = v || "Sans nom"; titreFeuille.textContent = feuilleCourante.titre; }
+      if (inp.dataset.l === "budget" && inp.dataset.k === "montant") inp.closest(".ligne-depense").classList.toggle("remplie", v > 0);
+      if (inp.dataset.l === "dettes" && (inp.dataset.k === "type" || inp.dataset.k === "interetsSeulement")) { sauver(); reconstruireFeuille(); tout(); return; }
       plusTard();
     }
   });
@@ -995,23 +1319,22 @@
       sauver(); rendreFiabilite();
     } else if (b.dataset.suppr) {
       tableau(b.dataset.suppr).splice(+b.dataset.i, 1); sauver();
-      if (b.dataset.suppr === "budget") listeBudget(); else if (b.dataset.suppr === "dettes") listeDettes(); else listeEnfants();
-      tout();
-    } else if (b.dataset.onglet) ouvrir(b.dataset.onglet);
-    else if (b.dataset.aller) ouvrir(b.dataset.aller);
+      if (b.dataset.suppr === "budget") { reconstruireFeuille(); tout(); } else feuille.close();
+    } else if (b.dataset.feuille) ouvrirSection(b.dataset.feuille);
   });
-    document.getElementById("ajout-dette").addEventListener("click", () => { S.dettes.push({ id: nouvelId("d"), nom: "Nouvelle dette", type: "pret", solde: 0, limite: 0, taux: 5, paiement: 0, frequence: "mois", interetsSeulement: false, finTerme: "", tauxRenouvellement: 0, dureeTerme: 5, privilege: 0, creditImpot: 0, partMoi: 100, paiementMoi: 100 }); sauver(); listeDettes(); tout(); });
-  document.getElementById("ajout-enfant").addEventListener("click", () => { S.epargne.reee.enfants.push({ id: nouvelId("e"), nom: "Enfant", age: 0, solde: 0 }); sauver(); listeEnfants(); tout(); });
-  document.getElementById("fiabilite").addEventListener("click", () => ouvrir("donnees"));
 
-  /* Onglets, avec l'onglet ouvert dans l'adresse (#revenu, #impot…). */
+  /* Pages, avec la page ouverte dans l'adresse (#revenu, #impot…). */
+  const ALIAS = { epargne: "avenir" };
   function ouvrir(nom) {
+    nom = ALIAS[nom] || nom;
     if (!document.getElementById("v-" + nom)) nom = "apercu";
-    document.querySelectorAll("[data-onglet]").forEach(b => b.setAttribute("aria-selected", b.dataset.onglet === nom ? "true" : "false"));
+    document.querySelectorAll(".nav [data-onglet], .barre-haut [data-onglet]").forEach(a => { if (a.dataset.onglet === nom) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     document.querySelectorAll(".vue").forEach(v => { v.hidden = v.id !== "v-" + nom; });
     if (location.hash !== "#" + nom) history.replaceState(null, "", "#" + nom);
-    if (R) tout();   // les graphiques prennent la largeur de l'onglet visible
+    window.scrollTo(0, 0);
+    if (R) tout();   // les graphiques prennent la largeur de la page visible
   }
+  window.addEventListener("hashchange", () => ouvrir(location.hash.slice(1)));
 
   /* Import et export */
   const message = t => { document.getElementById("donnees-message").textContent = t; };
@@ -1019,7 +1342,7 @@
     const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `boussole-donnees-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `wealthnord-donnees-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     message("Fichier exporté. Gardez-le dans un endroit sûr : il contient toutes vos données.");
@@ -1032,25 +1355,25 @@
         const d = JSON.parse(lecteur.result);
         if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
         S = fusion(clone(EXEMPLE), d); S.budget = normaliserBudget(S.budget); S.meta.exemple = false; sauver();
-        construireTout(); message(`Données importées : ${S.dettes.length} dettes, ${S.budget.length} dépenses.`);
-      } catch (err) { message("Ce fichier n'est pas un fichier de données Boussole. Rien n'a été changé."); }
+        tout(); message(`Données importées : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`);
+      } catch (err) { message("Ce fichier n'est pas un fichier de données Wealthnord (ou Boussole). Rien n'a été changé."); }
     };
     lecteur.readAsText(f); e.target.value = "";
   });
   const reinit = document.getElementById("reinitialiser"), confirmer = document.getElementById("confirmer-reinit");
   reinit.addEventListener("click", () => { confirmer.hidden = false; confirmer.focus(); });
-  confirmer.addEventListener("click", () => { S = clone(EXEMPLE); S.budget = normaliserBudget(S.budget); sauver(); construireTout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
+  confirmer.addEventListener("click", () => { S = clone(EXEMPLE); S.budget = normaliserBudget(S.budget); sauver(); tout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
 
-  function construireTout() {
-    construireChamps(document.getElementById("f-revenu"), CHAMPS.revenu);
-    construireChamps(document.getElementById("f-impot"), CHAMPS.impot);
-    construireChamps(document.getElementById("f-menage"), CHAMPS.menage);
-    construireChamps(document.getElementById("f-strategie"), CHAMPS.strategie);
-    construireChamps(document.getElementById("f-epargne"), CHAMPS.epargne);
-    listeBudget(); listeDettes(); listeEnfants();
-    remplirChamps(); tout();
-  }
-  construireTout();
+  /* Application installable (PWA) : fonctionne hors ligne. */
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname)))
+    navigator.serviceWorker.register("sw.js").catch(() => { /* le site fonctionne quand même */ });
+  let invite = null;
+  const boutonInstaller = document.getElementById("installer");
+  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); invite = e; boutonInstaller.hidden = false; });
+  boutonInstaller.addEventListener("click", async () => { if (!invite) return; invite.prompt(); await invite.userChoice; invite = null; boutonInstaller.hidden = true; });
+  if (window.matchMedia("(display-mode: standalone)").matches || navigator.standalone) document.getElementById("carte-installer").hidden = true;
+
+  tout();
   ouvrir((location.hash || "#apercu").slice(1));
   if (typeof ResizeObserver !== "undefined") {
     let largeur = 0;

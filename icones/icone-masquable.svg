@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Wealthnord</title>
+  <rect width="512" height="512" fill="#121211"/>
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#f5f4f0" stroke-opacity="0.16" stroke-width="5"/>
+  <g stroke="#f5f4f0" stroke-opacity="0.42" stroke-width="6" stroke-linecap="round">
+    <path d="M256 66v22M446 256h-22M256 446v-22M66 256h22"/>
+  </g>
+  <g transform="rotate(42 256 256)">
+    <path d="M256 92 218 256h38Z" fill="#e8cf9c"/>
+    <path d="M256 92 294 256h-38Z" fill="#b58d55"/>
+    <path d="M256 420 218 256h38Z" fill="#f5f4f0"/>
+    <path d="M256 420 294 256h-38Z" fill="#c9c6bc"/>
+  </g>
+  <circle cx="256" cy="256" r="15" fill="#121211" stroke="#e8cf9c" stroke-width="5"/>
+</svg>

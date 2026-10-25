@@ -1,12 +1,24 @@
 {
-  "name": "Boussole",
-  "short_name": "Boussole",
-  "description": "Revenu, impôt, dettes et épargne du ménage.",
+  "id": "./",
+  "name": "Wealthnord",
+  "short_name": "Wealthnord",
+  "description": "Revenu, impôt, dettes et avenir du ménage, calculés sur cet appareil.",
   "lang": "fr-CA",
-  "start_url": "./",
+  "dir": "ltr",
+  "start_url": "./#apercu",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f3f5f6",
-  "theme_color": "#f3f5f6",
-  "icons": [{ "src": "icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+  "background_color": "#f5f4f0",
+  "theme_color": "#f5f4f0",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-masquable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Budget", "url": "./#budget", "icons": [{ "src": "icones/icone-192.png", "sizes": "192x192" }] },
+    { "name": "Avenir", "url": "./#avenir", "icons": [{ "src": "icones/icone-192.png", "sizes": "192x192" }] }
+  ]
 }

@@ -1,4 +1,4 @@
-/* Boussole — moteur de calcul.
+/* Wealthnord — moteur de calcul.
    Fonctions pures, sans accès à la page : elles reçoivent l'état et
    rendent des nombres. Chargé tel quel par la page et par Node pour les
    vérifications. */
@@ -325,31 +325,70 @@
      Au renouvellement, le paiement ne change pas : seul le taux change. */
   // Taux réel : taux en vigueur (après un renouvellement), moins le crédit d'impôt sur les intérêts.
   function tauxReel(d) { return (d.tauxCourant ?? d.taux) * (1 - (d.creditImpot || 0) / 100); }
+  /* Taux mensuel effectif. Hypothèque à taux fixe au Canada : intérêt composé
+     deux fois par année (Loi sur l'intérêt), soit (1 + t/2)^(1/6) - 1 par mois.
+     Marge, prêts et hypothèque à taux variable : t/12. */
+  function tauxMensuel(d, taux) {
+    return d.type === "hypotheque" && !d.tauxVariable ? Math.pow(1 + taux / 200, 1 / 6) - 1 : taux / 1200;
+  }
+  // Nombre de mois pour rembourser un solde avec ce paiement (Infinity si le paiement ne couvre pas l'intérêt).
+  function moisRestants(solde, i, paiement) {
+    if (solde <= 0) return 0;
+    if (paiement <= solde * i) return Infinity;
+    return i === 0 ? solde / paiement : -Math.log(1 - solde * i / paiement) / Math.log(1 + i);
+  }
+  // Paiement qui rembourse le solde en n mois.
+  const paiementPour = (solde, i, n) => n <= 0 ? solde : i === 0 ? solde / n : solde * i / (1 - Math.pow(1 + i, -n));
 
+  /* Simulation mois par mois. Le budget consacré aux dettes (paiements
+     minimums de départ + montant en plus) reste le même : chaque dette
+     remboursée libère son paiement pour les suivantes.
+     o.extraParAnnee(a) donne le montant en plus de l'année a (revenus et
+     dépenses qui évoluent) ; o.ecartTaux décale les taux variables et les
+     taux de renouvellement (scénarios) ; o.continuerApres prolonge la
+     simulation après la dernière dette pour suivre l'argent libéré. */
   function simulerDettes(dettes, o) {
     const debut = new Date(o.debut + "-01T00:00:00");
-    const ds = dettes.map(d => ({
-      ...d, s: Math.max(0, +d.solde || 0), interets: 0, interetsNets: 0, fin: null, tauxCourant: d.taux,
-      paiementMensuel: d.frequence === "2sem" ? d.paiement * 26 / 12 : d.paiement,
-      finTerme: d.finTerme ? new Date(d.finTerme + "T00:00:00") : null,
-      privilegeRestant: Infinity,
-    }));
+    const ecart = o.ecartTaux || 0;
+    const ds = dettes.map(d => {
+      const x = {
+        ...d, s: Math.max(0, +d.solde || 0), interets: 0, interetsNets: 0, fin: null,
+        paiementMensuel: d.frequence === "2sem" ? d.paiement * 26 / 12 : d.paiement,
+        finTerme: d.finTerme ? new Date(d.finTerme + "T00:00:00") : null,
+        privilegeRestant: Infinity,
+      };
+      // Taux variable (marge) : l'écart du scénario s'applique tout de suite.
+      x.tauxCourant = d.type === "marge" ? Math.max(0, d.taux + ecart) : d.taux;
+      // Amortissement restant au départ, gardé au renouvellement (on ne le rallonge pas).
+      x.nRestant = d.type === "hypotheque" && !d.interetsSeulement ? moisRestants(x.s, tauxMensuel(d, x.tauxCourant), x.paiementMensuel) : Infinity;
+      return x;
+    });
     const mois = [], parAn = [];
-    let interetsTotaux = 0, interetsNetsTotaux = 0, extraLibre = 0, reserve = 0;
+    let interetsTotaux = 0, interetsNetsTotaux = 0, extraLibre = 0, reserve = 0, gainsAttente = 0;
+    // L'argent en attente (plafond de remboursement anticipé atteint) est placé à court terme
+    // jusqu'au prochain droit de remboursement : 2,4 % par an selon les normes de projection 2026.
+    const rAttente = Math.pow(1 + (o.rendementAttente ?? 2.4) / 100, 1 / 12) - 1;
     const max = o.moisMax || 480;
-    const minimumsDepart = ds.reduce((a, d) => a + (d.interetsSeulement ? d.s * d.taux / 100 / 12 : d.paiementMensuel), 0);
-    const budget = o.methode === "minimum" ? null : minimumsDepart + (o.extraMensuel || 0);
+    const minimumsDepart = ds.reduce((a, d) => a + (d.interetsSeulement ? d.s * tauxMensuel(d, d.tauxCourant) : d.paiementMensuel), 0);
+    const extraAnnee = a => o.extraParAnnee ? Math.max(0, o.extraParAnnee(a)) : (o.extraMensuel || 0);
     for (let m = 0; m < max; m++) {
       const date = new Date(debut.getFullYear(), debut.getMonth() + m, 1);
+      const budget = o.methode === "minimum" ? null : minimumsDepart + extraAnnee(Math.floor(m / 12));
       if (date.getMonth() === 0 || m === 0) {
         ds.forEach(d => { d.privilegeRestant = d.type === "hypotheque" ? d.s * (d.privilege || 0) / 100 : Infinity; });
       }
       let interetsMois = 0, interetsEtudes = 0, minimumsPayes = 0;
       for (const d of ds) {
+        // Renouvellement : à la fin du terme, puis à chaque nouveau terme (5 ans par défaut).
+        const moisDepuis = d.finTerme ? (date.getFullYear() - d.finTerme.getFullYear()) * 12 + date.getMonth() - d.finTerme.getMonth() : -1;
+        d.auRenouvellement = moisDepuis >= 0 && moisDepuis % (12 * (d.dureeTerme || 5)) === 0;
         if (d.s <= 0.005) continue;
-        const renouvele = d.finTerme && date >= d.finTerme;
-        d.tauxCourant = renouvele && d.tauxRenouvellement ? d.tauxRenouvellement : d.taux;
-        const i = d.s * d.tauxCourant / 100 / 12;
+        if (d.auRenouvellement) {
+          d.tauxCourant = Math.max(0, (d.tauxRenouvellement || d.taux) + ecart);
+          // Nouveau paiement : même amortissement restant, au nouveau taux.
+          if (isFinite(d.nRestant) && d.nRestant > 0) d.paiementMensuel = paiementPour(d.s, tauxMensuel(d, d.tauxCourant), d.nRestant);
+        }
+        const i = d.s * tauxMensuel(d, d.tauxCourant);
         d.interets += i; interetsMois += i;
         d.interetsNets += i * (1 - (d.creditImpot || 0) / 100);
         interetsNetsTotaux += i * (1 - (d.creditImpot || 0) / 100);
@@ -357,33 +396,33 @@
         const paye = Math.min(d.s + i, d.interetsSeulement ? i : d.paiementMensuel);
         minimumsPayes += paye;
         d.s = d.s + i - paye;
+        if (isFinite(d.nRestant)) d.nRestant = Math.max(0, d.nRestant - 1);
         if (d.s <= 0.005) { d.s = 0; d.fin = d.fin || date; }
       }
       // L'extra qui n'a pas pu être versé (plafond de remboursement anticipé
       // atteint) est mis de côté et versé dès que possible : en janvier ou
       // au renouvellement.
-      let extra = budget === null ? 0 : Math.max(0, budget - minimumsPayes) + reserve;
+      const gain = reserve * rAttente; gainsAttente += gain;
+      let extra = budget === null ? 0 : Math.max(0, budget - minimumsPayes) + reserve + gain;
       if (budget !== null && o.forfaitsAnnuels && date.getMonth() === (o.moisForfait ?? 3)) extra += o.forfaitsAnnuels;
       // Répartition de l'extra.
       const ordre = ds.filter(d => d.s > 0.005).sort((a, b) =>
         o.methode === "boule" ? a.s - b.s : tauxReel(b) - tauxReel(a));
       for (const d of ordre) {
         if (extra <= 0) break;
-        // Renouvellement à la fin du terme, puis à chaque nouveau terme (5 ans par défaut) :
-        // le remboursement anticipé n'y a pas de plafond.
-        const moisDepuis = d.finTerme ? (date.getFullYear() - d.finTerme.getFullYear()) * 12 + date.getMonth() - d.finTerme.getMonth() : -1;
-        const auMoisRenouvellement = moisDepuis >= 0 && moisDepuis % (12 * (d.dureeTerme || 5)) === 0;
-        const plafond = d.type === "hypotheque" && !auMoisRenouvellement ? d.privilegeRestant : Infinity;
+        // Au renouvellement, le remboursement anticipé n'a pas de plafond.
+        const plafond = d.type === "hypotheque" && !d.auRenouvellement ? d.privilegeRestant : Infinity;
         const verse = Math.min(extra, d.s, plafond);
         d.s -= verse; extra -= verse;
-        if (d.type === "hypotheque" && !auMoisRenouvellement) d.privilegeRestant -= verse;
+        if (d.type === "hypotheque" && !d.auRenouvellement) d.privilegeRestant -= verse;
         if (d.s <= 0.005) { d.s = 0; d.fin = d.fin || date; }
       }
       const resteDesDettes = ds.some(d => d.s > 0.005);
       reserve = resteDesDettes ? extra : 0;
       extraLibre = resteDesDettes ? 0 : extra;
       interetsTotaux += interetsMois;
-      mois.push({ date, soldes: ds.map(d => d.s), total: ds.reduce((a, d) => a + d.s, 0), extraLibre, interetsEtudes });
+      // reserve : argent mis de côté en attendant le prochain droit de remboursement anticipé (un actif).
+      mois.push({ date, soldes: ds.map(d => d.s), total: ds.reduce((a, d) => a + d.s, 0), extraLibre, reserve, interetsEtudes });
       if (ds.every(d => d.s <= 0.005) && (o.continuerApres ? m >= (o.continuerApres - 1) : true)) break;
     }
     // Intérêts sur les prêts d'études par année civile (pour le crédit d'impôt).
@@ -392,9 +431,10 @@
       const e = parAn.find(p => p.annee === a) || (parAn.push({ annee: a, interetsEtudes: 0 }), parAn[parAn.length - 1]);
       e.interetsEtudes += x.interetsEtudes;
     }
-    const libre = ds.every(d => d.s <= 0.005) ? mois[mois.length - 1].date : null;
-    return { mois, dettes: ds.map(d => ({ id: d.id, nom: d.nom, fin: d.fin, interets: d.interets, interetsNets: d.interetsNets })),
-      interetsTotaux, interetsNetsTotaux, libre, parAn };
+    const iLibre = mois.findIndex(x => x.total <= 0.005);
+    return { mois, dettes: ds.map(d => ({ id: d.id, nom: d.nom, fin: d.fin, interets: d.interets, interetsNets: d.interetsNets, tauxFinal: d.tauxCourant })),
+      interetsTotaux, interetsNetsTotaux, gainsAttente, coutNet: interetsNetsTotaux - gainsAttente,
+      libre: iLibre >= 0 ? mois[iLibre].date : null, iLibre, parAn };
   }
 
   /* ============================================================
@@ -418,37 +458,60 @@
     });
   }
 
-  /* Valeur nette projetée par année, à partir de la simulation des dettes. */
+  /* Valeur nette projetée, mois par mois, à partir de la simulation des
+     dettes prolongée jusqu'à l'horizon. Les placements croissent au taux
+     mensuel équivalent ; les cotisations sont versées chaque mois ; l'argent
+     libéré par la dernière dette est investi (CELI). Chaque paiement
+     d'hypothèque réduit la dette : le capital remboursé devient de l'équité
+     dans la maison, dont la valeur croît chaque année. */
   function projeterValeurNette(o, simulation) {
-    const ans = o.annees || 20, r = o.rendement / 100;
+    const ans = o.annees || 20, r = o.rendement / 100, rm = Math.pow(1 + r, 1 / 12) - 1;
+    const voitures = o.voitures || [];
+    let reer = o.reer.solde, celi = o.celi.solde, conj = o.actifsConjoint || 0;
+    const encaisse = o.encaisse || 0;
     const res = [];
-    let reer = o.reer.solde, celi = o.celi.solde, encaisse = o.encaisse || 0;
+    const soldesAu = a => {
+      if (a === 0) return o.dettes.map(d => Math.max(0, +d.solde || 0));
+      const m = simulation.mois[a * 12 - 1];
+      return m ? m.soldes : o.dettes.map(() => 0);
+    };
     for (let a = 0; a <= ans; a++) {
-      const idx = Math.min(simulation.mois.length - 1, a * 12);
-      const m = simulation.mois[idx];
-      const soldes = a * 12 < simulation.mois.length ? m.soldes : m.soldes.map(() => 0);
-      // Après la dernière dette, l'extra libéré est investi (CELI).
-      const extraAnnuel = a * 12 >= simulation.mois.length ? o.extraApresDettes * 12 : 0;
-      let detteMoi = 0, detteMenage = 0, hypotheque = 0;
+      if (a > 0) {
+        for (let k = (a - 1) * 12; k < a * 12; k++) {
+          const libre = simulation.mois[k] ? simulation.mois[k].extraLibre : (simulation.mois.length ? simulation.mois[simulation.mois.length - 1].extraLibre : 0);
+          reer = reer * (1 + rm) + o.reer.cotisationAnnuelle / 12;
+          // Sans remboursement accéléré (minimums seulement), le surplus du mois est épargné.
+          celi = celi * (1 + rm) + o.celi.cotisationAnnuelle / 12 + (libre || 0) + (o.ajoutMensuel ? Math.max(0, o.ajoutMensuel(a - 1)) : 0);
+          conj = conj * (1 + rm);
+        }
+      }
+      const soldes = soldesAu(a);
+      // Argent en attente d'être versé sur l'hypothèque (plafond de remboursement anticipé atteint).
+      const attente = a > 0 && simulation.mois[a * 12 - 1] ? simulation.mois[a * 12 - 1].reserve || 0 : 0;
+      let hypMoi = 0, hypMenage = 0, autresMoi = 0, autresMenage = 0;
       o.dettes.forEach((d, i) => {
-        detteMenage += soldes[i];
-        detteMoi += soldes[i] * (d.partMoi ?? 100) / 100;
-        if (d.type === "hypotheque") hypotheque += soldes[i];
+        const part = (d.partMoi ?? 100) / 100;
+        if (d.type === "hypotheque") { hypMenage += soldes[i]; hypMoi += soldes[i] * part; }
+        else { autresMenage += soldes[i]; autresMoi += soldes[i] * part; }
       });
-      const maison = o.maison.valeur * Math.pow(1 + o.maison.croissance / 100, a);
-      const voiture = o.voiture.valeur * Math.pow(1 - o.voiture.depreciation / 100, a);
-      const moi = maison * o.maison.part / 100 + voiture + reer + celi + encaisse - detteMoi;
-      // Ménage : la part de la maison détenue par le ménage (vous et votre conjointe, s'il y a lieu).
-      const menage = maison * (o.maison.partMenage ?? 100) / 100 + voiture + reer + celi + encaisse + (o.actifsConjoint || 0) * Math.pow(1 + r, a) - detteMenage;
-      res.push({ annee: o.anneeDepart + a, moi, menage, maison, hypotheque, dettes: detteMenage, reer, celi });
-      reer = reer * (1 + r) + o.reer.cotisationAnnuelle;
-      celi = celi * (1 + r) + o.celi.cotisationAnnuelle + extraAnnuel;
+      const valeurMaison = o.maison.valeur * Math.pow(1 + o.maison.croissance / 100, a);
+      const maisonMoi = valeurMaison * o.maison.part / 100;
+      const maisonMenage = valeurMaison * (o.maison.partMenage ?? o.maison.part) / 100;
+      const vMoi = voitures.filter(v => !v.conjointe).reduce((s, v) => s + v.valeur * Math.pow(1 - v.depreciation / 100, a), 0);
+      const vMenage = voitures.reduce((s, v) => s + v.valeur * Math.pow(1 - v.depreciation / 100, a), 0);
+      const placements = reer + celi + encaisse + attente;
+      const moi = maisonMoi - hypMoi + vMoi + placements - autresMoi;
+      const menage = maisonMenage - hypMenage + vMenage + placements + conj - autresMenage;
+      res.push({ annee: o.anneeDepart + a, moi, menage, valeurMaison, maisonMoi, maisonMenage, hypMoi, hypMenage,
+        equiteMoi: maisonMoi - hypMoi, equiteMenage: maisonMenage - hypMenage, autresMoi, autresMenage,
+        voitureMoi: vMoi, voitureMenage: vMenage, reer, celi, encaisse, attente, placements, conjointe: conj,
+        hypotheque: hypMenage, dettes: hypMenage + autresMenage });
     }
     return res;
   }
 
   const Calc = { P2026, VISITES, PRISE_EN_CHARGE, tarifVisite, revenuGmfu, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
-    remboursementReer, impotDividendes, comparerSociete, simulerDettes, tauxReel, projeterReee, projeterValeurNette };
+    remboursementReer, impotDividendes, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;
 })(typeof window !== "undefined" ? window : globalThis);
