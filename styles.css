@@ -21,7 +21,7 @@
   --surface-3: #e6e4dd;
   --encre: #121211;
   --encre-2: #45443f;
-  --discret: #6f6d66;
+  --discret: #67655e;   /* 4,5:1 au moins sur toutes les surfaces claires */
   --axe: #8b8981;
   --grille: #ecebe6;
   --trait: #d9d7cf;
@@ -256,8 +256,10 @@ main {
 .carte-sous { font-size: 0.82rem; color: var(--discret); }
 .lien-carte {
   border: 0; background: none; padding: 0; cursor: pointer; text-decoration: none;
-  font: 600 0.88rem var(--police); color: var(--info);
+  font: 600 0.88rem var(--police); color: var(--info); position: relative;
 }
+/* Zone tactile d'au moins 44 px de haut autour du lien, sans changer la mise en page. */
+.lien-carte::after { content: ""; position: absolute; inset: -14px -10px; }
 .carte h3 { font-size: 0.95rem; font-weight: 600; }
 .carte h4 { font-size: 0.9rem; font-weight: 600; margin-top: 4px; }
 .carte.exemple { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; background: var(--attention-lavis); border-color: transparent; box-shadow: none; }
@@ -647,7 +649,7 @@ a.tuile:hover { border-color: var(--trait); }
 .simulation { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: var(--rayon-petit); background: var(--surface-2); }
 .simulation-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 0.94rem; }
 .simulation-tete strong { font-variant-numeric: tabular-nums; }
-.simulation input[type="range"] { width: 100%; accent-color: var(--encre); margin: 4px 0; }
+.simulation input[type="range"] { width: 100%; height: 32px; accent-color: var(--encre); margin: 0; }   /* bande tactile plus haute que le fil */
 @media print { .simulation { display: none; } }
 
 /* ============================================================

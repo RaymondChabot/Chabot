@@ -166,7 +166,7 @@
     const axe = v => Math.abs(v) < 1e-6 ? "0 $" : Math.abs(v) >= 1e6 ? nb(v / 1e6, 1) + " M$" : pas < 10000 ? nb(v / 1000, 1) + " k$" : k$(v);
     const x = i => m.l + (n <= 1 ? iw / 2 : (i / (n - 1)) * iw);
     const y = v => m.t + ih - ((v - min) / (max - min)) * ih;
-    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${options.titre}">`;
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="group" aria-label="${options.titre}">`;
     for (let v = min; v <= max + 1e-6; v += pas) {
       const yy = Math.round(y(v)) + 0.5;
       s += `<line class="${Math.abs(v) < 1e-6 ? "base" : "grille"}" x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}"/>`;
