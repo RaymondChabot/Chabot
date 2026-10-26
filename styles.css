@@ -138,16 +138,12 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 /* Le nom fait environ 30 % de la hauteur du sceau (rapport 1200 / 78, losange compris) ;
    il rapetisse un peu si les boutons de droite manquent de place. */
 .marque-ico { width: 37px; height: 44px; flex: none; }
-.marque-nom { width: 215px; height: 14px; flex: 0 1 auto; min-width: 0; }
+.marque-nom { width: 246px; height: 16px; flex: 0 1 auto; min-width: 0; }
 .barre-haut { gap: 10px; }
-@media (max-width: 400px) {
+@media (max-width: 370px) {
   .marque { gap: 9px; }
   .marque-ico { width: 32px; height: 38px; }
-  .marque-nom { width: 185px; height: 12px; }
-}
-@media (max-width: 370px) {
-  .marque { gap: 8px; }
-  .marque-ico { width: 29px; height: 34px; }
+  .marque-nom { width: 215px; height: 14px; }
 }
 
 /* Écran d'ouverture : le sceau apparaît, puis s'efface (une fois par session, sans bloquer les clics). */
@@ -170,7 +166,7 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 @media (prefers-reduced-motion: reduce) { .ouverture-sceau, .ouverture.eclair .ouverture-sceau { animation: none; } }
 /* Verrou : tant que les données chiffrées ne sont pas ouvertes, l'app reste cachée. */
 .verrou { display: none; }
-.verrouille .barre-haut, .verrouille .app, .verrouille .saut { display: none; }
+.verrouille .barre-haut, .verrouille .barre-outils, .verrouille .app, .verrouille .saut { display: none; }
 .verrouille .verrou { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); }
 .verrou-boite { width: min(100%, 360px); display: flex; flex-direction: column; gap: 14px; text-align: center; }
 .verrou-sceau { width: 112px; height: 112px; color: var(--marque); align-self: center; }
@@ -571,7 +567,7 @@ a.tuile:hover { border-color: var(--trait); }
    ORDINATEUR : navigation à gauche, panneau à droite
    ============================================================ */
 @media (min-width: 960px) {
-  .barre-haut { display: none; }
+  .barre-haut, .barre-outils { display: none; }
   .app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
   .nav {
     position: sticky; top: 0; height: 100vh; flex-direction: column; justify-content: flex-start; gap: 2px;
@@ -637,7 +633,7 @@ a.tuile:hover { border-color: var(--trait); }
   :root, :root[data-theme="dark"] { color-scheme: light; }
   html, body { background: #fff; color: #121211; }
   body { font-size: 10.5pt; }
-  .barre-haut, .nav, .feuille, .toast, .saut, .bouton-modifier, .lien-carte, .segment, .carte.exemple, #carte-installer, .bouton, .chevron, .bulle, .graphique .reticule, .graphique .point, .hyp-ligne { display: none !important; }
+  .barre-haut, .barre-outils, .nav, .feuille, .toast, .saut, .bouton-modifier, .lien-carte, .segment, .carte.exemple, #carte-installer, .bouton, .chevron, .bulle, .graphique .reticule, .graphique .point, .hyp-ligne { display: none !important; }
   #v-donnees { display: none !important; }
   .app { display: block; }
   main { max-width: none; padding: 0; }
@@ -838,7 +834,11 @@ a.tuile:hover { border-color: var(--trait); }
 .rp-avis { font-size: 8pt; margin: 8px 0 0; font-weight: 600; }
 
 /* Installer l'application */
-.barre-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+/* Sous le logo : Installer, Rapport PDF (aperçu), thème et Données, alignés à droite ; pas collés en haut. */
+.barre-outils { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 2px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); }
+.barre-outils [hidden] { display: none; }
+@media (max-width: 959px) { #rapport-pdf { display: none; } }
 /* Téléphone étroit : « Installer » en icône seulement, pour laisser la place au logo. */
 @media (max-width: 400px) { .bouton-installer { width: 40px; padding: 0; justify-content: center; } .bouton-installer span { display: none; } }
 .bouton-installer {

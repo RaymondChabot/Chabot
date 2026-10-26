@@ -2792,7 +2792,8 @@ window.Verrou.quandOuvert(function () {
     nom = ALIAS[page] || page;
     if (sous && SOUS_ONGLETS[nom] && SOUS_ONGLETS[nom].some(([k]) => k === sous)) garderSous(nom, sous);
     if (!document.getElementById("v-" + nom)) nom = "apercu";
-    document.querySelectorAll(".nav [data-onglet], .barre-haut [data-onglet]").forEach(a => { if (a.dataset.onglet === nom) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    document.getElementById("barre-pdf").hidden = nom !== "apercu";
+    document.querySelectorAll(".nav [data-onglet], .barre-outils [data-onglet]").forEach(a => { if (a.dataset.onglet === nom) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     document.querySelectorAll(".vue").forEach(v => { v.hidden = v.id !== "v-" + nom; });
     if (location.hash !== "#" + nom) history.replaceState(null, "", "#" + nom);
     window.scrollTo(0, 0);
@@ -2971,6 +2972,7 @@ window.Verrou.quandOuvert(function () {
   const rapportPdf = () => (window.Wealthnord.rapport ? window.Wealthnord.rapport.imprimer() : window.print());
   document.getElementById("imprimer").addEventListener("click", rapportPdf);
   document.getElementById("rapport-pdf").addEventListener("click", rapportPdf);
+  document.getElementById("barre-pdf").addEventListener("click", rapportPdf);
   document.getElementById("rv-milieu").addEventListener("change", e => choisirMilieu(e.target.value));
   document.getElementById("rv-ajout-activite").addEventListener("click", ajouterActivite);
   document.getElementById("rv-autres-modifier").addEventListener("click", feuilleAutresRevenus);

@@ -627,6 +627,11 @@ async function finitions(b, base) {
   verifier("finitions : barre du bas en 12 px au moins", r.taille >= 12, r.taille);
   verifier("finitions : fondu des sous-onglets qui débordent", r.fondu);
   verifier("finitions : l'axe de projection ne descend pas à −1 M$", r.axe.length > 0 && !r.axe.some(t => t.startsWith("-") || t.startsWith("−")), r.axe);
+  verifier("en-tête : le logo et le nom seuls, les boutons dessous", await p.evaluate(() => !document.querySelector(".barre-haut button, .barre-haut .bouton-icone")
+    && !!document.querySelector(".barre-outils [data-bascule-theme]") && !!document.querySelector(".barre-outils .bouton-donnees")));
+  verifier("en-tête : Rapport PDF dans l'aperçu seulement", await p.evaluate(() => document.getElementById("barre-pdf").hidden));
+  await allerA(p, "apercu");
+  verifier("en-tête : Rapport PDF sous le logo, dans l'aperçu", await p.evaluate(() => !document.getElementById("barre-pdf").hidden && getComputedStyle(document.getElementById("rapport-pdf")).display === "none"));
   await p.setViewportSize({ width: 320, height: 700 }); await p.waitForTimeout(200);
   verifier("finitions : icône seule sous 360 px", (await p.evaluate(() => getComputedStyle(document.querySelector(".bouton-donnees span")).display)) === "none");
   verifier("finitions : aucune erreur", erreurs.length === 0, erreurs);
