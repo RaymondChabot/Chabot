@@ -252,7 +252,15 @@ main {
   display: flex; flex-direction: column; gap: 14px; min-width: 0;
 }
 .carte-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.carte-tete h2 { font-size: 1.06rem; font-weight: 600; letter-spacing: -0.01em; }
+.carte-tete h2, .carte-repliable > summary h2 { font-size: 1.06rem; font-weight: 600; letter-spacing: -0.01em; }
+/* Carte repliable : le titre et sa conclusion en une ligne ; le détail au toucher. */
+.carte-repliable { display: block; }   /* sans l'espace du contenu replié */
+.carte-repliable > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-items: center; }
+.carte-repliable > summary::-webkit-details-marker { display: none; }
+.carte-repliable > summary::after { content: ""; grid-column: 2; grid-row: 1 / span 2; width: 8px; height: 8px; margin-right: 4px; border-right: 2px solid var(--discret); border-bottom: 2px solid var(--discret); transform: rotate(45deg) translateY(-3px); }
+.carte-repliable[open] > summary::after { transform: rotate(-135deg) translateY(-2px); }
+.carte-repliable[open] > summary { margin-bottom: 14px; }
+.repli-resume { grid-column: 1; font-size: 0.88rem; color: var(--discret); margin-top: 2px; }
 .carte-sous { font-size: 0.82rem; color: var(--discret); }
 .lien-carte {
   border: 0; background: none; padding: 0; cursor: pointer; text-decoration: none;

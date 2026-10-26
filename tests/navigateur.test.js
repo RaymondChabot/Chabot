@@ -477,11 +477,39 @@ async function apercuCoherent(b, base) {
   await ctx.close();
 }
 
+/* 19. Assistant : en GMF-U et en CLSC, le mode de rémunération choisi devient celui du budget.
+   Page Impôt : « Et avec une société ? » et « Vérification officielle » sont repliées, leur conclusion en vue. */
+async function assistantMode(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base);
+  await p.click("#ap-assistant");
+  const suivant = () => p.click("#as-suivant");
+  await suivant(); await p.check('input[name="as-famille"][value="seul"]'); await suivant(); await suivant();
+  verifier("assistant : pas de choix de mode avant le milieu", !(await p.$('input[name="as-mode"]')));
+  await p.check('input[name="as-milieu"][value="clinique"]');
+  verifier("assistant : pas de choix de mode en clinique", !(await p.$('input[name="as-mode"]')));
+  await p.check('input[name="as-milieu"][value="gmfu"]');
+  verifier("assistant : taux horaire coché d'office", await p.isChecked('input[name="as-mode"][value="horaire"]'));
+  await p.check('input[name="as-mode"][value="mixte"]');
+  await suivant(); await suivant();
+  await p.check('input[name="as-logement"][value="locataire"]'); await suivant(); await suivant();
+  verifier("assistant : le mode dans le récapitulatif", (await p.textContent("#as-corps")).includes("GMF-U · taux mixte"));
+  await suivant(); await p.waitForTimeout(300);
+  const r = await resultat(p);
+  verifier("assistant : GMF-U au mixte", r.milieu === "gmfu" && r.mode === "mixte", { milieu: r.milieu, mode: r.mode });
+  await allerA(p, "impot");
+  const cartes = await p.evaluate(() => [...document.querySelectorAll("#v-impot details.carte-repliable")].map(d => ({ ouvert: d.open, resume: d.querySelector(".repli-resume").textContent })));
+  verifier("impôt : deux cartes repliées, leur conclusion en vue", cartes.length === 2 && cartes.every(c => !c.ouvert && c.resume.length > 10), cartes);
+  await p.click("#im-verif-resume");
+  verifier("impôt : la vérification s'ouvre au toucher", await p.evaluate(() => document.getElementById("im-verif").closest("details").open && document.getElementById("im-verif").textContent.includes("identiques")));
+  verifier("assistant et impôt : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

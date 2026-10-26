@@ -1260,6 +1260,8 @@ window.Verrou.quandOuvert(function () {
     rendreVerification();
 
     const s = R.societe, z = document.getElementById("im-societe"); z.textContent = "";
+    document.getElementById("im-societe-resume").textContent = s.reportAnnuel > 0
+      ? `Environ ${$(s.reportAnnuel)} d'impôt reporté cette année` : "Aucun avantage cette année";
     z.appendChild(el("p", "resume", s.reportAnnuel > 0
       ? `Avec une société, vous paieriez environ ${$(s.reportAnnuel)} de moins cette année, après ${$(S.societe.fraisSociete)} de frais. C'est un report : les ${$(s.societe.retenu)} laissés dans la société seront imposés quand vous les retirerez.`
       : `Une société ne réduirait pas votre impôt cette année : presque tout votre revenu sert au ménage et aux dettes, et les frais (${$(S.societe.fraisSociete)}) dépassent le report possible.`));
@@ -1340,6 +1342,7 @@ window.Verrou.quandOuvert(function () {
       const ecarts = CHAMPS_VERIF.map(([k, n]) => { const e = Math.round(b[k]) - v.officiel[k]; total++; if (Math.abs(e) <= 1) egaux++; if (Math.abs(e) > Math.abs(pire.e)) pire = { e, n, cas: nomCas(v) }; return { n, e, off: v.officiel[k], nous: Math.round(b[k]) }; });
       return { v, ecarts };
     });
+    document.getElementById("im-verif-resume").textContent = `${nb(egaux, 0)} montants sur ${nb(total, 0)} identiques à l'outil du ministère des Finances`;
     const tete = el("div", "hero-sous");
     tete.append(puce(`${nb(egaux, 0)} sur ${nb(total, 0)} identiques`, "haut", true));
     z.append(tete, el("p", "resume", `WealthMorand refait ${VERIFICATION.length} cas de l'outil officiel du ministère des Finances du Québec : ${nb(egaux, 0)} montants sur ${nb(total, 0)} sont identiques, à 1 $ près.` +
@@ -3002,7 +3005,7 @@ window.Verrou.quandOuvert(function () {
   const TYPES_ASSISTANT = Object.keys(ACTIVITES).filter(k => k !== "autre");
   let A = null, etape = 0;
   const reponsesVides = () => ({ famille: null, depuis12mois: true, enfantCommun: false, partenaire: "salarie", revenuPartenaire: 0,
-    enfants: [], milieu: null, demiJournees: 8, srv: 0, premiere: true, incorporee: false,
+    enfants: [], milieu: null, mode: "horaire", demiJournees: 8, srv: 0, premiere: true, incorporee: false,
     ...Object.fromEntries(TYPES_ASSISTANT.flatMap(k => [["act_" + k, false], ["actN_" + k, 4]])),
     logement: null, loyer: 0, maison: 0, hypotheque: 0, tauxHyp: 4.5, paiementHyp: 0, partMaison: 50,
     marge: false, margeSolde: 0, margeTaux: 4.5, pret: false, pretSolde: 0, auto: false, autoSolde: 0, autoPaiement: 0 });
@@ -3067,6 +3070,10 @@ window.Verrou.quandOuvert(function () {
     } },
     { titre: "Votre pratique", valide: () => A.milieu ? "" : "Choisissez votre milieu de pratique.", rendre: c => {
       c.appendChild(asChoix("Votre milieu principal", "milieu", Object.entries(MILIEUX).map(([k, m]) => [k, m.long, DESCRIPTION_MILIEU[k]])));
+      if (A.milieu && MILIEUX[A.milieu].modes.length > 1) c.appendChild(asChoix("Votre mode de rémunération", "mode", [
+        ["horaire", "Taux horaire", "Les heures, plus des forfaits et des suppléments"],
+        ["mixte", "Mixte", "Un forfait par heure, plus une part du tarif des visites"],
+        ["acte", "À l'acte", "Chaque visite payée selon son tarif"]]));
       c.appendChild(asGroupe(asNombre("Demi-journées de rendez-vous par semaine", "demiJournees", "d.-j.", 1),
         asNombre("Demi-journées de sans rendez-vous (SRV)", "srv", "d.-j.", 1),
         asCase("C'est ma première année de pratique", "premiere", "La clientèle se bâtit, et aucun acompte d'impôt n'est exigé la première année."),
@@ -3106,7 +3113,7 @@ window.Verrou.quandOuvert(function () {
       c.appendChild(rangees(el("div"), [
         { titre: "Famille", sous: !couple ? "Seul(e)" : `En couple, ${A.famille === "fait" ? "conjoints de fait" : "mariés ou union civile"} · partenaire ${A.partenaire === "sans" ? "sans revenu de travail" : `${A.partenaire === "salarie" ? "salarié(e)" : "à son compte"}, ${$(A.revenuPartenaire)} par année`}` },
         { titre: "Enfants", sous: n ? `${n} enfant${n > 1 ? "s" : ""} : ${A.enfants.map(a => `${nb(a, 0)} an${a >= 2 ? "s" : ""}`).join(", ")}` : "Aucun" },
-        { titre: "Pratique", sous: `${MILIEUX[A.milieu].nom} · ${nb(A.demiJournees)} demi-journées${A.srv ? ` et ${nb(A.srv)} de SRV` : ""} par semaine${A.premiere ? " · première année" : ""}${A.incorporee ? " · incorporée" : ""}` },
+        { titre: "Pratique", sous: `${MILIEUX[A.milieu].nom}${MILIEUX[A.milieu].modes.length > 1 ? ` · ${NOM_MODE[A.mode].toLowerCase()}` : ""} · ${nb(A.demiJournees)} demi-journées${A.srv ? ` et ${nb(A.srv)} de SRV` : ""} par semaine${A.premiere ? " · première année" : ""}${A.incorporee ? " · incorporée" : ""}` },
         { titre: "Activités en établissement", sous: TYPES_ASSISTANT.filter(k => A["act_" + k] && A["actN_" + k] > 0).map(k => `${ACTIVITES[k].nom} : ${nb(A["actN_" + k])} par mois`).join(" · ") || "Aucune" },
         { titre: "Logement", sous: A.logement === "locataire" ? `Locataire · ${$(A.loyer)} par mois` : `Propriétaire · maison de ${$(A.maison)}${A.hypotheque ? `, hypothèque de ${$(A.hypotheque)}` : ""}` },
         { titre: "Autres dettes", sous: det.length ? det.join(" · ") : "Aucune" },
@@ -3156,7 +3163,7 @@ window.Verrou.quandOuvert(function () {
     s.confirmes = {};
     // Pratique
     const dj = Math.min(12, Math.max(0, A.demiJournees || 0)), gmfu = A.milieu === "gmfu";
-    Object.assign(s.revenu, { milieu: A.milieu, annee: A.premiere ? "premiere" : "type", modeBudget: A.milieu === "clinique" ? "acte" : "horaire",
+    Object.assign(s.revenu, { milieu: A.milieu, annee: A.premiere ? "premiere" : "type", modeBudget: MILIEUX[A.milieu].modes.includes(A.mode) ? A.mode : MILIEUX[A.milieu].modes[0],
       demiJournees: dj, enseignement: gmfu ? Math.min(2, dj) : 0, residents: gmfu ? 1 : 0, demiJourneesSRV: A.srv || 0, patientsSRV: 12,
       semaines: 46, semainesArrivee: 46, autresRevenus: 0,
       activites: TYPES_ASSISTANT.filter(k => A["act_" + k] && A["actN_" + k] > 0).map(k => ({ id: nouvelId("a"), type: k, nom: "", nombre: A["actN_" + k], frequence: "mois", cycle: 6,
