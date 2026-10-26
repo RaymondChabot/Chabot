@@ -221,5 +221,12 @@ const soc27 = C.impotSociete({ revenu: 250000, depensesPro: 10000, fraisSociete:
 verifier("dividendes : dès 2027, l'impôt du Québec monte de 0,73 % du dividende majoré", proche(soc27.qc - soc26.qc, soc26.societe.dividendes * 1.15 * (0.0342 - 0.0269), 0.01)
   && soc27.fed === soc26.fed);
 
+/* 18. Rendement selon le profil (Normes d'hypothèses de projection 2026, avant frais) : revenu fixe 3,2 % ;
+   actions canadiennes, américaines et internationales 6,3 %, 6,4 % et 6,6 % ; moins les frais de gestion. */
+const eq = C.rendementProfil(60, 1);
+verifier("rendement : équilibré (60 % d'actions), 5,14 % avant frais, 4,14 % après 1 % de frais", proche(eq.brut, 0.6 * 6.4333333 + 0.4 * 3.2, 1e-6) && proche(eq.net, eq.brut - 1, 1e-9));
+verifier("rendement : 0 % d'actions = revenu fixe, 100 % = actions", proche(C.rendementProfil(0).brut, 3.2, 1e-9) && proche(C.rendementProfil(100).brut, (6.3 + 6.4 + 6.6) / 3, 1e-9));
+verifier("rendement : part bornée de 0 à 100 %, frais non précisés = 0", C.rendementProfil(140).brut === C.rendementProfil(100).brut && C.rendementProfil(60).net === C.rendementProfil(60).brut);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

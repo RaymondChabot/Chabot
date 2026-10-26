@@ -61,6 +61,11 @@ window.Verrou.quandOuvert(function () {
       }
     }
     if (d.actifs && !d.actifs.logement) d.actifs.logement = d.actifs.maison && d.actifs.maison.valeur > 0 ? "proprietaire" : "locataire";
+    // Rendement des placements : désormais selon le profil et les frais, sauf s'il avait été changé à la main.
+    if (d.scenarios && d.scenarios.rendementAuto === undefined) {
+      const depart = { prudent: 3.5, realiste: 5, optimiste: 6.5 };
+      d.scenarios.rendementAuto = Object.keys(depart).every(k => !d.scenarios[k] || d.scenarios[k].rendement === undefined || +d.scenarios[k].rendement === depart[k]);
+    }
     return d;
   }
   function charger() {
@@ -404,6 +409,9 @@ window.Verrou.quandOuvert(function () {
      ============================================================ */
   const mensuel = b => b.periode === "an" ? b.montant / 12 : b.montant;
   const SCENARIOS = { prudent: "Prudent", realiste: "Réaliste", optimiste: "Optimiste" };
+  // Part visée en actions : celle du profil de placement, ou la part personnalisée.
+  const PROFILS_PLACEMENT = { prudent: 40, equilibre: 60, croissance: 80 };
+  const pctActionsCible = () => S.epargne.profil === "personnalise" ? Math.min(100, Math.max(0, +S.epargne.pctActionsCible || 0)) : PROFILS_PLACEMENT[S.epargne.profil] ?? 60;
   const MODES = ["horaire", "mixte", "acte"];
   const METHODES = ["avalanche", "hybride", "boule", "minimum"];
   const NOMS_METHODES = { avalanche: "Avalanche", hybride: "Hybride", boule: "Boule de neige", minimum: "Minimums seulement" };
@@ -572,7 +580,11 @@ window.Verrou.quandOuvert(function () {
     // selon le scénario.
     R.revType = S.revenu.annee === "premiere" ? revenuDe({ annee: "type" }) : R.rev;
     R.scenario = SCENARIOS[S.scenarios.choisi] ? S.scenarios.choisi : "realiste";
-    R.hyp = S.scenarios[R.scenario];
+    // Rendement des placements : selon la part en actions et les frais (normes 2026), ou celui inscrit à la main.
+    R.rendementProfil = { pctActions: pctActionsCible(), ...C.rendementProfil(pctActionsCible(), S.epargne.frais) };
+    const ecart = { prudent: -1, realiste: 0, optimiste: 1 };
+    R.hypDe = k => S.scenarios.rendementAuto ? { ...S.scenarios[k], rendement: R.rendementProfil.net + ecart[k] * C.P2026.normes.ecartScenarios } : S.scenarios[k];
+    R.hyp = R.hypDe(R.scenario);
     // Surplus de l'année a (0 = cette année), qui va sur les dettes.
     /* Année a (0 = cette année), en dollars de l'année a. Les revenus augmentent selon
        le scénario ; les paliers d'impôt, les crédits, les seuils des allocations et la
@@ -656,8 +668,8 @@ window.Verrou.quandOuvert(function () {
     R.recommandee = METHODES.filter(m => m !== "minimum").reduce((a, m) => R.vnMethodes[m].moi > R.vnMethodes[a].moi ? m : a, "avalanche");
     R.projections = {}; R.libres = {};
     for (const k of Object.keys(SCENARIOS)) {
-      const sim = k === R.scenario ? R.sim : C.simulerDettes(S.dettes, opt(S.scenarios[k], methode));
-      R.projections[k] = projeter(S.scenarios[k], sim);
+      const sim = k === R.scenario ? R.sim : C.simulerDettes(S.dettes, opt(R.hypDe(k), methode));
+      R.projections[k] = projeter(R.hypDe(k), sim);
       R.libres[k] = sim.libre;
     }
     R.projection = R.projections[R.scenario];
@@ -1486,7 +1498,9 @@ window.Verrou.quandOuvert(function () {
     const cj = R.couple;
     segment("vn-scenario", Object.entries(SCENARIOS), R.scenario, v => changer("scenarios.choisi", v), "Scénario");
     const h = R.hyp, hyp = document.getElementById("vn-hyp"); hyp.textContent = "";
-    hyp.append(document.createTextNode(`Placements ${nb(h.rendement, 1)} %, maison ${signePct(h.croissanceMaison)}, autos −${nb(h.depreciationAuto, 0)} %, inflation ${nb(h.inflation, 1)} % par année. `));
+    const rp = R.rendementProfil, selon = !S.scenarios.rendementAuto ? ""
+      : ` (${nb(rp.pctActions, 0)} % d'actions, ${rp.frais ? `après ${nb(rp.frais, 2)} % de frais` : "avant frais"})`;
+    hyp.append(document.createTextNode(`Placements ${nb(h.rendement, 1)} %${selon}, maison ${signePct(h.croissanceMaison)}, autos −${nb(h.depreciationAuto, 0)} %, inflation ${nb(h.inflation, 1)} % par année. `));
     const lien = el("button", "lien-carte", "Modifier les hypothèses"); lien.type = "button"; lien.dataset.feuille = "hypotheses"; hyp.appendChild(lien);
     if (!cj) U.vueAvenir = "moi";
     if (cj) segment("vn-vue", [["moi", "Vous"], ["couple", "Couple"]], U.vueAvenir, v => { U.vueAvenir = v; tout(); }, "Valeur nette de qui");
@@ -2159,7 +2173,6 @@ window.Verrou.quandOuvert(function () {
      le REER (l'intérêt est imposé au complet ailleurs), puis la société, le CELIAPP et le CELI ;
      les actions de croissance d'abord dans le CELI, où la croissance n'est jamais imposée.
      ============================================================ */
-  const PROFILS_PLACEMENT = { prudent: 40, equilibre: 60, croissance: 80 };
   function emplacementPlacements(comptes, pctActions) {
     let obligations = comptes.reduce((t, c) => t + c.solde, 0) * (1 - pctActions / 100);
     for (const k of ["reer", "societe", "celiapp", "celi"]) {
@@ -2170,7 +2183,7 @@ window.Verrou.quandOuvert(function () {
   }
   function rendreRepartition(R) {
     const z = document.getElementById("pa-repartition"); z.textContent = "";
-    const e = S.epargne, cible = e.profil === "personnalise" ? Math.min(100, Math.max(0, +e.pctActionsCible || 0)) : PROFILS_PLACEMENT[e.profil] ?? 60;
+    const e = S.epargne, cible = pctActionsCible();
     const comptes = [
       { k: "reer", nom: "REER", solde: +e.reer.solde || 0, note: "Obligations d'abord : l'intérêt y échappe à l'impôt. Titres américains : pas de retenue de 15 % sur leurs dividendes." },
       { k: "celi", nom: "CELI", solde: +e.celi.solde || 0, note: "Actions de croissance : la croissance n'y est jamais imposée." },

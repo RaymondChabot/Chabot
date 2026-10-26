@@ -505,11 +505,36 @@ async function assistantMode(b, base) {
   await ctx.close();
 }
 
+/* 20. Rendement des scénarios selon le profil et les frais ; un rendement inscrit à la main est gardé. */
+async function rendementProfil(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "avenir" });
+  const lire = () => p.evaluate(() => { const R = window.Wealthnord.resultats(), S = window.Wealthnord.etat();
+    return { reel: R.hyp.rendement, prudent: R.hypDe("prudent").rendement, optimiste: R.hypDe("optimiste").rendement, auto: S.scenarios.rendementAuto, texte: document.getElementById("vn-hyp").textContent.replace(/\s/g, " ") }; });
+  let r = await lire();
+  verifier("rendement : équilibré sans frais, 5,1 % avant frais", r.auto === true && Math.abs(r.reel - 5.14) < 1e-9 && r.texte.includes("Placements 5,1 % (60 % d'actions, avant frais)"), r);
+  verifier("rendement : prudent et optimiste à 1,5 point", Math.abs(r.reel - r.prudent - 1.5) < 1e-9 && Math.abs(r.optimiste - r.reel - 1.5) < 1e-9, r);
+  await remplacer(p, { "epargne.profil": "croissance", "epargne.frais": 1.5 });
+  r = await lire();
+  verifier("rendement : croissance (80 %) moins 1,5 % de frais", Math.abs(r.reel - (0.8 * 19.3 / 3 + 0.2 * 3.2 - 1.5)) < 1e-9 && r.texte.includes("après 1,5 % de frais"), r);
+  await remplacer(p, { "scenarios.rendementAuto": false });
+  r = await lire();
+  verifier("rendement : décoché, celui inscrit (5 %)", r.reel === 5 && r.texte.includes("Placements 5 %,"), r);
+  // Données d'avant : un rendement changé à la main reste ; celui de départ devient calculé.
+  for (const [rendement, attendu] of [[4.2, false], [5, true]]) {
+    await p.evaluate(x => { const S = JSON.parse(JSON.stringify(window.Wealthnord.etat())); delete S.scenarios.rendementAuto; S.scenarios.realiste.rendement = x; localStorage.setItem("boussole.v1", JSON.stringify(S)); }, rendement);
+    await p.reload(); await pret(p);
+    r = await lire();
+    verifier(`rendement : données d'avant à ${rendement} %, ${attendu ? "calculé" : "gardé"}`, r.auto === attendu && (attendu ? r.reel !== rendement : r.reel === rendement), r);
+  }
+  verifier("rendement : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

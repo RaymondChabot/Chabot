@@ -46,6 +46,9 @@
     /* Dividendes non déterminés : majoration de 15 %, crédits de 9,0301 % (fédéral) et de 3,42 % (Québec) du montant
        majoré ; au Québec, 2,69 % après le 31 décembre 2026 (bulletin d'information 2026-3 du ministère des Finances). */
     dividendes: { majoration: 0.15, creditFederal: 0.090301, creditQuebec: 0.0342, creditQuebecDes2027: 0.0269 },
+    // Normes d'hypothèses de projection 2026 (Institut de planification financière et FP Canada), avant frais.
+    // Prudent et optimiste : le rendement réaliste, moins ou plus 1,5 point.
+    normes: { revenuFixe: 3.2, actions: { canadiennes: 6.3, americaines: 6.4, internationales: 6.6 }, ecartScenarios: 1.5 },
   };
 
   /* ---------- Tarifs RAMQ : Manuel des médecins omnipraticiens, rémunération à l'acte, onglet B
@@ -786,8 +789,16 @@
     return res;
   }
 
+  // Rendement annuel attendu d'un portefeuille selon sa part en actions (réparties à parts égales entre
+  // actions canadiennes, américaines et internationales), avant frais, puis net des frais de gestion (RFG).
+  function rendementProfil(pctActions, frais = 0) {
+    const n = P2026.normes, a = Object.values(n.actions), actions = a.reduce((t, x) => t + x, 0) / a.length;
+    const p = Math.min(100, Math.max(0, +pctActions || 0)) / 100, brut = p * actions + (1 - p) * n.revenuFixe;
+    return { brut, frais: +frais || 0, net: brut - (+frais || 0) };
+  }
+
   const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
-    remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette };
+    remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;
 })(typeof window !== "undefined" ? window : globalThis);

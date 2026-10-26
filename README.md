@@ -112,6 +112,12 @@ Revenu affiche tous les détails.
   report du non-dépensé (ou du dépassement) d'un mois à l'autre. **Bilan
   de l'année** : reçu et dépensé comparés au budget, part gardée, mois le
   plus cher, valeur nette et écart au plan de référence.
+- **Rendement des placements** selon votre profil et vos frais : Normes
+  d'hypothèses de projection 2026 (revenu fixe 3,2 % ; actions
+  canadiennes, américaines et internationales 6,3 %, 6,4 % et 6,6 %),
+  pondérées par la part visée en actions, moins les frais de gestion (RFG).
+  Prudent et optimiste : 1,5 point de moins ou de plus. On peut aussi
+  inscrire ses propres rendements (bouton Hypothèses).
 - **Probabilité de réussite** : 300 simulations où le rendement varie
   chaque année autour de la moyenne arithmétique (rendement du scénario
   + σ²/2, comme le demandent les Normes d'hypothèses de projection 2026) ;

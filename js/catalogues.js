@@ -54,6 +54,8 @@
       choisi: "realiste", dollarsAujourdhui: false, horizon: 20,
       // Probabilité de réussite : écart type des rendements annuels (portefeuille équilibré : environ 10 %).
       volatilite: 10,
+      // Rendement des placements selon le profil et les frais (normes 2026) ; décoché : ceux inscrits plus bas.
+      rendementAuto: true,
       prudent: { rendement: 3.5, croissanceMaison: 1.5, depreciationAuto: 20, ecartTaux: 1, inflation: 3, hausseRevenus: 2 },
       realiste: { rendement: 5, croissanceMaison: 3.1, depreciationAuto: 15, ecartTaux: 0, inflation: 2.1, hausseRevenus: 3.1 },
       optimiste: { rendement: 6.5, croissanceMaison: 4.5, depreciationAuto: 12, ecartTaux: -0.5, inflation: 2, hausseRevenus: 3.5 },
@@ -462,11 +464,11 @@
       { p: "epargne.celiapp.solde", l: "Solde CELIAPP", u: "$", s: 100, h: "Compte d'épargne libre d'impôt pour l'achat d'une première propriété." },
       { p: "epargne.celiapp.cotisationAnnuelle", l: "Cotisation CELIAPP par année", u: "$/an", s: 100, h: "8 000 $ par année au plus, 40 000 $ à vie ; déductible comme un REER ; retrait sans impôt pour acheter une première propriété." },
       { p: "epargne.encaisse", l: "Comptes et encaisse", u: "$", s: 100 },
-      { p: "epargne.frais", l: "Frais de gestion de vos placements (RFG)", u: "%", s: 0.05, h: "Sur vos relevés ou le document « Aperçu du fonds ». 0 : non précisé." },
+      { p: "epargne.frais", l: "Frais de gestion de vos placements (RFG)", u: "%", s: 0.05, h: "Sur vos relevés ou le document « Aperçu du fonds ». Soustraits du rendement des scénarios ; 0 : non précisé, le rendement est alors avant frais." },
       { p: "epargne.tauxRetrait", l: "Taux d'imposition prévu au retrait du REER", u: "%", s: 1, h: "Pour comparer le REER au CELI : s'il est plus bas que votre taux marginal d'aujourd'hui, le REER rapporte plus." },
       { g: "Répartition des placements" },
       { p: "epargne.profil", l: "Profil de placement", t: "select", o: [["prudent", "Prudent : 40 % d'actions"], ["equilibre", "Équilibré : 60 % d'actions"], ["croissance", "Croissance : 80 % d'actions"], ["personnalise", "Personnalisé"]],
-        h: "Selon votre horizon et les baisses que vous tolérez. Le rendement du scénario réaliste (5 %) correspond à un portefeuille équilibré." },
+        h: "Selon votre horizon et les baisses que vous tolérez. Le rendement des scénarios en dépend (bouton Hypothèses)." },
       { p: "epargne.pctActionsCible", l: "Part visée en actions", u: "%", si: "epargne.profil=personnalise" },
       { p: "epargne.pctActionsActuel", l: "Part actuelle en actions", u: "%", h: "Sur vos relevés : actions et fonds d'actions, tous comptes confondus." },
       { g: "Biens" },
@@ -480,9 +482,11 @@
     hypotheses: [
       { g: "Affichage" },
       { p: "scenarios.dollarsAujourdhui", l: "Montrer l'avenir en dollars d'aujourd'hui", t: "check", h: "Retire l'inflation du scénario choisi : 100 000 $ dans 10 ans valent moins que 100 000 $ aujourd'hui." },
+      { g: "Rendement des placements" },
+      { p: "scenarios.rendementAuto", l: "Selon votre profil et vos frais", t: "check", h: "Normes 2026, avant frais : revenu fixe 3,2 % ; actions canadiennes, américaines et internationales 6,3 %, 6,4 % et 6,6 %. Pondéré par la part en actions de votre profil, moins vos frais de gestion. Prudent et optimiste : 1,5 point de moins ou de plus. Décochez pour inscrire vos propres rendements." },
       ...Object.entries({ prudent: "Prudent", realiste: "Réaliste", optimiste: "Optimiste" }).flatMap(([k, nom]) => [
         { g: "Scénario " + nom.toLowerCase() + (k === "realiste" ? " · normes 2026" : "") },
-        { p: `scenarios.${k}.rendement`, l: "Rendement des placements, après frais", u: "%/an", s: 0.1 },
+        { p: `scenarios.${k}.rendement`, l: "Rendement des placements, après frais", u: "%/an", s: 0.1, si: "!scenarios.rendementAuto" },
         { p: `scenarios.${k}.croissanceMaison`, l: "Hausse de la valeur de la maison", u: "%/an", s: 0.1 },
         { p: `scenarios.${k}.depreciationAuto`, l: "Perte de valeur des autos", u: "%/an", s: 1 },
         { p: `scenarios.${k}.ecartTaux`, l: "Écart de taux : marge et renouvellements", u: "points", s: 0.25, neg: true },

@@ -318,7 +318,7 @@ window.Verrou.quandOuvert(function () {
     }
 
     /* 7. Hypothèses et sources */
-    const H = ["prudent", "realiste", "optimiste"].map(k => S.scenarios[k]);
+    const H = ["prudent", "realiste", "optimiste"].map(k => R.hypDe(k)), rp = R.rendementProfil;
     const ver = W.verification();
     const r = S.revenu;
     pages.push(page("Hypothèses et sources", "Les chiffres de ce rapport sont des estimations, calculées sur votre appareil à partir des valeurs saisies.", `
@@ -327,7 +327,7 @@ window.Verrou.quandOuvert(function () {
         ["Perte de valeur des autos", y => nb(y.depreciationAuto, 0) + " %"], ["Écart de taux : marge et renouvellements", y => (y.ecartTaux > 0 ? "+" : "") + nb(y.ecartTaux, 2) + " pt"],
         ["Inflation des dépenses", y => nb(y.inflation, 1) + " %"], ["Hausse des revenus", y => nb(y.hausseRevenus, 1) + " %"],
       ].map(([n, f]) => ({ c: [n, ...H.map(f)] })))}
-        <p class="rp-note">Le scénario réaliste suit les Normes d'hypothèses de projection 2026 de l'Institut de planification financière et de FP Canada (inflation 2,1 %, immobilier 3,1 %, salaires 3,1 %).</p></div>
+        <p class="rp-note">Le scénario réaliste suit les Normes d'hypothèses de projection 2026 de l'Institut de planification financière et de FP Canada (inflation 2,1 %, immobilier 3,1 %, salaires 3,1 %).${S.scenarios.rendementAuto ? ` Rendement : ${nb(rp.pctActions, 0)} % d'actions et ${nb(100 - rp.pctActions, 0)} % de revenu fixe, soit ${nb(rp.brut, 1)} % avant frais${rp.frais ? `, moins ${nb(rp.frais, 2)} % de frais de gestion` : " (frais de gestion non précisés)"}.` : ""}</p></div>
       <div class="rp-deux">
         <div class="rp-carte"><h2>Rémunération</h2>${tableau(["", ""], [
           ["Tarif horaire (annexe XIV)", `${O.$2(r.tarifHoraire)} / h, à 100 % jusqu'à ${nb(r.heuresMax100 ?? 1540, 0)} h`], ["Mixte : forfait horaire", O.$2(r.forfaitHoraireMixte) + " / h"], ["Mixte : part du tarif des visites", nb(r.pctMixte, 2) + " %"],
