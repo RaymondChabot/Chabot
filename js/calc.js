@@ -39,6 +39,10 @@
        officiel du ministère des Finances (2026) ; déductions de 2025 indexées de 2,05 %. */
     medicaments: { max: 766, deductions: { seul: 20298, mono1: 32901, mono2: 37207, couple0: 32901, couple1: 37207, couple2: 41187 },
       seuil: 5000, tauxCouple: [0.0393, 0.0589], tauxSeul: [0.0784, 0.1176] },
+    /* Cotisation des particuliers au Fonds des services de santé, sur les revenus autres que d'emploi : 1 % au-delà
+       de 18 500 $, jusqu'à 150 $ ; 150 $ jusqu'à 64 355 $ ; puis 1 % de plus, au plus 1 000 $ (Paramètres du régime
+       d'imposition des particuliers pour l'année d'imposition 2026, ministère des Finances, novembre 2025). */
+    fss: { seuil1: 18500, seuil2: 64355, taux: 0.01, palier: 150, max: 1000 },
     // Dividendes non déterminés (société qui profite du taux des PME).
     dividendes: { majoration: 0.15, creditFederal: 0.090301, creditQuebec: 0.0342 },
   };
@@ -363,7 +367,10 @@
   }
 
   // Cotisation au Fonds des services de santé sur les revenus autres que d'emploi (approximation).
-  const fss = revenu => revenu <= 17725 ? 0 : revenu <= 58000 ? Math.min(150, (revenu - 17725) * 0.01) : Math.min(1000, 150 + (revenu - 58000) * 0.01);
+  function fss(revenu) {
+    const f = P2026.fss;
+    return revenu <= f.seuil1 ? 0 : revenu <= f.seuil2 ? Math.min(f.palier, (revenu - f.seuil1) * f.taux) : Math.min(f.max, f.palier + (revenu - f.seuil2) * f.taux);
+  }
 
   function impotsDeBase(imposableFed, imposableQc, creditsFedMontant, creditsQcMontant, creditsFedDirects, creditsQcDirects) {
     const f = P2026.federal, q = P2026.quebec;

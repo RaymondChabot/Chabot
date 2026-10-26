@@ -209,5 +209,11 @@ verifier("responsabilité : majorée selon le territoire", proche(C.revenuGmfu({
 verifier("DMÉ : la première année du permis, sans égard au nombre d'inscrits", proche(C.compensationCabinet({ ...rev, annee: "premiere" }, 46, 6, 20).dme, 4 * (459.9 + 287.45), 1e-6)
   && C.compensationCabinet(rev, 46, 6, 20).dme === 0);
 
+/* 16. Fonds des services de santé (particuliers, 2026) : 1 % au-delà de 18 500 $ jusqu'à 150 $, puis au-delà de 64 355 $, au plus 1 000 $. */
+const fssDe = rev => C.impotParticulier({ revenu: rev }).fss;
+verifier("FSS 2026 : rien jusqu'à 18 500 $, 1 % ensuite", fssDe(18500) === 0 && proche(fssDe(25000), 65, 1e-9));
+verifier("FSS 2026 : 150 $ de 33 500 $ à 64 355 $", proche(fssDe(40000), 150, 1e-9) && proche(fssDe(64355), 150, 1e-9));
+verifier("FSS 2026 : 1 % au-delà de 64 355 $, au plus 1 000 $", proche(fssDe(100000), 150 + 356.45, 1e-6) && fssDe(149355) === 1000 && fssDe(300000) === 1000);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

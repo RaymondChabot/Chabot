@@ -217,9 +217,12 @@ dossier racine.
 - Dépenses professionnelles : grille tarifaire 2026-2027 du Collège des
   médecins ; cotisations 2027 de l'ACPM au Québec.
 - CELIAPP : 8 000 $ par année, 40 000 $ à vie (Agence du revenu du Canada).
-- Impôt : tables fédérales et québécoises 2026, RRQ et RQAP 2026 ; vérifié
-  contre l'outil de calcul du revenu disponible du ministère des Finances
-  du Québec (mai 2026).
+- Impôt : tables fédérales et québécoises 2026, RRQ et RQAP 2026 (RQAP du
+  travailleur autonome : 0,764 % jusqu'à 103 000 $) ; vérifié contre l'outil
+  de calcul du revenu disponible du ministère des Finances du Québec (mai
+  2026). Fonds des services de santé des particuliers : seuils de 18 500 $
+  et 64 355 $ (Paramètres du régime d'imposition des particuliers pour
+  l'année d'imposition 2026, novembre 2025).
 - Scénario réaliste : Normes d'hypothèses de projection 2026 de l'Institut
   de planification financière et de FP Canada.
 - Hypothèques à taux fixe : intérêt composé deux fois par année (Loi sur
