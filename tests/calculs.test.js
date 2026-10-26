@@ -228,5 +228,21 @@ verifier("rendement : équilibré (60 % d'actions), 5,14 % avant frais, 4,14 % a
 verifier("rendement : 0 % d'actions = revenu fixe, 100 % = actions", proche(C.rendementProfil(0).brut, 3.2, 1e-9) && proche(C.rendementProfil(100).brut, (6.3 + 6.4 + 6.6) / 3, 1e-9));
 verifier("rendement : part bornée de 0 à 100 %, frais non précisés = 0", C.rendementProfil(140).brut === C.rendementProfil(100).brut && C.rendementProfil(60).net === C.rendementProfil(60).brut);
 
+/* 19. Frais de garde (2026). Québec : crédit remboursable de 78 % à 67 % selon le revenu familial, frais plafonnés
+   à 12 525 $ (moins de 7 ans) et 6 305 $ (7 à 16 ans). Fédéral : déduction de 8 000 $ et 5 000 $ par enfant, au plus
+   les 2/3 du revenu gagné ; au fédéral seulement. */
+const garde1 = C.fraisGarde({ ages: [3], fraisQc: 15000, fraisFed: 15000, revenuFamilial: 200000, revenuGagne: 60000 });
+verifier("garde : 67 % de 12 525 $ au-delà de 122 290 $ de revenu familial ; déduction de 8 000 $", proche(garde1.creditQc, 12525 * 0.67, 1e-6) && garde1.deduction === 8000, garde1);
+const garde2 = C.fraisGarde({ ages: [3, 9], fraisQc: 30000, fraisFed: 30000, revenuFamilial: 30000, revenuGagne: 9000 });
+verifier("garde : deux enfants, 75 % à 30 000 $, déduction aux 2/3 du revenu gagné", proche(garde2.creditQc, (12525 + 6305) * 0.75, 1e-6) && proche(garde2.deduction, 6000, 1e-9) && garde2.plafondFed === 13000, garde2);
+const garde3 = C.fraisGarde({ ages: [17], fraisQc: 5000, fraisFed: 5000, revenuFamilial: 100000, revenuGagne: 50000 });
+verifier("garde : rien après 16 ans", garde3.creditQc === 0 && garde3.deduction === 0, garde3);
+verifier("garde : seuil de 122 290 $ à 70 %, au-delà à 67 %", C.fraisGarde({ ages: [2], fraisQc: 1000, revenuFamilial: 122290 }).taux === 0.70 && C.fraisGarde({ ages: [2], fraisQc: 1000, revenuFamilial: 122291 }).taux === 0.67);
+const sansGarde = C.impotSalarie({ salaire: 60000 }), avecGarde = C.impotSalarie({ salaire: 60000, deductionGarde: 8000 });
+verifier("garde : la déduction réduit l'impôt fédéral, pas celui du Québec", avecGarde.fed < sansGarde.fed && avecGarde.qc === sansGarde.qc && avecGarde.revenuNetFed === sansGarde.revenuNetFed - 8000 && avecGarde.revenuNetQc === sansGarde.revenuNetQc,
+  { fed: [sansGarde.fed, avecGarde.fed], qc: [sansGarde.qc, avecGarde.qc] });
+const autoSans = C.impotParticulier({ revenu: 200000, depensesPro: 5000 }), autoAvec = C.impotParticulier({ revenu: 200000, depensesPro: 5000, deductionGarde: 8000 });
+verifier("garde : même règle pour un travailleur autonome", autoAvec.fed < autoSans.fed && autoAvec.qc === autoSans.qc && autoAvec.fss === autoSans.fss);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

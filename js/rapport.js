@@ -479,7 +479,7 @@ window.Verrou.quandOuvert(function () {
       (reer > 0.5 || celiapp > 0.5) && [reer > 0.5 && `REER : reçus pour ${AN_IMPOT} (jusqu'au 1er mars ${suivante})`, celiapp > 0.5 && "CELIAPP : relevé des cotisations"].filter(Boolean).join(" ; ") + ".",
       R.interetsEtudes > 0.5 && `Prêt étudiant : relevé des intérêts (${$(R.interetsEtudes)}).`,
       I.autres > 0.5 && "Revenus de placement et de location : feuillets.",
-      budget.get("garderie") > 0 && `Frais de garde : reçus, relevé 24 (${$(budget.get("garderie"))} au budget).`,
+      budget.get("garderie") > 0 && `Frais de garde : reçus, relevé 24 (${$(budget.get("garderie"))} au budget ; crédit du Québec estimé à ${$(R.garde.creditQc)}${R.garde.deduction > 0 ? `, déduction fédérale de ${$(R.garde.deduction)}` : ""}).`,
       medicaux.length && `Frais médicaux et assurance santé : reçus (${$(somme(medicaux))} au budget).`,
       budget.get("dons") > 0 && "Dons : reçus officiels.",
       budget.get("fraisPlacements") > 0 && "Frais de gestion des placements non enregistrés : relevés.",

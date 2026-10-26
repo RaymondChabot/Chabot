@@ -473,11 +473,12 @@ window.Verrou.quandOuvert(function () {
     // Partenaire : salarié, ou à son compte (même calcul que le médecin travailleur autonome).
     // reel : facteur de revenu en dollars d'aujourd'hui (années futures).
     R.autonomeP = R.couple && S.conjointe.statut === "autonome";
-    const impotPartenaire = (reel = 1) => !R.couple ? null : R.autonomeP
-      ? C.impotParticulier({ revenu: ((S.conjointe.revenuAutonome || 0) + (S.conjointe.autresRevenus || 0)) * reel, depensesPro: S.conjointe.depensesAutonome || 0 })
-      : C.impotSalarie({ salaire: (S.conjointe.statut === "sans" ? 0 : S.conjointe.salaire) * reel, rpa: S.conjointe.rpa, syndicat: S.conjointe.syndicat, autresRevenus: S.conjointe.autresRevenus * reel });
+    // deductionGarde : déduction fédérale pour frais de garde, quand c'est le ou la partenaire qui la demande.
+    const impotPartenaire = (reel = 1, deductionGarde = 0) => !R.couple ? null : R.autonomeP
+      ? C.impotParticulier({ revenu: ((S.conjointe.revenuAutonome || 0) + (S.conjointe.autresRevenus || 0)) * reel, depensesPro: S.conjointe.depensesAutonome || 0, deductionGarde })
+      : C.impotSalarie({ salaire: (S.conjointe.statut === "sans" ? 0 : S.conjointe.salaire) * reel, rpa: S.conjointe.rpa, syndicat: S.conjointe.syndicat, autresRevenus: S.conjointe.autresRevenus * reel, deductionGarde });
     R.depensesPartenaire = R.autonomeP ? S.conjointe.depensesAutonome || 0 : 0;
-    const salariee = impotPartenaire();
+    let salariee = impotPartenaire();
     // Pratique incorporée : la société reçoit les revenus et verse des dividendes ;
     // sinon, travail autonome. f : facteur des dividendes fixes en dollars d'aujourd'hui.
     R.societeActive = S.impot.structure === "societe";
@@ -495,6 +496,26 @@ window.Verrou.quandOuvert(function () {
       ? Math.max(0, Math.max(0, total - (R.rev.activites + R.rev.polyvalence + R.rev.acte.compensation + R.rev.acte.autres) * f) * (S.revenu.fraisCabinetPct || 0) / 100
         + (S.revenu.fraisCabinetMois || 0) * 12) : 0;
     const depensesMode = md => R.depensesPro + R.rev[md].fraisCabinet;
+    // Frais de garde : garderie ou CPE, camps de jour et gardiennage du budget (tout le ménage, par année).
+    // Une place subventionnée : sa contribution réduite ne compte pas pour le crédit du Québec.
+    // Déduction fédérale : le conjoint au revenu net le moins élevé, au plus les 2/3 de son revenu gagné
+    // (salaire, revenu d'entreprise ; pas les dividendes). Années futures : selon l'âge des enfants.
+    const lignesGarde = k => depensesEffectives().filter(b => b.k === k);
+    const annuelGarde = (k, part = () => 1) => lignesGarde(k).reduce((t, b) => t + mensuel(b) * 12 * part(b), 0);
+    const kFed = ["garderie", "campsJour", "gardiennage"], kQc = S.famille.gardeSubventionnee ? ["campsJour", "gardiennage"] : kFed;
+    const fraisFed = kFed.reduce((t, k) => t + annuelGarde(k), 0), fraisQc = kQc.reduce((t, k) => t + annuelGarde(k), 0);
+    const partMoi = b => !R.couple || b.qui === "moi" ? 1 : b.qui === "commun" ? S.menage.partCommunMoi / 100 : 0;
+    const agesGarde = a => S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x <= 16);
+    const gagneMoi = R.societeActive ? 0 : Math.max(0, R.rev[mode].total - depensesMode(mode));
+    const gagneP = !R.couple ? 0 : R.autonomeP ? Math.max(0, (S.conjointe.revenuAutonome || 0) - (S.conjointe.depensesAutonome || 0)) : S.conjointe.statut === "sans" ? 0 : S.conjointe.salaire || 0;
+    const sansGarde = () => impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.rev[mode].total });
+    const parPartenaire = !!fraisFed && R.couple && R.coupleFiscal && salariee.revenuNetFed < sansGarde().revenuNetFed;
+    const deductionAn = (a, reel = 1) => !fraisFed ? 0 : C.fraisGarde({ ages: agesGarde(a), fraisFed, revenuGagne: (parPartenaire ? gagneP : gagneMoi) * reel }).deduction;
+    R.garde = { fraisFed, fraisQc, partMoiQc: fraisQc ? kQc.reduce((t, k) => t + annuelGarde(k, partMoi), 0) / fraisQc : 1, parPartenaire, deduction: deductionAn(0), economieFed: 0, agesGarde, deductionAn };
+    if (R.garde.deduction > 0) {
+      if (parPartenaire) { const avant = salariee.fed; salariee = impotPartenaire(1, R.garde.deduction); R.garde.economieFed = avant - salariee.fed; }
+      else { const avant = sansGarde().fed; base.deductionGarde = R.garde.deduction; R.garde.economieFed = avant - sansGarde().fed; }
+    }
     for (const md of R.modes) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, depensesPro: depensesMode(md), revenu: R.rev[md].total }));
     // Net après impôt, frais de cabinet et dépenses professionnelles : le « Reste pour vous » de la page Impôt,
     // le même chiffre dans l'aperçu, la page Revenu et le rapport. La société paie elle-même ses frais.
@@ -532,6 +553,10 @@ window.Verrou.quandOuvert(function () {
     R.ages = S.epargne.reee.enfants.map(x => +x.age).filter(a => a < 18);
     R.netFedFamille = R.impot.revenuNetFed + (R.coupleFiscal ? R.conjointe.revenuNetFed : 0);
     R.netQcFamille = R.impot.revenuNetQc + (R.coupleFiscal ? R.conjointe.revenuNetQc : 0);
+    // Crédit du Québec pour frais de garde : selon le revenu familial ; partagé comme les frais payés.
+    const cg = C.fraisGarde({ ages: agesGarde(0), fraisQc, revenuFamilial: R.netQcFamille });
+    Object.assign(R.garde, { creditQc: cg.creditQc, taux: cg.taux, admissibleQc: cg.admissibleQc, plafondQc: cg.plafondQc, plafondFed: cg.plafondFed,
+      creditMoi: cg.creditQc * R.garde.partMoiQc, creditConjointe: R.couple ? cg.creditQc * (1 - R.garde.partMoiQc) : 0 });
     R.famille = C.prestationsFamille({ revenuNetFed: R.netFedFamille, revenuNetQc: R.netQcFamille, ages: R.ages, couple: R.coupleFiscal });
     R.allocations = S.famille.calculAuto ? R.famille.total : S.menage.allocationsAnnuelles;
     const prime = C.primeMedicaments({ revenuNetQc: R.netQcFamille, couple: R.coupleFiscal, ages: R.ages, adultesCouverts: 1 }).parAdulte;
@@ -545,10 +570,12 @@ window.Verrou.quandOuvert(function () {
     const part = S.menage.partCommunMoi / 100;
     R.travailMoi = (R.impot.net - R.dproPerso - R.primeMoi) / 12;
     R.allocMoi = allocMoi / 12;
-    R.netMoi = R.travailMoi + R.allocMoi;
+    R.gardeMoi = R.garde.creditMoi / 12;
+    R.netMoi = R.travailMoi + R.allocMoi + R.gardeMoi;
     R.travailConjointe = R.couple ? (R.conjointe.net - R.depensesPartenaire - R.primeConjointe) / 12 : 0;
     R.allocConjointe = R.couple ? (R.allocations - allocMoi) / 12 : 0;
-    R.netConjointe = R.travailConjointe + R.allocConjointe;
+    R.gardeConjointe = R.garde.creditConjointe / 12;
+    R.netConjointe = R.travailConjointe + R.allocConjointe + R.gardeConjointe;
     R.depMoi = 0; R.depConjointe = 0; R.depMenage = 0;
     for (const b of depensesEffectives()) {
       const m = mensuel(b);
@@ -597,14 +624,14 @@ window.Verrou.quandOuvert(function () {
       if (cacheAnnee.has(cle)) return cacheAnnee.get(cle);
       const I = Math.pow(1 + h.inflation / 100, a), reel = Math.pow(1 + h.hausseRevenus / 100, a) / I;
       let res;
-      if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, epargne: (R.epargneMoi - R.objectifsMois) * 12 + R.objectifsAnnee(0), retenu: R.impot.societe ? R.impot.societe.retenu : 0 };
+      if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, garde: R.garde.creditMoi, epargne: (R.epargneMoi - R.objectifsMois) * 12 + R.objectifsAnnee(0), retenu: R.impot.societe ? R.impot.societe.retenu : 0 };
       else {
-        const conj = impotPartenaire(reel);
+        const conj = impotPartenaire(reel, R.garde.parPartenaire ? R.garde.deductionAn(a, reel) : 0);
         const fraisA = fraisCabinet(R.revType[mode].total * reel, mode, reel);
         // Dès 2027, le crédit québécois pour dividendes non déterminés passe à 2,69 % (pratique incorporée).
         const anneeProj = (+String(S.strategie.debut).slice(0, 4) || new Date().getFullYear()) + a;
         const creditDividendesQc = anneeProj >= 2027 ? C.P2026.dividendes.creditQuebecDes2027 : undefined;
-        let moi = impotDe({ ...base, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImposables: R.autresNonPro * reel, depensesPro: R.depensesPro + fraisA, revenu: R.revType[mode].total * reel, creditDividendesQc }, 1 / I);
+        let moi = impotDe({ ...base, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImposables: R.autresNonPro * reel, depensesPro: R.depensesPro + fraisA, revenu: R.revType[mode].total * reel, creditDividendesQc, deductionGarde: R.garde.parPartenaire ? 0 : R.garde.deductionAn(a, reel) }, 1 / I);
         // L'an prochain, des conjoints de fait auront 12 mois de vie commune : couple pour l'impôt.
         const fisc = R.couple && (R.coupleFiscal || a >= 1);
         if (fisc) moi = C.transfertsConjoints(moi, conj)[0];
@@ -617,6 +644,7 @@ window.Verrou.quandOuvert(function () {
           travail: (moi.net - (R.societeActive ? 0 : R.depensesPro + fraisA) - prime) * I,
           retenu: moi.societe ? moi.societe.retenu * I : 0,
           alloc: !R.couple || S.famille.versementA !== "conjointe" ? alloc : 0,
+          garde: C.fraisGarde({ ages: R.garde.agesGarde(a), fraisQc: R.garde.fraisQc, revenuFamilial: nq }).creditQc * R.garde.partMoiQc * I,
           epargne: enf * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle + R.celiappAnnee(a) + R.objectifsAnnee(a),
         };
       }
@@ -626,7 +654,7 @@ window.Verrou.quandOuvert(function () {
     const surplusAnnee = h => a => {
       if (S.strategie.extraMode === "manuel") return S.strategie.extraManuel;
       const x = R.annee(h, a);
-      return (x.travail + x.alloc - x.epargne) / 12 - R.depMoi * Math.pow(1 + h.inflation / 100, a) - R.dettesMoi;
+      return (x.travail + x.alloc + x.garde - x.epargne) / 12 - R.depMoi * Math.pow(1 + h.inflation / 100, a) - R.dettesMoi;
     };
     R.surplusAnnee = surplusAnnee(R.hyp);
 
@@ -1306,6 +1334,22 @@ window.Verrou.quandOuvert(function () {
         { titre: "Total par année", cls: "total", valeur: $(f.total) },
       ]));
     }
+    // Frais de garde : crédit du Québec et déduction fédérale.
+    const G = R.garde;
+    if (G.agesGarde(0).length) {
+      z.appendChild(el("h3", null, "Frais de garde"));
+      if (!G.fraisFed) z.appendChild(el("p", "aide", "Inscrivez la garderie ou le CPE, les camps de jour et le gardiennage dans le budget (catégorie Enfants, en détail) : le crédit du Québec et la déduction fédérale seront calculés."));
+      else {
+        const sansDeduction = G.parPartenaire ? `${Pn()} gagne moins que vous, mais n'a pas de revenu gagné : aucune déduction.`
+          : R.societeActive ? "Des dividendes ne sont pas un revenu gagné : aucune déduction." : "Aucune déduction.";
+        z.appendChild(rangees(el("div"), [
+          { titre: "Crédit du Québec", sous: `${pct(G.taux, 0)} de ${$(G.admissibleQc)} de frais admissibles` + (G.fraisQc > G.plafondQc + 0.5 ? ` (plafond de ${$(G.plafondQc)})` : "")
+            + (S.famille.gardeSubventionnee ? ", sans la contribution réduite de la place subventionnée" : "") + ". Remboursable.", valeur: $(G.creditQc) },
+          { titre: "Déduction fédérale", sous: G.deduction > 0 ? `${$(G.deduction)} déduits par ${G.parPartenaire ? `${votreP()}, qui gagne le moins` : "vous"}.` : sansDeduction,
+            valeur: G.economieFed > 0.5 ? `−${$(G.economieFed)}` : "—", valeurSous: G.economieFed > 0.5 ? "d'impôt fédéral" : null },
+        ]));
+      }
+    }
     z.appendChild(el("h3", null, "Assurance médicaments"));
     z.appendChild(rangees(el("div"), [
       { titre: "Votre prime du régime public", sous: S.famille.medicamentsPublicMoi ? "Payée avec l'impôt du Québec" : "Assurance collective : pas de prime", valeur: $(R.primeMoi) },
@@ -1380,9 +1424,9 @@ window.Verrou.quandOuvert(function () {
     const qui = b => vue === "menage" ? 1 : vue === "moi" ? (b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0) : (b.qui === "conjoint" ? 1 : b.qui === "commun" ? 1 - part : 0);
     const partDette = d => vue === "menage" ? 1 : vue === "moi" ? (d.paiementMoi ?? 100) / 100 : 1 - (d.paiementMoi ?? 100) / 100;
     const V = {
-      moi: { travail: R.travailMoi, alloc: R.allocMoi, autres: 0, rev: R.netMoi, dep: R.depMoi, dettes: R.dettesMoi, epargne: R.epargneMoi, surplus: R.surplusMoi },
-      conjointe: { travail: R.travailConjointe, alloc: R.allocConjointe, autres: 0, rev: R.netConjointe, dep: R.depConjointe, dettes: R.dettesConjointe, epargne: R.epargneConjointe, surplus: R.surplusConjointe },
-      menage: { travail: R.travailMoi + R.travailConjointe, alloc: R.allocMoi + R.allocConjointe, autres: S.menage.autresRevenusMensuels, rev: R.revenusMenage, dep: R.depMenage, dettes: R.dettesMenage, epargne: R.epargneMoi + R.epargneConjointe, surplus: R.surplusMenage },
+      moi: { travail: R.travailMoi, alloc: R.allocMoi, garde: R.gardeMoi, autres: 0, rev: R.netMoi, dep: R.depMoi, dettes: R.dettesMoi, epargne: R.epargneMoi, surplus: R.surplusMoi },
+      conjointe: { travail: R.travailConjointe, alloc: R.allocConjointe, garde: R.gardeConjointe, autres: 0, rev: R.netConjointe, dep: R.depConjointe, dettes: R.dettesConjointe, epargne: R.epargneConjointe, surplus: R.surplusConjointe },
+      menage: { travail: R.travailMoi + R.travailConjointe, alloc: R.allocMoi + R.allocConjointe, garde: R.gardeMoi + R.gardeConjointe, autres: S.menage.autresRevenusMensuels, rev: R.revenusMenage, dep: R.depMenage, dettes: R.dettesMenage, epargne: R.epargneMoi + R.epargneConjointe, surplus: R.surplusMenage },
     }[vue];
     const nomVue = { moi: "Votre surplus mensuel", conjointe: `Surplus de ${votreP()}`, menage: "Surplus du ménage" }[vue];
     hero("bu-hero", nomVue, $(V.surplus), [
@@ -1392,6 +1436,7 @@ window.Verrou.quandOuvert(function () {
     rangees("bu-revenus", [
       { titre: "Revenu net de travail", sous: vue === "conjointe" ? (S.conjointe.statut === "autonome" ? "Après impôt, cotisations et dépenses d'entreprise" : "Salaire après impôt et cotisations") : "Après impôt, prime d'assurance médicaments et dépenses pro", valeur: $(V.travail) },
       (R.allocations > 0 || vue !== "conjointe") && { titre: "Allocations familiales", sous: S.famille.calculAuto ? "Calculées selon vos revenus" : "Montant inscrit", valeur: $(V.alloc) },
+      V.garde > 0.5 && { titre: "Crédit pour frais de garde", sous: "Québec, remboursable, avec l'impôt", valeur: $(V.garde) },
       V.autres > 0 && { titre: "Autres revenus", valeur: $(V.autres) },
       { titre: "Total", cls: "total", valeur: $(V.rev) },
     ]);
@@ -1860,7 +1905,7 @@ window.Verrou.quandOuvert(function () {
     const act = (g.activites || 0) + (g.polyvalence || 0), autresPro = R.autresPro + (S.revenu.autresRevenus || 0), deficit = Math.max(0, -R.surplusMoi * 12);
     const sources = [
       ["Pratique principale", R.brut - act - autresPro], ["Activités en établissement", act], ["Autres revenus professionnels", autresPro],
-      ["Location et placements", R.autresNonPro], ["Allocations familiales", R.allocMoi * 12], ["Manque à combler", deficit],
+      ["Location et placements", R.autresNonPro], ["Allocations familiales", R.allocMoi * 12], ["Crédit pour frais de garde", R.garde.creditMoi], ["Manque à combler", deficit],
     ].filter(([, v]) => v > 0.5);
     const T = sources.reduce((t, [, v]) => t + v, 0), net = R.netMoi * 12 + deficit;
     const sorties = soc
@@ -1899,7 +1944,7 @@ window.Verrou.quandOuvert(function () {
     const proAnnuelles = somme(annuelles.filter(x => x.pro)), budgetAnnuelles = somme(annuelles.filter(x => !x.pro));
     // Revenu avant impôt, après dépenses professionnelles et frais de cabinet, hors montants versés d'un coup.
     const revenuAnnuel = soc ? R.travailMoi * 12 + R.primeMoi : R.travailMoi * 12 + t + R.primeMoi + proAnnuelles;
-    const entreeReguliere = (revenuAnnuel - inscription - vulnerables - juin) / 12 + R.allocMoi;
+    const entreeReguliere = (revenuAnnuel - inscription - vulnerables - juin) / 12 + R.allocMoi + R.gardeMoi;
     const sortieReguliere = R.depMoi - budgetAnnuelles / 12 + R.dettesMoi + R.epargneMoi;
     let encaisse = S.epargne.encaisse || 0, ecart = 0, pireEcart = 0;
     const mois = [];

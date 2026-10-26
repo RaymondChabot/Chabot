@@ -49,6 +49,13 @@
     // Normes d'hypothèses de projection 2026 (Institut de planification financière et FP Canada), avant frais.
     // Prudent et optimiste : le rendement réaliste, moins ou plus 1,5 point.
     normes: { revenuFixe: 3.2, actions: { canadiennes: 6.3, americaines: 6.4, internationales: 6.6 }, ecartScenarios: 1.5 },
+    // Frais de garde d'enfants (16 ans ou moins). Québec : crédit remboursable, taux selon le revenu familial
+    // (paramètres 2026, tableau 5), frais plafonnés par enfant. Fédéral : déduction plafonnée par enfant et
+    // aux 2/3 du revenu gagné de celui qui la demande.
+    garde: {
+      quebec: { moins7: 12525, autres: 6305, taux: [[25305, 0.78], [44620, 0.75], [46270, 0.74], [47935, 0.73], [49565, 0.72], [51225, 0.71], [122290, 0.70], [Infinity, 0.67]] },
+      federal: { moins7: 8000, autres: 5000, partRevenuGagne: 2 / 3 },
+    },
   };
 
   /* ---------- Tarifs RAMQ : Manuel des médecins omnipraticiens, rémunération à l'acte, onglet B
@@ -397,8 +404,10 @@
   function impotParticulier(o) {
     const revenuNetAffaires = Math.max(0, o.revenu - (o.depensesPro || 0)), autres = Math.max(0, o.autresImposables || 0);
     const c = cotisationsAutonome(revenuNetAffaires);
-    const imposableFed = Math.max(0, revenuNetAffaires - c.deduction - (o.reer || 0) + autres);
-    const imposableQc = Math.max(0, imposableFed - deductionTravailleur(revenuNetAffaires));
+    // Déduction pour frais de garde : au fédéral seulement (au Québec, c'est un crédit remboursable).
+    const netAvantGarde = Math.max(0, revenuNetAffaires - c.deduction - (o.reer || 0) + autres);
+    const imposableFed = Math.max(0, netAvantGarde - (o.deductionGarde || 0));
+    const imposableQc = Math.max(0, netAvantGarde - deductionTravailleur(revenuNetAffaires));
     const ie = o.interetsEtudes || 0;
     const { fed, qc } = impotsDeBase(imposableFed, imposableQc, c.creditFederal, 0,
       ie * P2026.creditInteretsEtudes.federal, ie * P2026.creditInteretsEtudes.quebec);
@@ -421,8 +430,9 @@
     const rqap = Math.min(s, P2026.rqap.max) * P2026.rqap.salarie;
     const ae = Math.min(s, P2026.ae.max) * P2026.ae.taux;
     const autres = Math.max(0, o.autresRevenus || 0);
-    const netFed = Math.max(0, s + autres - rrqSupp - (o.rpa || 0) - (o.syndicat || 0) - (o.reer || 0));
-    const netQc = Math.max(0, netFed - deductionTravailleur(s));
+    const netAvantGarde = Math.max(0, s + autres - rrqSupp - (o.rpa || 0) - (o.syndicat || 0) - (o.reer || 0));
+    const netFed = Math.max(0, netAvantGarde - (o.deductionGarde || 0));
+    const netQc = Math.max(0, netAvantGarde - deductionTravailleur(s));
     const creditsFed = Math.min(P2026.montantEmploi, s) + rrqBase + ae + rqap;
     const { fed, qc } = impotsDeBase(netFed, netQc, creditsFed, 0, 0, 0);
     const total = fed + qc + rrqBase + rrqSupp + rqap + ae;
@@ -797,8 +807,22 @@
     return { brut, frais: +frais || 0, net: brut - (+frais || 0) };
   }
 
+  /* Frais de garde d'enfants de 16 ans ou moins.
+     Québec : crédit remboursable = taux selon le revenu familial × frais admissibles (sans la contribution
+     réduite d'une place subventionnée), plafonnés par enfant ; indexQc : indexation des années futures.
+     Fédéral : déduction plafonnée par enfant et aux 2/3 du revenu gagné de celui qui la demande. */
+  function fraisGarde(o) {
+    const g = P2026.garde, ages = (o.ages || []).filter(a => a <= 16), indexQc = o.indexQc || 1;
+    const plafond = p => ages.reduce((t, a) => t + (a < 7 ? p.moins7 : p.autres), 0);
+    const plafondQc = plafond(g.quebec) * indexQc, plafondFed = plafond(g.federal);
+    const admissibleQc = Math.min(Math.max(0, o.fraisQc || 0), plafondQc);
+    const taux = g.quebec.taux.find(([seuil]) => (o.revenuFamilial || 0) <= seuil * indexQc)[1];
+    const deduction = Math.min(Math.max(0, o.fraisFed || 0), plafondFed, Math.max(0, o.revenuGagne || 0) * g.federal.partRevenuGagne);
+    return { plafondQc, admissibleQc, taux, creditQc: admissibleQc * taux, plafondFed, deduction };
+  }
+
   const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
-    remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil };
+    remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil, fraisGarde };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;
 })(typeof window !== "undefined" ? window : globalThis);

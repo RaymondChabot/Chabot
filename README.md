@@ -65,6 +65,12 @@ Revenu affiche tous les détails.
   santé ; société et dividendes ; partenaire salarié ou à son compte et
   transferts de crédits ; allocations
   familiales, prime d'assurance médicaments, REER, CELIAPP, société ;
+  frais de garde (garderie ou CPE, camps de jour, gardiennage du budget) :
+  crédit remboursable du Québec selon le revenu familial (78 % à 67 %,
+  plafonds de 12 525 $ et 6 305 $ par enfant ; sans la contribution
+  réduite d'une place subventionnée) et déduction fédérale du conjoint
+  au revenu le moins élevé (8 000 $ et 5 000 $, au plus les 2/3 de son
+  revenu gagné) ;
   dépenses professionnelles en un total ou ligne par ligne (Collège des
   médecins, FMOQ, ACPM, formation, équipement…).
 - **Budget et dettes** : une case par dépense récurrente (plus de 70

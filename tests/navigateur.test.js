@@ -555,11 +555,46 @@ async function lexiqueRamq(b, base) {
   await ctx.close();
 }
 
+/* 22. Frais de garde : couple, un enfant de 3 ans, garderie de 1 000 $ par mois payée en commun. Le ou la partenaire,
+   au revenu le moins élevé, déduit 8 000 $ au fédéral ; crédit du Québec de 67 % de 12 000 $, partagé comme les frais. */
+async function fraisGardeMenage(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "impot" });
+  const regler = async m => { await p.evaluate(m => {
+    const S = JSON.parse(JSON.stringify(window.Wealthnord.etat()));
+    Object.assign(S.conjointe, { active: true, lien: "maries", statut: "salarie", salaire: 60000 }, m.conjointe || {});
+    S.epargne.reee.enfants = [{ age: 3 }];
+    const l = S.budget.find(x => x.k === "garderie"); Object.assign(l, { montant: 1000, periode: "mois", qui: "commun" });
+    if (S.budgetTotaux && S.budgetTotaux.Enfants) S.budgetTotaux.Enfants.actif = false;
+    S.famille.gardeSubventionnee = !!m.subventionnee; if (m.annee) S.revenu.annee = m.annee;
+    S.meta.exemple = false; localStorage.setItem("boussole.v1", JSON.stringify(S));
+  }, m); await p.reload(); await pret(p); };
+  const lire = () => p.evaluate(() => { const R = window.Wealthnord.resultats(), S = window.Wealthnord.etat();
+    return { ...R.garde, part: S.menage.partCommunMoi / 100, gardeMoi: R.gardeMoi, texte: document.getElementById("im-famille").textContent.replace(/\s/g, " ") }; });
+  await regler({});
+  let g = await lire();
+  verifier("garde : déduction fédérale de 8 000 $ par le ou la partenaire", g.parPartenaire === true && g.deduction === 8000 && g.economieFed > 500, g);
+  verifier("garde : crédit du Québec de 67 % de 12 000 $, partagé comme les frais", Math.abs(g.creditQc - 8040) < 1e-6 && Math.abs(g.creditMoi - 8040 * g.part) < 1e-6 && Math.abs(g.gardeMoi * 12 - g.creditMoi) < 1e-6, g);
+  verifier("garde : affiché dans la page Impôt", g.texte.includes("Crédit du Québec") && g.texte.includes("67 % de 12 000 $") && g.texte.includes("8 000 $ déduits par votre"), g.texte.slice(0, 400));
+  await allerA(p, "budget");
+  verifier("garde : dans les revenus du budget", (await p.textContent("#bu-revenus")).includes("Crédit pour frais de garde"));
+  await regler({ annee: "type" });
+  const ecart = await p.evaluate(() => { const R = window.Wealthnord.resultats(), T = window.Wealthnord.outils.tresorerie(R); return T.mois.reduce((s, x) => s + x.solde, 0) - 12 * R.surplusMoi; });
+  verifier("garde : trésorerie, année type = 12 × surplus", Math.abs(ecart) < 1, ecart);
+  await regler({ subventionnee: true });
+  g = await lire();
+  verifier("garde : place subventionnée, pas de crédit du Québec, déduction gardée", g.creditQc === 0 && g.deduction === 8000, g);
+  await regler({ conjointe: { statut: "sans", salaire: 0 } });
+  g = await lire();
+  verifier("garde : partenaire sans revenu gagné, aucune déduction", g.deduction === 0 && g.texte.includes("n'a pas de revenu gagné"), g.texte.slice(0, 300));
+  verifier("garde : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

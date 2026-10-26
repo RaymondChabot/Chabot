@@ -60,7 +60,7 @@
       realiste: { rendement: 5, croissanceMaison: 3.1, depreciationAuto: 15, ecartTaux: 0, inflation: 2.1, hausseRevenus: 3.1 },
       optimiste: { rendement: 6.5, croissanceMaison: 4.5, depreciationAuto: 12, ecartTaux: -0.5, inflation: 2, hausseRevenus: 3.5 },
     },
-    famille: { calculAuto: true, versementA: "moi", medicamentsPublicMoi: true },
+    famille: { calculAuto: true, versementA: "moi", medicamentsPublicMoi: true, gardeSubventionnee: false },
     societe: { tauxSociete: 20.5, fraisSociete: 4000, retrait: "tout", retraitFixe: 120000, solde: 0 },
     menage: { conjointNetMensuel: 0, allocationsAnnuelles: 0, autresRevenusMensuels: 0, partCommunMoi: 100 },
     // Valeurs fictives ; les autres cases du catalogue partent à 0.
@@ -444,6 +444,7 @@
       { p: "menage.allocationsAnnuelles", l: "Allocations familiales reçues", u: "$/an", s: 50, si: "!famille.calculAuto" },
       { p: "famille.versementA", l: "Allocations versées à", t: "select", o: [["moi", "Vous"], ["conjointe", () => Pn()]], si: "conjointe.active" },
       { p: "famille.medicamentsPublicMoi", l: "Votre assurance médicaments : régime public", t: "check", h: "La prime se paie avec l'impôt du Québec. Décochez si vous avez une assurance collective." },
+      { p: "famille.gardeSubventionnee", l: "Place en garderie subventionnée (CPE ou contribution réduite)", t: "check", h: "La contribution réduite ne donne pas droit au crédit du Québec ; elle reste déductible au fédéral. Les frais de garde viennent du budget : garderie ou CPE, camps de jour, gardiennage." },
     ],
     strategie: [
       { g: "Stratégie de remboursement" },
