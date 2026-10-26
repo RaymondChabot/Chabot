@@ -122,7 +122,7 @@ window.Verrou.quandOuvert(function () {
       </div>
       <div class="rp-kpis rp-kpis-4">
         ${kpi("Revenu brut", $(R.brut), libelleRevenu())}
-        ${kpi("Net après impôt", $(R.nets[mode]), `${$(R.nets[mode] / 12)} par mois`)}
+        ${kpi(R.libelleNet(mode), $(R.nets[mode]), `${$(R.nets[mode] / 12)} par mois`)}
         ${kpi("Surplus mensuel", $(R.surplusMoi), "Après dépenses, dettes et épargne", R.surplusMoi >= 0 ? "bon" : "mauvais")}
         ${kpi("Impôt de l'année", $(totalImpot), `Taux marginal ${pct(R.tauxMarginal, 0)}`)}
         ${kpi("Dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées")}
@@ -149,7 +149,7 @@ window.Verrou.quandOuvert(function () {
     const dj = S.revenu.demiJournees, ens = R.milieu === "gmfu" ? S.revenu.enseignement : 0, srv = S.revenu.demiJourneesSRV;
     const colsSens = plusieurs ? M.map(m => COURT_MODE[m]) : ["Brut", soc ? "Pour vous" : "Net"];
     const kpisRevenu = plusieurs
-      ? M.map(m => `<div class="rp-kpi rp-mode ${m === mode ? "choisi" : ""}"><span><i style="background:${COULEUR_MODE[m]}"></i>${esc(NOM_MODE[m])}${m === mode ? " · utilisé" : ""}</span><strong>${$(g[m].total)}</strong><em>Net après impôt${g[m].fraisCabinet ? " et frais" : ""} : ${$(R.nets[m])}</em></div>`).join("")
+      ? M.map(m => `<div class="rp-kpi rp-mode ${m === mode ? "choisi" : ""}"><span><i style="background:${COULEUR_MODE[m]}"></i>${esc(NOM_MODE[m])}${m === mode ? " · utilisé" : ""}</span><strong>${$(g[m].total)}</strong><em>${R.libelleNet(m)} : ${$(R.nets[m])}</em></div>`).join("")
       : kpi("Revenu brut", $(g[mode].total), NOM_MODE[mode]) + kpi("Frais de cabinet", $(g[mode].fraisCabinet), `${nb(S.revenu.fraisCabinetPct)} % de la facturation de la clinique`) + kpi(soc ? "Pour vous" : "Net après impôt et frais", $(R.nets[mode]), `${$(R.nets[mode] / 12)} par mois`);
     const acts = S.revenu.activites || [], autresL = S.revenu.lignes.filter(l => O.annuelLigne(l) > 0);
     const serre = acts.length > 0 && autresL.length > 0;   // page chargée : graphique et tableau plus courts

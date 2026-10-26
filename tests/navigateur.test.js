@@ -446,11 +446,42 @@ async function monteCarlo(b, base) {
   await ctx.close();
 }
 
+/* 18. Un seul « net après impôt et frais » : la tuile de l'aperçu, la page Revenu et le « Reste pour vous » de la
+   page Impôt montrent le même montant. Sans aucune dépense entrée, l'aperçu montre le revenu net, pas un surplus. */
+async function apercuCoherent(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base);
+  const montant = t => +String(t).replace(/[^\d]/g, "");
+  const tuile = montant(await p.textContent('#ap-tuiles a[href="#impot"] .tuile-valeur'));
+  const sous = await p.textContent('#ap-tuiles a[href="#impot"] .tuile-sous');
+  await allerA(p, "revenu");
+  const revenu = montant((await p.textContent("#rv-hero .hero-sous span")).split(":")[1]);
+  await allerA(p, "impot");
+  const reste = montant(await p.evaluate(() => [...document.querySelectorAll("#im-cent .rangee")]
+    .find(r => r.querySelector(".rangee-titre").textContent === "Reste pour vous").querySelector(".rangee-valeur-sous").textContent));
+  verifier("net : même montant dans l'aperçu, la page Revenu et la page Impôt", tuile > 0 && tuile === revenu && revenu === reste, { tuile, revenu, reste });
+  verifier("net : « Après impôt et frais » sous la tuile", sous === "Après impôt et frais", sous);
+
+  // Assistant : propriétaire, sans dettes ni dépenses.
+  await allerA(p, "apercu");
+  await p.click("#ap-assistant");
+  const suivant = () => p.click("#as-suivant");
+  await suivant(); await p.check('input[name="as-famille"][value="seul"]'); await suivant(); await suivant();
+  await p.check('input[name="as-milieu"][value="gmfu"]'); await suivant(); await suivant();
+  await p.check('input[name="as-logement"][value="proprietaire"]'); await suivant(); await suivant(); await suivant();
+  await p.waitForTimeout(300);
+  const neuf = await p.evaluate(() => ({ etiquette: document.querySelector("#ap-hero .hero-etiquette").textContent, lien: !!document.querySelector('#ap-hero a[href="#budget"]') }));
+  verifier("aperçu sans dépenses : revenu net et lien vers le budget", neuf.etiquette === "Votre revenu net mensuel" && neuf.lien, neuf);
+  await remplacer(p, { "budget.0.montant": 500 });
+  verifier("aperçu avec une dépense : surplus", (await p.textContent("#ap-hero .hero-etiquette")) === "Votre surplus mensuel");
+  verifier("aperçu : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

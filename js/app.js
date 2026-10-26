@@ -488,9 +488,12 @@ window.Verrou.quandOuvert(function () {
         + (S.revenu.fraisCabinetMois || 0) * 12) : 0;
     const depensesMode = md => R.depensesPro + R.rev[md].fraisCabinet;
     for (const md of R.modes) [R.impots[md], partenaires[md]] = avec(impotDe({ ...base, depensesPro: depensesMode(md), revenu: R.rev[md].total }));
-    // Net après impôt et frais de cabinet (les dépenses professionnelles, égales dans tous les modes, à part).
+    // Net après impôt, frais de cabinet et dépenses professionnelles : le « Reste pour vous » de la page Impôt,
+    // le même chiffre dans l'aperçu, la page Revenu et le rapport. La société paie elle-même ses frais.
+    R.fraisPerso = md => R.societeActive ? 0 : R.depensesPro + R.rev[md].fraisCabinet;
+    R.libelleNet = md => R.fraisPerso(md) > 0 ? "Net après impôt et frais" : "Net après impôt";
     R.nets = {};
-    for (const md of R.modes) R.nets[md] = R.impots[md].net - (R.societeActive ? 0 : R.rev[md].fraisCabinet);
+    for (const md of R.modes) R.nets[md] = R.impots[md].net - R.fraisPerso(md);
     R.impot = R.impots[mode];
     R.conjointe = R.couple ? partenaires[mode] : null;
     const totalDe = x => x.totalGlobal ?? x.total;
@@ -498,7 +501,7 @@ window.Verrou.quandOuvert(function () {
     R.tauxMarginal = (totalDe(impotDe({ ...base, depensesPro: R.depensesPro + fraisCabinet(R.brut + 1000, mode), revenu: R.brut + 1000 }))
       - totalDe(impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.brut }))) / 1000;
     // Revenu net d'impôt et de frais de cabinet pour un autre revenu brut (mêmes déductions, mêmes transferts).
-    R.netPour = (rev, frais = 0) => avec(impotDe({ ...base, depensesPro: R.depensesPro + frais, revenu: rev }))[0].net - (R.societeActive ? 0 : frais);
+    R.netPour = (rev, frais = 0) => avec(impotDe({ ...base, depensesPro: R.depensesPro + frais, revenu: rev }))[0].net - (R.societeActive ? 0 : R.depensesPro + frais);
     // Sensibilité : revenu brut et net pour d'autres valeurs d'un champ (x : ce qui change).
     const sens = (valeurs, x) => valeurs.map(v => {
       const g = revenuDe(x(v)), o = { v };
@@ -729,7 +732,12 @@ window.Verrou.quandOuvert(function () {
   function rendreApercu(R) {
     document.getElementById("ap-exemple").hidden = !S.meta.exemple;
     rendrePortrait();
-    hero("ap-hero", "Votre surplus mensuel", $(R.surplusMoi), [
+    // Sans aucune dépense entrée, le « surplus » serait le revenu net en entier : on montre le revenu, et la suite.
+    if (!S.meta.exemple && !categoriesBudget().some(categorieRemplie)) {
+      const lien = el("a", "lien-carte", "Entrez vos dépenses du mois"); lien.href = "#budget";
+      const suite = el("span"); suite.append(lien, document.createTextNode(" pour voir ce qu'il vous reste."));
+      hero("ap-hero", "Votre revenu net mensuel", $(R.netMoi), [suite], R.netMoi);
+    } else hero("ap-hero", "Votre surplus mensuel", $(R.surplusMoi), [
       R.surplusMoi >= 0 ? `Sur un revenu net de ${$(R.netMoi)} par mois` : puce("Vos sorties dépassent vos revenus", "bas", false),
     ], R.surplusMoi);
 
@@ -758,7 +766,7 @@ window.Verrou.quandOuvert(function () {
     const p = R.projection, dix = p[Math.min(10, p.length - 1)];
     t.append(
       tuileLien("revenu", "Revenu brut", $(R.brut), libelleRevenu()),
-      tuileLien("impot", "Net après impôt", $(R.impot.net), `${$(R.impot.net / 12)} par mois`),
+      tuileLien("impot", "Net de l'année", $(R.nets[R.mode]), R.fraisPerso(R.mode) > 0 ? "Après impôt et frais" : "Après impôt"),
       tuileLien("budget", "Dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
       tuileLien("avenir", "Valeur nette", $(p[0].moi), `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}`),
     );
@@ -924,7 +932,7 @@ window.Verrou.quandOuvert(function () {
     const meilleur = autres.reduce((a, m) => g[m].total > g[a].total ? m : a, autres[0]);
     const diff = meilleur ? g[R.mode].total - g[meilleur].total : 0;
     hero("rv-hero", "Revenu brut de l'année", $(g[R.mode].total), [
-      `Net après impôt${g[R.mode].fraisCabinet ? " et frais" : ""} : ${$(R.nets[R.mode])}`,
+      `${R.libelleNet(R.mode)} : ${$(R.nets[R.mode])}`,
       meilleur ? puce(`${signe(diff)} par rapport ${AU_MODE[meilleur]}`, diff >= 0 ? "haut" : "bas", diff >= 0)
         : g.activites ? puce(`Dont ${$(g.activites)} d'activités en établissement`) : null,
     ], g[R.mode].total);
@@ -945,7 +953,7 @@ window.Verrou.quandOuvert(function () {
         const fr = g[k].fraisCabinet ? `Frais de cabinet : ${moins(g[k].fraisCabinet)} · ` : "";
         b.append(tete, piste, el("div", "aide", R.societeActive
           ? `${fr}Pour vous : ${$(R.nets[k])} · laissé dans la société : ${$(R.impots[k].societe.retenu)}`
-          : `${fr}Net après impôt${fr ? " et frais" : ""} : ${$(R.nets[k])}`));
+          : `${fr}${R.libelleNet(k)} : ${$(R.nets[k])}`));
         comp.appendChild(b);
       });
       comp.appendChild(rangees(el("div"), autres.map((m, i) => ({ titre: `${NOM_MODE[m]} par rapport ${AU_MODE[R.mode]}`,
@@ -1781,7 +1789,7 @@ window.Verrou.quandOuvert(function () {
     const ligne = (...c) => L.push(c.join(";"));
     ligne(t("WealthMorand"), t(`Exporté le ${new Date().toLocaleDateString("fr-CA")}`)); L.push("");
     ligne(t("Résumé"), t("Montant"));
-    [["Revenu brut de l'année", Rr.brut], ["Net après impôt (année)", Rr.nets[Rr.mode]], ["Impôt et cotisations (année)", Rr.impot.total], ["Revenu net par mois", Rr.netMoi],
+    [["Revenu brut de l'année", Rr.brut], [`${Rr.libelleNet(Rr.mode)} (année)`, Rr.nets[Rr.mode]], ["Impôt et cotisations (année)", Rr.impot.total], ["Revenu net par mois", Rr.netMoi],
      ["Dépenses par mois (votre part)", Rr.depMoi], ["Paiements de dettes par mois", Rr.dettesMoi], ["Épargne par mois", Rr.epargneMoi], ["Surplus par mois", Rr.surplusMoi],
      ["Dettes totales", Rr.detteTotale], ["Valeur nette aujourd'hui", Rr.projection[0].moi]].forEach(([a, v]) => ligne(t(a), n(v)));
     L.push(""); ligne(t("Budget"), t("Catégorie"), t("Dépense"), t("Montant"), t("Période"), t("Qui paie"), t("Par mois, votre part"));
