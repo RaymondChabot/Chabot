@@ -91,11 +91,11 @@
   const MONTANTS_LIEU = {
     cabinet: { forfaitInscription: 11.85, forfaitVulnerable: 62.50, forfaitTresVulnerable: 125,
       suppNonVulnerable: 23.55, suppVulnerableHorsGuichet: 72.50, suppVulnerableGuichet: 155.35, suppTresVulnerable: 310.65,
-      forfaitResponsabilite: 10.60, suppExamenEnfant: 17.05, suppSuiviGrossesse: 11.40,
+      forfaitResponsabilite: 10.60, suppExamenEnfant: 17.05, suppSuiviGrossesse: 11.40, suppGrossessePremierTrimestre: 47.40,
       perDiem: { 1: [55.35, 66.45], 2: [86.95, 98.00] } },
     etablissement: { forfaitInscription: 8.95, forfaitVulnerable: 47, forfaitTresVulnerable: 94,
       suppNonVulnerable: 19.55, suppVulnerableHorsGuichet: 60.15, suppVulnerableGuichet: 128.90, suppTresVulnerable: 257.80,
-      forfaitResponsabilite: 8.25, suppExamenEnfant: 13.35, suppSuiviGrossesse: 8.95,
+      forfaitResponsabilite: 8.25, suppExamenEnfant: 13.35, suppSuiviGrossesse: 8.95, suppGrossessePremierTrimestre: 35.60,
       perDiem: { 1: [41.45, 49.85], 2: [65.20, 73.55] } },
   };
   // Montants d'un lieu, à plat ; demi-per diem de la liste 1 ou 2.
@@ -114,6 +114,8 @@
   const RAMQ = { tarifHoraire: 99.48, heuresMax100: 1540, forfaitHoraireMixte: 59.68, pctMixte: 63.58,
     acteSupervision: 99.48, pctSupervision: 62.15, supervisionMaxH: 3.5, forfaitGmf: 9.35 };
   const PCT_AU_DELA = 71.8;
+  // Visites de suivi par grossesse, pour estimer les grossesses prises en charge quand leur nombre n'est pas inscrit.
+  const VISITES_PAR_GROSSESSE = 10;
   const E = TARIFS_LIEU.etablissement;
   const VISITES = [
     { cle: "suivi",  nom: "Suivi",                                 tarifs: E.suivi },
@@ -307,14 +309,17 @@
     const heuresAuDela = Math.max(0, heures - plafondHeures), perteHeures = heuresAuDela * (1 - PCT_AU_DELA / 100) * m("tarifHoraire") * maj;
     // En plus des heures : forfait de responsabilité à chaque examen d'un patient vulnérable inscrit (visites de
     // suivi et périodiques des patients vulnérables, prises en charge de patients vulnérables), supplément à chaque
-    // examen périodique d'un enfant de 0 à 5 ans et à chaque suivi de grossesse (EP 40, par. 6.02 B, 8.01, 7.02 B).
+    // examen périodique d'un enfant de 0 à 5 ans et à chaque suivi de grossesse (EP 40, par. 6.02 B, 8.01, 7.02 B),
+    // et une fois par grossesse prise en charge au premier trimestre (par. 7.02 A). Nombre de grossesses : celui
+    // inscrit, sinon les suivis de grossesse divisés par VISITES_PAR_GROSSESSE.
     const examens = {
       vulnerables: visitesPropres * (partVisite(r.mix, "suiviV") + partVisite(r.mix, "perioV")) + nbPriseEnCharge * (v + vt),
       enfants: visitesPropres * partVisite(r.mix, "pedia"),
       grossesse: visitesPropres * partVisite(r.mix, "gross"),
     };
+    examens.priseEnChargeGrossesse = r.grossessesAn != null && r.grossessesAn !== "" ? Math.max(0, +r.grossessesAn || 0) : examens.grossesse / VISITES_PAR_GROSSESSE;
     const responsabilite = (examens.vulnerables * m("forfaitResponsabilite") + examens.enfants * m("suppExamenEnfant")
-      + examens.grossesse * m("suppSuiviGrossesse")) * maj;
+      + examens.grossesse * m("suppSuiviGrossesse") + examens.priseEnChargeGrossesse * m("suppGrossessePremierTrimestre")) * maj;
     const horaire = { heures: (heures - heuresAuDela * (1 - PCT_AU_DELA / 100)) * m("tarifHoraire") * maj, responsabilite, ...base };
     horaire.total = horaire.heures + horaire.responsabilite + commun;
     // Mixte : forfait horaire, part du tarif des visites et, en GMF-U, l'intervention de supervision
@@ -725,7 +730,8 @@
     let reer = o.reer.solde, celi = o.celi.solde, conj = o.actifsConjoint || 0, soc = o.societe ? o.societe.solde || 0 : 0;
     // CELIAPP : cotisations jusqu'au plafond à vie (40 000 $), croissance à l'abri de l'impôt.
     const ca = o.celiapp || { solde: 0, cotisationAnnuelle: 0 };
-    let celiapp = ca.solde || 0, cumulCeliapp = ca.solde || 0;
+    // Plafond à vie : sur les cotisations versées à ce jour ; à défaut, le solde (qui comprend les gains).
+    let celiapp = ca.solde || 0, cumulCeliapp = ca.cotisationsVersees != null && ca.cotisationsVersees !== "" ? +ca.cotisationsVersees || 0 : ca.solde || 0;
     // Placements de la société : rendement après l'impôt de la société sur le revenu de placement (rmSocDe).
     // Autos : chacune perd de la valeur chaque année ; si un remplacement est prévu, une auto
     // neuve est achetée tous les N ans (prix indexé à l'inflation), payée avec l'épargne.

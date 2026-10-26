@@ -590,11 +590,34 @@ async function fraisGardeMenage(b, base) {
   await ctx.close();
 }
 
+/* 23. Prime d'assurance médicaments : avec les acomptes du Québec (et le solde de la première année), plus seule en avril.
+   CELIAPP : plafond à vie sur les cotisations versées, sinon sur le solde. */
+async function acomptesCeliapp(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "impot" });
+  let r = await p.evaluate(() => { const R = window.Wealthnord.resultats();
+    return { t: R.impot.total, prime: R.primeMoi, avril: [...document.querySelectorAll("#im-acomptes .rangee")].map(x => x.textContent.replace(/\s/g, " "))[0] }; });
+  const fmt = v => Math.round(v).toLocaleString("fr-CA").replace(/\s/g, " ") + " $";
+  verifier("première année : le solde du 30 avril comprend la prime", r.prime > 0 && r.avril.includes(fmt(r.t + r.prime)), r);
+  await remplacer(p, { "revenu.annee": "type" });
+  r = await p.evaluate(() => { const R = window.Wealthnord.resultats(), T = window.Wealthnord.outils.tresorerie(R), ev = T.mois.flatMap(m => m.ev);
+    return { t: R.impot.total, prime: R.primeMoi, acomptes: ev.filter(([n]) => n === "Acompte provisionnel").map(([, v]) => v), primeSeule: ev.some(([n]) => n === "Prime d'assurance médicaments"),
+      ecart: T.mois.reduce((s, x) => s + x.solde, 0) - 12 * R.surplusMoi }; });
+  verifier("acomptes : 4 × (impôt + prime) ÷ 4, plus de prime seule en avril", r.acomptes.length === 4 && r.acomptes.every(v => Math.abs(-v - (r.t + r.prime) / 4) < 1e-6) && !r.primeSeule, r);
+  verifier("acomptes : trésorerie, année type = 12 × surplus", Math.abs(r.ecart) < 1, r.ecart);
+  const celiapp = async c => { await remplacer(p, { "epargne.celiapp": c }); return p.evaluate(() => { const R = window.Wealthnord.resultats(); return [0, 1, 2].map(a => R.celiappAnnee(a)); }); };
+  const parSolde = await celiapp({ solde: 30000, cotisationAnnuelle: 8000, cotisationsVersees: null });
+  const parCotisations = await celiapp({ solde: 30000, cotisationAnnuelle: 8000, cotisationsVersees: 24000 });
+  verifier("CELIAPP : plafond à vie selon le solde, faute de cotisations inscrites", parSolde.join() === "8000,2000,0", parSolde);
+  verifier("CELIAPP : plafond à vie selon les cotisations versées", parCotisations.join() === "8000,8000,0", parCotisations);
+  verifier("acomptes et CELIAPP : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

@@ -468,7 +468,8 @@ window.Verrou.quandOuvert(function () {
     R.depensesPro = S.impot.depensesProMode === "detail" ? S.impot.depensesProDetail.reduce((t, l) => t + annuelLigne(l), 0) : S.impot.depensesPro;
     // CELIAPP : cotisations jusqu'au plafond à vie de 40 000 $ ; déductibles comme le REER.
     const ca = S.epargne.celiapp || { solde: 0, cotisationAnnuelle: 0 };
-    R.celiappAnnee = a => Math.min(ca.cotisationAnnuelle || 0, Math.max(0, 40000 - (ca.solde || 0) - a * (ca.cotisationAnnuelle || 0)));
+    const dejaCeliapp = ca.cotisationsVersees != null && ca.cotisationsVersees !== "" ? +ca.cotisationsVersees || 0 : ca.solde || 0;
+    R.celiappAnnee = a => Math.min(ca.cotisationAnnuelle || 0, Math.max(0, 40000 - dejaCeliapp - a * (ca.cotisationAnnuelle || 0)));
     const base = { depensesPro: R.depensesPro, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(0), interetsEtudes: R.interetsEtudes, autresImposables: R.autresNonPro };
     // Partenaire : salarié, ou à son compte (même calcul que le médecin travailleur autonome).
     // reel : facteur de revenu en dollars d'aujourd'hui (années futures).
@@ -820,7 +821,7 @@ window.Verrou.quandOuvert(function () {
       li.append(ico, txt); a.appendChild(li);
     };
     if (R.societeActive) action("important", `La société garde environ ${$(R.impot.societe.impotSociete / 12)} par mois pour son impôt ; vous, environ ${$(R.impot.total / 12)} par mois pour l'impôt sur vos dividendes.`);
-    else action("important", `Mettez ${pct(R.impot.total / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$(R.impot.total / 12)} par mois.`);
+    else action("important", `Mettez ${pct((R.impot.total + R.primeMoi) / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$((R.impot.total + R.primeMoi) / 12)} par mois.`);
     // Après l'assistant : ce qu'il reste à entrer.
     if (S.meta.assistant) {
       if (depensesEffectives().filter(b => b.montant > 0 && b.k !== "loyer").length < 3) action("important", "Entrez vos dépenses du mois (page Budget) : épicerie, électricité, assurances, transport… Sans elles, le surplus est surestimé.");
@@ -836,7 +837,7 @@ window.Verrou.quandOuvert(function () {
     if (!S.meta.exemple && !(S.bilans || []).some(b => b.mois === moisPasse() && (b.recu != null || b.depense != null)))
       action("info", `Faites le bilan de ${nomMois(moisPasse())} (page Budget) : ce que vous avez reçu et dépensé, comparé au budget.`);
     R.objectifs.filter(o => !o.atteint && !o.mois).forEach(o => action("important", `L'objectif « ${o.nom || "sans nom"} » n'est pas atteint à la date visée : choisissez une nouvelle date (page Patrimoine).`));
-    if (S.revenu.annee === "premiere") action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total)} seront à payer d'un coup le 30 avril.`);
+    if (S.revenu.annee === "premiere") action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total + R.primeMoi)} seront à payer d'un coup le 30 avril.`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
       action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 766 $ par adulte en 2026, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
@@ -878,12 +879,12 @@ window.Verrou.quandOuvert(function () {
   function echeances(R) {
     const auj = new Date(); auj.setHours(0, 0, 0, 0);
     const an = auj.getFullYear(), anImpot = (+String(S.strategie.debut).slice(0, 4) || an) + 1;
-    const l = [], premiere = S.revenu.annee === "premiere", t = R.impot.total;
+    const l = [], premiere = S.revenu.annee === "premiere", t = R.impot.total + R.primeMoi;   // prime d'assurance médicaments : avec l'impôt du Québec
     const prochaine = (m, j) => { const d = new Date(an, m, j); return d < auj ? new Date(an + 1, m, j) : d; };
     if (premiere) l.push({ date: new Date(anImpot, 3, 30), titre: "Solde de l'impôt", sous: "Première année : fédéral et Québec", valeur: $(t) });
     for (const y of [an, an + 1, an + 2]) for (const [m, j] of [[2, 15], [5, 15], [8, 15], [11, 15]]) {
       if (premiere && y < anImpot) continue;
-      l.push({ date: new Date(y, m, j), titre: "Acompte provisionnel", sous: "Impôt et cotisations", valeur: $(t / 4) });
+      l.push({ date: new Date(y, m, j), titre: "Acompte provisionnel", sous: "Impôt, cotisations et prime d'assurance médicaments", valeur: $(t / 4) });
     }
     l.push({ date: prochaine(5, 15), titre: "Déclarations de revenus", sous: "Date limite pour un travailleur autonome ; le solde était dû le 30 avril" });
     if (S.epargne.reer.droits > 0 || S.epargne.reer.cotisationAnnuelle > 0) {
@@ -1050,7 +1051,7 @@ window.Verrou.quandOuvert(function () {
       srv ? { titre: "Tarif moyen d'un patient au sans rendez-vous", sous: `Visite ponctuelle : ${nb(S.revenu.pctSrvComplexe || 0)} % complexes`, valeur: $2(g.tarifMoyenSrv) } : null,
       { titre: "Visites de prise en charge", valeur: nb(g.nbPriseEnCharge, 0) },
       R.modes.includes("horaire") && g.horaire.responsabilite > 0 ? { titre: "Forfaits de responsabilité, au taux horaire",
-        sous: `${nb(g.examens.vulnerables, 0)} examens de patients vulnérables, ${nb(g.examens.enfants, 0)} examens périodiques d'enfants de 0 à 5 ans, ${nb(g.examens.grossesse, 0)} suivis de grossesse (EP 40)`,
+        sous: `${nb(g.examens.vulnerables, 0)} examens de patients vulnérables, ${nb(g.examens.enfants, 0)} examens périodiques d'enfants de 0 à 5 ans, ${nb(g.examens.grossesse, 0)} suivis de grossesse et ${nb(g.examens.priseEnChargeGrossesse, 0)} prises en charge de grossesse au premier trimestre (EP 40)`,
         valeur: $(g.horaire.responsabilite) } : null,
       { titre: "Patients inscrits", sous: "Du début à la fin de l'année", valeur: `${nb(g.inscritsDepart, 0)} → ${nb(g.inscritsFin, 0)}` },
       { titre: "Semaines au tarif de 500 patients et plus", valeur: `${g.semainesPalierHaut} sur ${S.revenu.semaines}` },
@@ -1254,19 +1255,19 @@ window.Verrou.quandOuvert(function () {
     const a = document.getElementById("im-acomptes"); a.textContent = "";
     a.appendChild(el("p", "resume", soc
       ? `La société garde environ ${$(x.impotSociete / 12)} par mois pour son impôt. Vous, mettez de côté environ ${$(perso / 12)} par mois pour l'impôt sur vos dividendes. Votre taux marginal, société comprise, est de ${pct(R.tauxMarginal, 0)}.`
-      : `Mettez de côté ${pct(t / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$(t / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est l'impôt sur chaque dollar de plus facturé${Math.abs(R.tauxDeduction - R.tauxMarginal) > 0.01 ? `, après les frais de cabinet ; chaque dollar cotisé au REER vous rapporte ${pct(R.tauxDeduction, 0)}` : ", et ce que rapporte chaque dollar cotisé au REER"}.`));
+      : `Mettez de côté ${pct((t + R.primeMoi) / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$((t + R.primeMoi) / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est l'impôt sur chaque dollar de plus facturé${Math.abs(R.tauxDeduction - R.tauxMarginal) > 0.01 ? `, après les frais de cabinet ; chaque dollar cotisé au REER vous rapporte ${pct(R.tauxDeduction, 0)}` : ", et ce que rapporte chaque dollar cotisé au REER"}.`));
     const premiere = S.revenu.annee === "premiere";
     const an = (+String(S.strategie.debut).slice(0, 4) || 2026) + 1;
     a.appendChild(rangees(el("div"), [
       soc && { titre: "Société : acomptes mensuels", sous: "Impôt de la société, le dernier jour de chaque mois", valeur: $(x.impotSociete / 12), valeurSous: "par mois" },
       ...(premiere
-        ? [{ titre: `30 avril ${an}`, sous: "Solde de votre impôt de la première année", valeur: $(perso), ico: "!" },
-           { titre: `Puis acomptes de ${an}`, sous: "15 mars, 15 juin, 15 septembre et 15 décembre", valeur: $(perso / 4), valeurSous: "chacun" }]
-        : ["15 mars", "15 juin", "15 septembre", "15 décembre"].map(d => ({ titre: d, sous: "Votre acompte provisionnel", valeur: $(perso / 4) }))),
+        ? [{ titre: `30 avril ${an}`, sous: "Solde de votre impôt de la première année", valeur: $(perso + R.primeMoi), ico: "!" },
+           { titre: `Puis acomptes de ${an}`, sous: "15 mars, 15 juin, 15 septembre et 15 décembre", valeur: $((perso + R.primeMoi) / 4), valeurSous: "chacun" }]
+        : ["15 mars", "15 juin", "15 septembre", "15 décembre"].map(d => ({ titre: d, sous: "Votre acompte provisionnel", valeur: $((perso + R.primeMoi) / 4) }))),
     ]));
     a.appendChild(el("p", "aide", premiere
       ? "La première année, l'impôt de l'année précédente (résidence) était faible : aucun acompte n'est exigé. Tout le solde arrive le 30 avril, et les acomptes commencent l'année suivante."
-      : "Acomptes trimestriels, calculés sur l'impôt de l'année. Payer les montants que l'Agence du revenu et Revenu Québec vous envoient évite les intérêts."));
+      : "Acomptes trimestriels, calculés sur l'impôt de l'année ; ceux du Québec comprennent la prime d'assurance médicaments. Payer les montants que l'Agence du revenu et Revenu Québec vous envoient évite les intérêts."));
 
     // Détail selon le mode : une colonne par mode de rémunération (une seule au calcul simple).
     const I3 = R.modes.map(md => R.impots[md]), ligne = (nom, f, cls) => ({ cls, cellules: [nom, ...I3.map(f)] });
@@ -1953,9 +1954,10 @@ window.Verrou.quandOuvert(function () {
       if (m === 5 && inscription > 0) ev.push(["Forfait d'inscription", inscription]);
       if (m % 3 === 0 && vulnerables > 0) ev.push(["Forfait des patients vulnérables, trimestre", vulnerables / 4]);
       if (m === 6 && juin > 0) ev.push(["Volume de patients et pratique polyvalente", juin]);
-      if (t > 0 && m % 3 === 0 && (!premiere || an >= anImpot)) ev.push(["Acompte provisionnel", -t / 4]);
-      if (t > 0 && premiere && m === 4 && an === anImpot) ev.push(["Solde de l'impôt de la première année", -t]);
-      if (m === 4 && R.primeMoi > 0) ev.push(["Prime d'assurance médicaments", -R.primeMoi]);
+      // Les acomptes du Québec comprennent la prime d'assurance médicaments ; la première année, elle part avec le solde.
+      const tp = t + R.primeMoi;
+      if (tp > 0 && m % 3 === 0 && (!premiere || an >= anImpot)) ev.push(["Acompte provisionnel", -tp / 4]);
+      if (tp > 0 && premiere && m === 4 && an === anImpot) ev.push(["Solde de l'impôt de la première année", -tp]);
       annuelles.filter(x => x.mois === m).forEach(x => ev.push([x.nom, -x.montant]));
       const ponctuel = ev.reduce((s, [, v]) => s + v, 0), solde = entreeReguliere - sortieReguliere + ponctuel;
       encaisse += solde; ecart += solde - R.surplusMoi; pireEcart = Math.min(pireEcart, ecart);

@@ -199,7 +199,7 @@ verifier("responsabilité : 8,25 $, 13,35 $ et 8,95 $ en établissement ; 10,60 
   ML.e.forfaitResponsabilite === 8.25 && ML.e.suppExamenEnfant === 13.35 && ML.e.suppSuiviGrossesse === 8.95
   && ML.c.forfaitResponsabilite === 10.6 && ML.c.suppExamenEnfant === 17.05 && ML.c.suppSuiviGrossesse === 11.4);
 // 6 demi-journées cliniques × 5 patients × 46 semaines = 1 380 visites : 20 % de vulnérables, 5 % d'enfants, 5 % de grossesses.
-verifier("responsabilité : par examen, selon la répartition des visites", proche(g.horaire.responsabilite, 1380 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95), 1e-6)
+verifier("responsabilité : par examen, selon la répartition des visites", proche(g.horaire.responsabilite, 1380 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95) + 6.9 * 35.60, 1e-6)
   && proche(g.examens.vulnerables, 276, 1e-9) && proche(g.examens.enfants, 69, 1e-9) && proche(g.examens.grossesse, 69, 1e-9));
 verifier("responsabilité : au taux horaire seulement, et comptée dans le total", g.mixte.responsabilite === undefined && g.acte.responsabilite === undefined
   && proche(g.horaire.total - g.horaire.heures - g.horaire.responsabilite, g.mixte.total - g.mixte.forfaitHoraire - g.mixte.visites - g.mixte.supervision, 1e-6));
@@ -243,6 +243,14 @@ verifier("garde : la déduction réduit l'impôt fédéral, pas celui du Québec
   { fed: [sansGarde.fed, avecGarde.fed], qc: [sansGarde.qc, avecGarde.qc] });
 const autoSans = C.impotParticulier({ revenu: 200000, depensesPro: 5000 }), autoAvec = C.impotParticulier({ revenu: 200000, depensesPro: 5000, deductionGarde: 8000 });
 verifier("garde : même règle pour un travailleur autonome", autoAvec.fed < autoSans.fed && autoAvec.qc === autoSans.qc && autoAvec.fss === autoSans.fss);
+
+/* 20. Prise en charge d'une grossesse au premier trimestre (EP 40, par. 7.02 A) : 35,60 $ en établissement, 47,40 $ en
+   cabinet, une fois par grossesse ; au taux horaire seulement. Sans nombre inscrit : suivis de grossesse ÷ 10. */
+verifier("grossesse : 35,60 $ en établissement, 47,40 $ en cabinet", ML.e.suppGrossessePremierTrimestre === 35.6 && ML.c.suppGrossessePremierTrimestre === 47.4);
+verifier("grossesse : estimée d'après les suivis (69 ÷ 10)", proche(g.examens.priseEnChargeGrossesse, 6.9, 1e-9));
+const gGross = C.revenuGmfu({ ...rev, grossessesAn: 4 });
+verifier("grossesse : nombre inscrit, 4 × 35,60 $ de plus que sans grossesse", proche(gGross.horaire.responsabilite - C.revenuGmfu({ ...rev, grossessesAn: 0 }).horaire.responsabilite, 4 * 35.6, 1e-6)
+  && gGross.acte.total === g.acte.total && gGross.mixte.total === g.mixte.total);
 
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

@@ -462,7 +462,7 @@ window.Verrou.quandOuvert(function () {
       ...(R.couple && R.conjointe && R.conjointe.total > 0.5 ? [{ cls: "sous", c: [`Impôt et cotisations de ${P}`, $(R.conjointe.total)] }] : []),
     ];
     const echeances = [
-      premiere ? { c: [`Acomptes ${AN_IMPOT} : aucun (1re année)`, "—"] } : { c: [`Acomptes ${AN_IMPOT} (15 mars, juin, sept., déc.)`, `4 × ${$(perso / 4)}`] },
+      premiere ? { c: [`Acomptes ${AN_IMPOT} : aucun (1re année)`, "—"] } : { c: [`Acomptes ${AN_IMPOT} (15 mars, juin, sept., déc.), prime comprise`, `4 × ${$((perso + R.primeMoi) / 4)}`] },
       ...(soc ? [{ c: ["Société : acomptes mensuels", $(x.impotSociete / 12)] }] : []),
       ...(reer > 0 || S.epargne.reer.droits > 0 ? [{ c: [`1er mars ${suivante} : limite REER`, reer > 0 ? $(reer) : "—"] }] : []),
       { c: [`30 avril ${suivante} : solde de l'impôt`, premiere ? $(perso) : "s'il y a lieu"] },
@@ -487,7 +487,7 @@ window.Verrou.quandOuvert(function () {
         : `${P.charAt(0).toUpperCase() + P.slice(1)} : feuillets T4 et relevé 1${S.conjointe.autresRevenus > 0 ? ", et ses autres revenus" : ""}.`),
     ].filter(Boolean);
     const points = [];
-    if (premiere) points.push(`Première année de pratique : aucun acompte exigé ; environ ${$(perso)} à payer le 30 avril ${suivante}.`);
+    if (premiere) points.push(`Première année de pratique : aucun acompte exigé ; environ ${$(perso + R.primeMoi)} à payer le 30 avril ${suivante}, prime d'assurance médicaments comprise.`);
     // Cotiser tous les droits plutôt que la cotisation prévue : ce que l'impôt baisserait de plus.
     const droits = S.epargne.reer.droits;
     if (droits > reer) {

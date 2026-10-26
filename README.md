@@ -109,7 +109,8 @@ Revenu affiche tous les détails.
 - **Trésorerie des 12 prochains mois** : votre compte mois par mois, avec
   les paies de la RAMQ, le forfait d'inscription de mai, les forfaits des
   patients vulnérables chaque trimestre, les montants de juin, les
-  acomptes provisionnels, l'impôt d'avril et les dépenses annuelles ; la
+  acomptes provisionnels (ceux du Québec comprennent la prime d'assurance
+  médicaments), l'impôt d'avril et les dépenses annuelles ; la
   réserve à garder pour les mois serrés.
 - **Reste à dépenser librement** : revenu net moins les dépenses fixes, les
   dépenses annuelles, les dettes et l'épargne, aussi par jour et par
@@ -223,8 +224,10 @@ dossier racine.
   - EP 40, au taux horaire en établissement : forfait de responsabilité de
     8,25 $ à chaque examen d'un patient vulnérable inscrit (par. 6.02 B,
     code 15169), suppléments de 13,35 $ à l'examen périodique d'un enfant
-    de 0 à 5 ans (par. 8.01, code 08877) et de 8,95 $ au suivi de grossesse
-    (par. 7.02 B, code 15145). À l'acte et au mixte, ils sont compris dans
+    de 0 à 5 ans (par. 8.01, code 08877), de 8,95 $ au suivi de grossesse
+    (par. 7.02 B, code 15145) et de 35,60 $ une fois par grossesse prise en
+    charge au premier trimestre (par. 7.02 A, code 15159 ; nombre inscrit,
+    ou suivis de grossesse ÷ 10). À l'acte et au mixte, ils sont compris dans
     le tarif des visites (note du tableau-synthèse des visites). DMÉ : dès
     150 inscrits, ou sans égard au nombre la première année du permis
     (par. 17.01).
@@ -235,7 +238,8 @@ dossier racine.
   le tableau-synthèse des visites (P.G. 2.2.6 A, 25 juillet 2025).
 - Dépenses professionnelles : grille tarifaire 2026-2027 du Collège des
   médecins ; cotisations 2027 de l'ACPM au Québec.
-- CELIAPP : 8 000 $ par année, 40 000 $ à vie (Agence du revenu du Canada).
+- CELIAPP : 8 000 $ par année, 40 000 $ à vie (Agence du revenu du Canada),
+  sur les cotisations versées (à défaut, le solde sert d'estimation).
 - Impôt : tables fédérales et québécoises 2026, RRQ et RQAP 2026 (RQAP du
   travailleur autonome : 0,764 % jusqu'à 103 000 $) ; vérifié contre l'outil
   de calcul du revenu disponible du ministère des Finances du Québec (mai

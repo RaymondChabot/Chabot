@@ -28,6 +28,7 @@
       inscritsDebut: 0, nouveauxGuichet: 500, nouveauxSansMedecin: 0, nouveauxTransferes: 0,
       semainesArrivee: 38, partVulnerable: 20, partGroupe2: 0, partGroupe34: 0, assiduite80: true, anneePratique: "5", membreGmf: true, pctPatientsVus: 80,
       mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 },
+      grossessesAn: null,   // grossesses prises en charge au premier trimestre ; vide : estimées d'après les suivis
       // Taux horaire, mixte et supervision (Brochure no 1) ; forfaits, suppléments et demi-per diem de la colonne cabinet.
       ...C.RAMQ, ...C.montantsLieu("cabinet", 1), listeEnseignement: "1",
       pctActe: 100,
@@ -83,7 +84,7 @@
       reer: { solde: 25000, droits: 0, cotisationAnnuelle: 0 },
       celi: { solde: 0, cotisationAnnuelle: 0 },
       // CELIAPP : 8 000 $ par année, 40 000 $ à vie ; déductible ; retrait sans impôt pour une première propriété.
-      celiapp: { solde: 0, cotisationAnnuelle: 0 },
+      celiapp: { solde: 0, cotisationAnnuelle: 0, cotisationsVersees: null },
       // Taux d'imposition prévu au retrait du REER, pour le comparer au CELI.
       tauxRetrait: 35,
       // Frais de gestion des placements (RFG), en % ; 0 : non précisé.
@@ -361,6 +362,8 @@
       { p: "revenu.mix.perioV", l: "Visites périodiques de patients vulnérables", u: "%" },
       { p: "revenu.mix.pedia", l: "Visites périodiques pédiatriques", u: "%" },
       { p: "revenu.mix.gross", l: "Suivis de grossesse", u: "%" },
+      { p: "revenu.grossessesAn", l: "Grossesses prises en charge au premier trimestre, par année", u: "gross.", s: 1, si: SI_ETAB,
+        h: "Vide : estimé d'après vos suivis de grossesse, à environ 10 visites par grossesse. Sert au supplément du taux horaire (code 15159)." },
       { g: "Sans rendez-vous : détails", si: "details&revenu.demiJourneesSRV" },
       { p: "revenu.pctSrvComplexe", l: "Visites ponctuelles complexes", u: "%", h: "Environ 95 % du tarif d'un suivi. Le reste : visites ponctuelles mineures, environ la moitié d'un suivi. Tarifs dans « Tarifs des visites »." },
       { g: "Tarifs des visites (onglet B)", si: "details" },
@@ -399,6 +402,8 @@
         h: "Code 08877 : 13,35 $ en établissement, 17,05 $ en cabinet (par. 8.01)." },
       { p: "revenu.suppSuiviGrossesse", l: "Taux horaire : supplément au suivi de grossesse", u: "$", s: 0.01, si: SI_ETAB,
         h: "Codes 15145 et 15144 : 8,95 $ en établissement, 11,40 $ en cabinet (par. 7.02 B)." },
+      { p: "revenu.suppGrossessePremierTrimestre", l: "Taux horaire : supplément à la prise en charge d'une grossesse au premier trimestre", u: "$", s: 0.01, si: SI_ETAB,
+        h: "Code 15159 : 35,60 $ en établissement, 47,40 $ en cabinet, une fois par grossesse (par. 7.02 A). À l'acte et au mixte, il est compris dans le tarif des visites." },
       { p: "revenu.primeInscription", l: "Prime ponctuelle par nouveau patient inscrit", u: "$", s: 0.01, h: "Selon une entente en vigueur (par exemple 231,75 $ par patient inscrit individuellement lors de l'opération de prise en charge de 2026). 0 sinon." },
       { p: "revenu.perDiemResident", l: "Demi-per diem de supervision, par résident", u: "$", s: 0.01, si: SI_GMFU, h: "Par demi-journée d'au moins 3,5 h (EP 42, par. 5.01 et 5.02) : 41,45 $ en établissement, 55,35 $ en cabinet reconnu ; liste 2 : 65,20 $ et 86,95 $." },
       { p: "revenu.perDiemExterne", l: "Demi-per diem de supervision, par externe", u: "$", s: 0.01, si: SI_GMFU, h: "49,85 $ en établissement, 66,45 $ en cabinet reconnu ; liste 2 : 73,55 $ et 98 $." },
@@ -463,6 +468,7 @@
       { p: "epargne.celi.solde", l: "Solde CELI", u: "$", s: 100 },
       { p: "epargne.celi.cotisationAnnuelle", l: "Cotisation CELI par année", u: "$/an", s: 100 },
       { p: "epargne.celiapp.solde", l: "Solde CELIAPP", u: "$", s: 100, h: "Compte d'épargne libre d'impôt pour l'achat d'une première propriété." },
+      { p: "epargne.celiapp.cotisationsVersees", l: "Cotisations CELIAPP versées à ce jour", u: "$", s: 100, h: "Pour le plafond à vie de 40 000 $. Vide : le solde sert d'estimation, mais il comprend les gains." },
       { p: "epargne.celiapp.cotisationAnnuelle", l: "Cotisation CELIAPP par année", u: "$/an", s: 100, h: "8 000 $ par année au plus, 40 000 $ à vie ; déductible comme un REER ; retrait sans impôt pour acheter une première propriété." },
       { p: "epargne.encaisse", l: "Comptes et encaisse", u: "$", s: 100 },
       { p: "epargne.frais", l: "Frais de gestion de vos placements (RFG)", u: "%", s: 0.05, h: "Sur vos relevés ou le document « Aperçu du fonds ». Soustraits du rendement des scénarios ; 0 : non précisé, le rendement est alors avant frais." },
