@@ -660,10 +660,12 @@ window.Verrou.quandOuvert(function () {
     R.projection = R.projections[R.scenario];
     R.projeterAvec = rendement => projeter({ ...R.hyp, rendement }, R.sim);
     // Probabilité de réussite : n avenirs où le rendement de chaque année varie autour de celui du
-    // scénario (écart type vol). Graine fixe : les mêmes tirages d'un affichage à l'autre.
+    // scénario (écart type vol). Le rendement du scénario est une moyenne géométrique : les tirages se
+    // font autour de la moyenne arithmétique, MG + σ²/2 (Normes d'hypothèses de projection 2026), pour
+    // que la médiane des avenirs rejoigne la projection. Graine fixe : les mêmes tirages d'un affichage à l'autre.
     R.monteCarlo = (n, vol) => {
-      const z = normale(aleatoire(20260425)), runs = [];
-      for (let k = 0; k < n; k++) runs.push(projeter(R.hyp, R.sim, methode, Array.from({ length: ANNEES }, () => Math.max(-60, R.hyp.rendement + vol * z()))));
+      const z = normale(aleatoire(20260425)), runs = [], moyenne = R.hyp.rendement + vol * vol / 200;
+      for (let k = 0; k < n; k++) runs.push(projeter(R.hyp, R.sim, methode, Array.from({ length: ANNEES }, () => Math.max(-60, moyenne + vol * z()))));
       const tries = new Map();
       const quantile = (cle, i, q) => {
         const c = cle + i; if (!tries.has(c)) tries.set(c, runs.map(r => r[i][cle]).sort((a, b) => a - b));

@@ -113,8 +113,10 @@ Revenu affiche tous les détails.
   de l'année** : reçu et dépensé comparés au budget, part gardée, mois le
   plus cher, valeur nette et écart au plan de référence.
 - **Probabilité de réussite** : 300 simulations où le rendement varie
-  chaque année ; valeur nette dans 8 cas sur 10 et chances d'atteindre
-  l'indépendance financière.
+  chaque année autour de la moyenne arithmétique (rendement du scénario
+  + σ²/2, comme le demandent les Normes d'hypothèses de projection 2026) ;
+  valeur nette dans 8 cas sur 10 et chances d'atteindre l'indépendance
+  financière.
 - **Fiche d'une page** (PDF) et **export en tableur** (CSV : résumé,
   budget, dettes, projection) pour un ou une partenaire, un comptable ou
   un conseiller.

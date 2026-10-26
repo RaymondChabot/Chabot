@@ -434,11 +434,23 @@ async function sommaireComptable(b, base) {
   await ctx.close();
 }
 
+/* 17. Probabilité de réussite : les tirages se font autour de la moyenne arithmétique (MG + σ²/2, Normes 2026) ;
+   la médiane des avenirs rejoint donc la projection du scénario. */
+async function monteCarlo(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "avenir" });
+  const r = await p.evaluate(() => { const R = window.Wealthnord.resultats(), M = R.monteCarlo(300, 10), fin = R.projection.length - 1;
+    return { mediane: M.quantile("moi", fin, 0.5), projection: R.projection[fin].moi, p10: M.quantile("moi", fin, 0.1), p90: M.quantile("moi", fin, 0.9) }; });
+  verifier("probabilité : la médiane rejoint la projection (à 3 % près)", Math.abs(r.mediane / r.projection - 1) < 0.03, r);
+  verifier("probabilité : la projection entre le 1er et le 9e décile", r.p10 < r.projection && r.projection < r.p90, r);
+  verifier("probabilité : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }
