@@ -114,6 +114,8 @@
   const RAMQ = { tarifHoraire: 99.48, heuresMax100: 1540, forfaitHoraireMixte: 59.68, pctMixte: 63.58,
     acteSupervision: 99.48, pctSupervision: 62.15, supervisionMaxH: 3.5, forfaitGmf: 9.35 };
   const PCT_AU_DELA = 71.8;
+  // Garde sur place au-delà du plafond annuel : 94 % du tarif, au plus 528 heures (annexe XIV, par. 5.03 et 5.05).
+  const PCT_GARDE = 94, GARDE_MAX_94 = 528;
   // Visites de suivi par grossesse, pour estimer les grossesses prises en charge quand leur nombre n'est pas inscrit.
   const VISITES_PAR_GROSSESSE = 10;
   const E = TARIFS_LIEU.etablissement;
@@ -304,9 +306,14 @@
     const commun = forfaitInscription + forfaitVulnerable + forfaitGmf + supplements + volume + perDiem + compensation + activites + polyvalence + autres;
     const base = { perDiem, forfaitInscription, forfaitVulnerable, forfaitGmf, supplements, volume, compensation, activites, polyvalence, autres };
 
-    // Taux horaire : à 100 % jusqu'au plafond annuel, puis 71,8 % du tarif (annexe XIV, par. 5.02 et 5.04).
+    // Taux horaire (annexe XIV) : à 100 % jusqu'au plafond annuel (par. 5.02). Au-delà, la garde sur place
+    // à 94 %, au plus 528 h (par. 5.03 et 5.05), et les autres heures à 71,8 % (par. 5.04). Les heures au-delà
+    // du plafond se partagent entre la garde et les autres heures au prorata de leurs heures de l'année.
     const heures = W * (N + SRV) * H, plafondHeures = Math.max(0, m("heuresMax100"));
-    const heuresAuDela = Math.max(0, heures - plafondHeures), perteHeures = heuresAuDela * (1 - PCT_AU_DELA / 100) * m("tarifHoraire") * maj;
+    const garde = Math.max(0, +r.heuresGardeSurPlace || 0), heuresHoraire = heures + garde;
+    const heuresAuDela = Math.max(0, heuresHoraire - plafondHeures);
+    const gardeAuDela = heuresHoraire > 0 ? Math.min(GARDE_MAX_94, heuresAuDela * garde / heuresHoraire) : 0, autresAuDela = heuresAuDela - gardeAuDela;
+    const perteHeures = (gardeAuDela * (1 - PCT_GARDE / 100) + autresAuDela * (1 - PCT_AU_DELA / 100)) * m("tarifHoraire") * maj;
     // En plus des heures : forfait de responsabilité à chaque examen d'un patient vulnérable inscrit (visites de
     // suivi et périodiques des patients vulnérables, prises en charge de patients vulnérables), supplément à chaque
     // examen périodique d'un enfant de 0 à 5 ans et à chaque suivi de grossesse (EP 40, par. 6.02 B, 8.01, 7.02 B),
@@ -320,7 +327,7 @@
     examens.priseEnChargeGrossesse = r.grossessesAn != null && r.grossessesAn !== "" ? Math.max(0, +r.grossessesAn || 0) : examens.grossesse / VISITES_PAR_GROSSESSE;
     const responsabilite = (examens.vulnerables * m("forfaitResponsabilite") + examens.enfants * m("suppExamenEnfant")
       + examens.grossesse * m("suppSuiviGrossesse") + examens.priseEnChargeGrossesse * m("suppGrossessePremierTrimestre")) * maj;
-    const horaire = { heures: (heures - heuresAuDela * (1 - PCT_AU_DELA / 100)) * m("tarifHoraire") * maj, responsabilite, ...base };
+    const horaire = { heures: heuresHoraire * m("tarifHoraire") * maj - perteHeures, responsabilite, ...base };
     horaire.total = horaire.heures + horaire.responsabilite + commun;
     // Mixte : forfait horaire, part du tarif des visites et, en GMF-U, l'intervention de supervision
     // pour la demi-journée d'enseignement, ou les visites des apprenants.
@@ -359,7 +366,7 @@
     const tarifMoyenRdv = tarifVisite(r.mix, palierFin, TF) * maj, tarifMoyenSrv = tarifSrv(palierFin) * maj;
     // Hausse du tarif moyen d'une visite au palier de 500 inscrits.
     const t0 = tarifVisite(r.mix, 0, TF), gainPalier = t0 > 0 ? tarifVisite(r.mix, 1, TF) / t0 - 1 : 0;
-    return { heures, heuresAuDela, plafondHeures, perteHeures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, vulnerablesFin, semainesPalierHaut, gainPalier,
+    return { heures, garde, heuresHoraire, heuresAuDela, gardeAuDela, autresAuDela, plafondHeures, perteHeures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, vulnerablesFin, semainesPalierHaut, gainPalier,
       patientsVus, forfaitGmfPossible, detailCompensation, activites, detailActivites, basePolyvalence, polyvalence, pctPolyvalence, anneePratique, detailVolume, examens,
       visitesApprenants: W * T * apprenants, tarifMoyenRdv, tarifMoyenSrv,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
@@ -827,7 +834,7 @@
     return { plafondQc, admissibleQc, taux, creditQc: admissibleQc * taux, plafondFed, deduction };
   }
 
-  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil, fraisGarde };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

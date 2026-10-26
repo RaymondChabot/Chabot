@@ -207,7 +207,9 @@ dossier racine.
   vigueur depuis 2018 ou 2019 :
   - Taux horaire (annexe XIV) : 99,48 $ l'heure, à 100 % jusqu'à
     1 540 heures par année (jusqu'à 880 heures de plus si le chef de
-    département l'autorise), puis 71,8 %.
+    département l'autorise), puis 71,8 % ; la garde sur place au-delà du
+    plafond, à 94 %, jusqu'à 528 heures (par. 5.03 et 5.05), au prorata
+    des heures de l'année.
   - Mixte en CLSC et en GMF-U (annexe XXIII, sections B-1 et B-2) :
     forfait horaire de 59,68 $, 63,58 % du tarif des services médicaux ;
     intervention de supervision en GMF-U à 24,87 $ par 15 minutes, payée

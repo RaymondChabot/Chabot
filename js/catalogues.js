@@ -29,6 +29,7 @@
       semainesArrivee: 38, partVulnerable: 20, partGroupe2: 0, partGroupe34: 0, assiduite80: true, anneePratique: "5", membreGmf: true, pctPatientsVus: 80,
       mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 },
       grossessesAn: null,   // grossesses prises en charge au premier trimestre ; vide : estimées d'après les suivis
+      heuresGardeSurPlace: 0,   // au taux horaire, en plus des heures en clinique
       // Taux horaire, mixte et supervision (Brochure no 1) ; forfaits, suppléments et demi-per diem de la colonne cabinet.
       ...C.RAMQ, ...C.montantsLieu("cabinet", 1), listeEnseignement: "1",
       pctActe: 100,
@@ -379,6 +380,8 @@
       { p: "revenu.tarifHoraire", l: "Tarif horaire", u: "$/h", s: 0.01 },
       { p: "revenu.heuresMax100", l: "Heures payées à 100 % par année", u: "h", s: 10,
         h: "1 540 heures du 1er juin au 31 mai, puis 71,8 % du tarif. Si votre avis de service prévoit le dépassement autorisé par le chef de département (jusqu'à 880 heures, par. 5.10), inscrivez 2 420." },
+      { p: "revenu.heuresGardeSurPlace", l: "Heures de garde sur place par année, au taux horaire", u: "h/an", s: 10, si: SI_ETAB,
+        h: "En CLSC désigné ou en centre hospitalier, en plus de vos heures en clinique. Au-delà du plafond annuel, elles sont payées à 94 % plutôt qu'à 71,8 %, jusqu'à 528 h (annexe XIV, par. 5.03 et 5.05). Ne les comptez pas aussi dans vos activités en établissement." },
       { g: "Taux mixte (annexe XXIII)", si: SI_ETAB + "&details" },
       { p: "revenu.forfaitHoraireMixte", l: "Forfait horaire", u: "$/h", s: 0.01 },
       { p: "revenu.pctMixte", l: "Pourcentage du tarif des visites", u: "%", s: 0.01, h: "63,58 % des services médicaux, en CLSC et en GMF-U (annexe XXIII, sections B-1 et B-2)." },
@@ -522,7 +525,7 @@
     { termes: ["patients vulnérables", "patient vulnérable", "vulnérables", "vulnérable"], def: `Patient inscrit qui a un problème de santé reconnu par l'EP 40. Un forfait annuel s'ajoute : ${fr2(CAB.forfaitVulnerable)} $ en cabinet, ${fr2(ETAB.forfaitVulnerable)} $ en établissement, majoré selon le groupe.`, ref: "EP 40, par. 6.01" },
     { termes: ["forfaits d'inscription", "forfait d'inscription"], def: `Montant annuel versé pour chaque patient inscrit : ${fr2(CAB.forfaitInscription)} $ en cabinet, ${fr2(ETAB.forfaitInscription)} $ en établissement.`, ref: "EP 40, par. 4.01 et 4.08" },
     { termes: ["onglet B"], def: "Partie du Manuel de rémunération à l'acte qui donne le tarif de chaque visite.", ref: "Manuel de rémunération à l'acte de la RAMQ" },
-    { termes: ["taux horaire"], def: `Rémunération à l'heure : ${fr2(RQ.tarifHoraire)} $, payée à 100 % jusqu'à ${RQ.heuresMax100.toLocaleString("fr-CA")} heures par année, puis à ${C.PCT_AU_DELA.toLocaleString("fr-CA")} %.`, ref: "Brochure no 1, annexe XIV" },
+    { termes: ["taux horaire"], def: `Rémunération à l'heure : ${fr2(RQ.tarifHoraire)} $, payée à 100 % jusqu'à ${RQ.heuresMax100.toLocaleString("fr-CA")} heures par année, puis à ${C.PCT_AU_DELA.toLocaleString("fr-CA")} % ; la garde sur place au-delà, à ${C.PCT_GARDE} %, jusqu'à ${C.GARDE_MAX_94} heures.`, ref: "Brochure no 1, annexe XIV" },
     { termes: ["taux mixte"], def: `Rémunération mixte : un forfait de ${fr2(RQ.forfaitHoraireMixte)} $ l'heure, plus ${fr2(RQ.pctMixte)} % du tarif de chaque visite.`, ref: "Brochure no 1, annexe XXIII" },
     { termes: ["guichet"], def: "Guichet d'accès à un médecin de famille : il attribue des patients sans médecin. Inscrire un patient attribué donne droit à un supplément.", ref: "EP 40, par. 4.12 et 13.01" },
     { termes: ["GMF-U"], def: "Groupe de médecine de famille universitaire : un GMF qui forme des résidents en médecine familiale." },

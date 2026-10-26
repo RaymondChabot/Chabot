@@ -252,5 +252,17 @@ const gGross = C.revenuGmfu({ ...rev, grossessesAn: 4 });
 verifier("grossesse : nombre inscrit, 4 × 35,60 $ de plus que sans grossesse", proche(gGross.horaire.responsabilite - C.revenuGmfu({ ...rev, grossessesAn: 0 }).horaire.responsabilite, 4 * 35.6, 1e-6)
   && gGross.acte.total === g.acte.total && gGross.mixte.total === g.mixte.total);
 
+/* 21. Taux horaire : garde sur place au-delà du plafond annuel, payée à 94 % plutôt qu'à 71,8 %, au plus 528 h
+   (annexe XIV, par. 5.03 et 5.05). Les heures au-delà se partagent au prorata entre garde et autres heures. */
+const sansGardeH = C.revenuGmfu({ ...rev, heuresMax100: 1540 }), hc = sansGardeH.heures;
+const avecGardeH = C.revenuGmfu({ ...rev, heuresMax100: 1540, heuresGardeSurPlace: 600 });
+const totalH = hc + 600, auDelaH = Math.max(0, totalH - 1540), gardeH = Math.min(528, auDelaH * 600 / totalH);
+verifier("garde : heures au-delà du plafond partagées au prorata", proche(avecGardeH.gardeAuDela, gardeH, 1e-9) && proche(avecGardeH.autresAuDela, auDelaH - gardeH, 1e-9) && avecGardeH.heures === hc,
+  { hc, auDelaH, gardeH });
+verifier("garde : 94 % pour la garde, 71,8 % pour le reste", proche(avecGardeH.horaire.heures, (totalH - gardeH * 0.06 - (auDelaH - gardeH) * 0.282) * 99.48, 1e-6));
+verifier("garde : au plus 528 h à 94 %", C.revenuGmfu({ ...rev, heuresMax100: 1540, heuresGardeSurPlace: 5000 }).gardeAuDela === 528);
+verifier("garde : sous le plafond, tout à 100 %", proche(C.revenuGmfu({ ...rev, heuresMax100: 5000, heuresGardeSurPlace: 200 }).horaire.heures, (hc + 200) * 99.48, 1e-6));
+verifier("garde : le mixte et l'acte ne changent pas", avecGardeH.mixte.total === sansGardeH.mixte.total && avecGardeH.acte.total === sansGardeH.acte.total);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

@@ -936,7 +936,8 @@ window.Verrou.quandOuvert(function () {
      montants liés au volume, pratique polyvalente), assiduité et forfait GMF. */
   function alertesRamq(R, action) {
     const g = R.rev, rv = S.revenu, inscrits = Math.round(g.inscritsFin);
-    if (R.mode === "horaire" && g.heuresAuDela > 0) action("important", `Taux horaire : ${nb(g.heuresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h par année sont payées à 71,8 %, environ ${$(g.perteHeures)} de moins. `
+    if (R.mode === "horaire" && g.heuresAuDela > 0) action("important", `Taux horaire : ${nb(g.heuresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h par année sont payées `
+      + (g.gardeAuDela > 0.5 ? `à 71,8 % (${nb(g.autresAuDela, 0)} h) et à 94 % pour la garde sur place (${nb(g.gardeAuDela, 0)} h)` : "à 71,8 %") + `, environ ${$(g.perteHeures)} de moins. `
       + (g.plafondHeures < 2420 ? "Si votre chef de département autorise le dépassement (jusqu'à 880 h, annexe XIV), inscrivez-le dans Revenu, Modifier." : "C'est au-delà du dépassement maximal de 880 heures."));
     if (R.mode !== "horaire" && inscrits >= 350 && inscrits < 500 && g.gainPalier > 0)
       action("info", `Encore ${nb(500 - inscrits, 0)} patients inscrits pour atteindre 500 : chaque visite est alors payée environ ${pct(g.gainPalier, 0)} de plus.`);
@@ -1045,7 +1046,8 @@ window.Verrou.quandOuvert(function () {
     const auDela = R.modes.includes("horaire") && g.heuresAuDela > 0;
     const sousVisites = [srv ? `${nb(srv, 0)} en sans rendez-vous` : "", g.visitesApprenants ? `${nb(g.visitesApprenants, 0)} vues par les apprenants` : ""].filter(Boolean).join(", ");
     rangees("rv-faits", [
-      { titre: "Heures en clinique", sous: auDela ? `Au taux horaire, ${nb(g.heuresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h sont payées à 71,8 % (annexe XIV)` : null, valeur: nb(g.heures, 0) + " h" },
+      { titre: "Heures en clinique", sous: auDela ? `Au taux horaire, ${nb(g.autresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h sont payées à 71,8 % (annexe XIV)` : null, valeur: nb(g.heures, 0) + " h" },
+      R.modes.includes("horaire") && g.garde > 0 ? { titre: "Garde sur place, au taux horaire", sous: g.gardeAuDela > 0.5 ? `${nb(g.gardeAuDela, 0)} h au-delà du plafond, payées à 94 % (annexe XIV, par. 5.03)` : "Sous le plafond annuel : à 100 %", valeur: nb(g.garde, 0) + " h" } : null,
       { titre: "Visites en clinique", sous: sousVisites ? `Dont ${sousVisites}` : null, valeur: nb(g.nbVisites, 0) },
       { titre: "Tarif moyen d'une visite de rendez-vous", sous: "À l'acte, à 100 % du tarif", valeur: $2(g.tarifMoyenRdv) },
       srv ? { titre: "Tarif moyen d'un patient au sans rendez-vous", sous: `Visite ponctuelle : ${nb(S.revenu.pctSrvComplexe || 0)} % complexes`, valeur: $2(g.tarifMoyenSrv) } : null,
