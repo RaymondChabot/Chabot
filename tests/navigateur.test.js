@@ -402,9 +402,13 @@ async function sommaireComptable(b, base) {
     await p.evaluate(() => { window.Wealthnord.rapport.construire({ comptable: true }); document.body.classList.add("impression-rapport"); });
     await p.emulateMedia({ media: "print" });
     const pdf = await p.pdf({ format: "Letter", printBackground: true, preferCSSPageSize: true });
+    // Hauteur à la largeur imprimable d'une page Lettre (718 px sur 950) : une marge pour les autres navigateurs.
+    await p.setViewportSize({ width: 718, height: 950 });
+    const hauteur = await p.evaluate(() => document.querySelector("#rapport .rp-page").getBoundingClientRect().height / 950);
+    await p.setViewportSize({ width: 1280, height: 844 });
     await p.emulateMedia({ media: "screen" });
     const texte = await p.evaluate(() => { document.body.classList.remove("impression-rapport"); const t = document.getElementById("rapport").textContent; document.getElementById("rapport").textContent = ""; return t; });
-    return { pages: (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length, texte };
+    return { pages: (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length, texte, hauteur };
   };
   verifier("comptable : deux boutons (Impôt et Données)", (await p.locator("[data-comptable]").count()) === 2);
   const a = await pagesPdf();
@@ -424,7 +428,7 @@ async function sommaireComptable(b, base) {
   });
   await p.reload(); await pret(p);
   const c = await pagesPdf();
-  verifier("comptable chargé : toujours une page", c.pages === 1, c.pages);
+  verifier("comptable chargé : toujours une page, avec de la marge", c.pages === 1 && c.hauteur <= 0.92, { pages: c.pages, hauteur: Math.round(c.hauteur * 100) + " %" });
   verifier("comptable chargé : acomptes, REER, garde et partenaire", ["Acomptes 2026", "REER : droits inutilisés", "Frais de garde", "Votre partenaire"].every(t => c.texte.includes(t)), c.texte.slice(0, 300));
   verifier("comptable : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();

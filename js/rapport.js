@@ -473,18 +473,16 @@ window.Verrou.quandOuvert(function () {
     const listePro = lignesPro.slice(0, 3).map(([n, v]) => `${n} ${$(v)}`).join(", ") + (lignesPro.length > 3 ? ", etc." : "");
     const documents = [
       soc ? "Société : états financiers ; feuillets des dividendes (T5, relevé 3)." : `RAMQ : relevés et états de compte de ${AN_IMPOT}.`,
-      frais > 0.5 && `Frais de cabinet payés à la clinique : relevé (environ ${$(frais)}).`,
-      R.depensesPro > 0.5 && (lignesPro.length ? `Dépenses professionnelles : reçus (${listePro}).` : `Dépenses professionnelles : reçus (environ ${$(R.depensesPro)}).`),
-      pro("auto") && "Auto : registre des déplacements professionnels (km).",
-      pro("bureau") && "Bureau à domicile : superficie et frais de la maison.",
-      reer > 0.5 && `REER : reçus pour ${AN_IMPOT} (jusqu'au 1er mars ${suivante}).`,
-      celiapp > 0.5 && "CELIAPP : relevé des cotisations.",
-      R.interetsEtudes > 0.5 && `Prêt étudiant : relevé des intérêts (environ ${$(R.interetsEtudes)}).`,
-      I.autres > 0.5 && "Revenus de placement et de location : feuillets et relevés.",
-      budget.get("garderie") > 0 && `Frais de garde : reçus et relevé 24 (environ ${$(budget.get("garderie"))} au budget).`,
-      medicaux.length && `Frais médicaux et assurance santé privée : reçus (environ ${$(somme(medicaux))} au budget).`,
+      frais > 0.5 && `Frais de cabinet : relevé de la clinique (${$(frais)}).`,
+      R.depensesPro > 0.5 && (lignesPro.length ? `Dépenses professionnelles : reçus (${listePro})` : `Dépenses professionnelles : reçus (environ ${$(R.depensesPro)})`)
+        + (pro("auto") ? " ; registre de l'auto (km)" : "") + (pro("bureau") ? " ; bureau à domicile (superficie, frais)" : "") + ".",
+      (reer > 0.5 || celiapp > 0.5) && [reer > 0.5 && `REER : reçus pour ${AN_IMPOT} (jusqu'au 1er mars ${suivante})`, celiapp > 0.5 && "CELIAPP : relevé des cotisations"].filter(Boolean).join(" ; ") + ".",
+      R.interetsEtudes > 0.5 && `Prêt étudiant : relevé des intérêts (${$(R.interetsEtudes)}).`,
+      I.autres > 0.5 && "Revenus de placement et de location : feuillets.",
+      budget.get("garderie") > 0 && `Frais de garde : reçus, relevé 24 (${$(budget.get("garderie"))} au budget).`,
+      medicaux.length && `Frais médicaux et assurance santé : reçus (${$(somme(medicaux))} au budget).`,
       budget.get("dons") > 0 && "Dons : reçus officiels.",
-      budget.get("fraisPlacements") > 0 && "Frais de gestion de placements : relevés (comptes non enregistrés).",
+      budget.get("fraisPlacements") > 0 && "Frais de gestion des placements non enregistrés : relevés.",
       R.couple && R.conjointe && R.conjointe.revenu > 0.5 && (R.autonomeP ? `${P.charAt(0).toUpperCase() + P.slice(1)} : revenus et dépenses d'entreprise.`
         : `${P.charAt(0).toUpperCase() + P.slice(1)} : feuillets T4 et relevé 1${S.conjointe.autresRevenus > 0 ? ", et ses autres revenus" : ""}.`),
     ].filter(Boolean);
@@ -503,24 +501,15 @@ window.Verrou.quandOuvert(function () {
     if (I.transferts > 0.5 || (R.conjointe && R.conjointe.transferts > 0.5)) points.push(`Transfert de crédits entre conjoints estimé : ${$(I.transferts + R.conjointe.transferts)}.`);
 
     return page("Sommaire pour le comptable", `Année d'imposition ${AN_IMPOT} · préparé le ${date} · ${libelleRevenu()}${soc ? " · pratique incorporée" : " · travailleur autonome"}. ${union} ; ${enfants}. Montants estimés : les relevés officiels font foi.`, `
-      <div class="rp-kpis rp-kpis-4">
-        ${kpi(soc ? "Revenus de la société" : "Revenu brut", $(I.revenu), libelleRevenu())}
-        ${kpi("Revenu imposable", $(I.imposable), soc ? "Dividendes majorés" : `Québec : ${$(I.imposableQc)}`)}
-        ${kpi("Impôt et cotisations", $(I.totalGlobal ?? perso), soc ? "Société comprise" : `Taux marginal ${pct(R.tauxMarginal, 0)}`)}
-        ${premiere ? kpi(`Solde au 30 avril ${suivante}`, $(perso), "Aucun acompte la première année", "fort")
-          : kpi("Acompte trimestriel", $(perso / 4), "Fédéral et Québec ensemble", "fort")}
-      </div>
       <div class="rp-deux">
         <div class="rp-carte"><h2>${soc ? "Société et revenus" : "Revenus et déductions"}</h2>${tableau(["", "Année"], revenus, "compact")}</div>
         <div class="rp-carte"><h2>Impôt estimé ${AN_IMPOT}</h2>${tableau(["", "Année"], impots, "compact")}</div>
       </div>
       <div class="rp-deux">
-        <div class="rp-colonne">
-          <div class="rp-carte"><h2>Échéances</h2>${tableau(["", "Montant"], echeances, "compact")}</div>
-          ${points.length ? `<div class="rp-carte"><h2>Points à valider</h2><ul class="rp-points serre">${points.map(d => `<li>${esc(d)}</li>`).join("")}</ul></div>` : ""}
-        </div>
-        <div class="rp-carte"><h2>Documents à rassembler</h2><ul class="rp-points serre">${documents.map(d => `<li>${esc(d)}</li>`).join("")}</ul></div>
+        <div class="rp-carte"><h2>Échéances</h2>${tableau(["", "Montant"], echeances, "compact")}</div>
+        ${points.length ? `<div class="rp-carte"><h2>Points à valider</h2><ul class="rp-points serre">${points.map(d => `<li>${esc(d)}</li>`).join("")}</ul></div>` : ""}
       </div>
+      <div class="rp-carte"><h2>Documents à rassembler</h2><ul class="rp-points serre deux-colonnes">${documents.map(d => `<li>${esc(d)}</li>`).join("")}</ul></div>
       <p class="rp-avis">Estimations faites avec les paramètres fiscaux ${AN_IMPOT} : elles ne remplacent ni les relevés officiels ni l'avis d'un comptable. Les acomptes à payer sont ceux des rappels de l'Agence du revenu du Canada et de Revenu Québec.</p>`);
   }
 
