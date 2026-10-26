@@ -15,6 +15,13 @@ valeur nette.
   rien à un serveur.
 - **Exporter une sauvegarde** (page Données) crée une copie de vos données ;
   **Restaurer une sauvegarde** la recharge sur un autre appareil.
+- **Verrou par phrase de passe** (facultatif, page Données) : les données
+  gardées dans le navigateur sont chiffrées (AES-GCM 256 bits ; clé tirée de
+  la phrase par PBKDF2-SHA-256, 600 000 itérations, sel au hasard). L'app
+  demande la phrase à l'ouverture et après 1 à 60 minutes sans utilisation ;
+  les sauvegardes exportées sont chiffrées avec la même phrase. La phrase
+  n'est gardée nulle part : oubliée, elle ne se retrouve pas (on peut
+  effacer les données de l'appareil et restaurer une sauvegarde).
 - Ne versez jamais un fichier de données dans ce dépôt : `.gitignore`
   bloque les fichiers `*donnees*.json`.
 
@@ -137,7 +144,8 @@ node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
 - `navigateur.test.js` ouvre l'app : pages sans débordement sur téléphone,
   montants de la RAMQ selon la colonne, alertes, sauvegarde et restauration,
   démarrage avec un ancien fichier, noms piégés, rapport, avis de nouvelle
-  version, politique de sécurité du contenu.
+  version, politique de sécurité du contenu, sous-onglets, verrou (données
+  et sauvegardes chiffrées, mauvaise phrase, phrase changée, délai, retrait).
 - GitHub Actions lance les trois à chaque publication sur `main`
   (`.github/workflows/tests.yml`). Cas fictifs seulement.
 
@@ -149,8 +157,9 @@ node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
 | `styles.css` | Mise en page, thèmes clair et sombre |
 | `js/calc.js` | Calculs (revenu, impôt 2026, dettes, épargne), sans accès à la page |
 | `js/app.js` | Interface, sauvegarde locale, sauvegarde et restauration |
+| `js/verrou.js` | Verrou par phrase de passe : chiffrement des données et des sauvegardes |
 | `js/rapport.js` | Rapport PDF mis en page |
-| `js/demarrage.js` | Thème et écran d'ouverture, avant l'affichage |
+| `js/demarrage.js` | Thème, écran d'ouverture et écran du verrou, avant l'affichage |
 | `tests/` | Tests des calculs et du navigateur |
 | `package.json`, `eslint.config.js`, `.github/` | Outils de vérification (rien à installer pour utiliser l'app) |
 | `manifest.webmanifest`, `sw.js`, `icone.svg`, `icones/` | Application installable (PWA), hors ligne |

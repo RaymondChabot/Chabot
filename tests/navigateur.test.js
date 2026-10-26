@@ -291,11 +291,115 @@ async function repartition(b, base) {
   await ctx.close();
 }
 
+/* 13. Verrou par phrase de passe : données chiffrées, écran du verrou, sauvegardes chiffrées, phrase changée, retrait. */
+async function verrou(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "donnees" });
+  const PHRASE = "trois chats dansent", NOUVELLE = "quatre hiboux chantent";
+  const brut = (await resultat(p)).brut, nDettes = await p.evaluate(() => window.Wealthnord.etat().dettes.length);
+  const stocke = () => p.evaluate(() => localStorage.getItem("boussole.v1"));
+  const deverrouiller = async phrase => {
+    await p.fill("#verrou-phrase", phrase); await p.click("#verrou-ouvrir");
+    await p.waitForFunction(() => window.Wealthnord || document.getElementById("verrou-message").textContent.includes("incorrecte"));
+    return p.evaluate(() => !!window.Wealthnord);
+  };
+  const etat = () => p.evaluate(() => document.getElementById("verrou-etat").textContent);
+  // Activer : phrase trop courte, puis deux phrases différentes, puis la bonne.
+  await p.fill("#vr-nouvelle", "court"); await p.fill("#vr-confirmer", "court"); await p.click("#carte-verrou button[type=submit]");
+  verifier("verrou : phrase trop courte refusée", (await etat()) === "Désactivé");
+  await p.fill("#vr-nouvelle", PHRASE); await p.fill("#vr-confirmer", PHRASE + "!"); await p.click("#carte-verrou button[type=submit]");
+  verifier("verrou : phrases différentes refusées", (await etat()) === "Désactivé");
+  await p.fill("#vr-confirmer", PHRASE); await p.click("#carte-verrou button[type=submit]");
+  await p.waitForFunction(() => document.getElementById("verrou-etat").textContent === "Activé");
+  const t = await stocke();
+  verifier("verrou : données chiffrées dans le navigateur", t.startsWith('{"wealthmorand":"chiffre"') && !t.includes("revenu"), t.slice(0, 40));
+  // Sauvegarde exportée : chiffrée elle aussi.
+  const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#exporter")]);
+  const exportChiffre = fs.readFileSync(await dl.path(), "utf8");
+  verifier("verrou : sauvegarde exportée chiffrée", exportChiffre.startsWith('{"wealthmorand":"chiffre"') && /chiffrees/.test(dl.suggestedFilename()), dl.suggestedFilename());
+  // Une sauvegarde ordinaire restaurée pendant que le verrou est actif est gardée chiffrée.
+  const simple = await p.evaluate(() => JSON.stringify({ ...window.Wealthnord.etat(), dettes: [] }));
+  await p.setInputFiles("#importer", { name: "simple.json", mimeType: "application/json", buffer: Buffer.from(simple) });
+  await p.waitForFunction(() => window.Wealthnord.etat().dettes.length === 0);
+  await p.waitForTimeout(200);
+  verifier("verrou : restauration gardée chiffrée", (await stocke()).startsWith('{"wealthmorand":"chiffre"'));
+  // Rechargée : seul l'écran du verrou paraît ; l'app ne démarre qu'avec la bonne phrase.
+  await p.reload(); await p.waitForSelector("#verrou-phrase");
+  const ecran = await p.evaluate(() => ({ app: getComputedStyle(document.querySelector(".app")).display, verrou: getComputedStyle(document.getElementById("verrou")).display, W: !!window.Wealthnord }));
+  verifier("verrou : écran du verrou, app cachée", ecran.app === "none" && ecran.verrou !== "none" && !ecran.W, ecran);
+  verifier("verrou : mauvaise phrase refusée", !(await deverrouiller("mauvaise phrase")));
+  verifier("verrou : bonne phrase, données ouvertes", await deverrouiller(PHRASE) && (await p.evaluate(() => window.Wealthnord.etat().dettes.length)) === 0);
+  // La sauvegarde chiffrée se restaure avec sa phrase.
+  await allerA(p, "donnees");
+  await p.setInputFiles("#importer", { name: "chiffre.json", mimeType: "application/json", buffer: Buffer.from(exportChiffre) });
+  await p.waitForSelector("#fichier-chiffre:not([hidden])");
+  await p.fill("#fichier-phrase", "mauvaise phrase"); await p.click("#fichier-chiffre button[type=submit]");
+  await p.waitForFunction(() => document.getElementById("donnees-message").textContent.includes("incorrecte"));
+  await p.fill("#fichier-phrase", PHRASE); await p.click("#fichier-chiffre button[type=submit]");
+  await p.waitForFunction(n => window.Wealthnord.etat().dettes.length === n, nDettes);
+  verifier("verrou : sauvegarde chiffrée restaurée", (await resultat(p)).brut === brut && await p.evaluate(() => document.getElementById("fichier-chiffre").hidden));
+  // Changer la phrase : l'ancienne n'ouvre plus les données.
+  await p.evaluate(() => { document.querySelector("#carte-verrou details").open = true; });
+  await p.fill("#vr-actuelle", "mauvaise phrase"); await p.fill("#vr-nouvelle", NOUVELLE); await p.fill("#vr-confirmer", NOUVELLE);
+  await p.click("#carte-verrou button[type=submit]");
+  await p.waitForFunction(() => document.querySelector("#carte-verrou .message").textContent.includes("incorrecte"));
+  await p.fill("#vr-actuelle", PHRASE); await p.click("#carte-verrou button[type=submit]");
+  await p.waitForFunction(() => document.querySelector("#carte-verrou .message").textContent.includes("Phrase changée"));
+  await p.reload(); await p.waitForSelector("#verrou-phrase");
+  verifier("verrou : l'ancienne phrase n'ouvre plus", !(await deverrouiller(PHRASE)));
+  verifier("verrou : la nouvelle phrase ouvre", await deverrouiller(NOUVELLE) && (await resultat(p)).brut === brut);
+  // Retirer le verrou : les données redeviennent lisibles.
+  await allerA(p, "donnees");
+  await p.evaluate(() => { document.querySelector("#carte-verrou details").open = true; });
+  await p.fill("#vr-actuelle", NOUVELLE); await p.click("#carte-verrou button.danger");
+  await p.waitForFunction(() => document.getElementById("verrou-etat").textContent === "Désactivé");
+  verifier("verrou : retiré, données non chiffrées", (await stocke()).includes('"revenu"'));
+  verifier("verrou : aucune erreur", erreurs.length === 0 && (await p.evaluate(() => window.__csp.length)) === 0, erreurs);
+  await ctx.close();
+}
+
+/* 14. Verrou : il se referme après le délai sans utilisation ; « Phrase oubliée » efface les données de l'appareil. */
+async function verrouDelai(b, base) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+  const p = await ctx.newPage(), erreurs = [];
+  p.on("pageerror", e => erreurs.push(String(e)));
+  await ctx.addInitScript(() => { try { localStorage.setItem("wm.assistant", "1"); sessionStorage.setItem("wm.ouverture", "1"); } catch (e) { /* stockage indisponible */ } });
+  await p.clock.install();
+  await p.goto(`${base}/index.html#donnees`); await pret(p);
+  await p.fill("#vr-nouvelle", "trois chats dansent"); await p.fill("#vr-confirmer", "trois chats dansent"); await p.click("#carte-verrou button[type=submit]");
+  await p.waitForFunction(() => document.getElementById("verrou-etat").textContent === "Activé");
+  await p.selectOption("#vr-delai", "1");
+  await p.clock.runFor(30000);
+  verifier("verrou : ouvert avant le délai", await p.evaluate(() => !document.documentElement.classList.contains("verrouille")));
+  await Promise.all([p.waitForEvent("load"), p.clock.runFor(45000)]);
+  await p.waitForSelector("#verrou-phrase");
+  verifier("verrou : refermé après une minute sans utilisation", await p.evaluate(() => document.documentElement.classList.contains("verrouille") && !window.Wealthnord));
+  await p.click("#verrou summary"); await p.click("#verrou-effacer"); await p.click("#verrou-effacer-oui");
+  await p.waitForFunction(() => window.Wealthnord && window.Wealthnord.resultats());
+  verifier("verrou : phrase oubliée, données effacées, l'exemple revient", await p.evaluate(() => !document.documentElement.classList.contains("verrouille") && !localStorage.getItem("boussole.v1")));
+  verifier("verrou (délai) : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
+/* 15. Deux onglets : le verrou activé dans l'un, l'autre se recharge sur l'écran du verrou sans rien réécrire en clair. */
+async function verrouOnglets(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "donnees" });
+  const p2 = await ctx.newPage(); p2.on("pageerror", e => erreurs.push(String(e)));
+  await p2.goto(`${base}/index.html#apercu`); await pret(p2);
+  await p.fill("#vr-nouvelle", "trois chats dansent"); await p.fill("#vr-confirmer", "trois chats dansent"); await p.click("#carte-verrou button[type=submit]");
+  await p.waitForFunction(() => document.getElementById("verrou-etat").textContent === "Activé");
+  await p2.waitForSelector("#verrou-phrase", { state: "visible", timeout: 5000 });
+  await p2.waitForTimeout(300);
+  verifier("deux onglets : l'autre onglet se verrouille", await p2.evaluate(() => document.documentElement.classList.contains("verrouille")));
+  verifier("deux onglets : les données restent chiffrées", (await p.evaluate(() => localStorage.getItem("boussole.v1"))).startsWith('{"wealthmorand":"chiffre"'));
+  verifier("deux onglets : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

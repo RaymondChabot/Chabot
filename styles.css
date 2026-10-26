@@ -168,6 +168,21 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 }
 .ouverture.eclair .ouverture-sceau { animation: ouverture-sceau 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 @media (prefers-reduced-motion: reduce) { .ouverture-sceau, .ouverture.eclair .ouverture-sceau { animation: none; } }
+/* Verrou : tant que les données chiffrées ne sont pas ouvertes, l'app reste cachée. */
+.verrou { display: none; }
+.verrouille .barre-haut, .verrouille .app, .verrouille .saut { display: none; }
+.verrouille .verrou { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); }
+.verrou-boite { width: min(100%, 360px); display: flex; flex-direction: column; gap: 14px; text-align: center; }
+.verrou-sceau { width: 112px; height: 112px; color: var(--marque); align-self: center; }
+.verrou h1 { font: 500 1.7rem/1.15 var(--police-titre); }
+.verrou .message { color: var(--danger); }
+.verrou .plier { text-align: left; }
+.verrou .plier > summary { justify-content: center; }
+.verrou .plier .actions { margin-top: 12px; }
+.cache-visuel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.fichier-chiffre { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.fichier-chiffre[hidden] { display: none; }
+.fichier-chiffre > label { font-size: 0.92rem; }
 .barre-haut {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;

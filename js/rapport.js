@@ -1,7 +1,8 @@
 /* WealthMorand — rapport PDF. Construit, à la demande, un rapport mis en page pour
    l'impression (format Lettre), avec graphiques en couleurs, puis ouvre la boîte
-   d'impression du navigateur : « Enregistrer en PDF ». Rien ne quitte l'appareil. */
-(function () {
+   d'impression du navigateur : « Enregistrer en PDF ». Rien ne quitte l'appareil.
+   Démarre après app.js, une fois les données ouvertes (verrou.js). */
+window.Verrou.quandOuvert(function () {
   "use strict";
   const W = window.Wealthnord;
   if (!W) return;
@@ -410,4 +411,4 @@
     setTimeout(() => window.print(), 60);
   }
   W.rapport = { construire, imprimer };
-})();
+});

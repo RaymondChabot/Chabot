@@ -1,6 +1,6 @@
-/* WealthMorand — interface. L'état vit dans le localStorage de ce navigateur ;
-   aucune donnée ne quitte l'appareil. Les calculs sont dans calc.js. */
-(function () {
+/* WealthMorand — interface. L'état vit dans le localStorage de ce navigateur, chiffré si le
+   verrou est activé (verrou.js) ; aucune donnée ne quitte l'appareil. Les calculs sont dans calc.js. */
+window.Verrou.quandOuvert(function () {
   "use strict";
   const C = window.Calc;
   const CLE = "boussole.v1";
@@ -324,7 +324,7 @@
     return d;
   }
   function charger() {
-    try { const t = localStorage.getItem(CLE); if (t) return fusion(clone(EXEMPLE), migrer(JSON.parse(t))); } catch (e) { /* stockage indisponible */ }
+    try { const t = window.Verrou.lire(); if (t) return fusion(clone(EXEMPLE), migrer(JSON.parse(t))); } catch (e) { /* stockage indisponible */ }
     return clone(EXEMPLE);
   }
   // Une case par poste des catalogues : budget, autres revenus, dépenses professionnelles.
@@ -356,7 +356,7 @@
   function sauver() {
     const r = principal || S;
     S.meta.misAJour = r.meta.misAJour = new Date().toISOString();
-    try { localStorage.setItem(CLE, JSON.stringify(r)); } catch (e) { /* le calcul fonctionne quand même */ }
+    try { window.Verrou.ecrire(JSON.stringify(r)); } catch (e) { /* le calcul fonctionne quand même */ }
   }
   const lire = p => p.split(".").reduce((o, k) => (o == null ? o : o[k]), S);
   const ecrire = (p, v) => { const k = p.split("."); let o = S; for (let i = 0; i < k.length - 1; i++) o = o[k[i]] ?? (o[k[i]] = {}); o[k[k.length - 1]] = v; };
@@ -3405,29 +3405,131 @@
 
   /* Import et export */
   const message = t => { document.getElementById("donnees-message").textContent = t; };
-  document.getElementById("exporter").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(racine(), null, 2)], { type: "application/json" });
+  // Verrou activé : la sauvegarde est chiffrée avec la même phrase de passe.
+  document.getElementById("exporter").addEventListener("click", async () => {
+    const chiffree = window.Verrou.actif(), texte = await window.Verrou.pourExport(JSON.stringify(racine(), null, 2));
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `wealthmorand-donnees-${new Date().toISOString().slice(0, 10)}.json`;
+    a.href = URL.createObjectURL(new Blob([texte], { type: "application/json" }));
+    a.download = `wealthmorand-donnees${chiffree ? "-chiffrees" : ""}-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     S.meta.dernierExport = new Date().toISOString(); sauver(); tout();
-    message("Sauvegarde exportée. Gardez-la dans un endroit sûr : elle contient toutes vos données.");
+    message(chiffree ? "Sauvegarde chiffrée exportée : il faudra votre phrase de passe pour la restaurer."
+      : "Sauvegarde exportée. Gardez-la dans un endroit sûr : elle contient toutes vos données.");
   });
+  function restaurer(d, chiffree) {
+    if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
+    sortirPlan(true); S = normaliser(fusion(clone(EXEMPLE), migrer(d))); S.meta.exemple = false; sauver();
+    tout(); message(`Sauvegarde restaurée : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`
+      + (chiffree && !window.Verrou.actif() ? " Le verrou n'est pas activé sur cet appareil : activez-le ci-dessous pour garder vos données chiffrées." : ""));
+  }
+  // Sauvegarde chiffrée : on demande sa phrase de passe (celle de l'appareil qui l'a exportée).
+  const formFichier = document.getElementById("fichier-chiffre"), phraseFichier = document.getElementById("fichier-phrase");
+  let fichierChiffre = null;
+  const fermerFichier = () => { fichierChiffre = null; phraseFichier.value = ""; formFichier.hidden = true; };
   document.getElementById("importer").addEventListener("change", e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const lecteur = new FileReader();
     lecteur.onload = () => {
       try {
         const d = JSON.parse(lecteur.result);
-        if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
-        sortirPlan(true); S = normaliser(fusion(clone(EXEMPLE), migrer(d))); S.meta.exemple = false; sauver();
-        tout(); message(`Sauvegarde restaurée : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`);
+        if (window.Verrou.estChiffre(d)) { fichierChiffre = d; formFichier.hidden = false; phraseFichier.focus(); message(""); return; }
+        fermerFichier(); restaurer(d);
       } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
     };
     lecteur.readAsText(f); e.target.value = "";
   });
+  formFichier.addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!fichierChiffre || !phraseFichier.value) return;
+    let d;
+    try { d = JSON.parse(await window.Verrou.ouvrirFichier(fichierChiffre, phraseFichier.value)); } catch (err) { message("Phrase de passe incorrecte pour cette sauvegarde."); phraseFichier.select(); return; }
+    fermerFichier();
+    try { restaurer(d, true); } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
+  });
+  document.getElementById("fichier-annuler").addEventListener("click", () => { fermerFichier(); message("Rien n'a été changé."); });
+
+  /* Verrou par phrase de passe : l'activer, choisir le délai, changer la phrase, le retirer. */
+  const LONGUEUR_PHRASE = 8;
+  function champPhrase(id, libelle, auto) {
+    const l = el("div", "champ large"), lab = el("label", null, libelle), boite = el("div", "saisie"), inp = el("input");
+    lab.htmlFor = id; inp.id = id; inp.type = "password"; inp.autocomplete = auto; inp.spellcheck = false;
+    boite.appendChild(inp); l.append(lab, boite);
+    return l;
+  }
+  // Nom d'utilisateur invisible : le trousseau du téléphone range la phrase sous « WealthMorand ».
+  function utilisateurCache() {
+    const u = el("input", "cache-visuel"); u.type = "text"; u.autocomplete = "username"; u.value = "WealthMorand"; u.tabIndex = -1; u.setAttribute("aria-hidden", "true");
+    return u;
+  }
+  const texteActuel = () => JSON.stringify(racine());
+  function rendreVerrou(avis) {
+    const V = window.Verrou, z = document.getElementById("verrou-reglages"), msg = el("p", "message");
+    msg.setAttribute("role", "status"); msg.textContent = avis || "";
+    z.textContent = "";
+    if (!V.disponible) {
+      document.getElementById("verrou-etat").textContent = "Non offert";
+      z.appendChild(el("p", "aide", "Ce navigateur ne permet pas le chiffrement ici : ouvrez WealthMorand à son adresse habituelle (https)."));
+      return;
+    }
+    const f = el("form", "groupe");
+    const occupe = (oui, texte) => { f.querySelectorAll("button").forEach(x => { x.disabled = oui; }); if (texte !== undefined) msg.textContent = texte; };
+    if (!V.actif()) {
+      document.getElementById("verrou-etat").textContent = "Désactivé";
+      z.appendChild(el("p", "aide", "Chiffre vos données sur cet appareil : l'app demande votre phrase de passe à l'ouverture et après quelques minutes sans utilisation, et vos sauvegardes exportées sont chiffrées elles aussi. Personne ne peut retrouver une phrase oubliée : gardez-la en lieu sûr (le trousseau de votre téléphone, par exemple) et une sauvegarde à jour."));
+      f.append(utilisateurCache(), champPhrase("vr-nouvelle", "Phrase de passe", "new-password"), champPhrase("vr-confirmer", "La même, une deuxième fois", "new-password"),
+        el("p", "aide", `Au moins ${LONGUEUR_PHRASE} caractères ; quelques mots au hasard font une phrase solide et facile à retenir.`));
+      const actions = el("div", "actions"), b = el("button", "bouton", "Activer le verrou"); b.type = "submit"; actions.appendChild(b); f.appendChild(actions);
+      f.addEventListener("submit", async e => {
+        e.preventDefault();
+        const p1 = f.querySelector("#vr-nouvelle").value, p2 = f.querySelector("#vr-confirmer").value;
+        if (p1.length < LONGUEUR_PHRASE) { msg.textContent = `La phrase doit compter au moins ${LONGUEUR_PHRASE} caractères.`; return; }
+        if (p1 !== p2) { msg.textContent = "Les deux phrases ne sont pas identiques."; return; }
+        occupe(true, "Chiffrement…");
+        try { await V.activer(p1, texteActuel); } catch (err) { occupe(false, "Le chiffrement a échoué ; vos données n'ont pas changé."); return; }
+        rendreVerrou("Verrou activé : vos données sont chiffrées. Les sauvegardes exportées avant aujourd'hui ne le sont pas ; supprimez-les et exportez-en une nouvelle.");
+      });
+      z.append(f, msg);
+      return;
+    }
+    document.getElementById("verrou-etat").textContent = "Activé";
+    z.appendChild(el("p", "aide", "Vos données sont chiffrées sur cet appareil (AES-GCM 256 bits). La phrase de passe est demandée à l'ouverture de l'app et après le délai choisi sans utilisation."));
+    const delai = el("div", "champ large"), lab = el("label", null, "Verrouiller après, sans utilisation"), boite = el("div", "saisie"), choix = el("select");
+    lab.htmlFor = choix.id = "vr-delai";
+    for (const [v, t] of [[1, "1 minute"], [5, "5 minutes"], [15, "15 minutes"], [60, "1 heure"]]) { const o = el("option", null, t); o.value = v; choix.appendChild(o); }
+    choix.value = String(V.delai());
+    choix.addEventListener("change", () => { V.choisirDelai(+choix.value); msg.textContent = "Délai enregistré."; });
+    boite.appendChild(choix); delai.append(lab, boite);
+    const actions = el("div", "actions"), verrouiller = el("button", "bouton secondaire", "Verrouiller maintenant"); verrouiller.type = "button";
+    verrouiller.addEventListener("click", () => V.verrouiller());
+    actions.appendChild(verrouiller);
+    const plier = el("details", "plier"); plier.appendChild(el("summary", null, "Changer la phrase ou retirer le verrou"));
+    f.append(utilisateurCache(), champPhrase("vr-actuelle", "Phrase actuelle", "current-password"), champPhrase("vr-nouvelle", "Nouvelle phrase (pour la changer)", "new-password"),
+      champPhrase("vr-confirmer", "La nouvelle, une deuxième fois", "new-password"));
+    const actions2 = el("div", "actions"), changer = el("button", "bouton", "Changer la phrase"), retirer = el("button", "bouton danger", "Retirer le verrou");
+    changer.type = "submit"; retirer.type = "button"; actions2.append(changer, retirer); f.appendChild(actions2); plier.appendChild(f);
+    const valeur = id => f.querySelector("#" + id).value;
+    f.addEventListener("submit", async e => {
+      e.preventDefault();
+      const p1 = valeur("vr-nouvelle");
+      if (!valeur("vr-actuelle")) { msg.textContent = "Entrez la phrase actuelle."; return; }
+      if (p1.length < LONGUEUR_PHRASE) { msg.textContent = `La nouvelle phrase doit compter au moins ${LONGUEUR_PHRASE} caractères.`; return; }
+      if (p1 !== valeur("vr-confirmer")) { msg.textContent = "Les deux nouvelles phrases ne sont pas identiques."; return; }
+      occupe(true, "Chiffrement…");
+      let ok;
+      try { ok = await V.changer(valeur("vr-actuelle"), p1, texteActuel); } catch (err) { occupe(false, "Le changement a échoué ; l'ancienne phrase reste valide."); return; }
+      if (!ok) { occupe(false, "La phrase actuelle est incorrecte."); return; }
+      rendreVerrou("Phrase changée. Les sauvegardes exportées avant le changement s'ouvrent encore avec l'ancienne.");
+    });
+    retirer.addEventListener("click", async () => {
+      if (!valeur("vr-actuelle")) { msg.textContent = "Entrez la phrase actuelle pour retirer le verrou."; return; }
+      occupe(true, "Vérification…");
+      if (!(await V.retirer(valeur("vr-actuelle"), texteActuel))) { occupe(false, "La phrase actuelle est incorrecte."); return; }
+      rendreVerrou("Verrou retiré : vos données ne sont plus chiffrées sur cet appareil.");
+    });
+    z.append(delai, actions, plier, msg);
+  }
+  rendreVerrou();
   const reinit = document.getElementById("reinitialiser"), confirmer = document.getElementById("confirmer-reinit");
   reinit.addEventListener("click", () => { confirmer.hidden = false; confirmer.focus(); });
   confirmer.addEventListener("click", () => { sortirPlan(true); S = normaliser(clone(EXEMPLE)); sauver(); tout(); confirmer.hidden = true; message("Valeurs d'exemple rétablies."); });
@@ -3778,4 +3880,4 @@
     let largeur = document.querySelector("main").clientWidth;
     new ResizeObserver(() => { const w = document.querySelector("main").clientWidth; if (Math.abs(w - largeur) > 4) { largeur = w; if (R) tout(); } }).observe(document.querySelector("main"));
   }
-})();
+});
