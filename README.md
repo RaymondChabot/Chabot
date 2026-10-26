@@ -162,7 +162,9 @@ node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
 | `index.html` | Structure de la page |
 | `styles.css` | Mise en page, thèmes clair et sombre |
 | `js/calc.js` | Calculs (revenu, impôt 2026, dettes, épargne), sans accès à la page |
-| `js/app.js` | Interface, sauvegarde locale, sauvegarde et restauration |
+| `js/catalogues.js` | Exemple de départ, catalogues (dépenses, autres revenus, dépenses professionnelles), milieux, activités, champs des panneaux « Modifier », cas de vérification |
+| `js/interface.js` | Formats, petits composants (rangées, segments, tableaux) et graphique en lignes |
+| `js/app.js` | État, calculs du ménage, écrans et événements ; sauvegarde et restauration |
 | `js/verrou.js` | Verrou par phrase de passe : chiffrement des données et des sauvegardes |
 | `js/rapport.js` | Rapport PDF, fiche d'une page et sommaire pour le comptable |
 | `js/demarrage.js` | Thème, écran d'ouverture et écran du verrou, avant l'affichage |

@@ -15,8 +15,8 @@ function verifier(nom, condition, detail) {
 const proche = (a, b, tol) => Math.abs(a - b) <= tol;
 
 /* 1. Impôt, cotisations, allocations et prime : cas de l'outil officiel (mai 2026). */
-const app = fs.readFileSync(path.join(__dirname, "../js/app.js"), "utf8");
-const VERIFICATION = JSON.parse(app.match(/const VERIFICATION = (\[.*?\]);\n/s)[1]);
+const catalogues = fs.readFileSync(path.join(__dirname, "../js/catalogues.js"), "utf8");
+const VERIFICATION = JSON.parse(catalogues.match(/const VERIFICATION = (\[.*?\]);\n/s)[1]);
 let maxEcart = 0;
 for (const v of VERIFICATION) {
   let a = C.impotSalarie({ salaire: v.salaires[0] }), b = v.couple ? C.impotSalarie({ salaire: v.salaires[1] }) : null;
