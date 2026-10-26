@@ -214,7 +214,10 @@
     const etalement = Math.max(1, Math.min(W, r.semainesArrivee || W));
     let inscrits = premiere ? r.inscritsDebut : r.inscritsDebut + r.nouveauxGuichet + r.nouveauxSansMedecin + r.nouveauxTransferes;
     const inscritsDepart = inscrits;
-    const forfaitAnnuel = v * m("forfaitVulnerable") + vt * m("forfaitTresVulnerable");
+    // Forfait annuel selon les catégories de problèmes de santé (EP 40, par. 6.01) : une catégorie à 100 %, deux à 150 %
+    // (groupe II), trois ou plus, ou deux dont la santé mentale ou la déficience intellectuelle, à 200 % (groupes III et IV).
+    const g2 = borne((r.partGroupe2 || 0) / 100, 0, 1), g34 = borne((r.partGroupe34 || 0) / 100, 0, 1 - g2);
+    const forfaitAnnuel = v * m("forfaitVulnerable") * (1 + 0.5 * g2 + g34) + vt * m("forfaitTresVulnerable");
 
     let visitesMixte = 0, visitesAppr = 0, visitesSrv = 0, nbVisites = 0, nbPriseEnCharge = 0, forfaitVulnNouveaux = 0, semainesPalierHaut = 0;
     for (let k = 0; k < W; k++) {

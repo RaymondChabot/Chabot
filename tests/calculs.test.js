@@ -188,6 +188,8 @@ verifier("compensation : 3 jours à 64,80 $, une demi-journée et un sans rendez
 verifier("compensation : DMÉ hors GMF dès 150 inscrits, licences seulement en GMF", proche(gc.detailCompensation.dme, 4 * (459.9 + 287.45), 1e-6)
   && proche(C.revenuGmfu({ ...rev, lieuTarifs: "cabinet", membreGmf: true }).detailCompensation.dme, 4 * 459.9, 1e-6) && C.compensationCabinet(rev, 46, 6, 149).dme === 0);
 verifier("compensation : rien en établissement", g.detailCompensation.total === 0 && g.horaire.compensation === 0);
+verifier("groupes : forfait à 150 % pour deux catégories, 200 % pour trois ou plus", proche(C.revenuGmfu({ ...rev, partGroupe2: 50, partGroupe34: 25 }).horaire.forfaitVulnerable,
+  g.horaire.forfaitVulnerable * 1.5, 1e-6));
 verifier("polyvalence : au-delà de 245 vulnérables, chacun compte 2,5 fois", C.tauxPolyvalence(800, 345, 5) === 2.5 && C.tauxPolyvalence(800, 445, 5) === 5);
 
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
