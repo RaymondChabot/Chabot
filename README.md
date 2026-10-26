@@ -118,6 +118,11 @@ Revenu affiche tous les détails.
 - **Fiche d'une page** (PDF) et **export en tableur** (CSV : résumé,
   budget, dettes, projection) pour un ou une partenaire, un comptable ou
   un conseiller.
+- **Sommaire pour le comptable** (PDF d'une page, pages Impôt et Données) :
+  revenus et déductions jusqu'au revenu imposable, impôt estimé, acomptes
+  et échéances, documents à rassembler selon votre situation (relevés de
+  la RAMQ, frais de cabinet, reçus, REER, CELIAPP, garde, frais médicaux,
+  feuillets du ou de la partenaire) et points à valider.
 - **Dépenses annuelles** : le mois de chaque dépense annuelle, le montant à
   mettre de côté chaque mois et les échéances à venir.
 
@@ -145,7 +150,8 @@ node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
   montants de la RAMQ selon la colonne, alertes, sauvegarde et restauration,
   démarrage avec un ancien fichier, noms piégés, rapport, avis de nouvelle
   version, politique de sécurité du contenu, sous-onglets, verrou (données
-  et sauvegardes chiffrées, mauvaise phrase, phrase changée, délai, retrait).
+  et sauvegardes chiffrées, mauvaise phrase, phrase changée, délai, retrait),
+  sommaire pour le comptable sur une seule page.
 - GitHub Actions lance les trois à chaque publication sur `main`
   (`.github/workflows/tests.yml`). Cas fictifs seulement.
 
@@ -158,7 +164,7 @@ node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
 | `js/calc.js` | Calculs (revenu, impôt 2026, dettes, épargne), sans accès à la page |
 | `js/app.js` | Interface, sauvegarde locale, sauvegarde et restauration |
 | `js/verrou.js` | Verrou par phrase de passe : chiffrement des données et des sauvegardes |
-| `js/rapport.js` | Rapport PDF mis en page |
+| `js/rapport.js` | Rapport PDF, fiche d'une page et sommaire pour le comptable |
 | `js/demarrage.js` | Thème, écran d'ouverture et écran du verrou, avant l'affichage |
 | `tests/` | Tests des calculs et du navigateur |
 | `package.json`, `eslint.config.js`, `.github/` | Outils de vérification (rien à installer pour utiliser l'app) |

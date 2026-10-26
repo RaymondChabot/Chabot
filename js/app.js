@@ -3268,6 +3268,7 @@ window.Verrou.quandOuvert(function () {
   document.getElementById("bu-annuelles-modifier").addEventListener("click", feuilleAnnuelles);
   document.getElementById("exporter-tableur").addEventListener("click", exporterTableur);
   document.getElementById("imprimer-fiche").addEventListener("click", () => window.Wealthnord.rapport && window.Wealthnord.rapport.imprimer({ fiche: true }));
+  document.querySelectorAll("[data-comptable]").forEach(b => b.addEventListener("click", () => window.Wealthnord.rapport && window.Wealthnord.rapport.imprimer({ comptable: true })));
   document.getElementById("bandeau-plan-sortir").addEventListener("click", () => sortirPlan());
   document.getElementById("pa-independance-modifier").addEventListener("click", feuilleIndependance);
   document.getElementById("ap-portrait-masquer").addEventListener("click", () => {

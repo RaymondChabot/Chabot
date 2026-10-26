@@ -100,6 +100,7 @@ window.Verrou.quandOuvert(function () {
     const meilleurMode = R.modes.reduce((a, m) => R.nets[m] > R.nets[a] ? m : a, mode);
     const pages = [];
     if (opts.fiche) { pages.push(fiche(S, R, date)); return afficher(pages, date, "Fiche"); }
+    if (opts.comptable) { pages.push(comptable(S, R, date)); return afficher(pages, date, "Sommaire pour le comptable"); }
 
     /* 1. Couverture */
     const points = [
@@ -400,6 +401,127 @@ window.Verrou.quandOuvert(function () {
           <ul class="rp-jalons">${jal.map(j => `<li><b>${esc(j.jalon.mois ? `${j.jalon.mois} ${j.jalon.annee}` : j.jalon.annee)}</b><span>${esc(j.titre)}</span></li>`).join("")}</ul></div>
       </div>
       <p class="rp-avis">Estimations seulement : ni avis fiscal, ni avis financier. Rapport complet : page Données de WealthMorand.</p>`);
+  }
+
+  /* Sommaire pour le comptable : sur une page, ce qu'il faut pour les déclarations de l'année
+     (revenus, déductions, impôt estimé, échéances, documents à rassembler, points à valider). */
+  const AN_IMPOT = 2026;   // année des paramètres fiscaux de calc.js
+  function comptable(S, R, date) {
+    const I = R.impot, soc = R.societeActive, g = R.rev[R.mode], x = I.societe, perso = I.total, premiere = S.revenu.annee === "premiere";
+    const P = O.votreP(), suivante = AN_IMPOT + 1;
+    const frais = soc ? 0 : g.fraisCabinet, reer = S.epargne.reer.cotisationAnnuelle, celiapp = R.celiappAnnee(0);
+    const proDetail = S.impot.depensesProMode === "detail" ? S.impot.depensesProDetail.filter(l => O.annuelLigne(l) > 0) : [];
+    const pro = k => proDetail.some(l => l.k === k);
+    // Dépenses du budget (ménage) qui demandent des reçus.
+    const budget = new Map();
+    for (const b of O.depensesEffectives()) if (b.k) budget.set(b.k, (budget.get(b.k) || 0) + O.mensuel(b) * 12);
+    const somme = cles => cles.reduce((t, k) => t + (budget.get(k) || 0), 0);
+    const medicaux = ["dentiste", "orthodontie", "lunettes", "medicaments", "assuranceSante"].filter(k => budget.get(k) > 0);
+    const union = !R.couple ? "Personne seule" : S.conjointe.lien === "fait"
+      ? (R.coupleFiscal ? "Conjoints de fait : couple pour l'impôt" : "Conjoints de fait depuis moins de 12 mois : imposés seuls") : "Mariés ou unis civilement";
+    const enfants = R.ages.length ? `${R.ages.length} enfant${R.ages.length > 1 ? "s" : ""} de moins de 18 ans (${R.ages.join(", ")} ans)` : "aucun enfant à charge";
+
+    const revenus = soc ? [
+      { c: ["Revenus versés à la société", $(I.revenu)] },
+      { c: ["Dépenses et frais de la société", moins(x.depenses + x.frais)] },
+      { cls: "sous-total", c: ["Bénéfice de la société", $(x.profit)] },
+      { c: ["Impôt de la société", moins(x.impotSociete)] },
+      { c: ["Dividendes non déterminés versés", $(x.dividendes)] },
+      { cls: "sous", c: ["Laissé dans la société", $(x.retenu)] },
+      ...(I.autres > 0.5 ? [{ c: ["Autres revenus imposables", $(I.autres)] }] : []),
+      ...(reer + celiapp > 0.5 ? [{ c: ["Déduction REER et CELIAPP", moins(reer + celiapp)] }] : []),
+      { cls: "total", c: ["Revenu imposable (dividendes majorés)", $(I.imposable)] },
+    ] : (() => {
+      const netAffaires = Math.max(0, I.revenu - frais - R.depensesPro);
+      const cotis = Math.max(0, netAffaires + I.autres - reer - celiapp - I.imposable);
+      return [
+        { c: ["Rémunération de la RAMQ (estimée)", $(I.revenu - (g.autres || 0))] },
+        ...(g.autres > 0.5 ? [{ c: ["Autres revenus professionnels", $(g.autres)] }] : []),
+        ...(frais > 0.5 ? [{ c: ["Frais de cabinet payés à la clinique", moins(frais)] }] : []),
+        { c: ["Dépenses professionnelles", moins(R.depensesPro)] },
+        { cls: "sous-total", c: ["Revenu net d'entreprise", $(netAffaires)] },
+        ...(I.autres > 0.5 ? [{ c: ["Autres revenus imposables", $(I.autres)] }] : []),
+        ...(reer > 0.5 ? [{ c: ["Déduction REER", moins(reer)] }] : []),
+        ...(celiapp > 0.5 ? [{ c: ["Déduction CELIAPP", moins(celiapp)] }] : []),
+        ...(cotis > 0.5 ? [{ c: ["Déduction pour RRQ et RQAP", moins(cotis)] }] : []),
+        { cls: "total", c: ["Revenu imposable fédéral", $(I.imposable)] },
+        { cls: "sous", c: ["Revenu imposable du Québec", $(I.imposableQc)] },
+      ];
+    })();
+    const impots = [
+      { c: ["Impôt fédéral (après l'abattement)", $(I.fed)] },
+      { c: ["Impôt du Québec", $(I.qc)] },
+      ...(soc ? [] : [{ c: ["RRQ (deux parts)", $(I.rrq)] }, { c: ["RQAP", $(I.rqap)] }]),
+      { c: ["Fonds des services de santé", $(I.fss)] },
+      ...(I.transferts > 0.5 ? [{ cls: "sous", c: [`Crédits transférés par ${P}, déjà déduits`, $(I.transferts)] }] : []),
+      { cls: "total", c: [soc ? "Votre impôt sur les dividendes" : "Impôt et cotisations", $(perso)] },
+      ...(soc ? [{ c: ["Impôt de la société", $(x.impotSociete)] }, { cls: "sous-total", c: ["Total, société comprise", $(I.totalGlobal)] }] : []),
+      ...(R.primeMoi > 0.5 ? [{ c: ["Prime d'assurance médicaments (Québec)", $(R.primeMoi)] }] : []),
+      { cls: "sous", c: ["Taux moyen ; taux marginal", `${pct(I.tauxMoyen, 0)} ; ${pct(R.tauxMarginal, 0)}`] },
+      ...(R.couple && R.conjointe ? [{ cls: "sous", c: [`Revenu de ${P}`, $(R.conjointe.revenu)] }] : []),
+      ...(R.couple && R.conjointe && R.conjointe.total > 0.5 ? [{ cls: "sous", c: [`Impôt et cotisations de ${P}`, $(R.conjointe.total)] }] : []),
+    ];
+    const echeances = [
+      premiere ? { c: [`Acomptes ${AN_IMPOT} : aucun (1re année)`, "—"] } : { c: [`Acomptes ${AN_IMPOT} (15 mars, juin, sept., déc.)`, `4 × ${$(perso / 4)}`] },
+      ...(soc ? [{ c: ["Société : acomptes mensuels", $(x.impotSociete / 12)] }] : []),
+      ...(reer > 0 || S.epargne.reer.droits > 0 ? [{ c: [`1er mars ${suivante} : limite REER`, reer > 0 ? $(reer) : "—"] }] : []),
+      { c: [`30 avril ${suivante} : solde de l'impôt`, premiere ? $(perso) : "s'il y a lieu"] },
+      { c: [`${soc ? "30 avril" : "15 juin"} ${suivante} : déclarations`, ""] },
+      ...(soc ? [{ c: ["Société : T2 et CO-17, 6 mois après l'exercice", ""] }] : []),
+    ];
+    const lignesPro = proDetail.map(l => [O.ITEMS_PRO.get(l.k).nom.split(" : ")[0], O.annuelLigne(l)]).sort((a, b) => b[1] - a[1]);
+    const listePro = lignesPro.slice(0, 3).map(([n, v]) => `${n} ${$(v)}`).join(", ") + (lignesPro.length > 3 ? ", etc." : "");
+    const documents = [
+      soc ? "Société : états financiers ; feuillets des dividendes (T5, relevé 3)." : `RAMQ : relevés et états de compte de ${AN_IMPOT}.`,
+      frais > 0.5 && `Frais de cabinet payés à la clinique : relevé (environ ${$(frais)}).`,
+      R.depensesPro > 0.5 && (lignesPro.length ? `Dépenses professionnelles : reçus (${listePro}).` : `Dépenses professionnelles : reçus (environ ${$(R.depensesPro)}).`),
+      pro("auto") && "Auto : registre des déplacements professionnels (km).",
+      pro("bureau") && "Bureau à domicile : superficie et frais de la maison.",
+      reer > 0.5 && `REER : reçus pour ${AN_IMPOT} (jusqu'au 1er mars ${suivante}).`,
+      celiapp > 0.5 && "CELIAPP : relevé des cotisations.",
+      R.interetsEtudes > 0.5 && `Prêt étudiant : relevé des intérêts (environ ${$(R.interetsEtudes)}).`,
+      I.autres > 0.5 && "Revenus de placement et de location : feuillets et relevés.",
+      budget.get("garderie") > 0 && `Frais de garde : reçus et relevé 24 (environ ${$(budget.get("garderie"))} au budget).`,
+      medicaux.length && `Frais médicaux et assurance santé privée : reçus (environ ${$(somme(medicaux))} au budget).`,
+      budget.get("dons") > 0 && "Dons : reçus officiels.",
+      budget.get("fraisPlacements") > 0 && "Frais de gestion de placements : relevés (comptes non enregistrés).",
+      R.couple && R.conjointe && R.conjointe.revenu > 0.5 && (R.autonomeP ? `${P.charAt(0).toUpperCase() + P.slice(1)} : revenus et dépenses d'entreprise.`
+        : `${P.charAt(0).toUpperCase() + P.slice(1)} : feuillets T4 et relevé 1${S.conjointe.autresRevenus > 0 ? ", et ses autres revenus" : ""}.`),
+    ].filter(Boolean);
+    const points = [];
+    if (premiere) points.push(`Première année de pratique : aucun acompte exigé ; environ ${$(perso)} à payer le 30 avril ${suivante}.`);
+    // Cotiser tous les droits plutôt que la cotisation prévue : ce que l'impôt baisserait de plus.
+    const droits = S.epargne.reer.droits;
+    if (droits > reer) {
+      const plus = R.impotAvecReer(reer + celiapp) - R.impotAvecReer(droits + celiapp);
+      points.push(`REER : droits inutilisés de ${$(droits)}${reer > 0 ? ` (cotisation prévue : ${$(reer)})` : ""}. Tout cotiser réduirait l'impôt ${AN_IMPOT} d'environ ${$(plus)} de plus.`);
+    }
+    if (!soc && R.societe && R.societe.reportAnnuel > 500)
+      points.push(`Société professionnelle : report d'impôt estimé à ${$(R.societe.reportAnnuel)} cette année, après ${$(S.societe.fraisSociete)} de frais.`);
+    if (soc) points.push("Rémunération en dividendes seulement : un salaire serait-il préférable (RRQ, droits REER) ?");
+    if (R.couple && !R.coupleFiscal) points.push(`Conjoints de fait depuis moins de 12 mois : vous et ${P} êtes imposés comme des personnes seules pour ${AN_IMPOT}.`);
+    if (I.transferts > 0.5 || (R.conjointe && R.conjointe.transferts > 0.5)) points.push(`Transfert de crédits entre conjoints estimé : ${$(I.transferts + R.conjointe.transferts)}.`);
+
+    return page("Sommaire pour le comptable", `Année d'imposition ${AN_IMPOT} · préparé le ${date} · ${libelleRevenu()}${soc ? " · pratique incorporée" : " · travailleur autonome"}. ${union} ; ${enfants}. Montants estimés : les relevés officiels font foi.`, `
+      <div class="rp-kpis rp-kpis-4">
+        ${kpi(soc ? "Revenus de la société" : "Revenu brut", $(I.revenu), libelleRevenu())}
+        ${kpi("Revenu imposable", $(I.imposable), soc ? "Dividendes majorés" : `Québec : ${$(I.imposableQc)}`)}
+        ${kpi("Impôt et cotisations", $(I.totalGlobal ?? perso), soc ? "Société comprise" : `Taux marginal ${pct(R.tauxMarginal, 0)}`)}
+        ${premiere ? kpi(`Solde au 30 avril ${suivante}`, $(perso), "Aucun acompte la première année", "fort")
+          : kpi("Acompte trimestriel", $(perso / 4), "Fédéral et Québec ensemble", "fort")}
+      </div>
+      <div class="rp-deux">
+        <div class="rp-carte"><h2>${soc ? "Société et revenus" : "Revenus et déductions"}</h2>${tableau(["", "Année"], revenus, "compact")}</div>
+        <div class="rp-carte"><h2>Impôt estimé ${AN_IMPOT}</h2>${tableau(["", "Année"], impots, "compact")}</div>
+      </div>
+      <div class="rp-deux">
+        <div class="rp-colonne">
+          <div class="rp-carte"><h2>Échéances</h2>${tableau(["", "Montant"], echeances, "compact")}</div>
+          ${points.length ? `<div class="rp-carte"><h2>Points à valider</h2><ul class="rp-points serre">${points.map(d => `<li>${esc(d)}</li>`).join("")}</ul></div>` : ""}
+        </div>
+        <div class="rp-carte"><h2>Documents à rassembler</h2><ul class="rp-points serre">${documents.map(d => `<li>${esc(d)}</li>`).join("")}</ul></div>
+      </div>
+      <p class="rp-avis">Estimations faites avec les paramètres fiscaux ${AN_IMPOT} : elles ne remplacent ni les relevés officiels ni l'avis d'un comptable. Les acomptes à payer sont ceux des rappels de l'Agence du revenu du Canada et de Revenu Québec.</p>`);
   }
 
   function imprimer(opts = {}) {

@@ -758,6 +758,7 @@ a.tuile:hover { border-color: var(--trait); }
 .rp-sous { color: #8a6a32; font-size: 11pt; margin: 0; }
 .rp-date { color: #6f6d66; font-size: 8.5pt; margin: 4px 0 0; }
 .rp-points { margin: 0; padding-left: 16px; font-size: 9.2pt; display: flex; flex-direction: column; gap: 4px; }
+.rp-points.serre { font-size: 8.4pt; gap: 2.5px; }
 
 /* Graphiques */
 #rapport svg { display: block; overflow: visible; }

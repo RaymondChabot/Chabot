@@ -395,11 +395,46 @@ async function verrouOnglets(b, base) {
   await ctx.close();
 }
 
+/* 16. Sommaire pour le comptable : une seule page Lettre, même avec beaucoup de documents à rassembler. */
+async function sommaireComptable(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { largeur: 1280, page: "impot" });
+  const pagesPdf = async () => {
+    await p.evaluate(() => { window.Wealthnord.rapport.construire({ comptable: true }); document.body.classList.add("impression-rapport"); });
+    await p.emulateMedia({ media: "print" });
+    const pdf = await p.pdf({ format: "Letter", printBackground: true, preferCSSPageSize: true });
+    await p.emulateMedia({ media: "screen" });
+    const texte = await p.evaluate(() => { document.body.classList.remove("impression-rapport"); const t = document.getElementById("rapport").textContent; document.getElementById("rapport").textContent = ""; return t; });
+    return { pages: (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length, texte };
+  };
+  verifier("comptable : deux boutons (Impôt et Données)", (await p.locator("[data-comptable]").count()) === 2);
+  const a = await pagesPdf();
+  verifier("comptable : une page", a.pages === 1, a.pages);
+  verifier("comptable : revenus, impôt, échéances et documents", ["Revenus et déductions", "Impôt estimé 2026", "Échéances", "Documents à rassembler"].every(t => a.texte.includes(t)));
+  // Situation chargée : couple, enfants, détail des dépenses, REER, CELIAPP, garderie, frais médicaux, dons.
+  await p.evaluate(() => {
+    const S = JSON.parse(JSON.stringify(window.Wealthnord.etat()));
+    Object.assign(S.conjointe, { active: true, statut: "autonome", revenuAutonome: 70000, depensesAutonome: 8000 });
+    Object.assign(S.epargne.reer, { droits: 30000, cotisationAnnuelle: 10000 }); S.epargne.celiapp.cotisationAnnuelle = 8000;
+    S.epargne.reee.enfants = [{ age: 2 }, { age: 5 }, { age: 9 }]; S.revenu.annee = "type"; S.impot.depensesProMode = "detail";
+    for (const [k, v] of [["cmq", 1930], ["fmoq", 2400], ["acpm", 560], ["formation", 2500], ["auto", 1800], ["bureau", 1200], ["telecom", 600]]) S.impot.depensesProDetail.find(x => x.k === k).montant = v;
+    for (const [k, v] of [["garderie", 200], ["dentiste", 60], ["orthodontie", 150], ["lunettes", 30], ["dons", 50], ["fraisPlacements", 40]]) { const l = S.budget.find(x => x.k === k); if (l) l.montant = v; }
+    S.revenu.lignes = [{ k: "placements", montant: 3000, periode: "an" }];
+    S.dettes.push({ id: "dx", nom: "Prêt étudiant", type: "pret", solde: 30000, taux: 5, paiement: 300, creditImpot: 1 });
+    S.meta.exemple = false; localStorage.setItem("boussole.v1", JSON.stringify(S));
+  });
+  await p.reload(); await pret(p);
+  const c = await pagesPdf();
+  verifier("comptable chargé : toujours une page", c.pages === 1, c.pages);
+  verifier("comptable chargé : acomptes, REER, garde et partenaire", ["Acomptes 2026", "REER : droits inutilisés", "Frais de garde", "Votre partenaire"].every(t => c.texte.includes(t)), c.texte.slice(0, 300));
+  verifier("comptable : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }
