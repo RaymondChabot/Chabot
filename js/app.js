@@ -586,7 +586,10 @@ window.Verrou.quandOuvert(function () {
       else {
         const conj = impotPartenaire(reel);
         const fraisA = fraisCabinet(R.revType[mode].total * reel, mode, reel);
-        let moi = impotDe({ ...base, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImposables: R.autresNonPro * reel, depensesPro: R.depensesPro + fraisA, revenu: R.revType[mode].total * reel }, 1 / I);
+        // Dès 2027, le crédit québécois pour dividendes non déterminés passe à 2,69 % (pratique incorporée).
+        const anneeProj = (+String(S.strategie.debut).slice(0, 4) || new Date().getFullYear()) + a;
+        const creditDividendesQc = anneeProj >= 2027 ? C.P2026.dividendes.creditQuebecDes2027 : undefined;
+        let moi = impotDe({ ...base, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImposables: R.autresNonPro * reel, depensesPro: R.depensesPro + fraisA, revenu: R.revType[mode].total * reel, creditDividendesQc }, 1 / I);
         // L'an prochain, des conjoints de fait auront 12 mois de vie commune : couple pour l'impôt.
         const fisc = R.couple && (R.coupleFiscal || a >= 1);
         if (fisc) moi = C.transfertsConjoints(moi, conj)[0];

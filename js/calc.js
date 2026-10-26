@@ -43,8 +43,9 @@
        de 18 500 $, jusqu'à 150 $ ; 150 $ jusqu'à 64 355 $ ; puis 1 % de plus, au plus 1 000 $ (Paramètres du régime
        d'imposition des particuliers pour l'année d'imposition 2026, ministère des Finances, novembre 2025). */
     fss: { seuil1: 18500, seuil2: 64355, taux: 0.01, palier: 150, max: 1000 },
-    // Dividendes non déterminés (société qui profite du taux des PME).
-    dividendes: { majoration: 0.15, creditFederal: 0.090301, creditQuebec: 0.0342 },
+    /* Dividendes non déterminés : majoration de 15 %, crédits de 9,0301 % (fédéral) et de 3,42 % (Québec) du montant
+       majoré ; au Québec, 2,69 % après le 31 décembre 2026 (bulletin d'information 2026-3 du ministère des Finances). */
+    dividendes: { majoration: 0.15, creditFederal: 0.090301, creditQuebec: 0.0342, creditQuebecDes2027: 0.0269 },
   };
 
   /* ---------- Tarifs RAMQ : Manuel des médecins omnipraticiens, rémunération à l'acte, onglet B
@@ -496,6 +497,7 @@
      dividendes non déterminés : tout le bénéfice après impôt, ou un montant fixe. Le
      reste demeure dans la société. Même format que impotParticulier, pour la personne ;
      totalGlobal ajoute l'impôt de la société. */
+  // creditDividendesQc : taux du crédit québécois d'une autre année (2,69 % dès 2027).
   function impotSociete(o) {
     const profit = Math.max(0, o.revenu - (o.depensesPro || 0) - (o.fraisSociete || 0));
     const impotSoc = profit * o.tauxSociete;
@@ -505,7 +507,7 @@
     const imposable = Math.max(0, majore + autres - (o.reer || 0));
     const ie = o.interetsEtudes || 0;
     const { fed, qc } = impotsDeBase(imposable, imposable, 0, 0,
-      majore * d.creditFederal + ie * P2026.creditInteretsEtudes.federal, majore * d.creditQuebec + ie * P2026.creditInteretsEtudes.quebec);
+      majore * d.creditFederal + ie * P2026.creditInteretsEtudes.federal, majore * (o.creditDividendesQc ?? d.creditQuebec) + ie * P2026.creditInteretsEtudes.quebec);
     const cotisationFss = fss(majore + autres);
     const total = fed + qc + cotisationFss;
     return { revenu: o.revenu, autres, dividendes, imposable, imposableQc: imposable, revenuNetFed: imposable, revenuNetQc: imposable,

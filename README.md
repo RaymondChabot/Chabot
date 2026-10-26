@@ -223,6 +223,10 @@ dossier racine.
   2026). Fonds des services de santé des particuliers : seuils de 18 500 $
   et 64 355 $ (Paramètres du régime d'imposition des particuliers pour
   l'année d'imposition 2026, novembre 2025).
+- Dividendes non déterminés : majoration de 15 %, crédits de 9,0301 %
+  (fédéral) et de 3,42 % (Québec) ; au Québec, 2,69 % dès 2027 dans les
+  projections (bulletin d'information 2026-3, 29 avril 2026). La déduction
+  québécoise pour petite entreprise exige toujours 5 500 heures rémunérées.
 - Scénario réaliste : Normes d'hypothèses de projection 2026 de l'Institut
   de planification financière et de FP Canada.
 - Hypothèques à taux fixe : intérêt composé deux fois par année (Loi sur

@@ -215,5 +215,11 @@ verifier("FSS 2026 : rien jusqu'à 18 500 $, 1 % ensuite", fssDe(18500) === 0 &&
 verifier("FSS 2026 : 150 $ de 33 500 $ à 64 355 $", proche(fssDe(40000), 150, 1e-9) && proche(fssDe(64355), 150, 1e-9));
 verifier("FSS 2026 : 1 % au-delà de 64 355 $, au plus 1 000 $", proche(fssDe(100000), 150 + 356.45, 1e-6) && fssDe(149355) === 1000 && fssDe(300000) === 1000);
 
+/* 17. Dividendes non déterminés : crédit québécois de 3,42 % en 2026, de 2,69 % dès 2027 (bulletin 2026-3). */
+const soc26 = C.impotSociete({ revenu: 250000, depensesPro: 10000, fraisSociete: 4000, tauxSociete: 0.205, retrait: "tout" });
+const soc27 = C.impotSociete({ revenu: 250000, depensesPro: 10000, fraisSociete: 4000, tauxSociete: 0.205, retrait: "tout", creditDividendesQc: 0.0269 });
+verifier("dividendes : dès 2027, l'impôt du Québec monte de 0,73 % du dividende majoré", proche(soc27.qc - soc26.qc, soc26.societe.dividendes * 1.15 * (0.0342 - 0.0269), 0.01)
+  && soc27.fed === soc26.fed);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);
