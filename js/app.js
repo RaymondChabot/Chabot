@@ -86,6 +86,8 @@
       tauxRetrait: 35,
       // Frais de gestion des placements (RFG), en % ; 0 : non précisé.
       frais: 0,
+      // Répartition visée (profil) et part actuelle en actions (null : non précisée).
+      profil: "equilibre", pctActionsCible: 60, pctActionsActuel: null,
     },
     // Catégories du budget où l'on inscrit un seul total plutôt que le détail.
     budgetTotaux: {},
@@ -559,6 +561,11 @@
       { p: "epargne.encaisse", l: "Comptes et encaisse", u: "$", s: 100 },
       { p: "epargne.frais", l: "Frais de gestion de vos placements (RFG)", u: "%", s: 0.05, h: "Sur vos relevés ou le document « Aperçu du fonds ». 0 : non précisé." },
       { p: "epargne.tauxRetrait", l: "Taux d'imposition prévu au retrait du REER", u: "%", s: 1, h: "Pour comparer le REER au CELI : s'il est plus bas que votre taux marginal d'aujourd'hui, le REER rapporte plus." },
+      { g: "Répartition des placements" },
+      { p: "epargne.profil", l: "Profil de placement", t: "select", o: [["prudent", "Prudent : 40 % d'actions"], ["equilibre", "Équilibré : 60 % d'actions"], ["croissance", "Croissance : 80 % d'actions"], ["personnalise", "Personnalisé"]],
+        h: "Selon votre horizon et les baisses que vous tolérez. Le rendement du scénario réaliste (5 %) correspond à un portefeuille équilibré." },
+      { p: "epargne.pctActionsCible", l: "Part visée en actions", u: "%", si: "epargne.profil=personnalise" },
+      { p: "epargne.pctActionsActuel", l: "Part actuelle en actions", u: "%", h: "Sur vos relevés : actions et fonds d'actions, tous comptes confondus." },
       { g: "Biens" },
       { p: "actifs.logement", l: "Votre logement", t: "select", o: [["proprietaire", "Propriétaire"], ["locataire", "Locataire"]], h: "Locataire : le loyer va au budget (Logement) ; aucune maison dans la valeur nette." },
       { p: "actifs.maison.valeur", l: "Valeur de la maison", u: "$", s: 1000, si: "actifs.logement=proprietaire" },
@@ -2210,7 +2217,7 @@
     }));
 
     rendreBilan(R, couple); rendreReel(R, couple); rendreObjectifs(R); rendreProchain(R);
-    rendreIndependance(R, couple); rendreFrais(R); rendrePlans(R); rendreDossier(R); rendreChances(R, couple);
+    rendreIndependance(R, couple); rendreFrais(R); rendreRepartition(R); rendrePlans(R); rendreDossier(R); rendreChances(R, couple);
     rangees("ep-reee", [
       ...R.reee.map((x, i) => {
         const e = S.epargne.reee.enfants[i];
@@ -2253,6 +2260,7 @@
   let R = null;
   function tout() {
     R = calculer();
+    appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
     rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
     if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
   }
@@ -2809,6 +2817,42 @@
   }
 
   /* ============================================================
+     RÉPARTITION DES PLACEMENTS : part visée en actions selon le profil, écart avec la part
+     actuelle, et l'emplacement selon l'impôt de chaque compte : les obligations d'abord dans
+     le REER (l'intérêt est imposé au complet ailleurs), puis la société, le CELIAPP et le CELI ;
+     les actions de croissance d'abord dans le CELI, où la croissance n'est jamais imposée.
+     ============================================================ */
+  const PROFILS_PLACEMENT = { prudent: 40, equilibre: 60, croissance: 80 };
+  function emplacementPlacements(comptes, pctActions) {
+    let obligations = comptes.reduce((t, c) => t + c.solde, 0) * (1 - pctActions / 100);
+    for (const k of ["reer", "societe", "celiapp", "celi"]) {
+      const c = comptes.find(x => x.k === k); if (!c) continue;
+      c.obligations = Math.min(c.solde, obligations); c.actions = c.solde - c.obligations; obligations -= c.obligations;
+    }
+    return comptes;
+  }
+  function rendreRepartition(R) {
+    const z = document.getElementById("pa-repartition"); z.textContent = "";
+    const e = S.epargne, cible = e.profil === "personnalise" ? Math.min(100, Math.max(0, +e.pctActionsCible || 0)) : PROFILS_PLACEMENT[e.profil] ?? 60;
+    const comptes = [
+      { k: "reer", nom: "REER", solde: +e.reer.solde || 0, note: "Obligations d'abord : l'intérêt y échappe à l'impôt. Titres américains : pas de retenue de 15 % sur leurs dividendes." },
+      { k: "celi", nom: "CELI", solde: +e.celi.solde || 0, note: "Actions de croissance : la croissance n'y est jamais imposée." },
+      { k: "celiapp", nom: "CELIAPP", solde: +e.celiapp.solde || 0, note: "Prudent si l'achat de la propriété est dans moins de trois ans." },
+      { k: "societe", nom: "Société", solde: +S.societe.solde || 0, note: "Actions canadiennes et gains en capital, moins imposés. Au-delà de 50 000 $ de revenu passif par année, la déduction fédérale pour petite entreprise diminue." },
+    ].filter(c => c.solde > 0);
+    const total = comptes.reduce((t, c) => t + c.solde, 0);
+    if (!total) { z.appendChild(el("p", "aide", "Inscrivez le solde de vos REER, CELI et CELIAPP (Modifier) : vous verrez quoi placer dans chaque compte selon votre profil.")); return; }
+    emplacementPlacements(comptes, cible);
+    const res = el("p", "resume"), actuel = e.pctActionsActuel;
+    res.textContent = `Visé : ${cible} % d'actions et ${100 - cible} % d'obligations, sur ${$(total)} de placements.`
+      + (actuel != null && actuel !== "" ? (Math.abs(+actuel - cible) < 5 ? ` Aujourd'hui : ${nb(+actuel, 0)} % d'actions, c'est dans la cible.`
+        : ` Aujourd'hui : ${nb(+actuel, 0)} % d'actions ; déplacez environ ${$(Math.abs(+actuel - cible) / 100 * total)} ${+actuel > cible ? "des actions vers les obligations" : "des obligations vers les actions"}.`) : "");
+    z.appendChild(res);
+    z.appendChild(rangees(el("div"), comptes.map(c => ({ titre: c.nom, sous: c.note, valeur: $(c.solde), valeurSous: `Actions ${$(c.actions)} · obligations ${$(c.obligations)}` }))));
+    z.appendChild(el("p", "aide", "Le fonds d'urgence (encaisse) et le REEE suivent leur propre horizon : ils ne sont pas comptés. Rééquilibrez une ou deux fois par année, de préférence avec vos nouvelles cotisations."));
+  }
+
+  /* ============================================================
      DOSSIER POUR MES PROCHES : assurances, testament, documents, personnes-ressources.
      ============================================================ */
   const CHAMPS_DOSSIER = [
@@ -3318,8 +3362,27 @@
 
   /* Pages, avec la page ouverte dans l'adresse (#revenu, #impot…). */
   const ALIAS = { epargne: "avenir", patrimoine: "avenir" };
+  /* Sous-onglets du Budget et du Patrimoine : des pages plus courtes sur téléphone. Le choix est
+     gardé sur cet appareil ; une adresse comme #budget/dettes ouvre directement un sous-onglet. */
+  const SOUS_ONGLETS = {
+    budget: [["mois", "Ce mois-ci"], ["annee", "L'année"], ["dettes", "Dettes"]],
+    avenir: [["aujourdhui", "Aujourd'hui"], ["projection", "Projection"], ["placements", "Placements"], ["proches", "Proches"]],
+  };
+  function sousChoisi(page) {
+    let v = null;
+    try { v = localStorage.getItem("wm.sous." + page); } catch (e) { /* préférence non gardée */ }
+    return SOUS_ONGLETS[page].some(([k]) => k === v) ? v : SOUS_ONGLETS[page][0][0];
+  }
+  function garderSous(page, cle) { try { localStorage.setItem("wm.sous." + page, cle); } catch (e) { /* préférence non gardée */ } }
+  function appliquerSous(page) {
+    const cle = sousChoisi(page);
+    segment(page === "budget" ? "bu-onglets" : "pa-onglets", SOUS_ONGLETS[page], cle, v => { garderSous(page, v); tout(); }, page === "budget" ? "Sections du budget" : "Sections du patrimoine");
+    document.querySelectorAll(`#v-${page} .carte[data-sous]`).forEach(c => c.classList.toggle("hors-onglet", c.dataset.sous !== cle));
+  }
   function ouvrir(nom, sansRendu) {
-    nom = ALIAS[nom] || nom;
+    const [page, sous] = String(nom).split("/");
+    nom = ALIAS[page] || page;
+    if (sous && SOUS_ONGLETS[nom] && SOUS_ONGLETS[nom].some(([k]) => k === sous)) garderSous(nom, sous);
     if (!document.getElementById("v-" + nom)) nom = "apercu";
     document.querySelectorAll(".nav [data-onglet], .barre-haut [data-onglet]").forEach(a => { if (a.dataset.onglet === nom) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     document.querySelectorAll(".vue").forEach(v => { v.hidden = v.id !== "v-" + nom; });

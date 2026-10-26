@@ -97,7 +97,7 @@
         <div class="rangees" id="ap-jalons"></div>
       </div>
       <div class="carte">
-        <div class="carte-tete"><h2>Total des dettes</h2><a class="lien-carte" href="#budget" data-onglet="budget">Voir le plan</a></div>
+        <div class="carte-tete"><h2>Total des dettes</h2><a class="lien-carte" href="#budget/dettes">Voir le plan</a></div>
         <p class="aide" id="ap-dettes-sous"></p>
         <div class="graphique" id="ap-graph-dettes"></div>
       </div>
@@ -191,53 +191,54 @@
       <header class="tete-page"><h1 id="h-budget">Budget</h1><button type="button" class="bouton-modifier" data-feuille="menage">Ménage</button></header>
       <div class="segment" id="bu-vue"></div>
       <div class="hero" id="bu-hero"></div>
-      <div class="carte demi">
+      <div class="onglets" id="bu-onglets"></div>
+      <div class="carte demi" data-sous="mois">
         <div class="carte-tete"><h2>Revenus nets</h2><span class="carte-sous">Par mois</span></div>
         <div class="rangees" id="bu-revenus"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="annee">
         <div class="carte-tete"><h2>Votre surplus au fil des ans</h2><span class="carte-sous">Par mois</span></div>
         <div class="graphique" id="bu-surplus-graph"></div>
         <div class="rangees" id="bu-surplus"></div>
         <p class="aide" id="bu-surplus-note"></p>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="mois">
         <div class="carte-tete"><h2>Reste à dépenser librement</h2><span class="carte-sous">Par mois, votre part</span></div>
         <div id="bu-reste"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="mois">
         <div class="carte-tete"><h2>Bilan du mois</h2><span class="carte-sous">Réel et budget</span></div>
         <div id="bu-bilan"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="annee">
         <div class="carte-tete"><h2>Bilan de l'année</h2><div class="segment petit compact" id="bu-annee-choix"></div></div>
         <div id="bu-annee"></div>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="annee">
         <div class="carte-tete"><h2>L'année en un coup d'œil</h2><span class="carte-sous">Votre part</span></div>
         <div class="flux" id="bu-flux"></div>
         <p class="aide" id="bu-flux-sources"></p>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="annee">
         <div class="carte-tete"><h2>Trésorerie des 12 prochains mois</h2><span class="carte-sous">Votre compte</span></div>
         <p class="resume" id="bu-tresorerie-resume"></p>
         <div class="graphique" id="bu-tresorerie-graph"></div>
         <div class="rangees" id="bu-tresorerie"></div>
         <p class="aide" id="bu-tresorerie-note"></p>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="mois">
         <div class="carte-tete"><h2>Dépenses</h2><span class="carte-sous">Par mois</span></div>
         <div class="rangees" id="bu-depenses"></div>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="annee">
         <div class="carte-tete"><h2>Dépenses annuelles</h2><button type="button" class="lien-carte" id="bu-annuelles-modifier">Calendrier</button></div>
         <div id="bu-annuelles"></div>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="dettes">
         <div class="carte-tete"><h2>Dettes</h2><span class="carte-sous">Solde</span></div>
         <div class="rangees" id="bu-dettes"></div>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="dettes">
         <div class="carte-tete"><h2>Plan de remboursement</h2><button type="button" class="lien-carte" data-feuille="strategie">Modifier</button></div>
         <p class="resume" id="de-resume"></p>
         <div class="legende" id="de-legende"></div>
@@ -250,7 +251,7 @@
         </div>
         <div class="actions"><button type="button" class="bouton secondaire petit" id="exporter-plan">Exporter le plan mois par mois (CSV)</button></div>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="dettes">
         <div class="carte-tete"><h2>Choisir la méthode</h2><span class="carte-sous">Valeur nette</span></div>
         <div class="rangees" id="de-methodes"></div>
         <p class="aide" id="de-methodes-note"></p>
@@ -263,64 +264,69 @@
       <div class="segment" id="vn-scenario"></div>
       <p class="aide hyp-ligne" id="vn-hyp"></p>
       <div class="hero" id="vn-hero"></div>
-      <div class="carte">
+      <div class="onglets" id="pa-onglets"></div>
+      <div class="carte" data-sous="aujourdhui">
         <div class="carte-tete"><h2>Bilan d'aujourd'hui</h2><span class="carte-sous" id="pa-bilan-sous"></span></div>
         <div class="bilan" id="pa-bilan"></div>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="projection">
         <div class="carte-tete"><h2>Valeur nette projetée</h2><div class="segment petit compact" id="vn-vue"></div></div>
         <div class="legende" id="vn-legende"></div>
         <div class="graphique" id="vn-graph"></div>
         <div class="segment petit compact horizon" id="vn-horizon"></div>
         <p class="aide" id="vn-note"></p>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="aujourdhui">
         <div class="carte-tete"><h2>Réel comparé au plan</h2></div>
         <div id="pa-reel"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="aujourdhui">
         <div class="carte-tete"><h2>Vos objectifs</h2></div>
         <div id="pa-objectifs"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="aujourdhui">
         <div class="carte-tete"><h2>Où mettre le prochain 1 000 $ ?</h2><span class="carte-sous">Dans 10 ans</span></div>
         <div id="pa-prochain"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="projection">
         <div class="carte-tete"><h2>Indépendance financière</h2><button type="button" class="lien-carte" id="pa-independance-modifier">Modifier</button></div>
         <div id="pa-independance"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="placements">
         <div class="carte-tete"><h2>Frais de gestion</h2><button type="button" class="lien-carte" data-feuille="epargne">Modifier</button></div>
         <div id="pa-frais"></div>
       </div>
-      <div class="carte">
+      <div class="carte demi" data-sous="placements">
+        <div class="carte-tete"><h2>Répartition des placements</h2><button type="button" class="lien-carte" data-feuille="epargne">Modifier</button></div>
+        <div id="pa-repartition"></div>
+      </div>
+      <div class="carte" data-sous="projection">
         <div class="carte-tete"><h2>Probabilité de réussite</h2><button type="button" class="lien-carte" data-feuille="hypotheses">Hypothèses</button></div>
         <div id="pa-chances"></div>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="projection">
         <div class="carte-tete"><h2>Comparer deux plans</h2></div>
         <div id="pa-plans"></div>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="projection">
         <div class="carte-tete"><h2>De quoi elle est faite</h2></div>
         <div class="tableau-defile"><table class="tableau" id="vn-composition"></table></div>
         <p class="aide" id="vn-composition-note"></p>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="projection">
         <div class="carte-tete"><h2>Selon le scénario</h2><button type="button" class="lien-carte" data-feuille="hypotheses">Hypothèses</button></div>
         <div class="rangees" id="vn-scenarios"></div>
         <p class="aide">Le scénario réaliste suit les Normes d'hypothèses de projection 2026 de l'Institut de planification financière et de FP Canada : inflation 2,1 %, immobilier résidentiel 3,1 %, salaires 3,1 %, actions de 6,3 à 7,5 % avant frais. Prudent et optimiste encadrent ces normes, comme le recommandent les planificateurs financiers.</p>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="placements">
         <div class="carte-tete"><h2>REEE des enfants</h2><span class="carte-sous">À 17 ans</span></div>
         <div class="rangees" id="ep-reee"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi" data-sous="placements">
         <div class="carte-tete"><h2>REER</h2></div>
         <div id="ep-reer"></div>
       </div>
-      <div class="carte">
+      <div class="carte" data-sous="proches">
         <div class="carte-tete"><h2>Si quelque chose m'arrive</h2><span class="carte-sous">Dossier pour vos proches</span></div>
         <div id="pa-dossier"></div>
       </div>

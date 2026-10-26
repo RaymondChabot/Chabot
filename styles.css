@@ -304,6 +304,14 @@ a.tuile:hover { border-color: var(--trait); }
 }
 .segment button[aria-checked="true"] { background: var(--surface); color: var(--encre); font-weight: 600; box-shadow: 0 1px 3px rgba(18, 18, 17, 0.12); }
 .segment.petit button { padding: 7px 8px; font-size: 0.84rem; }
+/* Sous-onglets du Budget et du Patrimoine : soulignés, pour ne pas les confondre avec les choix (segments). */
+.onglets { display: flex; gap: 2px; margin: 2px 0 4px; border-bottom: 1px solid var(--ligne); overflow-x: auto; scrollbar-width: none; }
+.onglets::-webkit-scrollbar { display: none; }
+.onglets:empty { display: none; }
+.onglets button { flex: 1 0 auto; padding: 11px 8px 9px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--discret);
+  font: inherit; font-size: 0.93rem; white-space: nowrap; cursor: pointer; }
+.onglets button[aria-checked="true"] { color: var(--encre); font-weight: 650; border-bottom-color: var(--marque); }
+.carte.hors-onglet { display: none !important; }
 .segment.compact { flex: none; }
 .segment.compact button { flex: 1 0 auto; padding: 5px 12px; font-size: 0.8rem; }
 .hyp-ligne { margin-top: -4px; padding: 0 4px; }

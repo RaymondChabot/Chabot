@@ -250,11 +250,52 @@ async function logo(b, base) {
   await ctx.close();
 }
 
+/* 11. Sous-onglets : Budget et Patrimoine montrent une partie à la fois ; un lien peut viser un onglet. */
+async function sousOnglets(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "budget" });
+  const visibles = page => p.evaluate(pg => [...document.querySelectorAll(`#v-${pg} .carte[data-sous]`)]
+    .filter(c => getComputedStyle(c).display !== "none").map(c => c.dataset.sous), page);
+  const budgetMois = await visibles("budget");
+  verifier("sous-onglets : Budget s'ouvre sur « Ce mois-ci »", budgetMois.length > 0 && budgetMois.every(s => s === "mois"), budgetMois);
+  await p.click("#bu-onglets button:nth-child(2)"); await p.waitForTimeout(200);
+  const annee = await p.evaluate(() => { const s = document.querySelector("#bu-tresorerie-graph svg"); return s ? +s.getAttribute("width") : 0; });
+  verifier("sous-onglets : « L'année » affiche la trésorerie", (await visibles("budget")).every(s => s === "annee") && annee > 200, annee);
+  await allerA(p, "apercu");
+  await allerA(p, "budget/dettes");
+  const dettes = await visibles("budget");
+  verifier("sous-onglets : #budget/dettes ouvre les dettes", dettes.length > 0 && dettes.every(s => s === "dettes") && await p.evaluate(() => location.hash) === "#budget", dettes);
+  await allerA(p, "avenir");
+  const parOnglet = {};
+  for (const [i, cle] of ["aujourdhui", "projection", "placements", "proches"].entries()) {
+    await p.click(`#pa-onglets button:nth-child(${i + 1})`); await p.waitForTimeout(150);
+    const v = await visibles("avenir"); parOnglet[cle] = v.length;
+    verifier(`sous-onglets : Patrimoine « ${cle} »`, v.length > 0 && v.every(s => s === cle), v);
+  }
+  // Chaque carte appartient à un onglet : la somme des onglets égale le nombre de cartes.
+  const total = await p.evaluate(() => document.querySelectorAll("#v-avenir .carte[data-sous]").length);
+  verifier("sous-onglets : aucune carte oubliée", Object.values(parOnglet).reduce((a, n) => a + n, 0) === total, { parOnglet, total });
+  await p.reload(); await pret(p);
+  verifier("sous-onglets : l'onglet choisi est gardé", (await visibles("avenir")).every(s => s === "proches"));
+  verifier("sous-onglets : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
+/* 12. Répartition des placements : le profil donne la cible ; les obligations vont d'abord au REER. */
+async function repartition(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "avenir" });
+  await remplacer(p, { "epargne.reer.solde": 20000, "epargne.celi.solde": 20000, "epargne.profil": "equilibre", "epargne.pctActionsActuel": 75 });
+  const t = await p.evaluate(() => document.getElementById("pa-repartition").textContent.replace(/\s/g, " "));
+  verifier("répartition : cible de 60 % en actions", t.includes("60 %"), t);
+  verifier("répartition : écart avec la part actuelle", /déplacez environ/.test(t), t);
+  verifier("répartition : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

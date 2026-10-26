@@ -80,6 +80,14 @@ Revenu affiche tous les détails.
 - **Indépendance financière et jalons** : placements visés (25 fois les
   dépenses), année atteinte et âge ; jalons personnels avec la valeur nette
   projetée. **Frais de gestion** : leur coût sur l'horizon.
+- **Répartition des placements** : part en actions visée selon le profil
+  (prudent, équilibré, croissance), obligations placées d'abord dans le
+  REER, puis la société, le CELIAPP et le CELI ; écart avec la part actuelle
+  et montant à déplacer.
+- **Sous-onglets** : Budget (Ce mois-ci, L'année, Dettes) et Patrimoine
+  (Aujourd'hui, Projection, Placements, Proches) montrent une partie à la
+  fois ; l'onglet choisi est gardé et un lien peut en viser un
+  (« #budget/dettes »).
 - **Dossier pour mes proches** : assurances (besoin d'assurance vie
   estimé, part du revenu remplacée en invalidité), testament, mandat,
   documents et personnes-ressources ; une page du rapport PDF.
