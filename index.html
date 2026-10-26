@@ -53,12 +53,12 @@
 
 <!-- Barre du haut (téléphone) -->
 <header class="barre-haut">
-  <a class="marque" href="#apercu" aria-label="WealthMorand : accueil"><svg class="marque-ico" aria-hidden="true"><use href="#wm-arbre"/></svg><svg class="marque-nom" aria-hidden="true"><use href="#wm-nom"/></svg></a>
+  <a class="marque" href="#apercu" aria-label="WealthMorand : aperçu"><svg class="marque-ico" aria-hidden="true"><use href="#wm-arbre"/></svg><svg class="marque-nom" aria-hidden="true"><use href="#wm-nom"/></svg></a>
   <div class="barre-actions">
   <button type="button" class="bouton-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer</span></button>
   <button type="button" class="bouton-icone" data-bascule-theme aria-label="Changer de thème"></button>
-  <a class="bouton-icone" href="#donnees" data-onglet="donnees" aria-label="Données et confidentialité">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg>
+  <a class="bouton-icone bouton-donnees" href="#donnees" data-onglet="donnees" aria-label="Données et confidentialité">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg><span>Données</span>
   </a>
   </div>
 </header>
@@ -67,7 +67,7 @@
   <!-- Navigation : barre du bas sur téléphone, colonne à gauche sur ordinateur -->
   <nav class="nav" aria-label="Sections">
     <a class="marque nav-marque" href="#apercu" aria-label="WealthMorand : accueil"><svg class="nav-sceau" aria-hidden="true"><use href="#wm-sceau"/></svg></a>
-    <a href="#apercu" data-onglet="apercu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7V20a.5.5 0 0 1-.5.5h-5v-6h-6v6H4a.5.5 0 0 1-.5-.5Z"/></svg><span>Accueil</span></a>
+    <a href="#apercu" data-onglet="apercu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7V20a.5.5 0 0 1-.5.5h-5v-6h-6v6H4a.5.5 0 0 1-.5-.5Z"/></svg><span>Aperçu</span></a>
     <a href="#revenu" data-onglet="revenu"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="13" rx="2.5"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7M12 11.5v4M10 13.5h4"/></svg><span>Revenu</span></a>
     <a href="#impot" data-onglet="impot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4Z"/><path d="M9.5 9.5h.01M14.5 14.5h.01M15 9l-6 6"/></svg><span>Impôt</span></a>
     <a href="#budget" data-onglet="budget"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16.5" height="11.5" rx="2.5"/><path d="M16 13.75h.01"/></svg><span>Budget</span></a>
@@ -99,11 +99,11 @@
         <div id="ap-portrait-liste"></div>
         <div class="actions"><button type="button" class="bouton" id="ap-portrait-suite">Continuer</button></div>
       </div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>Ce mois-ci</h2><span class="carte-sous">Votre part</span></div>
         <div id="ap-flux"></div>
       </div>
-      <div class="tuiles" id="ap-tuiles"></div>
+      <div class="tuiles demi" id="ap-tuiles"></div>
       <div class="carte">
         <div class="carte-tete"><h2>À faire</h2></div>
         <ul class="a-faire" id="ap-actions"></ul>
@@ -142,12 +142,12 @@
         <div class="carte-tete"><h2>Votre année en chiffres</h2></div>
         <div class="rangees" id="rv-faits"></div>
       </div>
-      <div class="carte" id="rv-carte-activites">
+      <div class="carte demi" id="rv-carte-activites">
         <div class="carte-tete"><h2>Activités en établissement</h2></div>
         <div id="rv-activites"></div>
         <div class="actions"><button type="button" class="bouton secondaire" id="rv-ajout-activite">Ajouter une activité</button></div>
       </div>
-      <div class="carte" id="rv-carte-autres">
+      <div class="carte demi" id="rv-carte-autres">
         <div class="carte-tete"><h2>Autres revenus</h2><button type="button" class="lien-carte" id="rv-autres-modifier">Modifier</button></div>
         <div id="rv-autres"></div>
       </div>
@@ -188,12 +188,12 @@
         <div class="tableau-defile"><table class="tableau" id="im-tableau"></table></div>
         <p class="aide" id="im-tableau-note"></p>
       </div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>Pour votre comptable</h2></div>
         <p class="aide">Une page à imprimer ou à enregistrer en PDF : revenus et déductions, impôt estimé, acomptes et échéances, documents à rassembler et points à valider ensemble.</p>
         <div class="actions"><button type="button" class="bouton secondaire" data-comptable>Sommaire pour le comptable</button></div>
       </div>
-      <div class="carte">
+      <div class="carte demi">
         <div class="carte-tete"><h2>Dépenses professionnelles</h2><button type="button" class="lien-carte" id="im-pro-modifier">Modifier</button></div>
         <div id="im-pro"></div>
       </div>
@@ -201,11 +201,11 @@
         <div class="carte-tete"><h2>Famille et couple</h2><button type="button" class="lien-carte" data-feuille="menage">Modifier</button></div>
         <div id="im-famille"></div>
       </div>
-      <details class="carte carte-repliable">
+      <details class="carte demi carte-repliable">
         <summary><h2>Et avec une société ?</h2><span class="repli-resume" id="im-societe-resume"></span></summary>
         <div id="im-societe"></div>
       </details>
-      <details class="carte carte-repliable">
+      <details class="carte demi carte-repliable">
         <summary><h2>Vérification officielle</h2><span class="repli-resume" id="im-verif-resume"></span></summary>
         <div id="im-verif"></div>
       </details>

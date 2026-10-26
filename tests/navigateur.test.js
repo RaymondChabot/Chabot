@@ -613,11 +613,31 @@ async function acomptesCeliapp(b, base) {
   await ctx.close();
 }
 
+/* 24. Finitions : « Aperçu » partout, bouton Données nommé (icône seule sous 360 px), fondu des sous-onglets qui
+   débordent, texte de la barre du bas d'au moins 12 px, axe de projection qui ne descend pas d'un pas entier sous zéro. */
+async function finitions(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "avenir/projection" });
+  const r = await p.evaluate(() => ({
+    nav: document.querySelector('.nav [data-onglet="apercu"]').textContent.trim(), titre: document.getElementById("h-apercu").textContent.trim(),
+    donnees: getComputedStyle(document.querySelector(".bouton-donnees span")).display, taille: parseFloat(getComputedStyle(document.querySelector(".nav a")).fontSize),
+    fondu: document.getElementById("pa-onglets").classList.contains("defile-plus"),
+    axe: [...document.querySelectorAll("#v-avenir .graphique .etiquette")].map(t => t.textContent).filter(t => /M\$|k\$|^0 \$$/.test(t)) }));
+  verifier("finitions : « Aperçu » dans la navigation et en titre", r.nav === "Aperçu" && r.titre === "Aperçu", r);
+  verifier("finitions : bouton Données nommé à 390 px", r.donnees !== "none", r.donnees);
+  verifier("finitions : barre du bas en 12 px au moins", r.taille >= 12, r.taille);
+  verifier("finitions : fondu des sous-onglets qui débordent", r.fondu);
+  verifier("finitions : l'axe de projection ne descend pas à −1 M$", r.axe.length > 0 && !r.axe.some(t => t.startsWith("-") || t.startsWith("−")), r.axe);
+  await p.setViewportSize({ width: 320, height: 700 }); await p.waitForTimeout(200);
+  verifier("finitions : icône seule sous 360 px", (await p.evaluate(() => getComputedStyle(document.querySelector(".bouton-donnees span")).display)) === "none");
+  verifier("finitions : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

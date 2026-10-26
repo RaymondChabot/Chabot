@@ -1663,7 +1663,12 @@ window.Verrou.quandOuvert(function () {
     // Sigles de la RAMQ : définition au toucher, dans les pages et le panneau ouvert.
     lexique(document.querySelector("main"), LEXIQUE);
     if (feuille.open) lexique(corps, LEXIQUE);
+    document.querySelectorAll(".onglets").forEach(indiceDefilement);
   }
+  // Sous-onglets qui débordent : un fondu au bord droit, tant qu'il reste des onglets à voir.
+  function indiceDefilement(o) { o.classList.toggle("defile-plus", o.scrollLeft + o.clientWidth < o.scrollWidth - 2); }
+  document.addEventListener("scroll", e => { if (e.target.classList && e.target.classList.contains("onglets")) indiceDefilement(e.target); }, { capture: true, passive: true });
+  window.addEventListener("resize", () => document.querySelectorAll(".onglets").forEach(indiceDefilement));
 
   /* ============================================================
      RESTE À DÉPENSER LIBREMENT : le revenu net, moins les dépenses fixes, les
