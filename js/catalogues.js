@@ -26,6 +26,7 @@
       demiJourneesSRV: 1, patientsSRV: 12,
       residents: 0, patientsPendantSupervision: 0, autresRevenus: 0,
       inscritsDebut: 0, nouveauxGuichet: 500, nouveauxSansMedecin: 0, nouveauxTransferes: 0,
+      nouveauxAnGuichet: 0, nouveauxAnSansMedecin: 0,   // année type : nouveaux patients par année, à la place des départs
       semainesArrivee: 38, partVulnerable: 20, partGroupe2: 0, partGroupe34: 0, assiduite80: true, anneePratique: "5", membreGmf: true, pctPatientsVus: 80,
       mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 },
       grossessesAn: null,   // grossesses prises en charge au premier trimestre ; vide : estimées d'après les suivis
@@ -347,6 +348,9 @@
       { p: "revenu.nouveauxSansMedecin", l: "Nouveaux patients sans médecin, hors guichet", u: "pat.", si: "details", h: "Par exemple, les patients d'un médecin retraité qui a avisé la RAMQ. Ils donnent droit au supplément." },
       { p: "revenu.nouveauxTransferes", l: "Patients transférés, déjà inscrits ailleurs", u: "pat.", si: "details", h: "Pas de supplément." },
       { p: "revenu.semainesArrivee", l: "Arrivée des nouveaux patients étalée sur", u: "sem.", si: "details" },
+      { p: "revenu.nouveauxAnGuichet", l: "Année type : nouveaux patients du guichet par année", u: "pat./an", si: "details",
+        h: "Les années suivantes, à la place des patients qui partent : la clientèle reste stable. Chacun donne son supplément d'inscription et une visite de prise en charge." },
+      { p: "revenu.nouveauxAnSansMedecin", l: "Année type : nouveaux patients sans médecin, hors guichet, par année", u: "pat./an", si: "details" },
       { p: "revenu.assiduite80", l: "Taux d'assiduité de 80 % ou plus", t: "check", si: "details", h: "Condition des suppléments au volume : par patient au-delà de 500 inscrits et de 200 vulnérables (EP 40, par. 15.01 et 15.03)." },
       { g: "Frais de cabinet" },
       { p: "revenu.fraisCabinetPct", l: "Part de la facturation remise à la clinique", u: "%", s: 0.5, h: "À l'acte : loyer, personnel, équipement, DMÉ. Souvent de 25 à 35 % en clinique privée." },

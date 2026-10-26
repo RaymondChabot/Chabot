@@ -245,6 +245,10 @@
     const maj = 1 + (r.majorationPct || 0) / 100;
 
     const nouveaux = premiere ? r.nouveauxGuichet + r.nouveauxSansMedecin + r.nouveauxTransferes : 0;
+    // Année type : de nouveaux patients chaque année, qui remplacent les départs (la clientèle reste stable).
+    // Ils donnent leurs suppléments d'inscription et une visite de prise en charge.
+    const anGuichet = premiere ? 0 : Math.max(0, +r.nouveauxAnGuichet || 0), anSansMedecin = premiere ? 0 : Math.max(0, +r.nouveauxAnSansMedecin || 0);
+    const remplacements = (anGuichet + anSansMedecin) / Math.max(1, W);
     const etalement = Math.max(1, Math.min(W, r.semainesArrivee || W));
     let inscrits = premiere ? r.inscritsDebut : r.inscritsDebut + r.nouveauxGuichet + r.nouveauxSansMedecin + r.nouveauxTransferes;
     const inscritsDepart = inscrits;
@@ -260,7 +264,7 @@
       if (palier) semainesPalierHaut++;
       const arrivees = k < etalement ? nouveaux / etalement : 0;
       const visitesSem = C * r.patientsParDJ;
-      const pec = Math.min(arrivees, visitesSem);
+      const pec = Math.min(arrivees + remplacements, visitesSem);
       const tarifPec = nv * TF.pecNonVuln[palier] + (v + vt) * TF.pecVuln[palier];
       const tv = tarifVisite(r.mix, palier, TF);
       visitesMixte += pec * tarifPec + (visitesSem - pec) * tv + T * (r.patientsPendantSupervision || 0) * tv;
@@ -279,15 +283,13 @@
     // Forfaits, suppléments et montants liés au volume : identiques dans tous les modes.
     const forfaitInscription = inscritsFin * m("forfaitInscription") * maj;   // payé en entier (EP 40, par. 4.08)
     const forfaitVulnerable = (inscritsDepart * forfaitAnnuel + forfaitVulnNouveaux) * maj;
-    let supplements = 0;
-    if (premiere) {
-      // Patient sans médecin de famille : non vulnérable (19957), vulnérable hors guichet (19958),
-      // vulnérable du guichet (19959), très vulnérable du guichet (19960).
-      supplements += r.nouveauxGuichet * (nv * m("suppNonVulnerable") + v * m("suppVulnerableGuichet") + vt * m("suppTresVulnerable"));
-      supplements += r.nouveauxSansMedecin * (nv * m("suppNonVulnerable") + (v + vt) * m("suppVulnerableHorsGuichet"));
-      // Prime d'inscription individuelle d'une entente ponctuelle, par nouveau patient (0 si aucune).
-      supplements += (r.nouveauxGuichet + r.nouveauxSansMedecin) * (r.primeInscription || 0);
-    }
+    // Patient sans médecin de famille : non vulnérable (19957), vulnérable hors guichet (19958),
+    // vulnérable du guichet (19959), très vulnérable du guichet (19960).
+    const suppNouveaux = (guichet, sansMedecin) => guichet * (nv * m("suppNonVulnerable") + v * m("suppVulnerableGuichet") + vt * m("suppTresVulnerable"))
+      + sansMedecin * (nv * m("suppNonVulnerable") + (v + vt) * m("suppVulnerableHorsGuichet"));
+    let supplements = premiere ? suppNouveaux(r.nouveauxGuichet, r.nouveauxSansMedecin) : suppNouveaux(anGuichet, anSansMedecin);
+    // Prime d'inscription individuelle d'une entente ponctuelle, par nouveau patient de la première année (0 si aucune).
+    if (premiere) supplements += (r.nouveauxGuichet + r.nouveauxSansMedecin) * (r.primeInscription || 0);
     const detailVolume = montantsVolume(inscritsFin, vulnerablesFin, r.assiduite80 !== false), volume = detailVolume.total;
     // Forfait GMF : chaque nouveau patient à son inscription, et les inscrits vus au moins une fois dans l'année.
     const patientsVus = nouveaux + inscritsDepart * borne((r.pctPatientsVus ?? 80) / 100, 0, 1);

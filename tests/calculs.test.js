@@ -264,5 +264,16 @@ verifier("garde : au plus 528 h à 94 %", C.revenuGmfu({ ...rev, heuresMax100: 1
 verifier("garde : sous le plafond, tout à 100 %", proche(C.revenuGmfu({ ...rev, heuresMax100: 5000, heuresGardeSurPlace: 200 }).horaire.heures, (hc + 200) * 99.48, 1e-6));
 verifier("garde : le mixte et l'acte ne changent pas", avecGardeH.mixte.total === sansGardeH.mixte.total && avecGardeH.acte.total === sansGardeH.acte.total);
 
+/* 22. Année type : de nouveaux patients par année remplacent les départs. Clientèle stable ; chacun donne son
+   supplément d'inscription (19957 à 19960) et une visite de prise en charge. Rien de tel la première année. */
+const anBase = C.revenuGmfu(rev), anNouv = C.revenuGmfu({ ...rev, nouveauxAnGuichet: 40, nouveauxAnSansMedecin: 10 });
+const LM = C.montantsLieu(C.lieuTarifs(rev), 1);
+const suppAttendus = 40 * (0.8 * LM.suppNonVulnerable + 0.2 * LM.suppVulnerableGuichet) + 10 * (0.8 * LM.suppNonVulnerable + 0.2 * LM.suppVulnerableHorsGuichet);
+verifier("année type : suppléments des nouveaux patients", proche(anNouv.horaire.supplements - anBase.horaire.supplements, suppAttendus, 1e-6), { ecart: anNouv.horaire.supplements - anBase.horaire.supplements, suppAttendus });
+verifier("année type : clientèle stable, 50 prises en charge", anNouv.inscritsFin === anBase.inscritsFin && proche(anNouv.nbPriseEnCharge - anBase.nbPriseEnCharge, 50, 1e-9));
+verifier("année type : la prise en charge paie plus qu'un suivi, à l'acte", anNouv.acte.total > anBase.acte.total + suppAttendus);
+const prem = { ...rev, annee: "premiere", inscritsDebut: 0, nouveauxGuichet: 300 };
+verifier("première année : pas de nouveaux patients « par année »", C.revenuGmfu({ ...prem, nouveauxAnGuichet: 40 }).acte.total === C.revenuGmfu(prem).acte.total);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

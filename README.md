@@ -47,7 +47,9 @@ Revenu affiche tous les détails.
   sans rendez-vous (au mixte et à l'acte, chaque patient est payé au tarif
   de la visite ponctuelle, mineure ou complexe, plus bas qu'un suivi),
   patients, prise en charge
-  de nouveaux patients, patients vulnérables et très vulnérables. En GMF-U :
+  de nouveaux patients (la première année ; puis, l'année type, ceux qui
+  remplacent les départs, avec leurs suppléments d'inscription), patients
+  vulnérables et très vulnérables. En GMF-U :
   résidents (4 à 5 patients par demi-journée) et externes (2 à 3),
   demi-per diem selon le lieu et la région ; au mixte, intervention de
   supervision ou visites des apprenants ; à l'acte, visites des
