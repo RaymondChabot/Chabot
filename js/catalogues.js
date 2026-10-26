@@ -498,9 +498,32 @@
     ],
   });
 
+  /* ============================================================
+     LEXIQUE : sigles et termes de la RAMQ, expliqués au toucher (lexique() d'interface.js).
+     Les montants viennent des mêmes constantes que le calcul.
+     ============================================================ */
+  const fr2 = x => x.toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const RQ = C.RAMQ, CAB = C.MONTANTS_LIEU.cabinet, ETAB = C.MONTANTS_LIEU.etablissement;
+  const LEXIQUE = [
+    { termes: ["EP 40"], def: "Entente particulière 40 : médecine de famille, prise en charge et suivi de la clientèle. Elle fixe l'inscription, les forfaits, les suppléments, la majoration de pratique polyvalente et la compensation des frais de cabinet.", ref: "Brochure no 1 de la RAMQ" },
+    { termes: ["EP 42"], def: "Entente particulière 42 : médecin enseignant. Elle paie la supervision des résidents et des externes au demi-per diem, selon la liste du lieu de formation.", ref: "Brochure no 1 de la RAMQ" },
+    { termes: ["EP 33"], def: `Entente particulière 33 : groupe de médecine de famille (GMF). Elle prévoit le forfait de prise en charge et de suivi en GMF (code 08875), ${fr2(RQ.forfaitGmf)} $ par patient inscrit vu dans l'année.`, ref: "EP 33, annexe V" },
+    { termes: ["DMÉ"], def: "Dossier médical électronique. L'EP 40 compense les frais de sa licence : 459,90 $ par trimestre, plus 287,45 $ hors GMF, dès 150 patients inscrits ; la première année du permis, sans égard au nombre.", ref: "EP 40, par. 17.01" },
+    { termes: ["demi-per diem", "per diem"], def: "Montant fixe par demi-journée où le médecin supervise un résident ou un externe. Il varie selon le lieu et la liste du lieu de formation.", ref: "EP 42, par. 5.01 et 5.02" },
+    { termes: ["SRV", "sans rendez-vous"], def: "Plages où l'on voit des patients qui n'ont pas pris rendez-vous, inscrits ou non." },
+    { termes: ["pratique polyvalente"], def: "Majoration de 2,5 %, 5 % ou 10 % de la rémunération à l'urgence, à l'hospitalisation, en CHSLD, en obstétrique, en soins palliatifs et dans d'autres secteurs visés, selon le nombre de patients inscrits (700, 1 000 ou 1 500 ; seuils plus bas les quatre premières années).", ref: "EP 40, par. 16.00" },
+    { termes: ["patients vulnérables", "patient vulnérable", "vulnérables", "vulnérable"], def: `Patient inscrit qui a un problème de santé reconnu par l'EP 40. Un forfait annuel s'ajoute : ${fr2(CAB.forfaitVulnerable)} $ en cabinet, ${fr2(ETAB.forfaitVulnerable)} $ en établissement, majoré selon le groupe.`, ref: "EP 40, par. 6.01" },
+    { termes: ["forfaits d'inscription", "forfait d'inscription"], def: `Montant annuel versé pour chaque patient inscrit : ${fr2(CAB.forfaitInscription)} $ en cabinet, ${fr2(ETAB.forfaitInscription)} $ en établissement.`, ref: "EP 40, par. 4.01 et 4.08" },
+    { termes: ["onglet B"], def: "Partie du Manuel de rémunération à l'acte qui donne le tarif de chaque visite.", ref: "Manuel de rémunération à l'acte de la RAMQ" },
+    { termes: ["taux horaire"], def: `Rémunération à l'heure : ${fr2(RQ.tarifHoraire)} $, payée à 100 % jusqu'à ${RQ.heuresMax100.toLocaleString("fr-CA")} heures par année, puis à ${C.PCT_AU_DELA.toLocaleString("fr-CA")} %.`, ref: "Brochure no 1, annexe XIV" },
+    { termes: ["taux mixte"], def: `Rémunération mixte : un forfait de ${fr2(RQ.forfaitHoraireMixte)} $ l'heure, plus ${fr2(RQ.pctMixte)} % du tarif de chaque visite.`, ref: "Brochure no 1, annexe XXIII" },
+    { termes: ["guichet"], def: "Guichet d'accès à un médecin de famille : il attribue des patients sans médecin. Inscrire un patient attribué donne droit à un supplément.", ref: "EP 40, par. 4.12 et 13.01" },
+    { termes: ["GMF-U"], def: "Groupe de médecine de famille universitaire : un GMF qui forme des résidents en médecine familiale." },
+  ];
+
   window.WM = window.WM || {};
   window.WM.catalogues = {
-    EXEMPLE, nouvelId, CATALOGUE, CATALOGUE_REVENUS, ITEMS_REVENUS, normaliserLignes, annuelLigne, estPro, nomLigne,
+    EXEMPLE, nouvelId, CATALOGUE, CATALOGUE_REVENUS, ITEMS_REVENUS, normaliserLignes, annuelLigne, estPro, nomLigne, LEXIQUE,
     CATALOGUE_PRO, ITEMS_PRO, normaliserPro, ITEMS, AIDE_CATEGORIE, normaliserBudget, nomDepense, categorie,
     VERIFICATION, MILIEUX, ACTIVITES, nomActivite, champs,
   };

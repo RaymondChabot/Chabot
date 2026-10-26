@@ -8,9 +8,9 @@ window.Verrou.quandOuvert(function () {
   const CLE = "boussole.v1";
   // Valeurs de départ, catalogues et champs (catalogues.js) ; formats, composants et graphique (interface.js).
   const { EXEMPLE, nouvelId, CATALOGUE, ITEMS_REVENUS, normaliserLignes, annuelLigne, estPro, nomLigne, ITEMS_PRO, normaliserPro, AIDE_CATEGORIE,
-    normaliserBudget, nomDepense, categorie, VERIFICATION, MILIEUX, ACTIVITES, nomActivite } = window.WM.catalogues;
+    normaliserBudget, nomDepense, categorie, VERIFICATION, MILIEUX, ACTIVITES, nomActivite, LEXIQUE } = window.WM.catalogues;
   const { SERIES, $, $2, nb, pct, signe, texteDe, moisAn, el, icone, hero, puce, rangees, segment, tableauSimple, lignes, moins, signePct,
-    graphiqueLignes } = window.WM.interface;
+    graphiqueLignes, lexique } = window.WM.interface;
 
   // Dépenses prises en compte : les lignes, sauf dans les catégories où l'on a choisi un total.
   const totalActif = g => S.budgetTotaux && S.budgetTotaux[g] && S.budgetTotaux[g].actif;
@@ -204,7 +204,7 @@ window.Verrou.quandOuvert(function () {
   function ouvrirFeuille(titre, construire) {
     feuilleCourante = { titre, construire, maj: null };
     titreFeuille.textContent = titre; corps.textContent = "";
-    construire(corps); remplirChamps();
+    construire(corps); remplirChamps(); lexique(corps, LEXIQUE);
     if (!feuille.open) feuille.showModal();
     corps.scrollTop = 0;
   }
@@ -212,7 +212,7 @@ window.Verrou.quandOuvert(function () {
   function reconstruireFeuille() {
     if (!feuilleCourante || !feuille.open) return;
     const y = corps.scrollTop;
-    corps.textContent = ""; feuilleCourante.construire(corps); remplirChamps();
+    corps.textContent = ""; feuilleCourante.construire(corps); remplirChamps(); lexique(corps, LEXIQUE);
     corps.scrollTop = y;
   }
   feuille.addEventListener("close", () => {
@@ -1614,6 +1614,9 @@ window.Verrou.quandOuvert(function () {
     appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
     rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
     if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
+    // Sigles de la RAMQ : définition au toucher, dans les pages et le panneau ouvert.
+    lexique(document.querySelector("main"), LEXIQUE);
+    if (feuille.open) lexique(corps, LEXIQUE);
   }
 
   /* ============================================================

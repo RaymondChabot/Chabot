@@ -138,6 +138,11 @@ Revenu affiche tous les détails.
   revenu, impôt, budget, dettes, patrimoine, hypothèses et sources), plus
   le dossier pour les proches s'il est rempli, avec graphiques en
   couleurs ; « Enregistrer en PDF » du navigateur.
+- **Lexique des sigles de la RAMQ** : EP 40, EP 42, EP 33, DMÉ, demi-per
+  diem, pratique polyvalente, forfait d'inscription, patient vulnérable,
+  guichet, taux horaire et mixte… Un toucher sur le mot, souligné en
+  pointillé, ouvre sa définition et sa référence ; les montants viennent
+  des mêmes constantes que le calcul.
 
 À l'acte : règles d'avant la Loi 2 (le mode composé n'est pas en vigueur),
 avec frais de cabinet (pourcentage de la facturation et montant fixe).

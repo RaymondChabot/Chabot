@@ -530,11 +530,36 @@ async function rendementProfil(b, base) {
   await ctx.close();
 }
 
+/* 21. Lexique : les sigles de la RAMQ s'expliquent au toucher, jamais dans un bouton, un lien, une étiquette ou un titre ;
+   Échap ferme la bulle (pas le panneau) et rend le focus au mot. */
+async function lexiqueRamq(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu" });
+  const termes = await p.evaluate(() => [...document.querySelectorAll("#v-revenu .terme")].map(x => x.dataset.terme));
+  verifier("lexique : sigles marqués dans la page Revenu", ["EP 40", "DMÉ", "pratique polyvalente", "onglet B"].every(t => termes.includes(t)), termes);
+  verifier("lexique : jamais dans un bouton, un lien, une étiquette ou un titre",
+    (await p.evaluate(() => document.querySelectorAll("button .terme, a .terme, label .terme, summary .terme, h1 .terme, h2 .terme, h3 .terme, table .terme").length)) === 0);
+  verifier("lexique : l'article élidé reste collé au mot", await p.evaluate(() => [...document.querySelectorAll(".terme-lie")].some(x => /^l['’]onglet B$/.test(x.textContent))));
+  await p.evaluate(() => { const t = document.querySelector('#v-revenu .terme[data-terme="DMÉ"]'); t.scrollIntoView({ block: "center" }); t.id = "terme-dme"; });
+  await p.waitForTimeout(300); await p.click("#terme-dme"); await p.waitForTimeout(100);
+  const bulle = await p.evaluate(() => { const x = document.querySelector(".lexique-bulle"); return x && { role: x.getAttribute("role"), texte: x.textContent, etendu: document.getElementById("terme-dme").getAttribute("aria-expanded") }; });
+  verifier("lexique : la bulle explique le DMÉ, avec sa référence", bulle && bulle.role === "status" && bulle.texte.includes("Dossier médical électronique") && bulle.texte.includes("EP 40, par. 17.01") && bulle.etendu === "true", bulle);
+  await p.keyboard.press("Escape"); await p.waitForTimeout(100);
+  verifier("lexique : Échap ferme la bulle et rend le focus au mot", await p.evaluate(() => !document.querySelector(".lexique-bulle") && document.activeElement.id === "terme-dme"));
+  await p.click("#v-revenu [data-feuille]"); await p.waitForTimeout(300);
+  await p.evaluate(() => { const t = [...document.querySelectorAll("#feuille-corps .terme")].find(x => x.offsetParent !== null); t.scrollIntoView({ block: "center" }); t.id = "terme-panneau"; });
+  await p.waitForTimeout(300); await p.click("#terme-panneau"); await p.waitForTimeout(100);
+  verifier("lexique : bulle dans le panneau « Modifier »", await p.evaluate(() => !!document.querySelector("#feuille .lexique-bulle")));
+  await p.keyboard.press("Escape"); await p.waitForTimeout(100);
+  verifier("lexique : Échap ferme la bulle, pas le panneau", await p.evaluate(() => document.getElementById("feuille").open && !document.querySelector(".lexique-bulle")));
+  verifier("lexique : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

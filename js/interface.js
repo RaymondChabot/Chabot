@@ -222,8 +222,85 @@
   }
 
   window.WM = window.WM || {};
+  /* ============================================================
+     LEXIQUE : un toucher sur un sigle de la RAMQ ouvre sa définition, sous le mot.
+     Seule la première occurrence d'un terme dans une carte devient un bouton, et jamais
+     dans un bouton, un lien, une étiquette, un titre, un tableau ou un champ masqué. Navigateur sans
+     lookbehind dans les expressions régulières : rien n'est marqué.
+     ============================================================ */
+  const HORS_LEXIQUE = "button, a, label, summary, input, select, option, textarea, svg, h1, h2, h3, h4, table, .terme, .hero, .segment, .puce, .toast, [aria-hidden='true'], .visuellement-cache, .cache-visuel, [data-si][hidden]";
+  let lexiqueRe = null, lexiqueDef = null, bulle = null, ouvert = null;
+  function preparerLexique(entrees) {
+    lexiqueDef = new Map();
+    for (const e of entrees) for (const t of e.termes) lexiqueDef.set(t.toLowerCase(), e);
+    const alt = [...lexiqueDef.keys()].sort((a, b) => b.length - a.length).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s")).join("|");
+    try { lexiqueRe = new RegExp(`(?<![\\p{L}\\d])(${alt})(?![\\p{L}\\d])`, "giu"); } catch (e) { lexiqueRe = false; }
+  }
+  function lexique(racine, entrees) {
+    if (lexiqueRe === null) preparerLexique(entrees);
+    if (!lexiqueRe || !racine) return;
+    const portees = new Map();   // carte → termes déjà expliqués
+    const dejaDans = p => { if (!portees.has(p)) portees.set(p, new Set([...p.querySelectorAll(".terme")].map(b => b.dataset.terme))); return portees.get(p); };
+    const marcheur = document.createTreeWalker(racine, NodeFilter.SHOW_TEXT, { acceptNode: n => {
+      lexiqueRe.lastIndex = 0;
+      return lexiqueRe.test(n.data) && !n.parentElement.closest(HORS_LEXIQUE) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    } });
+    const noeuds = []; while (marcheur.nextNode()) noeuds.push(marcheur.currentNode);
+    for (let n of noeuds) {
+      const deja = dejaDans(n.parentElement.closest(".carte, .feuille, .vue") || racine);
+      lexiqueRe.lastIndex = 0;
+      let m;
+      while ((m = lexiqueRe.exec(n.data))) {
+        const e = lexiqueDef.get(m[1].toLowerCase().replace(/\s/g, " ")), cle = e.termes[0];
+        if (deja.has(cle)) continue;
+        deja.add(cle);
+        const mot = n.splitText(m.index), reste = mot.splitText(m[1].length);
+        const b = el("button", "terme", m[1]); b.type = "button"; b.dataset.terme = cle; b.setAttribute("aria-expanded", "false");
+        // « l'onglet B » : l'article élidé reste collé au mot, sur la même ligne.
+        const lie = /\S*['’]$/.exec(n.data);
+        if (lie) { const art = n.splitText(n.data.length - lie[0].length), s = el("span", "terme-lie"); art.replaceWith(s); s.append(art, b); mot.remove(); }
+        else mot.replaceWith(b);
+        n = reste; lexiqueRe.lastIndex = 0;
+      }
+    }
+  }
+  function fermerLexique(rendreFocus) {
+    if (!bulle) return;
+    bulle.remove(); bulle = null;
+    if (ouvert) { ouvert.setAttribute("aria-expanded", "false"); if (rendreFocus) ouvert.focus(); }
+    ouvert = null;
+  }
+  // La bulle s'ajoute au panneau ouvert, sinon à la page ; sous le mot, ou au-dessus s'il manque de place.
+  function ouvrirLexique(b) {
+    const e = lexiqueDef.get(b.dataset.terme.toLowerCase()); if (!e) return;
+    const hote = b.closest("dialog[open]") || document.body;
+    bulle = el("div", "lexique-bulle"); bulle.setAttribute("role", "status");
+    hote.appendChild(bulle);
+    const contenu = bulle;
+    requestAnimationFrame(() => {
+      if (bulle !== contenu) return;
+      contenu.append(el("strong", null, b.textContent), document.createTextNode(e.def));
+      if (e.ref) contenu.appendChild(el("span", "lexique-ref", e.ref));
+      const r = b.getBoundingClientRect(), w = Math.min(320, innerWidth - 32);
+      const base = hote === document.body ? { x: -scrollX, y: -scrollY } : (() => { const h = hote.getBoundingClientRect(); return { x: h.left + hote.clientLeft - hote.scrollLeft, y: h.top + hote.clientTop - hote.scrollTop }; })();
+      contenu.style.width = w + "px";
+      contenu.style.left = (Math.max(16, Math.min(r.left, innerWidth - w - 16)) - base.x) + "px";
+      const haut = contenu.offsetHeight, dessous = r.bottom + 8 + haut <= innerHeight - 8;
+      contenu.style.top = ((dessous ? r.bottom + 8 : Math.max(8, r.top - 8 - haut)) - base.y) + "px";
+    });
+    b.setAttribute("aria-expanded", "true"); ouvert = b;
+  }
+  document.addEventListener("click", ev => {
+    const b = ev.target.closest && ev.target.closest(".terme");
+    if (b) { const meme = b === ouvert; fermerLexique(false); if (!meme) ouvrirLexique(b); return; }
+    if (bulle && !bulle.contains(ev.target)) fermerLexique(false);
+  });
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && bulle) { ev.preventDefault(); ev.stopPropagation(); fermerLexique(true); } }, true);
+  window.addEventListener("scroll", () => fermerLexique(false), { capture: true, passive: true });
+  window.addEventListener("resize", () => fermerLexique(false));
+
   window.WM.interface = {
     SERIES, $, $2, nb, pct, signe, k$, texteDe, moisAn, el, icone, hero, puce, rangee, rangees, segment, tableauSimple,
-    lignes, moins, signePct, graphiqueLignes,
+    lignes, moins, signePct, graphiqueLignes, lexique,
   };
 })();
