@@ -94,7 +94,9 @@ Revenu affiche tous les détails.
   dépenses annuelles, les dettes et l'épargne, aussi par jour et par
   semaine. **Bilan du mois** : revenu reçu et dépenses réelles comparés au
   budget, avec un rappel mensuel ; au choix, le réel par catégorie et le
-  report du non-dépensé (ou du dépassement) d'un mois à l'autre.
+  report du non-dépensé (ou du dépassement) d'un mois à l'autre. **Bilan
+  de l'année** : reçu et dépensé comparés au budget, part gardée, mois le
+  plus cher, valeur nette et écart au plan de référence.
 - **Probabilité de réussite** : 300 simulations où le rendement varie
   chaque année ; valeur nette dans 8 cas sur 10 et chances d'atteindre
   l'indépendance financière.

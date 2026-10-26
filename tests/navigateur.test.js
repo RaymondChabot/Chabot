@@ -218,11 +218,43 @@ async function nouvelleVersion(b, base) {
   await ctx.close();
 }
 
+/* 9. Budget : trésorerie des 12 prochains mois, report par catégorie, bilan de l'année. */
+async function budget(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "budget" });
+  const t = await p.evaluate(() => ({ mois: document.querySelectorAll("#bu-tresorerie .rangee").length, resume: document.getElementById("bu-tresorerie-resume").textContent }));
+  verifier("trésorerie : 12 mois et un résumé", t.mois === 12 && t.resume.length > 20, t);
+  // Année type : la trésorerie de 12 mois égale 12 fois le surplus.
+  await remplacer(p, { "revenu.annee": "type" });
+  const ecart = await p.evaluate(() => { const R = window.Wealthnord.resultats(), T = window.Wealthnord.outils.tresorerie(R); return T.mois.reduce((s, x) => s + x.solde, 0) - 12 * R.surplusMoi; });
+  verifier("trésorerie : année type = 12 × surplus", Math.abs(ecart) < 1, ecart);
+  await remplacer(p, { bilans: [
+    { id: "m1", mois: "2026-07", recu: 9000, depense: 3000, note: "", cats: { Alimentation: 600 } },
+    { id: "m2", mois: "2026-08", recu: 9100, depense: 3400, note: "Vacances", cats: { Alimentation: 450 } } ] });
+  const a = await p.evaluate(() => ({ annee: document.getElementById("bu-annee").textContent.replace(/\s/g, " "), bilan: document.getElementById("bu-bilan").textContent }));
+  verifier("bilan de l'année : mois notés et mois le plus cher", a.annee.includes("2 mois notés") && a.annee.includes("Mois le plus cher"), a.annee);
+  verifier("report par catégorie : Alimentation", a.bilan.includes("Report par catégorie") && a.bilan.includes("Alimentation"), a.bilan);
+  verifier("budget : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
+/* 10. Logo : l'arbre à côté du nom ; au clic, le sceau 0,3 seconde, puis l'accueil. */
+async function logo(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "budget" });
+  verifier("en-tête : l'arbre seul", await p.evaluate(() => document.querySelector(".barre-haut .marque-ico use").getAttribute("href") === "#wm-arbre"));
+  await p.click(".barre-haut a.marque");
+  const pendant = await p.evaluate(() => new Promise(r => setTimeout(() => r(document.querySelector(".ouverture").classList.contains("eclair")), 150)));
+  await p.waitForTimeout(600);
+  const apres = await p.evaluate(() => ({ eclair: document.querySelector(".ouverture").classList.contains("eclair"), page: location.hash }));
+  verifier("logo : sceau au clic, puis l'accueil", pendant && !apres.eclair && apres.page === "#apercu", apres);
+  verifier("logo : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

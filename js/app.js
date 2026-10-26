@@ -2035,7 +2035,7 @@
       V.autres > 0 && { titre: "Autres revenus", valeur: $(V.autres) },
       { titre: "Total", cls: "total", valeur: $(V.rev) },
     ]);
-    rendreAnnuelles(); rendreFlux(R); rendreTresorerie(R); rendreReste(R); rendreBilanMois(R);
+    rendreAnnuelles(); rendreFlux(R); rendreTresorerie(R); rendreReste(R); rendreBilanMois(R); rendreBilanAnnee(R);
     // Dépenses : une rangée par catégorie ; toucher ouvre ses cases.
     const cats = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
     rangees("bu-depenses", [
@@ -2275,10 +2275,10 @@
     for (const b of depensesEffectives()) if (b.periode !== "an" && !estFixe(b)) m.set(categorie(b), (m.get(categorie(b)) || 0) + mensuel(b) * qui(b));
     return [...m].filter(([, v]) => v > 0.5);
   }
-  // Report par catégorie : la marge (ou le dépassement) cumulée sur les mois où le réel a été noté.
-  function reportParCategorie() {
+  // Report par catégorie : la marge (ou le dépassement) cumulée sur les mois où le réel a été noté (une année, au besoin).
+  function reportParCategorie(an) {
     const budget = new Map(variablesParCategorie()), cumul = new Map();
-    for (const b of S.bilans || []) for (const [cat, reel] of Object.entries(b.cats || {})) {
+    for (const b of (S.bilans || []).filter(x => !an || x.mois.startsWith(an + "-"))) for (const [cat, reel] of Object.entries(b.cats || {})) {
       if (!budget.has(cat) || reel == null || reel === "") continue;
       const c = cumul.get(cat) || { marge: 0, mois: 0 };
       c.marge += budget.get(cat) - +reel; c.mois++; cumul.set(cat, c);
@@ -2370,6 +2370,66 @@
     }
     const a = el("div", "actions"), bt = el("button", "bouton secondaire", (S.bilans || []).some(b => b.mois === passe && (b.recu != null || b.depense != null)) ? `Revoir le bilan de ${nomMois(passe)}` : `Faire le bilan de ${nomMois(passe)}`);
     bt.type = "button"; bt.addEventListener("click", () => feuilleBilan(passe)); a.appendChild(bt); z.appendChild(a);
+  }
+
+  /* ============================================================
+     BILAN DE L'ANNÉE : les bilans du mois et les relevés de valeur nette d'une année,
+     comparés au budget et au plan de référence.
+     ============================================================ */
+  let anneeBilan = null;   // année affichée (choix de la session)
+  function anneesBilan() {
+    const ans = new Set([...(S.bilans || []).filter(b => b.recu != null || b.depense != null).map(b => +b.mois.slice(0, 4)),
+      ...((S.suivi || {}).instantanes || []).map(x => +x.date.slice(0, 4))]);
+    return [...ans].filter(Boolean).sort((a, b) => a - b);
+  }
+  function bilanAnnee(R, an) {
+    const mois = (S.bilans || []).filter(b => b.mois.startsWith(an + "-") && (b.recu != null || b.depense != null));
+    const recus = mois.filter(b => b.recu != null), depenses = mois.filter(b => b.depense != null), deux = mois.filter(b => b.recu != null && b.depense != null);
+    const somme = (l, k) => l.reduce((t, b) => t + (+b[k] || 0), 0);
+    const notes = (S.suivi || {}).instantanes || [], avant = notes.filter(x => x.date < `${an}-01-01`).pop(), cetteAnnee = notes.filter(x => x.date.startsWith(an + "-"));
+    const recuDeux = somme(deux, "recu");
+    // Écart au plan de référence, au dernier relevé de l'année.
+    const ref = (S.suivi || {}).reference, fin = cetteAnnee[cetteAnnee.length - 1];
+    let ecartPlan = null;
+    if (ref && fin) {
+      const v = ref.moi, f = Math.max(0, (new Date(fin.date + "T00:00:00") - new Date(ref.date + "T00:00:00")) / (365.25 * 864e5));
+      const i = Math.min(v.length - 1, f), a = Math.floor(i), b = Math.min(v.length - 1, a + 1);
+      ecartPlan = fin.moi - (v[a] + (v[b] - v[a]) * (i - a));
+    }
+    return { an, n: mois.length, recu: somme(recus, "recu"), nRecu: recus.length, depense: somme(depenses, "depense"), nDepense: depenses.length,
+      prevuRecu: R.netMoi * recus.length, prevuDepense: R.depMoi * depenses.length,
+      tauxEpargne: recuDeux > 0 ? (recuDeux - somme(deux, "depense")) / recuDeux : null,
+      debut: avant || cetteAnnee[0], fin, ecartPlan,
+      plusCher: depenses.reduce((a, b) => !a || +b.depense > +a.depense ? b : a, null), moinsCher: depenses.reduce((a, b) => !a || +b.depense < +a.depense ? b : a, null),
+      cats: reportParCategorie(an) };
+  }
+  function rendreBilanAnnee(R) {
+    const z = document.getElementById("bu-annee"); z.textContent = "";
+    const ans = anneesBilan(), anCourant = new Date().getFullYear();
+    if (!ans.length) {
+      segment("bu-annee-choix", [], "", () => {}, "Année");
+      z.appendChild(el("p", "aide", "Faites le bilan de chaque mois (ci-dessus) et notez votre valeur nette de temps en temps (page Patrimoine) : vous verrez ici votre année en un coup d'œil, comparée au budget et au plan."));
+      return;
+    }
+    if (!ans.includes(anneeBilan)) anneeBilan = ans.includes(anCourant) ? anCourant : ans[ans.length - 1];
+    segment("bu-annee-choix", ans.length > 1 ? ans.slice(-3).map(a => [String(a), String(a)]) : [], String(anneeBilan), v => { anneeBilan = +v; rendreBilanAnnee(R); }, "Année du bilan");
+    const B = bilanAnnee(R, anneeBilan), nomM = b => { const s = nomMois(b.mois); return s[0].toUpperCase() + s.slice(1); };
+    const res = el("p", "resume");
+    res.textContent = B.n
+      ? `En ${B.an}, ${B.n} mois notés${B.tauxEpargne != null ? ` : vous avez gardé ${pct(Math.max(0, B.tauxEpargne), 0)} de ce que vous avez reçu, une fois les dépenses payées` : ""}.`
+      : `En ${B.an}, aucun bilan du mois noté : seule la valeur nette est suivie.`;
+    z.appendChild(res);
+    z.appendChild(rangees(el("div"), [
+      B.nRecu ? { titre: "Revenu net reçu", sous: `${B.nRecu} mois · prévu ${$(B.prevuRecu)}`, valeur: $(B.recu), valeurSous: signe(B.recu - B.prevuRecu), valeurCls: null } : null,
+      B.nDepense ? { titre: "Dépenses", sous: `${B.nDepense} mois · prévu ${$(B.prevuDepense)}`, valeur: $(B.depense), valeurSous: signe(B.depense - B.prevuDepense) } : null,
+      B.plusCher && B.nDepense > 1 ? { titre: "Mois le plus cher", sous: nomM(B.plusCher) + (B.plusCher.note ? ` · ${B.plusCher.note}` : ""), valeur: $(B.plusCher.depense) } : null,
+      B.moinsCher && B.nDepense > 1 ? { titre: "Mois le plus économe", sous: nomM(B.moinsCher), valeur: $(B.moinsCher.depense) } : null,
+      B.fin && B.debut && B.fin !== B.debut ? { titre: "Valeur nette", sous: `Du ${dateLongue(B.debut.date)} au ${dateLongue(B.fin.date)}`, valeur: $(B.fin.moi), valeurSous: signe(B.fin.moi - B.debut.moi) }
+        : B.fin ? { titre: "Valeur nette", sous: `Notée le ${dateLongue(B.fin.date)}`, valeur: $(B.fin.moi) } : null,
+      B.ecartPlan != null ? { titre: "Par rapport au plan de référence", sous: "Au dernier relevé de l'année", valeur: signe(B.ecartPlan), valeurCls: B.ecartPlan < 0 ? "negatif" : "positif" } : null,
+      ...B.cats.slice().sort((a, b) => Math.abs(b.marge) - Math.abs(a.marge)).slice(0, 3).map(c => ({ titre: c.cat, sous: `Dépenses variables, ${c.mois} mois noté${c.mois > 1 ? "s" : ""}`, valeur: signe(c.marge),
+        valeurCls: c.marge < 0 ? "negatif" : "positif", valeurSous: c.marge < 0 ? "dépassement" : "non dépensé" })),
+    ]));
   }
 
   /* ============================================================
@@ -3265,7 +3325,16 @@
   }
   window.addEventListener("hashchange", () => ouvrir(location.hash.slice(1)));
   // Le logo mène à l'accueil, même si on y est déjà (retour en haut).
-  document.querySelectorAll("a.marque").forEach(a => a.addEventListener("click", e => { e.preventDefault(); ouvrir("apercu"); }));
+  // Avant, le sceau s'affiche 0,3 seconde, comme à l'ouverture de l'app.
+  const ecranSceau = document.querySelector(".ouverture");
+  let finSceau = null;
+  document.querySelectorAll("a.marque").forEach(a => a.addEventListener("click", e => {
+    e.preventDefault();
+    document.documentElement.classList.remove("avec-ouverture");   // l'écran d'ouverture ne repart pas ensuite
+    ecranSceau.classList.remove("eclair"); void ecranSceau.offsetWidth; ecranSceau.classList.add("eclair");
+    setTimeout(() => ouvrir("apercu"), 120);
+    clearTimeout(finSceau); finSceau = setTimeout(() => ecranSceau.classList.remove("eclair"), 500);
+  }));
 
   /* Import et export */
   const message = t => { document.getElementById("donnees-message").textContent = t; };

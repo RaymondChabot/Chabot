@@ -137,17 +137,17 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 .marque { display: inline-flex; align-items: center; gap: 11px; min-width: 0; color: var(--marque); text-decoration: none; border-radius: 12px; }
 /* Le nom fait environ 30 % de la hauteur du sceau (rapport 1200 / 78, losange compris) ;
    il rapetisse un peu si les boutons de droite manquent de place. */
-.marque-ico { width: 46px; height: 46px; flex: none; }
+.marque-ico { width: 37px; height: 44px; flex: none; }
 .marque-nom { width: 215px; height: 14px; flex: 0 1 auto; min-width: 0; }
 .barre-haut { gap: 10px; }
 @media (max-width: 400px) {
   .marque { gap: 9px; }
-  .marque-ico { width: 40px; height: 40px; }
+  .marque-ico { width: 32px; height: 38px; }
   .marque-nom { width: 185px; height: 12px; }
 }
 @media (max-width: 370px) {
   .marque { gap: 8px; }
-  .marque-ico { width: 36px; height: 36px; }
+  .marque-ico { width: 29px; height: 34px; }
 }
 
 /* Écran d'ouverture : le sceau apparaît, puis s'efface (une fois par session, sans bloquer les clics). */
@@ -160,7 +160,14 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 .ouverture-sceau { width: min(56vw, 230px); height: min(56vw, 230px); animation: ouverture-sceau 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 @keyframes ouverture-fin { to { opacity: 0; visibility: hidden; } }
 @keyframes ouverture-sceau { from { opacity: 0; transform: scale(0.94); } }
-@media (prefers-reduced-motion: reduce) { .ouverture-sceau { animation: none; } }
+/* Clic sur le logo : le même écran, 0,3 seconde, pendant que l'accueil s'ouvre derrière. */
+.ouverture.eclair {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  background: var(--fond); color: var(--marque); pointer-events: none;
+  animation: ouverture-fin 0.15s ease 0.3s forwards;
+}
+.ouverture.eclair .ouverture-sceau { animation: ouverture-sceau 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .ouverture-sceau, .ouverture.eclair .ouverture-sceau { animation: none; } }
 .barre-haut {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;

@@ -33,7 +33,7 @@
 
 <!-- Barre du haut (téléphone) -->
 <header class="barre-haut">
-  <a class="marque" href="#apercu" aria-label="WealthMorand : accueil"><svg class="marque-ico" aria-hidden="true"><use href="#wm-sceau"/></svg><svg class="marque-nom" aria-hidden="true"><use href="#wm-nom"/></svg></a>
+  <a class="marque" href="#apercu" aria-label="WealthMorand : accueil"><svg class="marque-ico" aria-hidden="true"><use href="#wm-arbre"/></svg><svg class="marque-nom" aria-hidden="true"><use href="#wm-nom"/></svg></a>
   <div class="barre-actions">
   <button type="button" class="bouton-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer</span></button>
   <button type="button" class="bouton-icone" data-bascule-theme aria-label="Changer de thème"></button>
@@ -208,6 +208,10 @@
       <div class="carte demi">
         <div class="carte-tete"><h2>Bilan du mois</h2><span class="carte-sous">Réel et budget</span></div>
         <div id="bu-bilan"></div>
+      </div>
+      <div class="carte demi">
+        <div class="carte-tete"><h2>Bilan de l'année</h2><div class="segment petit compact" id="bu-annee-choix"></div></div>
+        <div id="bu-annee"></div>
       </div>
       <div class="carte">
         <div class="carte-tete"><h2>L'année en un coup d'œil</h2><span class="carte-sous">Votre part</span></div>
