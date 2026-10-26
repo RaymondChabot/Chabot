@@ -67,13 +67,20 @@
      suppléments à l'inscription d'un patient sans médecin de famille (par. 4.12 et 13.01, depuis le
      1er septembre 2018, codes 19957 à 19960 ; la majoration temporaire du par. 18.01 a pris fin le
      30 avril 2021). EP 42 (médecin enseignant, par. 5.01 et 5.02, depuis le 1er octobre 2019) : demi-per
-     diem [résident, externe], liste 1 (régions régulières) ou liste 2 (régions du par. 5.03). ---------- */
+     diem [résident, externe], liste 1 (régions régulières) ou liste 2 (régions du par. 5.03).
+     Payés au taux horaire (et aux honoraires fixes), depuis le 1er octobre 2019 : forfait de responsabilité
+     à chaque examen d'un patient vulnérable inscrit (EP 40, par. 6.02 B, code 15169), supplément à l'examen
+     périodique d'un enfant de 0 à 5 ans (par. 8.01, code 08877) et au suivi de grossesse (par. 7.02 B, codes
+     15144 et 15145). À l'acte et au mixte, ils sont compris dans le tarif des visites (tableau-synthèse des
+     visites, note). ---------- */
   const MONTANTS_LIEU = {
     cabinet: { forfaitInscription: 11.85, forfaitVulnerable: 62.50, forfaitTresVulnerable: 125,
       suppNonVulnerable: 23.55, suppVulnerableHorsGuichet: 72.50, suppVulnerableGuichet: 155.35, suppTresVulnerable: 310.65,
+      forfaitResponsabilite: 10.60, suppExamenEnfant: 17.05, suppSuiviGrossesse: 11.40,
       perDiem: { 1: [55.35, 66.45], 2: [86.95, 98.00] } },
     etablissement: { forfaitInscription: 8.95, forfaitVulnerable: 47, forfaitTresVulnerable: 94,
       suppNonVulnerable: 19.55, suppVulnerableHorsGuichet: 60.15, suppVulnerableGuichet: 128.90, suppTresVulnerable: 257.80,
+      forfaitResponsabilite: 8.25, suppExamenEnfant: 13.35, suppSuiviGrossesse: 8.95,
       perDiem: { 1: [41.45, 49.85], 2: [65.20, 73.55] } },
   };
   // Montants d'un lieu, à plat ; demi-per diem de la liste 1 ou 2.
@@ -128,6 +135,12 @@
     return poids > 0 ? somme / poids : 0;
   }
 
+  // Part d'un type de visite dans la répartition saisie (ramenée à 100 %).
+  function partVisite(mix, cle) {
+    const total = VISITES.reduce((t, v) => t + Math.max(0, +mix[v.cle] || 0), 0);
+    return total > 0 ? Math.max(0, +mix[cle] || 0) / total : 0;
+  }
+
   /* ============================================================
      REVENU DE LA PRATIQUE : GMF ou clinique, GMF-U, CLSC
      ============================================================
@@ -176,14 +189,16 @@
   /* Compensation des frais de cabinet, en cabinet seulement (EP 40) : par jour de pratique, 32,40 $ si l'on voit
      au moins 6 patients inscrits, 64,80 $ à 12 ou plus, au plus 64,80 $ par jour (par. 14.01, codes 19928 et 19929) ;
      au sans rendez-vous, 10 et 20 patients. Les demi-journées de rendez-vous vont par deux dans une journée ; une
-     demi-journée de sans rendez-vous compte pour une journée. DMÉ, dès 150 inscrits (par. 17.01) : licences,
-     459,90 $ par trimestre ; hors GMF, équipements, 287,45 $ par trimestre en plus. */
+     demi-journée de sans rendez-vous compte pour une journée. DMÉ, dès 150 inscrits ou, la première année du
+     permis, sans égard au nombre (par. 17.01) : licences, 459,90 $ par trimestre ; hors GMF, équipements,
+     287,45 $ par trimestre en plus. */
   const parJourCabinet = (n, [haut, bas]) => n >= haut ? 64.80 : n >= bas ? 32.40 : 0;
   function compensationCabinet(r, semaines, demiJournees, inscrits) {
     const p = Math.max(0, r.patientsParDJ || 0), srv = Math.max(0, r.demiJourneesSRV || 0), pSrv = Math.max(0, r.patientsSRV || 0);
     const jours = Math.floor(demiJournees / 2), seule = demiJournees - 2 * jours >= 1;
     const parSemaine = jours * parJourCabinet(2 * p, [12, 6]) + (seule ? parJourCabinet(p, [12, 6]) : 0) + srv * parJourCabinet(pSrv, [20, 10]);
-    const jour = Math.max(0, semaines) * parSemaine, dme = inscrits >= 150 ? 4 * (459.90 + (r.membreGmf ? 0 : 287.45)) : 0;
+    const dmeOk = inscrits >= 150 || r.annee === "premiere";
+    const jour = Math.max(0, semaines) * parSemaine, dme = dmeOk ? 4 * (459.90 + (r.membreGmf ? 0 : 287.45)) : 0;
     return { jour, dme, total: jour + dme };
   }
   function revenuGmfu(r) {
@@ -220,6 +235,7 @@
     const forfaitAnnuel = v * m("forfaitVulnerable") * (1 + 0.5 * g2 + g34) + vt * m("forfaitTresVulnerable");
 
     let visitesMixte = 0, visitesAppr = 0, visitesSrv = 0, nbVisites = 0, nbPriseEnCharge = 0, forfaitVulnNouveaux = 0, semainesPalierHaut = 0;
+    let visitesPropres = 0;
     for (let k = 0; k < W; k++) {
       const palier = inscrits >= 499.999 ? 1 : 0;
       if (palier) semainesPalierHaut++;
@@ -233,6 +249,7 @@
       visitesSrv += SRV * patientsSRV * tarifSrv(palier);
       nbVisites += visitesSem + T * (r.patientsPendantSupervision || 0) + T * apprenants + SRV * patientsSRV;
       nbPriseEnCharge += pec;
+      visitesPropres += visitesSem - pec + T * (r.patientsPendantSupervision || 0);
       // Forfait vulnérable : payé à partir du mois d'inscription (EP 40, par. 6.01).
       const mois = Math.floor((k / W) * 12);
       forfaitVulnNouveaux += arrivees * forfaitAnnuel * (12 - mois) / 12;
@@ -273,8 +290,18 @@
     // Taux horaire : à 100 % jusqu'au plafond annuel, puis 71,8 % du tarif (annexe XIV, par. 5.02 et 5.04).
     const heures = W * (N + SRV) * H, plafondHeures = Math.max(0, m("heuresMax100"));
     const heuresAuDela = Math.max(0, heures - plafondHeures), perteHeures = heuresAuDela * (1 - PCT_AU_DELA / 100) * m("tarifHoraire") * maj;
-    const horaire = { heures: (heures - heuresAuDela * (1 - PCT_AU_DELA / 100)) * m("tarifHoraire") * maj, ...base };
-    horaire.total = horaire.heures + commun;
+    // En plus des heures : forfait de responsabilité à chaque examen d'un patient vulnérable inscrit (visites de
+    // suivi et périodiques des patients vulnérables, prises en charge de patients vulnérables), supplément à chaque
+    // examen périodique d'un enfant de 0 à 5 ans et à chaque suivi de grossesse (EP 40, par. 6.02 B, 8.01, 7.02 B).
+    const examens = {
+      vulnerables: visitesPropres * (partVisite(r.mix, "suiviV") + partVisite(r.mix, "perioV")) + nbPriseEnCharge * (v + vt),
+      enfants: visitesPropres * partVisite(r.mix, "pedia"),
+      grossesse: visitesPropres * partVisite(r.mix, "gross"),
+    };
+    const responsabilite = (examens.vulnerables * m("forfaitResponsabilite") + examens.enfants * m("suppExamenEnfant")
+      + examens.grossesse * m("suppSuiviGrossesse")) * maj;
+    const horaire = { heures: (heures - heuresAuDela * (1 - PCT_AU_DELA / 100)) * m("tarifHoraire") * maj, responsabilite, ...base };
+    horaire.total = horaire.heures + horaire.responsabilite + commun;
     // Mixte : forfait horaire, part du tarif des visites et, en GMF-U, l'intervention de supervision
     // pour la demi-journée d'enseignement, ou les visites des apprenants.
     const mixte = {
@@ -313,7 +340,7 @@
     // Hausse du tarif moyen d'une visite au palier de 500 inscrits.
     const t0 = tarifVisite(r.mix, 0, TF), gainPalier = t0 > 0 ? tarifVisite(r.mix, 1, TF) / t0 - 1 : 0;
     return { heures, heuresAuDela, plafondHeures, perteHeures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, vulnerablesFin, semainesPalierHaut, gainPalier,
-      patientsVus, forfaitGmfPossible, detailCompensation, activites, detailActivites, basePolyvalence, polyvalence, pctPolyvalence, anneePratique, detailVolume,
+      patientsVus, forfaitGmfPossible, detailCompensation, activites, detailActivites, basePolyvalence, polyvalence, pctPolyvalence, anneePratique, detailVolume, examens,
       visitesApprenants: W * T * apprenants, tarifMoyenRdv, tarifMoyenSrv,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
   }

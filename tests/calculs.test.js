@@ -192,5 +192,22 @@ verifier("groupes : forfait à 150 % pour deux catégories, 200 % pour trois ou 
   g.horaire.forfaitVulnerable * 1.5, 1e-6));
 verifier("polyvalence : au-delà de 245 vulnérables, chacun compte 2,5 fois", C.tauxPolyvalence(800, 345, 5) === 2.5 && C.tauxPolyvalence(800, 445, 5) === 5);
 
+/* 15. Au taux horaire, en établissement : forfait de responsabilité et suppléments (EP 40, par. 6.02 B, 8.01 et 7.02 B).
+   À l'acte et au mixte, ils sont compris dans le tarif des visites. */
+const ML = { e: C.montantsLieu("etablissement", 1), c: C.montantsLieu("cabinet", 1) };
+verifier("responsabilité : 8,25 $, 13,35 $ et 8,95 $ en établissement ; 10,60 $, 17,05 $ et 11,40 $ en cabinet",
+  ML.e.forfaitResponsabilite === 8.25 && ML.e.suppExamenEnfant === 13.35 && ML.e.suppSuiviGrossesse === 8.95
+  && ML.c.forfaitResponsabilite === 10.6 && ML.c.suppExamenEnfant === 17.05 && ML.c.suppSuiviGrossesse === 11.4);
+// 6 demi-journées cliniques × 5 patients × 46 semaines = 1 380 visites : 20 % de vulnérables, 5 % d'enfants, 5 % de grossesses.
+verifier("responsabilité : par examen, selon la répartition des visites", proche(g.horaire.responsabilite, 1380 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95), 1e-6)
+  && proche(g.examens.vulnerables, 276, 1e-9) && proche(g.examens.enfants, 69, 1e-9) && proche(g.examens.grossesse, 69, 1e-9));
+verifier("responsabilité : au taux horaire seulement, et comptée dans le total", g.mixte.responsabilite === undefined && g.acte.responsabilite === undefined
+  && proche(g.horaire.total - g.horaire.heures - g.horaire.responsabilite, g.mixte.total - g.mixte.forfaitHoraire - g.mixte.visites - g.mixte.supervision, 1e-6));
+const gPec = C.revenuGmfu({ ...rev, annee: "premiere", inscritsDebut: 0, nouveauxGuichet: 100 });
+verifier("responsabilité : une prise en charge d'un patient vulnérable compte", gPec.nbPriseEnCharge > 0 && proche(gPec.examens.vulnerables, 1380 * 0.2, 1e-6));
+verifier("responsabilité : majorée selon le territoire", proche(C.revenuGmfu({ ...rev, majorationPct: 15 }).horaire.responsabilite, g.horaire.responsabilite * 1.15, 1e-6));
+verifier("DMÉ : la première année du permis, sans égard au nombre d'inscrits", proche(C.compensationCabinet({ ...rev, annee: "premiere" }, 46, 6, 20).dme, 4 * (459.9 + 287.45), 1e-6)
+  && C.compensationCabinet(rev, 46, 6, 20).dme === 0);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

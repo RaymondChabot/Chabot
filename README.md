@@ -201,6 +201,14 @@ dossier racine.
     suppléments (par. 18.01) a pris fin le 30 avril 2021 ; la limite de
     150 patients du guichet après 4 ans (ancien par. 13.02) est abolie
     depuis le 1er janvier 2023.
+  - EP 40, au taux horaire en établissement : forfait de responsabilité de
+    8,25 $ à chaque examen d'un patient vulnérable inscrit (par. 6.02 B,
+    code 15169), suppléments de 13,35 $ à l'examen périodique d'un enfant
+    de 0 à 5 ans (par. 8.01, code 08877) et de 8,95 $ au suivi de grossesse
+    (par. 7.02 B, code 15145). À l'acte et au mixte, ils sont compris dans
+    le tarif des visites (note du tableau-synthèse des visites). DMÉ : dès
+    150 inscrits, ou sans égard au nombre la première année du permis
+    (par. 17.01).
   - EP 42 (médecin enseignant) : demi-per diem par résident et par externe,
     en établissement ou en cabinet reconnu, liste 1 ou liste 2.
 - Sans rendez-vous : visites ponctuelles mineures (15765, 15766) et
