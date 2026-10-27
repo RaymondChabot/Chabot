@@ -23,6 +23,8 @@
     rqap: { max: 103000, autonome: 0.00764, salarie: 0.0043 },
     // Crédits pour les intérêts d'un prêt du programme d'aide financière aux études.
     creditInteretsEtudes: { federal: 0.14, quebec: 0.20 },
+    // Crédit du Québec pour frais de scolarité : 8 % (au fédéral, le taux de base, sur le montant des frais).
+    scolariteQuebec: 0.08,
     // Déduction pour travailleurs du Québec : 6 % du revenu de travail (emploi ou entreprise), au plus 1 450 $.
     deductionTravailleur: { taux: 0.06, max: 1450 },
     // Salarié : RRQ (part de l'employé), assurance-emploi au taux du Québec, montant canadien pour emploi.
@@ -456,6 +458,69 @@
       net: brut - total - (o.rpa || 0) - (o.syndicat || 0), tauxMoyen: brut > 0 ? total / brut : 0 };
   }
 
+  /* Salaire et revenu d'entreprise la même année (la résidence, puis la pratique), ou le salaire seul d'un
+     résident. RRQ : part de l'employé sur le salaire, puis les deux parts sur le revenu d'entreprise, dans ce
+     qui reste sous les maximums ; RQAP de même ; assurance-emploi sur le salaire seulement. Déductions : RRQ
+     supplémentaire, part « employeur » du travailleur autonome, cotisations syndicales, REER, frais de garde
+     (fédéral) ; au Québec, déduction pour travailleurs. Crédits : montant canadien pour emploi, RRQ de base,
+     assurance-emploi et RQAP ; droits de scolarité (fédéral au taux de base, Québec 8 %) et intérêts d'un prêt
+     étudiant. Fonds des services de santé sur les revenus autres que d'emploi. Sans salaire, le résultat est
+     celui d'impotParticulier ; sans revenu d'entreprise ni autres revenus, celui d'impotSalarie. */
+  function impotMixte(o) {
+    const q = P2026.rrq, r = P2026.rrqSalarie, rq = P2026.rqap;
+    const s = Math.max(0, o.salaire || 0), affaires = Math.max(0, (o.revenu || 0) - (o.depensesPro || 0)), autres = Math.max(0, o.autresImposables || 0);
+    const gains = s + affaires;
+    // RRQ : assiette de base (sous le MGA, moins l'exemption) et supplémentaire (entre le MGA et le MGS), le salaire d'abord.
+    const assTotal = borne(gains - q.exemption, 0, q.mga - q.exemption), assS = borne(s - q.exemption, 0, q.mga - q.exemption), assA = assTotal - assS;
+    const s2S = borne(Math.min(s, q.mgs) - q.mga, 0, q.mgs - q.mga), s2A = borne(Math.min(gains, q.mgs) - q.mga, 0, q.mgs - q.mga) - s2S;
+    const rrqBaseS = assS * r.base, rrqSuppS = assS * r.supp1 + s2S * r.supp2;
+    const baseA = assA * q.base, suppA = assA * q.supp1 + s2A * q.supp2;
+    const assurS = Math.min(s, rq.max), assurA = Math.min(affaires, Math.max(0, rq.max - assurS));
+    const rqapS = assurS * rq.salarie, rqapA = assurA * rq.autonome;
+    const ae = Math.min(s, P2026.ae.max) * P2026.ae.taux;
+    const deductionAutonome = baseA / 2 + suppA + assurA * (rq.autonome - rq.salarie);
+    const syndicat = Math.max(0, o.syndicat || 0), rpa = Math.max(0, o.rpa || 0);
+    const netAvantGarde = Math.max(0, gains + autres - rrqSuppS - deductionAutonome - syndicat - rpa - (o.reer || 0));
+    const imposableFed = Math.max(0, netAvantGarde - (o.deductionGarde || 0));
+    const imposableQc = Math.max(0, netAvantGarde - deductionTravailleur(gains));
+    const ie = o.interetsEtudes || 0, scolarite = Math.max(0, o.scolarite || 0);
+    const creditsFed = Math.min(P2026.montantEmploi, s) + rrqBaseS + ae + rqapS + baseA / 2 + assurA * rq.salarie + scolarite;
+    const { fed, qc } = impotsDeBase(imposableFed, imposableQc, creditsFed, 0,
+      ie * P2026.creditInteretsEtudes.federal, ie * P2026.creditInteretsEtudes.quebec + scolarite * P2026.scolariteQuebec);
+    const cotisationFss = fss(affaires + autres);
+    const rrq = rrqBaseS + rrqSuppS + baseA + suppA, rqap = rqapS + rqapA;
+    const total = fed + qc + rrq + rqap + ae + cotisationFss, brut = s + Math.max(0, o.revenu || 0);
+    return { revenu: brut, salaire: s, autres, imposable: imposableFed, imposableQc, revenuNetFed: imposableFed, revenuNetQc: imposableQc,
+      fed, qc, rrq, rqap, ae, fss: cotisationFss, syndicat, total, totalGlobal: total,
+      net: brut + autres - total - syndicat - rpa, tauxMoyen: brut + autres > 0 ? total / (brut + autres) : 0 };
+  }
+
+  /* Médecins résidents : entente FMRQ-MSSS 2021-2028, annexe I. Salaire annuel par niveau (1 à 8, soit R1 à R8 ;
+     les niveaux 6 à 8 sont égaux). L'échelle augmente au 1er avril (art. 32.06 à 32.08), avec l'ajustement de
+     0,11 % du 31 mars 2026 (art. 32.10 ; avis de la RAMQ du 16 juillet 2026 : 58 793 $ au niveau 1 et 89 229 $ au
+     niveau 6 en 2026-2027) ; montants arrondis au dollar à chaque hausse, comme ceux de l'avis. Le niveau monte
+     d'un cran à chaque année de formation, au 1er juillet (art. 32.01). Primes de responsabilité de garde et
+     d'enseignement : à la fin de chaque période de 28 jours, 13 par année (art. 12.26 et 13.10). Après le
+     31 mars 2028 (fin de l'entente), la dernière échelle. */
+  const FMRQ = {
+    echelles: [
+      { du: "2025-04-01", salaires: [57296, 63228, 69161, 75092, 81024, 86957, 86957, 86957], garde: 706, enseignement: 279 },
+      { du: "2026-04-01", salaires: [58793, 64880, 70968, 77054, 83141, 89229, 89229, 89229], garde: 725, enseignement: 286 },
+      { du: "2027-04-01", salaires: [60851, 67151, 73452, 79751, 86051, 92352, 92352, 92352], garde: 750, enseignement: 296 },
+    ],
+    periodes: 13,
+    finEntente: "2028-03-31",
+    // Part des droits de scolarité payée par le résident, par année universitaire (art. 13.09).
+    scolarite: { "2025-2026": 900, "2026-2027": 1100, "2027-2028": 1300 },
+  };
+  // Salaire annuel d'un résident au niveau donné, selon l'échelle en vigueur à une date (AAAA-MM-JJ), avec les primes.
+  function salaireResident(o) {
+    const niveau = Math.min(8, Math.max(1, Math.round(+o.niveau || 1))), date = o.date || FMRQ.echelles[0].du;
+    const e = FMRQ.echelles.filter(x => x.du <= date).pop() || FMRQ.echelles[0];
+    const salaire = e.salaires[niveau - 1], garde = o.primeGarde ? e.garde * FMRQ.periodes : 0, enseignement = o.primeEnseignement ? e.enseignement * FMRQ.periodes : 0;
+    return { niveau, echelle: e.du, salaire, garde, enseignement, total: salaire + garde + enseignement };
+  }
+
   /* Conjoints : le conjoint au revenu le plus élevé réclame le montant pour conjoint
      (fédéral) et reçoit les crédits non utilisés de l'autre (Québec). Rend des copies
      ajustées des deux résultats. */
@@ -836,7 +901,7 @@
     return { plafondQc, admissibleQc, taux, creditQc: admissibleQc * taux, plafondFed, deduction };
   }
 
-  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { P2026, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil, fraisGarde };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

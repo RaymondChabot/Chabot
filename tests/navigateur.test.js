@@ -660,6 +660,9 @@ async function enteteEtChamps(b, base) {
     await p.setViewportSize({ width: largeur, height: 800 }); await p.waitForTimeout(150);
     verifier(`en-tête : rien ne déborde à ${largeur} px`, await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll("#v-apercu > *")].every(x => x.getBoundingClientRect().right <= innerWidth - 15)));
   }
+  await p.setViewportSize({ width: 1280, height: 900 }); await p.waitForTimeout(150);
+  verifier("en-tête : sur ordinateur, ni barre du haut ni boutons empilés", await p.evaluate(() => getComputedStyle(document.querySelector(".barre-outils")).display === "none"
+    && getComputedStyle(document.querySelector(".barre-haut")).display === "none" && getComputedStyle(document.getElementById("rapport-pdf")).display !== "none"));
   await p.setViewportSize({ width: 390, height: 844 });
   // Installer
   const installer = () => p.evaluate(() => ({ barre: document.querySelector(".barre-outils [data-installer]").hidden, deja: document.getElementById("installer-deja").hidden,
@@ -745,11 +748,59 @@ async function transfert(b, base) {
   await troisieme.ctx.close(); await ctx.close();
 }
 
+/* 27. Résidence : le salaire de l'échelle de la FMRQ jusqu'au début de la pratique, et la bascule Résidence / Pratique.
+   En vue résidence, l'aperçu, le revenu, l'impôt, le budget et le rapport montrent la résidence (impôt retenu sur la
+   paie) ; en vue pratique, la pratique comme avant. Les projections suivent le parcours dans les deux vues. */
+async function residence(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu" });
+  verifier("résidence : invitation dans la page Revenu", await p.evaluate(() => !document.getElementById("rv-residence-ajout").hidden));
+  await p.click("#rv-residence-ajouter"); await p.waitForTimeout(300);
+  const ajout = await p.evaluate(() => { const S = window.Wealthnord.etat(); return { active: S.residence.active, vue: S.residence.vue, date: S.residence.debutPratique, titre: document.getElementById("feuille-titre").textContent }; });
+  verifier("résidence : ajoutée, vue Résidence, début de pratique proposé, panneau ouvert", ajout.active && ajout.vue === "residence" && /^\d{4}-07$/.test(ajout.date) && ajout.titre === "Résidence", ajout);
+  await p.keyboard.press("Escape"); await p.waitForTimeout(200);
+  const pratique = await p.evaluate(() => { const S = JSON.parse(JSON.stringify(window.Wealthnord.etat())); S.residence.active = false; return S; });
+  await remplacer(p, { "strategie.debut": "2026-10", residence: { ...pratique.residence, active: false } });
+  const avant = await p.evaluate(() => { const R = window.Wealthnord.resultats(); return { surplus: R.surplusMoi, vn: R.projection[10].moi }; });
+  await remplacer(p, { "strategie.debut": "2026-10", residence: { ...pratique.residence, active: true, niveau: "2", debutPratique: "2027-07", vue: "residence", primeGarde: true, primeEnseignement: false, autres: 0, syndicat: 0, scolarite: 1100 } });
+  const r = await p.evaluate(() => { const R = window.Wealthnord.resultats(); return { vue: R.vueResidence, brut: R.res.brut, niveau: R.res.niveau, mois: R.moisAvantPratique,
+    a0: R.annee(R.hyp, 0).moisResidence, a1: R.annee(R.hyp, 1).moisResidence, vn: R.projection[10].moi, surplus: R.surplusMoi, ae: R.impot.ae }; });
+  verifier("résidence : R2 et la prime de garde, 64 880 $ + 9 425 $", r.vue && r.niveau === 2 && r.brut === 74305 && r.ae > 0, r);
+  verifier("résidence : 9 mois de résidence, puis la pratique", r.mois === 9 && r.a0 === 9 && r.a1 === 0, r);
+  await allerA(p, "apercu");
+  const ap = await p.evaluate(() => ({ hero: document.querySelector("#ap-hero .hero-etiquette").textContent, choix: [...document.querySelectorAll("#ap-parcours button")].map(x => x.textContent),
+    tuile: document.querySelector("#ap-tuiles .tuile .tuile-valeur").textContent.replace(/\s/g, " "), faire: document.getElementById("ap-actions").textContent,
+    echeances: document.getElementById("ap-echeances").textContent }));
+  verifier("résidence : l'aperçu montre la résidence, avec la bascule", ap.hero.includes("en résidence") && ap.choix.join() === "Résidence,Pratique" && ap.tuile === "74 305 $", ap);
+  verifier("résidence : impôt retenu sur la paie, ni acompte ni alerte de la RAMQ", ap.faire.includes("retenus sur chaque paie") && !ap.faire.includes("paiement de la RAMQ") && !ap.echeances.includes("Acompte provisionnel")
+    && ap.echeances.includes("Début de la pratique"), ap.echeances);
+  await allerA(p, "revenu");
+  const rv = await p.evaluate(() => ({ carte: !document.getElementById("rv-residence").hidden, pratique: [...document.querySelectorAll("#v-revenu .pratique-seule")].every(x => x.hidden),
+    detail: document.getElementById("rv-residence-detail").textContent, invitation: document.getElementById("rv-residence-ajout").hidden }));
+  verifier("résidence : la page Revenu montre le salaire et cache la pratique", rv.carte && rv.pratique && rv.invitation && rv.detail.includes("Salaire de l'échelle, R2") && rv.detail.includes("Début de la pratique"), rv);
+  await allerA(p, "impot");
+  const im = await p.evaluate(() => ({ titre: document.getElementById("im-acomptes-titre").textContent, tableau: document.getElementById("im-tableau").textContent,
+    societe: document.getElementById("im-societe").closest(".carte").hidden }));
+  verifier("résidence : l'impôt d'un salarié, retenu sur la paie", im.titre === "Retenues sur la paie" && im.tableau.includes("Assurance-emploi") && im.tableau.includes("scolarité") && im.societe, im);
+  const tresorerie = await p.evaluate(() => window.Wealthnord.outils.tresorerie(window.Wealthnord.resultats()).mois.flatMap(m => m.ev.map(([n]) => n)));
+  verifier("résidence : trésorerie sans acompte", !tresorerie.includes("Acompte provisionnel"), tresorerie);
+  const rapport = await p.evaluate(() => { const W = window.Wealthnord.rapport, boite = document.getElementById("rapport");
+    W.construire(); const t = boite.textContent; W.construire({ comptable: true }); const c = boite.textContent; boite.textContent = ""; return { t, c }; });
+  verifier("résidence : le rapport et le sommaire du comptable", rapport.t.includes("Revenu · résidence") && rapport.t.includes("Retenu par paie") && rapport.c.includes("T4") && rapport.c.includes("T2202"));
+  // La bascule : la pratique, comme sans résidence ; les projections ne changent pas d'une vue à l'autre.
+  await allerA(p, "apercu");
+  await p.click('#ap-parcours button[data-v="pratique"]'); await p.waitForTimeout(300);
+  const q = await p.evaluate(() => { const R = window.Wealthnord.resultats(); return { vue: R.vueResidence, surplus: R.surplusMoi, vn: R.projection[10].moi, hero: document.querySelector("#ap-hero .hero-etiquette").textContent }; });
+  verifier("bascule : la vue Pratique, comme sans résidence", !q.vue && Math.abs(q.surplus - avant.surplus) < 0.01 && q.hero.includes("en pratique"), { q, avant });
+  verifier("bascule : mêmes projections dans les deux vues ; la résidence les change", Math.abs(q.vn - r.vn) < 0.01 && r.vn < avant.vn, { pratique: q.vn, residence: r.vn, sans: avant.vn });
+  verifier("résidence : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

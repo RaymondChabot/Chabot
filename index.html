@@ -78,13 +78,14 @@
       <!-- Téléphone : les boutons empilés à droite du titre (le logo garde toute la largeur en haut). La barre suit
            la page ouverte ; Rapport PDF dans l'aperçu seulement. Cachée sur ordinateur. -->
       <div class="barre-outils">
-        <button type="button" class="bouton-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer</span></button>
+        <button type="button" class="bouton-installer" data-installer aria-label="Installer l'application" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer</span></button>
         <button type="button" class="bouton-modifier bouton-pdf" id="barre-pdf">Rapport PDF</button>
         <button type="button" class="bouton-icone" data-bascule-theme aria-label="Changer de thème"></button>
         <a class="bouton-icone bouton-donnees" href="#donnees" data-onglet="donnees" aria-label="Données et confidentialité">
           <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg><span>Données</span>
         </a>
       </div>
+      <div class="segment parcours" id="ap-parcours"></div>
       <div class="carte exemple" id="ap-exemple" hidden>
         <div>
           <h2>Ces chiffres sont un exemple</h2>
@@ -129,23 +130,29 @@
     <!-- ============ REVENU ============ -->
     <section class="vue" id="v-revenu" aria-labelledby="h-revenu" hidden>
       <header class="tete-page"><h1 id="h-revenu">Revenu</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
-      <div class="choix-milieu">
+      <div class="segment parcours" id="rv-parcours"></div>
+      <div class="choix-milieu pratique-seule">
         <label for="rv-milieu">Pratique principale</label>
         <div class="saisie"><select id="rv-milieu"></select></div>
         <p class="aide" id="rv-milieu-aide"></p>
       </div>
-      <div class="segment" id="rv-mode"></div>
+      <div class="segment pratique-seule" id="rv-mode"></div>
       <div class="hero" id="rv-hero"></div>
-      <div class="carte demi" id="rv-carte-modes">
+      <div class="carte residence-seule" id="rv-residence" hidden>
+        <div class="carte-tete"><h2>Votre résidence</h2><button type="button" class="lien-carte" data-feuille="residence">Modifier</button></div>
+        <div class="rangees" id="rv-residence-detail"></div>
+        <p class="aide" id="rv-residence-note"></p>
+      </div>
+      <div class="carte demi pratique-seule" id="rv-carte-modes">
         <div class="carte-tete"><h2>Comparer les modes</h2></div>
         <div id="rv-comparaison"></div>
         <p class="aide" id="rv-seuil"></p>
       </div>
-      <div class="carte demi" id="rv-carte-faits">
+      <div class="carte demi pratique-seule" id="rv-carte-faits">
         <div class="carte-tete"><h2>Votre année en chiffres</h2></div>
         <div class="rangees" id="rv-faits"></div>
       </div>
-      <div class="carte demi" id="rv-carte-activites">
+      <div class="carte demi pratique-seule" id="rv-carte-activites">
         <div class="carte-tete"><h2>Activités en établissement</h2></div>
         <div id="rv-activites"></div>
         <div class="actions"><button type="button" class="bouton secondaire" id="rv-ajout-activite">Ajouter une activité</button></div>
@@ -154,7 +161,7 @@
         <div class="carte-tete"><h2>Autres revenus</h2><button type="button" class="lien-carte" id="rv-autres-modifier">Modifier</button></div>
         <div id="rv-autres"></div>
       </div>
-      <div class="carte" id="rv-carte-sens">
+      <div class="carte pratique-seule" id="rv-carte-sens">
         <div class="carte-tete"><h2 id="rv-sens-titre">Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>
         <div class="legende" id="rv-sens-legende"></div>
         <div class="graphique" id="rv-sens-graph"></div>
@@ -165,25 +172,31 @@
         </div>
         <p class="aide" id="rv-sens-note"></p>
       </div>
-      <div class="carte" id="rv-carte-source">
+      <div class="carte pratique-seule" id="rv-carte-source">
         <div class="carte-tete"><h2>D'où vient le revenu</h2></div>
         <div id="rv-barres"></div>
         <div class="legende" id="rv-legende"></div>
         <div class="tableau-defile"><table class="tableau" id="rv-detail"></table></div>
+      </div>
+      <div class="carte" id="rv-residence-ajout" hidden>
+        <div class="carte-tete"><h2 id="rv-residence-ajout-titre">En résidence ?</h2></div>
+        <p class="aide" id="rv-residence-ajout-texte">Ajoutez votre salaire de résident (échelle de la FMRQ) et la date de début de votre pratique : l'app montre l'une ou l'autre, et vos projections passent de la résidence à la pratique à cette date.</p>
+        <div class="actions"><button type="button" class="bouton secondaire" id="rv-residence-ajouter">Ajouter ma résidence</button></div>
       </div>
     </section>
 
     <!-- ============ IMPÔT ============ -->
     <section class="vue" id="v-impot" aria-labelledby="h-impot" hidden>
       <header class="tete-page"><h1 id="h-impot">Impôt 2026</h1><button type="button" class="bouton-modifier" data-feuille="impot">Modifier</button></header>
-      <div class="segment" id="im-mode"></div>
+      <div class="segment parcours" id="im-parcours"></div>
+      <div class="segment pratique-seule" id="im-mode"></div>
       <div class="hero" id="im-hero"></div>
       <div class="carte demi">
         <div class="carte-tete"><h2>Sur chaque 100 $ gagnés</h2></div>
         <div id="im-cent"></div>
       </div>
       <div class="carte demi">
-        <div class="carte-tete"><h2>Mettre de côté et payer</h2></div>
+        <div class="carte-tete"><h2 id="im-acomptes-titre">Mettre de côté et payer</h2></div>
         <div id="im-acomptes"></div>
       </div>
       <div class="carte">
@@ -196,7 +209,7 @@
         <p class="aide">Une page à imprimer ou à enregistrer en PDF : revenus et déductions, impôt estimé, acomptes et échéances, documents à rassembler et points à valider ensemble.</p>
         <div class="actions"><button type="button" class="bouton secondaire" data-comptable>Sommaire pour le comptable</button></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi pratique-seule">
         <div class="carte-tete"><h2>Dépenses professionnelles</h2><button type="button" class="lien-carte" id="im-pro-modifier">Modifier</button></div>
         <div id="im-pro"></div>
       </div>
@@ -204,7 +217,7 @@
         <div class="carte-tete"><h2>Famille et couple</h2><button type="button" class="lien-carte" data-feuille="menage">Modifier</button></div>
         <div id="im-famille"></div>
       </div>
-      <details class="carte demi carte-repliable">
+      <details class="carte demi carte-repliable pratique-seule">
         <summary><h2>Et avec une société ?</h2><span class="repli-resume" id="im-societe-resume"></span></summary>
         <div id="im-societe"></div>
       </details>
@@ -217,6 +230,7 @@
     <!-- ============ BUDGET ============ -->
     <section class="vue" id="v-budget" aria-labelledby="h-budget" hidden>
       <header class="tete-page"><h1 id="h-budget">Budget</h1><button type="button" class="bouton-modifier" data-feuille="menage">Ménage</button></header>
+      <div class="segment parcours" id="bu-parcours"></div>
       <div class="segment" id="bu-vue"></div>
       <div class="hero" id="bu-hero"></div>
       <div class="onglets" id="bu-onglets"></div>

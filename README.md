@@ -39,6 +39,22 @@ Pour tout médecin de famille au Québec, dans tous les milieux : seul ou
 en couple (mariés ou conjoints de fait), avec ou sans enfants,
 propriétaire ou locataire, travail autonome ou pratique incorporée.
 
+**En résidence** (page Revenu, ou l'assistant de départ) : le salaire de
+l'échelle de l'entente FMRQ-MSSS 2021-2028 (annexe I), selon le niveau (R1
+à R8), avec l'ajustement de 0,11 % du 31 mars 2026 (avis de la RAMQ du
+16 juillet 2026) et la hausse de 3,5 % du 1er avril 2027 ; le niveau monte
+au 1er juillet. Primes de responsabilité de garde (725 $) et
+d'enseignement (286 $) par période de 28 jours, 13 par année ; autres
+revenus d'emploi, cotisation syndicale, part des droits de scolarité
+(crédits fédéral et du Québec). Impôt d'un salarié, retenu sur la paie :
+ni acomptes ni frais de cabinet. Avec la **date de début de pratique**,
+une bascule **Résidence / Pratique** (aperçu, revenu, impôt, budget,
+rapport) montre l'une ou l'autre ; les projections et le plan des dettes
+suivent le parcours dans les deux vues : la résidence, puis la pratique à
+cette date. L'année de transition réunit le salaire et le revenu de
+pratique dans un même calcul d'impôt (RRQ de l'employé, puis des deux
+parts sous les maximums ; assurance-emploi sur le salaire seulement).
+
 Au premier lancement, un **assistant de départ** pose quelques questions
 (famille, enfants, pratique, logement, dettes) et bâtit le point de départ
 à partir des réponses ; l'exemple fictif reste offert. La carte **Votre
@@ -216,6 +232,13 @@ dossier racine.
 
 ## Sources des paramètres
 
+- Résidence : Entente relative aux conditions de travail des médecins
+  résidents (FMRQ-MSSS, 2021-2028), annexe I (échelles salariales, primes
+  de responsabilité de garde et d'enseignement), art. 12.26 et 13.10
+  (primes par période de 28 jours), 13.09 (part des droits de scolarité),
+  32.01 (un niveau de plus par année de formation), 32.06 à 32.10 (hausses
+  et ajustement selon l'IPC) ; avis de la RAMQ du 16 juillet 2026 sur la
+  rémunération du médecin résident (0,11 % au 31 mars 2026).
 - Tarifs de visite : RAMQ, Manuel des médecins omnipraticiens –
   Rémunération à l'acte, onglet B (version Web consultée le 25 octobre
   2026) : colonne « en cabinet » pour la clinique privée et le GMF,

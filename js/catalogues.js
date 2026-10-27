@@ -64,6 +64,9 @@
       optimiste: { rendement: 6.5, croissanceMaison: 4.5, depreciationAuto: 12, ecartTaux: -0.5, inflation: 2, hausseRevenus: 3.5 },
     },
     famille: { calculAuto: true, versementA: "moi", medicamentsPublicMoi: true, gardeSubventionnee: false },
+    // Résidence : salaire de l'échelle de la FMRQ jusqu'au début de la pratique (mois AAAA-MM). vue : ce que
+    // montrent l'aperçu, le revenu, l'impôt et le budget (« residence » ou « pratique »).
+    residence: { active: false, niveau: 1, debutPratique: "", primeGarde: true, primeEnseignement: false, autres: 0, syndicat: 0, scolarite: 1100, vue: "residence" },
     societe: { tauxSociete: 20.5, fraisSociete: 4000, retrait: "tout", retraitFixe: 120000, solde: 0 },
     menage: { conjointNetMensuel: 0, allocationsAnnuelles: 0, autresRevenusMensuels: 0, partCommunMoi: 100 },
     // Valeurs fictives ; les autres cases du catalogue partent à 0.
@@ -493,6 +496,19 @@
       { p: "actifs.voiture.remplacementAns", l: "Remplacer les autos tous les", u: "ans", s: 1, h: "0 : jamais. Chaque auto est échangée à sa valeur ; la différence sort de l'épargne." },
       { p: "actifs.voiture.prixNeuf", l: "Prix d'une auto neuve, en dollars d'aujourd'hui", u: "$", s: 1000 },
     ],
+    residence: [
+      { g: "Votre résidence" },
+      { p: "residence.active", l: "Je suis en résidence en ce moment", t: "check", h: "Jusqu'au début de la pratique, l'app compte votre salaire de résident ; ensuite, la pratique décrite dans la page Revenu." },
+      { p: "residence.niveau", l: "Niveau sur l'échelle salariale", t: "select", si: "residence.active",
+        o: [1, 2, 3, 4, 5, 6, 7, 8].map(n => [String(n), `R${n} : ${C.salaireResident({ niveau: n, date: "2026-04-01" }).salaire.toLocaleString("fr-CA")} $${n >= 6 ? " (R6 et plus)" : ""}`]),
+        h: "Échelle 2026-2027 de l'entente FMRQ (annexe I), au 1er avril 2026. Le niveau monte d'un cran au 1er juillet ; l'échelle augmente au 1er avril (3,5 % en 2027)." },
+      { p: "residence.debutPratique", l: "Début de la pratique", t: "month", si: "residence.active", h: "Le mois où commence la facturation à la RAMQ. Les projections passent alors du salaire de résident à la pratique." },
+      { p: "residence.primeGarde", l: `Prime de responsabilité de garde : ${C.FMRQ.echelles[1].garde} $ par 28 jours`, t: "check", si: "residence.active", h: "Pour le résident appelé à faire de la garde dans l'année (art. 12.26), 13 fois par année." },
+      { p: "residence.primeEnseignement", l: `Prime de responsabilité d'enseignement : ${C.FMRQ.echelles[1].enseignement} $ par 28 jours`, t: "check", si: "residence.active", h: "Pour le résident appelé à enseigner (art. 13.10)." },
+      { p: "residence.autres", l: "Autres revenus d'emploi : gardes volontaires, autres primes", u: "$/an", s: 100, si: "residence.active" },
+      { p: "residence.syndicat", l: "Cotisation syndicale (association et FMRQ)", u: "$/an", s: 10, si: "residence.active", h: "Retenue sur la paie ; elle figure sur le T4 et le relevé 1, et se déduit du revenu." },
+      { p: "residence.scolarite", l: "Droits de scolarité : votre part", u: "$/an", s: 50, si: "residence.active", h: "Selon l'entente (art. 13.09) : 900 $ en 2025-2026, 1 100 $ en 2026-2027, 1 300 $ en 2027-2028. Crédit d'impôt fédéral et du Québec (8 %)." },
+    ],
     hypotheses: [
       { g: "Affichage" },
       { p: "scenarios.dollarsAujourdhui", l: "Montrer l'avenir en dollars d'aujourd'hui", t: "check", h: "Retire l'inflation du scénario choisi : 100 000 $ dans 10 ans valent moins que 100 000 $ aujourd'hui." },
@@ -533,6 +549,7 @@
     { termes: ["taux mixte"], def: `Rémunération mixte : un forfait de ${fr2(RQ.forfaitHoraireMixte)} $ l'heure, plus ${fr2(RQ.pctMixte)} % du tarif de chaque visite.`, ref: "Brochure no 1, annexe XXIII" },
     { termes: ["guichet"], def: "Guichet d'accès à un médecin de famille : il attribue des patients sans médecin. Inscrire un patient attribué donne droit à un supplément.", ref: "EP 40, par. 4.12 et 13.01" },
     { termes: ["GMF-U"], def: "Groupe de médecine de famille universitaire : un GMF qui forme des résidents en médecine familiale." },
+    { termes: ["FMRQ"], def: `Fédération des médecins résidents du Québec : elle négocie l'entente des résidents avec le ministère de la Santé (salaires, primes, congés). Échelle 2026-2027 : de ${C.salaireResident({ niveau: 1, date: "2026-04-01" }).salaire.toLocaleString("fr-CA")} $ (R1) à ${C.salaireResident({ niveau: 6, date: "2026-04-01" }).salaire.toLocaleString("fr-CA")} $ (R6 et plus).`, ref: "Entente FMRQ-MSSS 2021-2028, annexe I" },
   ];
 
   window.WM = window.WM || {};

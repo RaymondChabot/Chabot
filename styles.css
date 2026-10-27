@@ -333,6 +333,9 @@ a.tuile:hover { border-color: var(--trait); }
 }
 .segment button[aria-checked="true"] { background: var(--surface); color: var(--encre); font-weight: 600; box-shadow: 0 1px 3px rgba(18, 18, 17, 0.12); }
 .segment.petit button { padding: 7px 8px; font-size: 0.84rem; }
+/* Bascule Résidence / Pratique : deux choix, pas plus large qu'il ne faut. */
+.segment.parcours { max-width: 340px; }
+@media print { .segment.parcours { display: none; } }
 /* Sous-onglets du Budget et du Patrimoine : soulignés, pour ne pas les confondre avec les choix (segments). */
 .onglets { display: flex; gap: 2px; margin: 2px 0 4px; border-bottom: 1px solid var(--ligne); overflow-x: auto; scrollbar-width: none; }
 .onglets::-webkit-scrollbar { display: none; }
@@ -848,6 +851,8 @@ a.tuile:hover { border-color: var(--trait); }
 .barre-outils > * { min-height: 40px; justify-content: center; }
 .barre-outils .bouton-icone { width: auto; border-radius: 999px; }
 .barre-outils .bouton-installer { order: 9; }
+/* Ordinateur : ces boutons sont dans la colonne de gauche et l'en-tête de chaque page. */
+@media (min-width: 960px) { .barre-outils { display: none; } }
 @media screen and (max-width: 959px) {
   #rapport-pdf { display: none; }
   .vue { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: start; }
@@ -857,6 +862,10 @@ a.tuile:hover { border-color: var(--trait); }
   .vue > .barre-outils { grid-column: 2; grid-row: 1; }
   #v-apercu > .barre-outils { grid-row: 1 / span 2; }
   #v-apercu > .hero { grid-column: 1; grid-row: 2; container-type: inline-size; }
+  /* Bascule Résidence / Pratique : sous le titre, à gauche des boutons, au-dessus du chiffre. */
+  #v-apercu.avec-parcours > .barre-outils { grid-row: 1 / span 3; }
+  #v-apercu.avec-parcours > #ap-parcours { grid-column: 1; grid-row: 2; }
+  #v-apercu.avec-parcours > .hero { grid-row: 3; }
   /* À côté des boutons, le chiffre rapetisse au besoin pour tenir dans sa colonne (« −12 345 $ » compris). */
   #v-apercu > .hero .hero-valeur { font-size: min(clamp(2.6rem, 11vw, 3.4rem), 19cqi); }
 }

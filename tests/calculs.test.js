@@ -275,5 +275,40 @@ verifier("année type : la prise en charge paie plus qu'un suivi, à l'acte", an
 const prem = { ...rev, annee: "premiere", inscritsDebut: 0, nouveauxGuichet: 300 };
 verifier("première année : pas de nouveaux patients « par année »", C.revenuGmfu({ ...prem, nouveauxAnGuichet: 40 }).acte.total === C.revenuGmfu(prem).acte.total);
 
+/* 23. Résidence : échelle salariale de l'entente FMRQ-MSSS 2021-2028 (annexe I), avec l'ajustement de 0,11 % du
+   31 mars 2026 (avis de la RAMQ du 16 juillet 2026 : niveau 1, 58 793 $ puis 60 851 $ ; niveau 6, 89 229 $ puis
+   92 352 $). Primes de responsabilité par période de 28 jours, 13 par année. */
+const sr = (niveau, date, o = {}) => C.salaireResident({ niveau, date, ...o });
+verifier("résidence : niveaux 1 et 6 de l'avis de la RAMQ", sr(1, "2026-10-01").salaire === 58793 && sr(6, "2026-10-01").salaire === 89229
+  && sr(1, "2027-04-01").salaire === 60851 && sr(6, "2027-04-01").salaire === 92352);
+verifier("résidence : échelle 2025-2026 de l'annexe I, jusqu'au 31 mars 2026", sr(1, "2026-03-31").salaire === 57296 && sr(6, "2026-03-31").salaire === 86957);
+const E = C.FMRQ.echelles;
+verifier("résidence : 0,11 % puis 2,5 % en 2026, 3,5 % en 2027, arrondis au dollar", E[0].salaires.every((x, i) => Math.round(Math.round(x * 1.0011) * 1.025) === E[1].salaires[i])
+  && E[1].salaires.every((x, i) => Math.round(x * 1.035) === E[2].salaires[i]));
+verifier("résidence : les niveaux 6 à 8 sont égaux ; l'échelle monte d'un niveau à l'autre", E.every(e => e.salaires[5] === e.salaires[6] && e.salaires[6] === e.salaires[7] && e.salaires.slice(0, 6).every((x, i, a) => !i || x > a[i - 1])));
+verifier("résidence : prime de garde, 725 $ × 13 ; d'enseignement, 286 $ × 13", sr(2, "2026-10-01", { primeGarde: true }).garde === 9425 && sr(2, "2026-10-01", { primeEnseignement: true }).enseignement === 3718
+  && sr(2, "2026-10-01", { primeGarde: true, primeEnseignement: true }).total === 64880 + 9425 + 3718);
+verifier("résidence : après la fin de l'entente, la dernière échelle", sr(3, "2029-01-01").salaire === E[2].salaires[2]);
+// Impôt d'une année mixte : il rejoint celui du particulier sans salaire, et celui du salarié sans entreprise.
+const champsImpot = ["fed", "qc", "rrq", "rqap", "fss", "total", "net", "revenuNetFed", "revenuNetQc"];
+verifier("impôt mixte = travailleur autonome, sans salaire", [20000, 90000, 250000].every(rv => {
+  const a = C.impotMixte({ revenu: rv, depensesPro: 5000, reer: 3000, interetsEtudes: 400, autresImposables: 1000 }), b = C.impotParticulier({ revenu: rv, depensesPro: 5000, reer: 3000, interetsEtudes: 400, autresImposables: 1000 });
+  return champsImpot.every(k => proche(a[k], b[k], 1e-6)); }));
+verifier("impôt mixte = salarié, sans revenu d'entreprise", [30000, 64880, 150000].every(sal => {
+  const a = C.impotMixte({ salaire: sal, syndicat: 500, reer: 2000, rpa: 1000 }), b = C.impotSalarie({ salaire: sal, syndicat: 500, reer: 2000, rpa: 1000 });
+  return [...champsImpot, "ae"].every(k => proche(a[k], b[k], 1e-6)); }));
+// Transition : 30 000 $ de salaire et 90 000 $ de revenu net d'entreprise. RRQ : part de l'employé sur le salaire, les deux
+// parts sur le reste, sous le MGA (74 600 $) et le MGS (85 000 $) partagés.
+const mix = C.impotMixte({ salaire: 30000, revenu: 100000, depensesPro: 10000 }), q = C.P2026.rrq;
+const rrqMix = (30000 - q.exemption) * 0.063 + (q.mga - 30000) * (q.base + q.supp1) + (q.mgs - q.mga) * q.supp2;
+verifier("transition : RRQ du salaire, puis des deux parts sous les maximums", proche(mix.rrq, rrqMix, 1e-6), { rrq: mix.rrq, rrqMix });
+verifier("transition : assurance-emploi sur le salaire seulement ; FSS sur le revenu d'entreprise", proche(mix.ae, 30000 * C.P2026.ae.taux, 1e-9) && mix.fss > 0
+  && C.impotMixte({ salaire: 120000 }).fss === 0);
+const avecScol = C.impotMixte({ salaire: 70000, scolarite: 1100 }), sansScol = C.impotMixte({ salaire: 70000 });
+verifier("résidence : droits de scolarité, crédit fédéral (taux de base, après l'abattement) et du Québec (8 %)",
+  proche(sansScol.total - avecScol.total, 1100 * (0.14 * (1 - 0.165) + 0.08), 0.01), sansScol.total - avecScol.total);
+verifier("résidence : la cotisation syndicale se déduit et sort de la paie", C.impotMixte({ salaire: 70000, syndicat: 600 }).total < sansScol.total
+  && proche(sansScol.net - C.impotMixte({ salaire: 70000, syndicat: 600 }).net, 600 - (sansScol.total - C.impotMixte({ salaire: 70000, syndicat: 600 }).total), 1e-6));
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

@@ -239,6 +239,7 @@ window.Verrou.quandOuvert(function () {
     strategie: ["Plan de remboursement", CHAMPS.strategie],
     epargne: ["Épargne et biens", CHAMPS.epargne],
     hypotheses: ["Hypothèses de l'avenir", CHAMPS.hypotheses],
+    residence: ["Résidence", CHAMPS.residence],
   };
   function ouvrirSection(nom) {
     const [titre, champs] = FEUILLES[nom];
@@ -248,7 +249,8 @@ window.Verrou.quandOuvert(function () {
         c.appendChild(el("p", "aide feuille-intro", "L'essentiel suffit pour commencer. Pour optimiser, affichez tous les détails : tarifs, forfaits, suppléments, apprenants, majoration selon le territoire."));
         boutonDetails(c);
       }
-      construireChamps(c, champs);
+      // La résidence en tête du revenu : le salaire de résident, puis la pratique à venir.
+      construireChamps(c, nom === "revenu" ? [...CHAMPS.residence, ...champs] : champs);
       if (nom === "impot") {
         const a = el("div", "actions"); a.dataset.si = "impot.depensesProMode=detail";
         const b = el("button", "bouton secondaire", "Détailler les dépenses professionnelles"); b.type = "button"; b.addEventListener("click", feuilleDepensesPro);
@@ -474,6 +476,26 @@ window.Verrou.quandOuvert(function () {
     // partagent le logement et les dépenses.
     R.coupleFiscal = R.couple && (S.conjointe.lien !== "fait" || !!S.conjointe.depuis12mois || !!S.conjointe.enfantCommun);
     R.interetsEtudes = S.dettes.filter(d => d.creditImpot > 0).reduce((a, d) => a + d.solde * d.taux / 100, 0);
+    // Résidence : salaire de l'échelle de la FMRQ jusqu'au début de la pratique. Vue « résidence » : l'aperçu, le
+    // revenu, l'impôt et le budget montrent la résidence ; vue « pratique » : la pratique à venir. Les projections et
+    // le plan des dettes suivent le parcours (résidence, puis pratique) dans les deux vues. Sans date : le 1er juillet qui vient.
+    const rs = S.residence || {}, [an0, mo0] = String(S.strategie.debut).split("-").map(Number);
+    R.debutPratique = /^\d{4}-\d{2}$/.test(rs.debutPratique || "") ? rs.debutPratique : `${mo0 >= 7 ? an0 + 1 : an0}-07`;
+    R.moisAvantPratique = moisEntre(S.strategie.debut, R.debutPratique);
+    R.residenceActive = !!rs.active && R.moisAvantPratique > 0;
+    R.vueResidence = R.residenceActive && rs.vue !== "pratique";
+    // Le niveau monte au 1er juillet ; m : mois depuis le début de la simulation.
+    const julletDans = (7 - mo0 + 12) % 12 || 12;
+    const niveauAu = m => Math.min(8, (+rs.niveau || 1) + (m >= julletDans ? Math.floor((m - julletDans) / 12) + 1 : 0));
+    const isoMois = m => { const d = new Date(an0, mo0 - 1 + m, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; };
+    const echelleAu = m => C.salaireResident({ niveau: niveauAu(m), date: isoMois(m), primeGarde: !!rs.primeGarde, primeEnseignement: !!rs.primeEnseignement });
+    if (R.residenceActive) {
+      const x = echelleAu(0), autres = +rs.autres || 0;
+      // Chaque 1er juillet d'ici la pratique : le niveau suivant (jusqu'à R8).
+      const etapes = [];
+      for (let m = julletDans; m < R.moisAvantPratique; m += 12) if (niveauAu(m) > niveauAu(m - 1)) etapes.push({ date: isoMois(m), ...echelleAu(m) });
+      R.res = { ...x, autres, brut: x.total + autres, scolarite: Math.max(0, +rs.scolarite || 0), syndicat: Math.max(0, +rs.syndicat || 0), prochain: etapes[0] || null, etapes };
+    }
     // Dépenses professionnelles : le total, ou la somme du détail.
     R.depensesPro = S.impot.depensesProMode === "detail" ? S.impot.depensesProDetail.reduce((t, l) => t + annuelLigne(l), 0) : S.impot.depensesPro;
     // CELIAPP : cotisations jusqu'au plafond à vie de 40 000 $ ; déductibles comme le REER.
@@ -517,9 +539,12 @@ window.Verrou.quandOuvert(function () {
     const fraisFed = kFed.reduce((t, k) => t + annuelGarde(k), 0), fraisQc = kQc.reduce((t, k) => t + annuelGarde(k), 0);
     const partMoi = b => !R.couple || b.qui === "moi" ? 1 : b.qui === "commun" ? S.menage.partCommunMoi / 100 : 0;
     const agesGarde = a => S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x <= 16);
-    const gagneMoi = R.societeActive ? 0 : Math.max(0, R.rev[mode].total - depensesMode(mode));
+    // Vue résidence : mon impôt de salarié sur le salaire de résident (base.deductionGarde, s'il y a lieu).
+    const impotResidence = (x = {}) => C.impotMixte({ salaire: R.res.brut, reer: base.reer, interetsEtudes: R.interetsEtudes, autresImposables: R.autresNonPro,
+      scolarite: R.res.scolarite, syndicat: R.res.syndicat, deductionGarde: base.deductionGarde || 0, ...x });
+    const gagneMoi = R.vueResidence ? R.res.brut : R.societeActive ? 0 : Math.max(0, R.rev[mode].total - depensesMode(mode));
     const gagneP = !R.couple ? 0 : R.autonomeP ? Math.max(0, (S.conjointe.revenuAutonome || 0) - (S.conjointe.depensesAutonome || 0)) : S.conjointe.statut === "sans" ? 0 : S.conjointe.salaire || 0;
-    const sansGarde = () => impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.rev[mode].total });
+    const sansGarde = () => R.vueResidence ? impotResidence() : impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.rev[mode].total });
     const parPartenaire = !!fraisFed && R.couple && R.coupleFiscal && salariee.revenuNetFed < sansGarde().revenuNetFed;
     const deductionAn = (a, reel = 1) => !fraisFed ? 0 : C.fraisGarde({ ages: agesGarde(a), fraisFed, revenuGagne: (parPartenaire ? gagneP : gagneMoi) * reel }).deduction;
     R.garde = { fraisFed, fraisQc, partMoiQc: fraisQc ? kQc.reduce((t, k) => t + annuelGarde(k, partMoi), 0) / fraisQc : 1, parPartenaire, deduction: deductionAn(0), economieFed: 0, agesGarde, deductionAn };
@@ -536,9 +561,15 @@ window.Verrou.quandOuvert(function () {
     for (const md of R.modes) R.nets[md] = R.impots[md].net - R.fraisPerso(md);
     R.impot = R.impots[mode];
     R.conjointe = R.couple ? partenaires[mode] : null;
+    // Vue résidence : le salaire de résident remplace la pratique dans l'impôt, le budget et la famille ; les frais
+    // personnels sont la part des droits de scolarité. Revenu brut et net de la vue (pratique ou résidence).
+    if (R.vueResidence) { [R.impot, R.conjointe] = avec(impotResidence()); R.dproPerso = R.res.scolarite; }
+    R.brutVue = R.vueResidence ? R.res.brut : R.brut;
+    R.netVue = R.vueResidence ? R.impot.net - R.dproPerso : R.nets[mode];
     const totalDe = x => x.totalGlobal ?? x.total;
     // Taux marginal : impôt (société comprise) sur 1 000 $ de plus.
-    R.tauxMarginal = (totalDe(impotDe({ ...base, depensesPro: R.depensesPro + fraisCabinet(R.brut + 1000, mode), revenu: R.brut + 1000 }))
+    R.tauxMarginal = R.vueResidence ? (impotResidence({ salaire: R.res.brut + 1000 }).total - impotResidence().total) / 1000
+      : (totalDe(impotDe({ ...base, depensesPro: R.depensesPro + fraisCabinet(R.brut + 1000, mode), revenu: R.brut + 1000 }))
       - totalDe(impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.brut }))) / 1000;
     // Revenu net d'impôt et de frais de cabinet pour un autre revenu brut (mêmes déductions, mêmes transferts).
     R.netPour = (rev, frais = 0) => avec(impotDe({ ...base, depensesPro: R.depensesPro + frais, revenu: rev }))[0].net - (R.societeActive ? 0 : R.depensesPro + frais);
@@ -553,9 +584,10 @@ window.Verrou.quandOuvert(function () {
     R.sensPat = sens([...new Set([3, 4, 5, 6, 7, 8, pat])].sort((a, b) => a - b), v => ({ patientsParDJ: v }));
     // REER : impôt sans cotisation, et avec une cotisation donnée (au revenu de l'année).
     const baseMode = { ...base, depensesPro: depensesMode(mode), revenu: R.brut };
-    R.impotSansReer = impotDe({ ...baseMode, reer: 0 }).total;
-    R.impotAvecReer = m => impotDe({ ...baseMode, reer: m }).total;
-    R.remboursementReer = S.epargne.reer.cotisationAnnuelle > 0 ? impotDe({ ...baseMode, reer: 0 }).total - impotDe(baseMode).total : 0;
+    const impotVue = x => R.vueResidence ? impotResidence(x) : impotDe({ ...baseMode, ...x });
+    R.impotSansReer = impotVue({ reer: 0 }).total;
+    R.impotAvecReer = m => impotVue({ reer: m }).total;
+    R.remboursementReer = S.epargne.reer.cotisationAnnuelle > 0 ? impotVue({ reer: 0 }).total - impotVue({}).total : 0;
     // Taux de déduction : ce que rapporte 1 000 $ cotisés au REER (sur le revenu imposable). Il dépasse
     // le taux marginal par dollar facturé quand une part de chaque dollar va aux frais de cabinet.
     R.tauxDeduction = (R.impotSansReer - R.impotAvecReer(1000)) / 1000;
@@ -630,12 +662,67 @@ window.Verrou.quandOuvert(function () {
        dollars d'aujourd'hui, puis on le ramène en dollars de l'année. Les enfants
        vieillissent : allocations selon l'âge, cotisations REEE jusqu'à 17 ans. */
     const cacheAnnee = new Map();
+    /* Parcours avec la résidence : la période a (12 mois depuis le début de la simulation) compte d'abord ses mois de
+       résidence (salaire de l'échelle au niveau et à la date de chaque mois ; après la fin de l'entente, la hausse des
+       revenus du scénario), puis ceux de la pratique : la période où elle commence suit l'année de la page Revenu
+       (première année, s'il y a lieu), les suivantes l'année type. Impôt sur le salaire et le revenu de pratique
+       réunis (impotMixte) ; en société, le salaire est imposé à part la période de transition (approximation). */
+    const finEntente = C.FMRQ.finEntente.slice(0, 7);
+    const salaireMois = (m, h) => {
+      const d = isoMois(m), apres = d.slice(0, 7) > finEntente ? Math.pow(1 + h.hausseRevenus / 100, moisEntre(finEntente, d.slice(0, 7)) / 12) : 1;
+      return (echelleAu(m).total * apres + (+rs.autres || 0) * Math.pow(1 + h.hausseRevenus / 100, m / 12)) / 12;
+    };
+    const sommeImpots = (x, y) => { const o = { ...y }; for (const k of Object.keys(x)) if (typeof x[k] === "number") o[k] = (x[k] || 0) + (y[k] || 0); return o; };
+    const anneeParcours = (h, a) => {
+      const I = Math.pow(1 + h.inflation / 100, a), reel = Math.pow(1 + h.hausseRevenus / 100, a) / I;
+      const moisRes = Math.max(0, Math.min(12, R.moisAvantPratique - 12 * a)), fP = (12 - moisRes) / 12;
+      let brutRes = 0;
+      for (let m = 12 * a; m < 12 * a + moisRes; m++) brutRes += salaireMois(m, h);
+      brutRes /= I;   // en dollars d'aujourd'hui, comme le reste du calcul de l'impôt
+      const rev = fP > 0 ? (a === Math.floor(R.moisAvantPratique / 12) ? R.rev : R.revType) : null;
+      const totalP = rev ? rev[mode].total * reel * fP : 0, fraisP = rev ? fraisCabinet(rev[mode].total * reel, mode, reel) * fP : 0;
+      const proPerso = R.societeActive ? 0 : R.depensesPro * fP + fraisP;
+      const scol = (+rs.scolarite || 0) * moisRes / 12, synd = (+rs.syndicat || 0) * moisRes / 12;
+      const reer = S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImp = R.autresNonPro * reel;
+      const anneeProj = (an0 || new Date().getFullYear()) + a;
+      const creditDividendesQc = anneeProj >= 2027 ? C.P2026.dividendes.creditQuebecDes2027 : undefined;
+      const impotMoi = dg => {
+        const perso = () => C.impotMixte({ salaire: brutRes, revenu: R.societeActive ? 0 : totalP, depensesPro: proPerso, reer, interetsEtudes: R.interetsEtudes,
+          autresImposables: autresImp, scolarite: scol, syndicat: synd, deductionGarde: dg });
+        if (!R.societeActive || !totalP) return perso();
+        const soc = impotDe({ ...base, reer: brutRes ? 0 : reer, autresImposables: brutRes ? 0 : autresImp, depensesPro: R.depensesPro * fP + fraisP, revenu: totalP, creditDividendesQc, deductionGarde: brutRes ? 0 : dg }, 1 / I);
+        return brutRes ? sommeImpots(perso(), soc) : soc;
+      };
+      // Frais de garde : la déduction fédérale va au conjoint au revenu net le moins élevé.
+      const fisc = R.couple && (R.coupleFiscal || a >= 1);
+      const conj0 = impotPartenaire(reel, 0), moi0 = impotMoi(0);
+      const parPart = !!R.garde.fraisFed && fisc && conj0.revenuNetFed < moi0.revenuNetFed;
+      const gagne = parPart ? gagneP * reel : brutRes + (R.societeActive ? 0 : Math.max(0, totalP - proPerso));
+      const deduction = R.garde.fraisFed ? C.fraisGarde({ ages: R.garde.agesGarde(a), fraisFed: R.garde.fraisFed, revenuGagne: gagne }).deduction : 0;
+      const conj = parPart && deduction ? impotPartenaire(reel, deduction) : conj0;
+      let moi = !parPart && deduction ? impotMoi(deduction) : moi0;
+      if (fisc) moi = C.transfertsConjoints(moi, conj)[0];
+      const ages = S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x < 18);
+      const nf = moi.revenuNetFed + (fisc ? conj.revenuNetFed : 0), nq = moi.revenuNetQc + (fisc ? conj.revenuNetQc : 0);
+      const prime = S.famille.medicamentsPublicMoi ? C.primeMedicaments({ revenuNetQc: nq, couple: fisc, ages, adultesCouverts: 1 }).parAdulte : 0;
+      const alloc = S.famille.calculAuto ? C.prestationsFamille({ revenuNetFed: nf, revenuNetQc: nq, ages, couple: fisc }).total * I : S.menage.allocationsAnnuelles;
+      const enf = S.epargne.reee.enfants.filter(x => +x.age + a < 17).length;
+      return {
+        travail: (moi.net - proPerso - scol - prime) * I,
+        retenu: moi.societe ? moi.societe.retenu * I : 0,
+        alloc: !R.couple || S.famille.versementA !== "conjointe" ? alloc : 0,
+        garde: C.fraisGarde({ ages: R.garde.agesGarde(a), fraisQc: R.garde.fraisQc, revenuFamilial: nq }).creditQc * R.garde.partMoiQc * I,
+        epargne: enf * S.epargne.reee.cotisationAnnuelle + S.epargne.reer.cotisationAnnuelle + S.epargne.celi.cotisationAnnuelle + R.celiappAnnee(a) + R.objectifsAnnee(a),
+        moisResidence: moisRes, brutResidence: brutRes * I, brutPratique: totalP * I,
+      };
+    };
     R.annee = (h, a) => {
       const cle = `${h.hausseRevenus}|${h.inflation}|${a}`;
       if (cacheAnnee.has(cle)) return cacheAnnee.get(cle);
       const I = Math.pow(1 + h.inflation / 100, a), reel = Math.pow(1 + h.hausseRevenus / 100, a) / I;
       let res;
-      if (a === 0) res = { travail: R.travailMoi * 12, alloc: R.allocMoi * 12, garde: R.garde.creditMoi, epargne: (R.epargneMoi - R.objectifsMois) * 12 + R.objectifsAnnee(0), retenu: R.impot.societe ? R.impot.societe.retenu : 0 };
+      if (R.residenceActive) res = anneeParcours(h, a);
+      else if (a === 0) res ={ travail: R.travailMoi * 12, alloc: R.allocMoi * 12, garde: R.garde.creditMoi, epargne: (R.epargneMoi - R.objectifsMois) * 12 + R.objectifsAnnee(0), retenu: R.impot.societe ? R.impot.societe.retenu : 0 };
       else {
         const conj = impotPartenaire(reel, R.garde.parPartenaire ? R.garde.deductionAn(a, reel) : 0);
         const fraisA = fraisCabinet(R.revType[mode].total * reel, mode, reel);
@@ -773,10 +860,10 @@ window.Verrou.quandOuvert(function () {
   const AU_MODE = { horaire: "au taux horaire", mixte: "au taux mixte", acte: "à l'acte" };
   const COULEUR_MODE = { horaire: SERIES[0], mixte: SERIES[1], acte: SERIES[2] };
   // Libellé du revenu utilisé : pratique principale et mode.
-  const libelleRevenu = () => `${MILIEUX[R.milieu].nom} · ${NOM_MODE[R.mode]}`;
+  const libelleRevenu = () => R.vueResidence ? `Résidence, R${R.res.niveau} · pratique dès ${moisLong(R.debutPratique)}` : `${MILIEUX[R.milieu].nom} · ${NOM_MODE[R.mode]}`;
   // Choix du mode : seulement s'il y en a plusieurs (GMF-U, CLSC).
   const choixMode = id => {
-    document.getElementById(id).hidden = !R.plusieursModes;
+    document.getElementById(id).hidden = !R.plusieursModes || R.vueResidence;
     if (R.plusieursModes) segment(id, [["horaire", "Horaire"], ["mixte", "Mixte"], ["acte", "À l'acte"]], R.mode, v => changer("revenu.modeBudget", v), "Mode de rémunération utilisé");
   };
 
@@ -784,12 +871,15 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("ap-exemple").hidden = !S.meta.exemple;
     rendrePortrait();
     // Sans aucune dépense entrée, le « surplus » serait le revenu net en entier : on montre le revenu, et la suite.
+    // Avec la résidence : ce que montre la vue, et jusqu'à quand.
+    const enVue = !R.residenceActive ? "" : R.vueResidence ? " en résidence" : " en pratique";
+    const quand = !R.residenceActive ? null : puce(R.vueResidence ? `R${R.res.niveau}, jusqu'en ${moisLong(moisAvant(R.debutPratique))}` : `Dès ${moisLong(R.debutPratique)}`);
     if (!S.meta.exemple && !categoriesBudget().some(categorieRemplie)) {
       const lien = el("a", "lien-carte", "Entrez vos dépenses du mois"); lien.href = "#budget";
       const suite = el("span"); suite.append(lien, document.createTextNode(" pour voir ce qu'il vous reste."));
-      hero("ap-hero", "Votre revenu net mensuel", $(R.netMoi), [suite], R.netMoi);
-    } else hero("ap-hero", "Votre surplus mensuel", $(R.surplusMoi), [
-      R.surplusMoi >= 0 ? `Sur un revenu net de ${$(R.netMoi)} par mois` : puce("Vos sorties dépassent vos revenus", "bas", false),
+      hero("ap-hero", "Votre revenu net mensuel" + enVue, $(R.netMoi), [suite, quand], R.netMoi);
+    } else hero("ap-hero", "Votre surplus mensuel" + enVue, $(R.surplusMoi), [
+      R.surplusMoi >= 0 ? `Sur un revenu net de ${$(R.netMoi)} par mois` : puce("Vos sorties dépassent vos revenus", "bas", false), quand,
     ], R.surplusMoi);
 
     // Ce mois-ci : où va votre revenu net.
@@ -816,8 +906,8 @@ window.Verrou.quandOuvert(function () {
     };
     const p = R.projection, dix = p[Math.min(10, p.length - 1)];
     t.append(
-      tuileLien("revenu", "Revenu brut", $(R.brut), libelleRevenu()),
-      tuileLien("impot", "Net de l'année", $(R.nets[R.mode]), R.fraisPerso(R.mode) > 0 ? "Après impôt et frais" : "Après impôt"),
+      tuileLien("revenu", "Revenu brut", $(R.brutVue), R.vueResidence ? `Salaire de résident, R${R.res.niveau}` : libelleRevenu()),
+      tuileLien("impot", "Net de l'année", $(R.netVue), R.vueResidence ? "Après impôt et retenues" : R.fraisPerso(R.mode) > 0 ? "Après impôt et frais" : "Après impôt"),
       tuileLien("budget", "Dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
       tuileLien("avenir", "Valeur nette", $(p[0].moi), `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}`),
     );
@@ -830,12 +920,13 @@ window.Verrou.quandOuvert(function () {
       const txt = el("span"); txt.append(lib, document.createTextNode(texte));
       li.append(ico, txt); a.appendChild(li);
     };
-    if (R.societeActive) action("important", `La société garde environ ${$(R.impot.societe.impotSociete / 12)} par mois pour son impôt ; vous, environ ${$(R.impot.total / 12)} par mois pour l'impôt sur vos dividendes.`);
+    if (R.vueResidence) action("bon", "En résidence, l'impôt et les cotisations sont retenus sur chaque paie : rien à mettre de côté.");
+    else if (R.societeActive) action("important", `La société garde environ ${$(R.impot.societe.impotSociete / 12)} par mois pour son impôt ; vous, environ ${$(R.impot.total / 12)} par mois pour l'impôt sur vos dividendes.`);
     else action("important", `Mettez ${pct((R.impot.total + R.primeMoi) / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$((R.impot.total + R.primeMoi) / 12)} par mois.`);
     // Après l'assistant : ce qu'il reste à entrer.
     if (S.meta.assistant) {
       if (depensesEffectives().filter(b => b.montant > 0 && b.k !== "loyer").length < 3) action("important", "Entrez vos dépenses du mois (page Budget) : épicerie, électricité, assurances, transport… Sans elles, le surplus est surestimé.");
-      if ((S.revenu.activites || []).some(x => x.calcul !== "patients" && ACTIVITES[x.type] && x.parJour === ACTIVITES[x.type].parJour))
+      if (!R.vueResidence && (S.revenu.activites || []).some(x => x.calcul !== "patients" && ACTIVITES[x.type] && x.parJour === ACTIVITES[x.type].parJour))
         action("info", "Vérifiez le revenu par jour de vos activités en établissement (page Revenu) : les valeurs de départ sont indicatives.");
       if (!S.epargne.encaisse && !S.epargne.reer.solde && !S.epargne.celi.solde && !S.epargne.reer.droits) action("info", "Ajoutez votre épargne et vos droits REER (page Patrimoine, bouton Modifier).");
     }
@@ -847,9 +938,14 @@ window.Verrou.quandOuvert(function () {
     if (!S.meta.exemple && !(S.bilans || []).some(b => b.mois === moisPasse() && (b.recu != null || b.depense != null)))
       action("info", `Faites le bilan de ${nomMois(moisPasse())} (page Budget) : ce que vous avez reçu et dépensé, comparé au budget.`);
     R.objectifs.filter(o => !o.atteint && !o.mois).forEach(o => action("important", `L'objectif « ${o.nom || "sans nom"} » n'est pas atteint à la date visée : choisissez une nouvelle date (page Patrimoine).`));
-    if (S.revenu.annee === "premiere") action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total + R.primeMoi)} seront à payer d'un coup le 30 avril.`);
+    if (R.residenceActive) action(R.moisAvantPratique <= 6 ? "important" : "info", `Début de la pratique en ${moisLong(R.debutPratique)}, ${delaiMois(R.moisAvantPratique)} : la première année, aucun acompte n'est exigé, mais le solde de l'impôt arrive le 30 avril suivant.${R.vueResidence ? " Basculez sur « Pratique » pour la préparer." : ""}`);
+    if (R.residenceActive && !S.residence.debutPratique) action("important", `Inscrivez la date de début de votre pratique (Revenu, Modifier) : l'app suppose ${moisLong(R.debutPratique)}.`);
+    if (S.residence && S.residence.active && !R.residenceActive) action("info", "Votre date de début de pratique est passée : l'app compte maintenant votre pratique. Si c'est fait, retirez la résidence (Revenu, Modifier).");
+    if (S.revenu.annee === "premiere" && !R.vueResidence) action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total + R.primeMoi)} seront à payer d'un coup le 30 avril.`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
-    if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
+    // En résidence, le régime d'assurance collective de l'entente de la FMRQ couvre les médicaments (art. 28.10).
+    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si vous y êtes inscrit(e), décochez le régime public (Budget, bouton Ménage) ; la prime de 766 $ ne s'applique pas.");
+    else if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
       action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 766 $ par adulte en 2026, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
     const auj = new Date(S.strategie.debut + "-01T00:00:00");
     S.dettes.filter(d => d.type === "hypotheque" && d.finTerme).forEach(d => {
@@ -870,9 +966,9 @@ window.Verrou.quandOuvert(function () {
       const pm = d.frequence === "2sem" ? d.paiement * 26 / 12 : d.paiement;
       if (!d.interetsSeulement && d.solde > 0 && pm <= d.solde * C.tauxMensuel(d, d.taux)) action("important", `Le paiement de « ${d.nom} » ne couvre pas les intérêts : vérifiez le montant, ou choisissez « Intérêts seulement ».`);
     });
-    alertesRamq(R, action);
+    if (!R.vueResidence) alertesRamq(R, action);
     const mix = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
-    if (Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
+    if (!R.vueResidence && Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
     if (R.surplusMoi < 0) action("important", `Votre budget est négatif de ${$(-R.surplusMoi)} par mois : revoyez les dépenses ou leur partage.`);
     else action("bon", `Votre surplus de ${$(R.surplusMoi)} par mois va sur les dettes, dans l'ordre de la méthode choisie.`);
 
@@ -891,12 +987,15 @@ window.Verrou.quandOuvert(function () {
     const an = auj.getFullYear(), anImpot = (+String(S.strategie.debut).slice(0, 4) || an) + 1;
     const l = [], premiere = S.revenu.annee === "premiere", t = R.impot.total + R.primeMoi;   // prime d'assurance médicaments : avec l'impôt du Québec
     const prochaine = (m, j) => { const d = new Date(an, m, j); return d < auj ? new Date(an + 1, m, j) : d; };
-    if (premiere) l.push({ date: new Date(anImpot, 3, 30), titre: "Solde de l'impôt", sous: "Première année : fédéral et Québec", valeur: $(t) });
-    for (const y of [an, an + 1, an + 2]) for (const [m, j] of [[2, 15], [5, 15], [8, 15], [11, 15]]) {
+    // En résidence, l'impôt est retenu sur la paie : ni acomptes ni solde de première année.
+    if (premiere && !R.vueResidence) l.push({ date: new Date(anImpot, 3, 30), titre: "Solde de l'impôt", sous: "Première année : fédéral et Québec", valeur: $(t) });
+    if (!R.vueResidence) for (const y of [an, an + 1, an + 2]) for (const [m, j] of [[2, 15], [5, 15], [8, 15], [11, 15]]) {
       if (premiere && y < anImpot) continue;
       l.push({ date: new Date(y, m, j), titre: "Acompte provisionnel", sous: "Impôt, cotisations et prime d'assurance médicaments", valeur: $(t / 4) });
     }
-    l.push({ date: prochaine(5, 15), titre: "Déclarations de revenus", sous: "Date limite pour un travailleur autonome ; le solde était dû le 30 avril" });
+    l.push(R.vueResidence ? { date: prochaine(3, 30), titre: "Déclarations de revenus", sous: "Date limite pour un salarié ; l'impôt est retenu sur la paie" }
+      : { date: prochaine(5, 15), titre: "Déclarations de revenus", sous: "Date limite pour un travailleur autonome ; le solde était dû le 30 avril" });
+    if (R.residenceActive) { const [a, m] = R.debutPratique.split("-").map(Number); l.push({ date: new Date(a, m - 1, 1), titre: "Début de la pratique", sous: "Fin de la résidence ; les paies de la RAMQ commencent" }); }
     if (S.epargne.reer.droits > 0 || S.epargne.reer.cotisationAnnuelle > 0) {
       let d = new Date(an, 0, 60); if (d < auj) d = new Date(an + 1, 0, 60);
       l.push({ date: d, titre: "Limite REER", sous: `Cotisations déductibles pour l'année ${d.getFullYear() - 1}`, valeur: S.epargne.reer.cotisationAnnuelle > 0 ? $(S.epargne.reer.cotisationAnnuelle) : undefined });
@@ -926,6 +1025,8 @@ window.Verrou.quandOuvert(function () {
       // La dernière dette remboursée est annoncée par « Plus aucune dette ».
       if (f && f.getTime() !== derniere) l.push({ t: f, jalon: { mois: mois(f), annee: f.getFullYear() }, titre: d.nom, sous: `Remboursement complet · ${$(d.solde)} aujourd'hui` });
     });
+    if (R.residenceActive) { const [a, m] = R.debutPratique.split("-").map(Number), d = new Date(a, m - 1, 1);
+      l.push({ t: d, jalon: { mois: mois(d), annee: a }, titre: "Début de la pratique", sous: "Fin de la résidence", cls: "fort" }); }
     if (R.sim.libre && S.dettes.length > 1) l.push({ t: R.sim.libre, jalon: { mois: mois(R.sim.libre), annee: R.sim.libre.getFullYear() }, titre: "Plus aucune dette", sous: `${$(R.detteTotale)} remboursés ; le budget des dettes est ensuite placé`, cls: "fort" });
     const p = R.projection, debut = p[0].moi;
     for (const seuil of [0, 250000, 500000, 1000000, 2000000]) {
@@ -969,7 +1070,34 @@ window.Verrou.quandOuvert(function () {
   }
 
   const COURT_MODE = { horaire: "Horaire", mixte: "Mixte", acte: "À l'acte" };
+  // Résidence : la carte du salaire en vue résidence ; sinon, l'invitation à l'ajouter (ou à la retirer, date passée).
+  function rendreResidence(R) {
+    const rs = S.residence || {}, ajout = document.getElementById("rv-residence-ajout");
+    ajout.hidden = R.residenceActive;
+    document.getElementById("rv-residence-ajout-titre").textContent = rs.active ? "Votre pratique a commencé" : "En résidence ?";
+    document.getElementById("rv-residence-ajout-texte").textContent = rs.active
+      ? `La date de début de pratique (${moisLong(R.debutPratique)}) est passée : l'app compte votre pratique. Retirez la résidence si elle est terminée.`
+      : "Ajoutez votre salaire de résident (échelle de la FMRQ) et la date de début de votre pratique : l'app montre l'une ou l'autre, et vos projections passent de la résidence à la pratique à cette date.";
+    document.getElementById("rv-residence-ajouter").textContent = rs.active ? "Retirer la résidence" : "Ajouter ma résidence";
+    if (!R.vueResidence) return;
+    const x = R.res, net = R.netVue;
+    hero("rv-hero", "Salaire brut de l'année", $(x.brut), [`Net après impôt et retenues : ${$(net)}`, puce(`R${x.niveau}, échelle du ${dateLongue(x.echelle)}`)], x.brut);
+    rangees("rv-residence-detail", [
+      { titre: `Salaire de l'échelle, R${x.niveau}`, sous: "Entente FMRQ, annexe I", valeur: $(x.salaire) },
+      x.garde > 0 && { titre: "Prime de responsabilité de garde", sous: `${$(x.garde / C.FMRQ.periodes)} par période de 28 jours, ${C.FMRQ.periodes} fois`, valeur: $(x.garde) },
+      x.enseignement > 0 && { titre: "Prime de responsabilité d'enseignement", sous: `${$(x.enseignement / C.FMRQ.periodes)} par période de 28 jours`, valeur: $(x.enseignement) },
+      x.autres > 0 && { titre: "Autres revenus d'emploi", valeur: $(x.autres) },
+      { titre: "Total brut", cls: "total", valeur: $(x.brut) },
+      { titre: "Net après impôt et retenues", sous: `Environ ${$(R.impot.net / 26)} par paie, aux deux semaines${x.scolarite ? ` ; moins ${$(x.scolarite)} de droits de scolarité par année` : ""}`, valeur: $(net) },
+      x.prochain && { titre: `Au ${dateLongue(x.prochain.date)} : R${x.prochain.niveau}`, sous: "Une année de formation de plus", valeur: $(x.prochain.total + x.autres) },
+      { titre: "Début de la pratique", sous: delaiMois(R.moisAvantPratique), valeur: moisLong(R.debutPratique) },
+    ]);
+    document.getElementById("rv-residence-note").textContent = "Échelle de l'entente FMRQ-MSSS 2021-2028 (annexe I), avec l'ajustement de 0,11 % du 31 mars 2026 (avis de la RAMQ du 16 juillet 2026) ; "
+      + "hausse de 3,5 % le 1er avril 2027, puis, après l'entente, la hausse des revenus du scénario. Basculez sur « Pratique » pour voir et préparer la pratique.";
+  }
   function rendreRevenu(R) {
+    rendreResidence(R);
+    if (R.vueResidence) { rendreAutresRevenus(); return; }
     // Pratique principale, en haut de la section.
     const choix = document.getElementById("rv-milieu");
     if (!choix.options.length) for (const [k, m] of Object.entries(MILIEUX)) { const o = el("option", null, m.long); o.value = k; choix.appendChild(o); }
@@ -987,6 +1115,7 @@ window.Verrou.quandOuvert(function () {
       `${R.libelleNet(R.mode)} : ${$(R.nets[R.mode])}`,
       meilleur ? puce(`${signe(diff)} par rapport ${AU_MODE[meilleur]}`, diff >= 0 ? "haut" : "bas", diff >= 0)
         : g.activites ? puce(`Dont ${$(g.activites)} d'activités en établissement`) : null,
+      R.residenceActive ? puce(`Dès ${moisLong(R.debutPratique)}`) : null,
     ], g[R.mode].total);
 
     if (R.plusieursModes) {
@@ -1242,9 +1371,61 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("rv-sens-note").textContent = `${notePrefixe} Demi-journées de rendez-vous${ens ? `, dont ${nb(ens)} d'enseignement` : ""}, à ${nb(pat)} patients chacune ; le sans rendez-vous et les activités restent les mêmes.${R.modes.includes("horaire") ? " Au taux horaire, le nombre de patients ne change pas le revenu." : ""}`;
   }
 
+  // Sur chaque 100 $ gagnés : où va le revenu brut (morceaux : nom, montant de l'année, couleur).
+  function centDollars(morceaux, brut) {
+    const cent = document.getElementById("im-cent"); cent.textContent = "";
+    const barre = el("div", "flux-barre"); barre.setAttribute("role", "img");
+    barre.setAttribute("aria-label", morceaux.map(([n, v]) => `${n} ${$2(v / brut * 100)}`).join(", "));
+    morceaux.forEach(([n, v, c]) => { if (v > 0) { const sp = el("span"); sp.style.flex = `${v} 0 0`; sp.style.background = c; sp.title = n; barre.appendChild(sp); } });
+    cent.appendChild(barre);
+    cent.appendChild(rangees(el("div"), morceaux.map(([n, v, c]) => ({ titre: n, couleur: c, valeur: $2(v / brut * 100), valeurSous: $(v) + " par année" }))));
+  }
+  // Vue résidence : un salarié ; l'impôt et les cotisations sont retenus sur chaque paie.
+  function rendreImpotResidence(R) {
+    const I = R.impot, x = R.res, t = I.total, brut = Math.max(1, I.revenu + (I.autres || 0));
+    hero("im-hero", "Impôt et cotisations de l'année", $(t), [puce(`Taux moyen ${pct(I.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`)], t);
+    centDollars([["Impôt fédéral", I.fed, SERIES[0]], ["Impôt du Québec", I.qc, SERIES[1]], ["RRQ, RQAP et assurance-emploi", I.rrq + I.rqap + I.ae + I.fss, SERIES[2]],
+      ["Cotisation syndicale et droits de scolarité", x.syndicat + x.scolarite, SERIES[3]], ["Reste pour vous", R.netVue, SERIES[4]]].filter(([, v]) => v > 0.5), brut);
+    document.getElementById("im-acomptes-titre").textContent = "Retenues sur la paie";
+    const a = document.getElementById("im-acomptes"); a.textContent = "";
+    a.appendChild(el("p", "resume", `En résidence, votre établissement retient l'impôt et les cotisations sur chaque paie, aux deux semaines : pas d'acomptes provisionnels. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est aussi ce que rapporte chaque dollar cotisé au REER.`));
+    a.appendChild(rangees(el("div"), [
+      { titre: "Paie brute", sous: "26 paies par année, en moyenne", valeur: $(I.revenu / 26) },
+      { titre: "Impôt et cotisations retenus", valeur: moins(t / 26) },
+      x.syndicat > 0 && { titre: "Cotisation syndicale", valeur: moins(x.syndicat / 26) },
+      { titre: "Paie nette", cls: "total", valeur: $(I.net / 26) },
+    ]));
+    a.appendChild(el("p", "aide", "Montants moyens : les primes de responsabilité sont versées toutes les 4 semaines, et la retenue réelle dépend des formulaires TD1 et TP-1015.3 remplis à l'embauche. Déclarations de revenus : le 30 avril."));
+    document.getElementById("im-tableau-titre").textContent = "Détail de l'impôt";
+    lignes(document.getElementById("im-tableau"), ["", "Par année"], [
+      { cellules: [`Salaire de l'échelle, R${x.niveau}`, $(x.salaire)] },
+      x.garde + x.enseignement > 0 && { cellules: ["Primes de responsabilité", $(x.garde + x.enseignement)] },
+      x.autres > 0 && { cellules: ["Autres revenus d'emploi", $(x.autres)] },
+      (I.autres || 0) > 0 && { cellules: ["Location et placements", $(I.autres)] },
+      { cls: "sous", cellules: ["Revenu imposable", $(I.imposable)] },
+      { cellules: ["Impôt fédéral", $(I.fed)] },
+      { cellules: ["Impôt du Québec", $(I.qc)] },
+      { cellules: ["RRQ", $(I.rrq)] },
+      { cellules: ["RQAP", $(I.rqap)] },
+      { cellules: ["Assurance-emploi", $(I.ae)] },
+      I.fss > 0.5 && { cellules: ["Fonds des services de santé", $(I.fss)] },
+      x.syndicat > 0 && { cellules: ["Cotisation syndicale", moins(x.syndicat)] },
+      R.couple && I.transferts > 0 && { cellules: [`Crédits transférés par ${votreP()}`, moins(I.transferts)] },
+      { cls: "total", cellules: ["Net après impôt et retenues", $(I.net)] },
+      x.scolarite > 0 && { cls: "sous", cellules: ["Moins votre part des droits de scolarité", moins(x.scolarite)] },
+      { cls: "sous", cellules: ["Taux moyen", pct(I.tauxMoyen)] },
+    ].filter(Boolean));
+    document.getElementById("im-tableau-note").textContent = "Salarié : impôt fédéral (après l'abattement du Québec) et du Québec, RRQ, RQAP et assurance-emploi de l'employé. Crédits : montant canadien pour emploi, cotisations, droits de scolarité (fédéral, et Québec à 8 %) et intérêts d'un prêt étudiant ; déductions : cotisation syndicale, REER et, au Québec, déduction pour travailleurs.";
+  }
   function rendreImpot(R) {
+    if (R.vueResidence) {
+      rendreImpotResidence(R); rendreFamille(R); rendreVerification();
+      document.getElementById("im-societe").closest(".carte").hidden = true;
+      return;
+    }
     const soc = R.societeActive, t = R.impot.totalGlobal ?? R.impot.total, perso = R.impot.total;
     choixMode("im-mode");
+    document.getElementById("im-acomptes-titre").textContent = "Mettre de côté et payer";
     hero("im-hero", soc ? "Impôt de l'année : société et vous" : "Impôt et cotisations de l'année", $(t), [
       puce(`Taux moyen ${pct(R.impot.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`),
     ], t);
@@ -1257,12 +1438,7 @@ window.Verrou.quandOuvert(function () {
          ["Dépenses et frais de la société", x.depenses + x.frais, SERIES[3]], ["Laissé dans la société", x.retenu, SERIES[5]], ["Reste pour vous", R.impot.net, SERIES[4]]]
       : [["Impôt fédéral", R.impot.fed, SERIES[0]], ["Impôt du Québec", R.impot.qc, SERIES[1]], ["RRQ, RQAP et Fonds des services de santé", cotis, SERIES[2]],
          [R.rev[R.mode].fraisCabinet ? "Dépenses et frais de cabinet" : "Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", R.impot.net - dpro, SERIES[4]]];
-    const cent = document.getElementById("im-cent"); cent.textContent = "";
-    const barre = el("div", "flux-barre"); barre.setAttribute("role", "img");
-    barre.setAttribute("aria-label", morceaux.map(([n, v]) => `${n} ${$2(v / brut * 100)}`).join(", "));
-    morceaux.forEach(([n, v, c]) => { if (v > 0) { const sp = el("span"); sp.style.flex = `${v} 0 0`; sp.style.background = c; sp.title = n; barre.appendChild(sp); } });
-    cent.appendChild(barre);
-    cent.appendChild(rangees(el("div"), morceaux.map(([n, v, c]) => ({ titre: n, couleur: c, valeur: $2(v / brut * 100), valeurSous: $(v) + " par année" }))));
+    centDollars(morceaux, brut);
 
     const a = document.getElementById("im-acomptes"); a.textContent = "";
     a.appendChild(el("p", "resume", soc
@@ -1447,7 +1623,7 @@ window.Verrou.quandOuvert(function () {
       V.surplus < 0 && puce("Budget négatif", "bas", false),
     ], V.surplus);
     rangees("bu-revenus", [
-      { titre: "Revenu net de travail", sous: vue === "conjointe" ? (S.conjointe.statut === "autonome" ? "Après impôt, cotisations et dépenses d'entreprise" : "Salaire après impôt et cotisations") : "Après impôt, prime d'assurance médicaments et dépenses pro", valeur: $(V.travail) },
+      { titre: "Revenu net de travail", sous: vue === "conjointe" ? (S.conjointe.statut === "autonome" ? "Après impôt, cotisations et dépenses d'entreprise" : "Salaire après impôt et cotisations") : R.vueResidence ? "Salaire de résident, après impôt, retenues, droits de scolarité et prime d'assurance médicaments" : "Après impôt, prime d'assurance médicaments et dépenses pro", valeur: $(V.travail) },
       (R.allocations > 0 || vue !== "conjointe") && { titre: "Allocations familiales", sous: S.famille.calculAuto ? "Calculées selon vos revenus" : "Montant inscrit", valeur: $(V.alloc) },
       V.garde > 0.5 && { titre: "Crédit pour frais de garde", sous: "Québec, remboursable, avec l'impôt", valeur: $(V.garde) },
       V.autres > 0 && { titre: "Autres revenus", valeur: $(V.autres) },
@@ -1657,18 +1833,35 @@ window.Verrou.quandOuvert(function () {
   }
 
   function rendreFiabilite() {
-    const uniques = [...new Set(Object.values(CHAMPS).flat().filter(c => c.p).map(c => c.p))];
+    const compte = c => c.p && (!c.p.startsWith("residence.") || (S.residence || {}).active);
+    const uniques = [...new Set(Object.values(CHAMPS).flat().filter(compte).map(c => c.p))];
     const n = uniques.filter(p => S.confirmes[p]).length;
     document.getElementById("fiabilite").textContent = `${n} sur ${uniques.length}`;
     document.querySelector("#fiabilite-jauge span").style.width = (n / Math.max(1, uniques.length) * 100) + "%";
     const l = document.getElementById("liste-a-confirmer"); l.textContent = "";
-    Object.values(CHAMPS).flat().filter(c => c.p && !S.confirmes[c.p]).filter((c, i, a) => a.findIndex(x => x.p === c.p) === i).forEach(c => l.appendChild(el("li", null, texteDe(c.l))));
+    Object.values(CHAMPS).flat().filter(c => compte(c) && !S.confirmes[c.p]).filter((c, i, a) => a.findIndex(x => x.p === c.p) === i).forEach(c => l.appendChild(el("li", null, texteDe(c.l))));
     document.getElementById("donnees-maj").textContent = S.meta.misAJour ? `Dernière modification : ${new Date(S.meta.misAJour).toLocaleString("fr-CA")}` : "";
   }
 
   let R = null;
+  // Résidence : la bascule Résidence / Pratique (aperçu, revenu, impôt, budget) ; en vue résidence, les éléments
+  // propres à la pratique se cachent et ceux de la résidence paraissent.
+  const moisLong = cle => { const [a, m] = String(cle).split("-").map(Number); return new Date(a, m - 1, 1).toLocaleDateString("fr-CA", { month: "long", year: "numeric" }); };
+  const moisAvant = cle => { const [a, m] = String(cle).split("-").map(Number); return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, "0")}`; };
+  const delaiMois = n => n <= 0 ? "maintenant" : n < 12 ? `dans ${n} mois` : `dans ${nb(Math.floor(n / 12), 0)} an${n >= 24 ? "s" : ""}${n % 12 ? ` et ${n % 12} mois` : ""}`;
+  function appliquerVue(R) {
+    document.querySelectorAll(".pratique-seule").forEach(e => { e.hidden = R.vueResidence; });
+    document.querySelectorAll(".residence-seule").forEach(e => { e.hidden = !R.vueResidence; });
+    const choix = [["residence", "Résidence"], ["pratique", "Pratique"]];
+    for (const id of ["ap-parcours", "rv-parcours", "im-parcours", "bu-parcours"]) {
+      if (R.residenceActive) segment(id, choix, R.vueResidence ? "residence" : "pratique", v => changer("residence.vue", v), "Afficher la résidence ou la pratique");
+      else { const z = document.getElementById(id); z.textContent = ""; delete z.dataset.cle; }
+    }
+    document.getElementById("v-apercu").classList.toggle("avec-parcours", R.residenceActive);
+  }
   function tout() {
     R = calculer();
+    appliquerVue(R);
     appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
     rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
     if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
@@ -1921,12 +2114,13 @@ window.Verrou.quandOuvert(function () {
   function fluxAnnee(R) {
     const g = R.rev, soc = R.societeActive, x = R.impot.societe, part = S.menage.partCommunMoi / 100;
     const act = (g.activites || 0) + (g.polyvalence || 0), autresPro = R.autresPro + (S.revenu.autresRevenus || 0), deficit = Math.max(0, -R.surplusMoi * 12);
-    const sources = [
+    const sources = R.vueResidence ? [["Salaire de résident", R.res.brut], ["Location et placements", R.autresNonPro], ["Allocations familiales", R.allocMoi * 12],
+      ["Crédit pour frais de garde", R.garde.creditMoi], ["Manque à combler", deficit]].filter(([, v]) => v > 0.5) : [
       ["Pratique principale", R.brut - act - autresPro], ["Activités en établissement", act], ["Autres revenus professionnels", autresPro],
       ["Location et placements", R.autresNonPro], ["Allocations familiales", R.allocMoi * 12], ["Crédit pour frais de garde", R.garde.creditMoi], ["Manque à combler", deficit],
     ].filter(([, v]) => v > 0.5);
     const T = sources.reduce((t, [, v]) => t + v, 0), net = R.netMoi * 12 + deficit;
-    const sorties = soc
+    const sorties = R.vueResidence ? [["Droits de scolarité", R.dproPerso, SERIES[5]]] : soc
       ? [["Dépenses de la société", x.depenses + x.frais, SERIES[5]], ["Laissé dans la société", x.retenu, SERIES[3]]]
       : [[g[R.mode].fraisCabinet ? "Frais et dépenses pro" : "Dépenses pro", R.dproPerso, SERIES[5]]];
     const impot = T - net - sorties.reduce((t, [, v]) => t + v, 0);
@@ -1949,14 +2143,14 @@ window.Verrou.quandOuvert(function () {
      en première année, tout l'impôt le 30 avril suivant. Le surplus reste dans le compte.
      ============================================================ */
   function tresorerie(R) {
-    const g = R.rev[R.mode], soc = R.societeActive, part = S.menage.partCommunMoi / 100, t = soc ? 0 : R.impot.total;
+    const res = R.vueResidence, g = R.rev[R.mode], soc = R.societeActive && !res, part = S.menage.partCommunMoi / 100, t = soc || res ? 0 : R.impot.total;
     const auj = new Date(), an0 = auj.getFullYear(), m0 = auj.getMonth();
     const premiere = S.revenu.annee === "premiere", anImpot = (+String(S.strategie.debut).slice(0, 4) || an0) + 1;
     // Montants versés d'un coup (en société, la RAMQ paie la société : ils n'arrivent pas dans votre compte).
-    const inscription = soc ? 0 : g.forfaitInscription, vulnerables = soc ? 0 : g.forfaitVulnerable, juin = soc ? 0 : (g.volume || 0) + (g.polyvalence || 0);
+    const inscription = soc || res ? 0 : g.forfaitInscription, vulnerables = soc || res ? 0 : g.forfaitVulnerable, juin = soc || res ? 0 : (g.volume || 0) + (g.polyvalence || 0);
     // Dépenses annuelles à un mois précis (votre part) ; celles de la pratique, si vous les payez vous-même.
     const qui = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0;
-    const annuelles = lignesAnnuelles().filter(x => x.mois > 0 && (!x.pro || !soc))
+    const annuelles = lignesAnnuelles().filter(x => x.mois > 0 && (!x.pro || !(soc || res)))
       .map(x => ({ nom: x.nom, mois: x.mois, pro: x.pro, montant: x.montant * (x.pro ? 1 : qui(S.budget[x.i] || {})) })).filter(x => x.montant > 0);
     const somme = l => l.reduce((s, x) => s + x.montant, 0);
     const proAnnuelles = somme(annuelles.filter(x => x.pro)), budgetAnnuelles = somme(annuelles.filter(x => !x.pro));
@@ -1972,9 +2166,10 @@ window.Verrou.quandOuvert(function () {
       if (m % 3 === 0 && vulnerables > 0) ev.push(["Forfait des patients vulnérables, trimestre", vulnerables / 4]);
       if (m === 6 && juin > 0) ev.push(["Volume de patients et pratique polyvalente", juin]);
       // Les acomptes du Québec comprennent la prime d'assurance médicaments ; la première année, elle part avec le solde.
-      const tp = t + R.primeMoi;
+      const tp = res ? 0 : t + R.primeMoi;   // en résidence, l'impôt est retenu sur la paie (la prime, avec l'impôt du Québec)
       if (tp > 0 && m % 3 === 0 && (!premiere || an >= anImpot)) ev.push(["Acompte provisionnel", -tp / 4]);
       if (tp > 0 && premiere && m === 4 && an === anImpot) ev.push(["Solde de l'impôt de la première année", -tp]);
+      if (res && R.primeMoi > 0 && m === 4) ev.push(["Prime d'assurance médicaments, avec la déclaration", -R.primeMoi]);
       annuelles.filter(x => x.mois === m).forEach(x => ev.push([x.nom, -x.montant]));
       const ponctuel = ev.reduce((s, [, v]) => s + v, 0), solde = entreeReguliere - sortieReguliere + ponctuel;
       encaisse += solde; ecart += solde - R.surplusMoi; pireEcart = Math.min(pireEcart, ecart);
@@ -1997,7 +2192,9 @@ window.Verrou.quandOuvert(function () {
       sous: x.ev.length ? x.ev.map(([n, v]) => `${n} ${signe(v)}`).join(" · ") : `Entrées ${$(x.entrees)} · sorties ${$(x.sorties)}`,
       valeur: signe(x.solde), valeurCls: x.solde < 0 ? "negatif" : null, valeurSous: `Encaisse ${$(x.encaisse)}`,
     })));
-    document.getElementById("bu-tresorerie-note").textContent = (R.societeActive
+    document.getElementById("bu-tresorerie-note").textContent = (R.vueResidence
+      ? "En résidence, une paie aux deux semaines, l'impôt déjà retenu, en moyenne par mois. "
+      : R.societeActive
       ? "En société, la RAMQ paie la société : ce calendrier suit ce qu'elle vous verse, net d'impôt. "
       : "Paies de la RAMQ aux deux semaines, en moyenne par mois ; forfait d'inscription en mai, patients vulnérables chaque trimestre, volume et pratique polyvalente en juin. ")
       + "Le surplus du mois reste dans le compte ; s'il va aux dettes ou à l'épargne, gardez la réserve indiquée.";
@@ -2374,7 +2571,7 @@ window.Verrou.quandOuvert(function () {
   ];
   const dateMois = ym => { const [y, m] = String(ym || "").split("-").map(Number); return y && m ? new Date(y, m - 1, 1) : null; };
   const dansMois = n => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
-  const dateLongue = iso => new Date(iso + "T00:00:00").toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" });
+  const dateLongue = iso => new Date(iso.slice(0, 10) + "T00:00:00").toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" }).replace(/^1 /, "1er ");
 
   // Champs d'un élément de liste (actif, objectif) : nom libre, nombres, listes, cases.
   function champsElement(c, nomListe, i, defs) {
@@ -2712,6 +2909,8 @@ window.Verrou.quandOuvert(function () {
       if (inp.dataset.p.startsWith("revenu.tarifs.")) S.revenu.tarifsModifies = true;
       if (inp.dataset.p === "revenu.membreGmf") S.confirmes["revenu.membreGmf"] = true;   // l'alerte de l'Aperçu disparaît
       ecrire(inp.dataset.p, v); S.meta.exemple = false;
+      // Résidence cochée : la vue Résidence, et le 1er juillet qui vient comme début de pratique, à préciser.
+      if (inp.dataset.p === "residence.active" && v) { S.residence.vue = "residence"; if (!S.residence.debutPratique) { S.residence.debutPratique = R.debutPratique; remplirChamps(); } }
       majVisibilite();   // un champ peut en afficher ou en cacher d'autres
       if (inp.dataset.p === "conjointe.designation") { S.conjointe.designation = v; reconstruireFeuille(); }
       if (inp.dataset.p === "revenu.lieuTarifs" || inp.dataset.p === "revenu.listeEnseignement") { synchroniserTarifs(S); remplirChamps(); }
@@ -2981,6 +3180,13 @@ window.Verrou.quandOuvert(function () {
     c.appendChild(a);
   }
   document.getElementById("transfert-creer").addEventListener("click", creerLienTransfert);
+  // Page Revenu : ajouter la résidence (cochée, vue Résidence, puis son panneau) ; ou la retirer, une fois la date passée.
+  document.getElementById("rv-residence-ajouter").addEventListener("click", () => {
+    const rs = S.residence;
+    if (rs.active) { rs.active = false; sauver(); tout(); toast("Résidence retirée : l'app compte votre pratique."); return; }
+    rs.active = true; rs.vue = "residence"; if (!rs.debutPratique) rs.debutPratique = R.debutPratique;
+    S.meta.exemple = false; sauver(); tout(); ouvrirSection("residence");
+  });
   document.getElementById("transfert-recevoir").addEventListener("click", () => recevoirTransfert(null));
 
   /* Verrou par phrase de passe : l'activer, choisir le délai, changer la phrase, le retirer. */
@@ -3130,7 +3336,7 @@ window.Verrou.quandOuvert(function () {
       VERIFICATION.forEach(v => { const b = casCalcul(v); CHAMPS_VERIF.forEach(([k]) => { const e = Math.abs(Math.round(b[k]) - v.officiel[k]); total++; if (e <= 1) egaux++; pire = Math.max(pire, e); }); });
       return { total, egaux, pire, cas: VERIFICATION.length };
     },
-    outils: { depensesEffectives, annuelLigne, nomLigne, estPro, ITEMS_PRO, analyseDossier, independance, tresorerie, $, $2, nb, pct, signe, signePct, moisAn, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, ACTIVITES, nomActivite, frequenceTexte, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
+    outils: { depensesEffectives, annuelLigne, nomLigne, estPro, ITEMS_PRO, analyseDossier, independance, tresorerie, $, $2, nb, pct, signe, signePct, moisAn, moisLong, moisAvant, dateLongue, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, ACTIVITES, nomActivite, frequenceTexte, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
   };
 
   /* Application installable (PWA) : fonctionne hors ligne. */
@@ -3217,6 +3423,7 @@ window.Verrou.quandOuvert(function () {
   let A = null, etape = 0;
   const reponsesVides = () => ({ famille: null, depuis12mois: true, enfantCommun: false, partenaire: "salarie", revenuPartenaire: 0,
     enfants: [], milieu: null, mode: "horaire", demiJournees: 8, srv: 0, premiere: true, incorporee: false,
+    statut: "pratique", niveau: "1", debutPratique: (() => { const d = new Date(); return `${d.getMonth() >= 6 ? d.getFullYear() + 1 : d.getFullYear()}-07`; })(),
     ...Object.fromEntries(TYPES_ASSISTANT.flatMap(k => [["act_" + k, false], ["actN_" + k, 4]])),
     logement: null, loyer: 0, maison: 0, hypotheque: 0, tauxHyp: 4.5, paiementHyp: 0, partMaison: 50,
     marge: false, margeSolde: 0, margeTaux: 4.5, pret: false, pretSolde: 0, auto: false, autoSolde: 0, autoPaiement: 0 });
@@ -3280,14 +3487,24 @@ window.Verrou.quandOuvert(function () {
       c.appendChild(el("p", "aide", "Les allocations familiales, l'assurance médicaments et le REEE en dépendent. Pour un enfant de moins d'un an, inscrivez 0."));
     } },
     { titre: "Votre pratique", valide: () => A.milieu ? "" : "Choisissez votre milieu de pratique.", rendre: c => {
-      c.appendChild(asChoix("Votre milieu principal", "milieu", Object.entries(MILIEUX).map(([k, m]) => [k, m.long, DESCRIPTION_MILIEU[k]])));
+      // En résidence : le niveau et le début de la pratique ; les questions suivantes décrivent la pratique à venir.
+      c.appendChild(asChoix("Où en êtes-vous ?", "statut", [["pratique", "En pratique"], ["residence", "En résidence", "Salaire de résident (échelle de la FMRQ) jusqu'au début de la pratique"]]));
+      const residence = A.statut === "residence";
+      if (residence) c.appendChild(asGroupe(
+        creerChamp({ l: "Votre niveau sur l'échelle", t: "select", o: [1, 2, 3, 4, 5, 6, 7, 8].map(n => [String(n), `R${n} : ${$(C.salaireResident({ niveau: n, date: "2026-04-01" }).salaire)}`]) }, "as-niveau", inp => {
+          inp.value = A.niveau; inp.addEventListener("change", () => { A.niveau = inp.value; });
+        }, false),
+        creerChamp({ l: "Début de la pratique", t: "month" }, "as-debutPratique", inp => {
+          inp.value = A.debutPratique; inp.addEventListener("change", () => { A.debutPratique = inp.value; });
+        }, false)));
+      c.appendChild(asChoix(residence ? "Votre future pratique : milieu principal" : "Votre milieu principal", "milieu", Object.entries(MILIEUX).map(([k, m]) => [k, m.long, DESCRIPTION_MILIEU[k]])));
       if (A.milieu && MILIEUX[A.milieu].modes.length > 1) c.appendChild(asChoix("Votre mode de rémunération", "mode", [
         ["horaire", "Taux horaire", "Les heures, plus des forfaits et des suppléments"],
         ["mixte", "Mixte", "Un forfait par heure, plus une part du tarif des visites"],
         ["acte", "À l'acte", "Chaque visite payée selon son tarif"]]));
       c.appendChild(asGroupe(asNombre("Demi-journées de rendez-vous par semaine", "demiJournees", "d.-j.", 1),
         asNombre("Demi-journées de sans rendez-vous (SRV)", "srv", "d.-j.", 1),
-        asCase("C'est ma première année de pratique", "premiere", "La clientèle se bâtit, et aucun acompte d'impôt n'est exigé la première année."),
+        !residence && asCase("C'est ma première année de pratique", "premiere", "La clientèle se bâtit, et aucun acompte d'impôt n'est exigé la première année."),
         asCase("Ma pratique est incorporée", "incorporee", "Les paiements de la RAMQ sont versés à votre société.")));
     } },
     { titre: "Vos activités en établissement", rendre: c => {
@@ -3374,7 +3591,10 @@ window.Verrou.quandOuvert(function () {
     s.confirmes = {};
     // Pratique
     const dj = Math.min(12, Math.max(0, A.demiJournees || 0)), gmfu = A.milieu === "gmfu";
-    Object.assign(s.revenu, { milieu: A.milieu, annee: A.premiere ? "premiere" : "type", modeBudget: MILIEUX[A.milieu].modes.includes(A.mode) ? A.mode : MILIEUX[A.milieu].modes[0],
+    // En résidence : la pratique à venir commence par une première année.
+    const residence = A.statut === "residence";
+    s.residence = { ...s.residence, active: residence, niveau: String(A.niveau || 1), debutPratique: residence ? A.debutPratique || "" : "", vue: "residence" };
+    Object.assign(s.revenu, { milieu: A.milieu, annee: A.premiere || residence ? "premiere" : "type", modeBudget: MILIEUX[A.milieu].modes.includes(A.mode) ? A.mode : MILIEUX[A.milieu].modes[0],
       demiJournees: dj, enseignement: gmfu ? Math.min(2, dj) : 0, residents: gmfu ? 1 : 0, demiJourneesSRV: A.srv || 0, patientsSRV: 12,
       semaines: 46, semainesArrivee: 46, autresRevenus: 0,
       activites: TYPES_ASSISTANT.filter(k => A["act_" + k] && A["actN_" + k] > 0).map(k => ({ id: nouvelId("a"), type: k, nom: "", nombre: A["actN_" + k], frequence: "mois", cycle: 6,
@@ -3388,7 +3608,8 @@ window.Verrou.quandOuvert(function () {
       rpa: 0, syndicat: 0, depensesAutonome: 0, autresRevenus: 0, medicamentsPublic: A.partenaire !== "salarie",
       partMaison: couple && proprio ? 100 - A.partMaison : 0, epargne: 0, epargneMensuelle: 0, voiture: 0 });
     s.menage = { conjointNetMensuel: 0, allocationsAnnuelles: 0, autresRevenusMensuels: 0, partCommunMoi: couple ? 50 : 100 };
-    s.famille = { calculAuto: true, versementA: "moi", medicamentsPublicMoi: true };
+    // En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments.
+    s.famille = { calculAuto: true, versementA: "moi", medicamentsPublicMoi: !residence };
     s.epargne = { rendement: 5, encaisse: 0, reer: { solde: 0, droits: 0, cotisationAnnuelle: 0 }, celi: { solde: 0, cotisationAnnuelle: 0 },
       celiapp: { solde: 0, cotisationAnnuelle: 0 }, tauxRetrait: 35,
       reee: { cotisationAnnuelle: 0, enfants: A.enfants.map((age, i) => ({ id: "e" + (i + 1), nom: `Enfant ${i + 1}`, age, solde: 0 })) } };
