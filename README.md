@@ -50,8 +50,10 @@ Revenu affiche tous les détails.
   de nouveaux patients (la première année ; puis, l'année type, ceux qui
   remplacent les départs, avec leurs suppléments d'inscription), patients
   vulnérables et très vulnérables. En GMF-U :
-  résidents (4 à 5 patients par demi-journée) et externes (2 à 3),
-  demi-per diem selon le lieu et la région ; au mixte, intervention de
+  résidents (4 à 5 patients par demi-journée) et externes (2 à 3), sous
+  un même libellé « Apprenants supervisés » mais comptés à part, car leur
+  demi-per diem diffère (41,45 $ et 49,85 $ en établissement), selon le
+  lieu et la région ; au mixte, intervention de
   supervision ou visites des apprenants ; à l'acte, visites des
   apprenants. Taux horaire plafonné à 1 540 heures par année à 100 %
   (dépassement autorisé modifiable). Montants liés au volume de patients
@@ -152,6 +154,12 @@ Revenu affiche tous les détails.
   guichet, taux horaire et mixte… Un toucher sur le mot, souligné en
   pointillé, ouvre sa définition et sa référence ; les montants viennent
   des mêmes constantes que le calcul.
+- **Sur téléphone** : le logo et le nom occupent toute la largeur en haut ;
+  Rapport PDF (aperçu), thème et Données s'empilent à droite du titre de
+  la page. Le bouton **Installer** disparaît une fois l'app installée
+  (sur iPhone, Safari ne peut pas le savoir : « Elle est déjà installée »
+  le masque) ; la page Données garde de quoi réinstaller. Un champ à 0
+  s'efface au toucher : on tape par-dessus.
 
 À l'acte : règles d'avant la Loi 2 (le mode composé n'est pas en vigueur),
 avec frais de cabinet (pourcentage de la facturation et montant fixe).

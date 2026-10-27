@@ -56,16 +56,6 @@
   <a class="marque" href="#apercu" aria-label="WealthMorand : aperçu"><svg class="marque-ico" aria-hidden="true"><use href="#wm-arbre"/></svg><svg class="marque-nom" aria-hidden="true"><use href="#wm-nom"/></svg></a>
 </header>
 
-<!-- Téléphone : les boutons sous le logo, qui garde toute la largeur ; Rapport PDF dans l'aperçu seulement. -->
-<div class="barre-outils">
-  <button type="button" class="bouton-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer</span></button>
-  <button type="button" class="bouton-modifier bouton-pdf" id="barre-pdf" hidden>Rapport PDF</button>
-  <button type="button" class="bouton-icone" data-bascule-theme aria-label="Changer de thème"></button>
-  <a class="bouton-icone bouton-donnees" href="#donnees" data-onglet="donnees" aria-label="Données et confidentialité">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg><span>Données</span>
-  </a>
-</div>
-
 <div class="app">
   <!-- Navigation : barre du bas sur téléphone, colonne à gauche sur ordinateur -->
   <nav class="nav" aria-label="Sections">
@@ -85,6 +75,16 @@
     <!-- ============ ACCUEIL ============ -->
     <section class="vue" id="v-apercu" aria-labelledby="h-apercu">
       <header class="tete-page"><h1 id="h-apercu">Aperçu</h1><button type="button" class="bouton-modifier bouton-pdf" id="rapport-pdf">Rapport PDF</button></header>
+      <!-- Téléphone : les boutons empilés à droite du titre (le logo garde toute la largeur en haut). La barre suit
+           la page ouverte ; Rapport PDF dans l'aperçu seulement. Cachée sur ordinateur. -->
+      <div class="barre-outils">
+        <button type="button" class="bouton-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer</span></button>
+        <button type="button" class="bouton-modifier bouton-pdf" id="barre-pdf">Rapport PDF</button>
+        <button type="button" class="bouton-icone" data-bascule-theme aria-label="Changer de thème"></button>
+        <a class="bouton-icone bouton-donnees" href="#donnees" data-onglet="donnees" aria-label="Données et confidentialité">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg><span>Données</span>
+        </a>
+      </div>
       <div class="carte exemple" id="ap-exemple" hidden>
         <div>
           <h2>Ces chiffres sont un exemple</h2>
@@ -387,6 +387,7 @@
       <div class="carte" id="carte-installer">
         <div class="carte-tete"><h2>Installer l'application</h2></div>
         <p class="aide">WealthMorand s'installe sur l'écran d'accueil comme une application : icône, plein écran, et fonctionne sans connexion. Rien à télécharger d'un magasin d'applications.</p>
+        <p class="aide" id="installer-deja" hidden>Elle est déjà installée sur cet appareil : ouvrez-la depuis l'écran d'accueil. Le bouton ci-dessous sert à la réinstaller au besoin.</p>
         <div class="actions"><button type="button" class="bouton" data-installer>Installer WealthMorand</button></div>
         <p class="aide">Sur iPhone, l'application installée garde ses propres données, séparées de Safari : restaurez votre sauvegarde une fois dans l'application (page Données).</p>
       </div>

@@ -638,11 +638,80 @@ async function finitions(b, base) {
   await ctx.close();
 }
 
+/* 25. En-tête : le logo et le nom sur toute la largeur, les boutons empilés à droite du titre (et du chiffre de
+   l'aperçu). Bouton Installer masqué une fois l'app installée. Champ à 0 qui s'efface au toucher. Apprenants :
+   résidents et externes sous un même libellé, comptés à part. */
+async function enteteEtChamps(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { details: true });
+  const m = await p.evaluate(() => {
+    const r = s => document.querySelector(s).getBoundingClientRect();
+    const marque = r(".barre-haut .marque"), barre = document.querySelector(".barre-outils"), h1 = r("#h-apercu"), hero = r("#ap-hero");
+    const boutons = [...barre.children].filter(x => getComputedStyle(x).display !== "none").map(x => x.getBoundingClientRect()).sort((a, c) => a.top - c.top);
+    return { largeur: Math.round(marque.width), place: innerWidth - 32, vue: barre.parentElement.id, n: boutons.length,
+      memeX: boutons.every(x => Math.abs(x.left - boutons[0].left) < 1), empiles: boutons.every((x, i) => !i || x.top >= boutons[i - 1].bottom),
+      aDroite: boutons[0].left > h1.right && boutons[0].left > hero.right, heroACote: hero.top < boutons[boutons.length - 1].bottom };
+  });
+  verifier("en-tête : le logo et le nom sur toute la largeur", m.largeur >= m.place - 1, m);
+  verifier("en-tête : Rapport PDF, thème et Données empilés à droite du titre et du chiffre", m.vue === "v-apercu" && m.n >= 3 && m.memeX && m.empiles && m.aDroite && m.heroACote, m);
+  await allerA(p, "revenu");
+  verifier("en-tête : les boutons suivent la page ouverte, sans Rapport PDF", await p.evaluate(() => document.querySelector(".barre-outils").parentElement.id === "v-revenu" && document.getElementById("barre-pdf").hidden));
+  await allerA(p, "apercu");
+  for (const largeur of [320, 360, 430]) {
+    await p.setViewportSize({ width: largeur, height: 800 }); await p.waitForTimeout(150);
+    verifier(`en-tête : rien ne déborde à ${largeur} px`, await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll("#v-apercu > *")].every(x => x.getBoundingClientRect().right <= innerWidth - 15)));
+  }
+  await p.setViewportSize({ width: 390, height: 844 });
+  // Installer
+  const installer = () => p.evaluate(() => ({ barre: document.querySelector(".barre-outils [data-installer]").hidden, deja: document.getElementById("installer-deja").hidden,
+    carte: document.getElementById("carte-installer").hidden, marque: localStorage.getItem("wm.installee") }));
+  let i = await installer();
+  verifier("installer : bouton offert dans le navigateur", !i.barre && i.deja && !i.carte, i);
+  await p.evaluate(() => localStorage.setItem("wm.installee", "1")); await p.reload(); await pret(p);
+  i = await installer();
+  verifier("installer : masqué une fois installée ; la page Données le dit et garde de quoi réinstaller", i.barre && !i.deja && !i.carte, i);
+  await p.evaluate(() => { const e = new Event("beforeinstallprompt"); e.prompt = () => {}; e.userChoice = Promise.resolve({ outcome: "dismissed" }); window.dispatchEvent(e); });
+  i = await installer();
+  verifier("installer : de retour si le navigateur propose de nouveau l'installation", !i.barre && i.marque === null, i);
+  await p.click(".barre-outils [data-installer]"); await p.waitForTimeout(300);
+  await p.click("#feuille-corps .feuille-actions .bouton"); await p.waitForTimeout(200);
+  i = await installer();
+  verifier("installer : « Elle est déjà installée » masque le bouton (iPhone)", i.barre && i.marque === "1" && !(await p.evaluate(() => document.getElementById("feuille").open)), i);
+  // Champ à 0 : s'efface au toucher, « 2 » donne 2 (et non 20) ; laissé vide, il revient à 0.
+  await allerA(p, "revenu");
+  await p.click("#v-revenu [data-feuille]"); await p.waitForTimeout(300);
+  const zero = "#c-revenu-majorationPct";
+  await p.evaluate(s => document.querySelector(s).scrollIntoView({ block: "center" }), zero);
+  await p.click(zero);
+  const vide = await p.evaluate(s => document.querySelector(s).value, zero);
+  await p.keyboard.type("2"); await p.waitForTimeout(250);
+  const z = await p.evaluate(s => ({ valeur: document.querySelector(s).value, etat: window.Wealthnord.etat().revenu.majorationPct }), zero);
+  verifier("champ à 0 : effacé au toucher, « 2 » donne 2", vide === "" && z.valeur === "2" && z.etat === 2, { vide, ...z });
+  await p.evaluate(s => { const x = document.querySelector(s); x.value = "0"; x.dispatchEvent(new Event("input", { bubbles: true })); x.blur(); }, zero);
+  await p.click(zero); await p.evaluate(s => document.querySelector(s).blur(), zero);
+  verifier("champ à 0 : laissé vide, il revient à 0", (await p.evaluate(s => document.querySelector(s).value, zero)) === "0");
+  await p.keyboard.press("Escape"); await p.waitForTimeout(200);
+  // Apprenants (GMF-U)
+  await remplacer(p, { "revenu.milieu": "gmfu", "revenu.residents": 1, "revenu.externes": 0 });
+  await allerA(p, "revenu");
+  await p.click("#v-revenu [data-feuille]"); await p.waitForTimeout(300);
+  const paire = await p.evaluate(() => { const x = document.querySelector("#feuille-corps .saisie-paire"); const l = x && x.closest(".champ");
+    return x && { libelle: l.querySelector("label").textContent, champs: [...x.querySelectorAll("input")].map(i => i.dataset.p), unites: [...x.querySelectorAll(".unite")].map(u => u.textContent),
+      aide: l.querySelector(".aide").textContent, ancien: !!document.querySelector('#feuille-corps [data-p="revenu.externes"]:not(.saisie-paire input)') }; });
+  verifier("apprenants : résidents et externes sous « Apprenants supervisés »", paire && paire.libelle === "Apprenants supervisés en même temps" && paire.champs.join() === "revenu.residents,revenu.externes"
+    && paire.unites.join() === "résidents,externes" && !paire.ancien, paire);
+  verifier("apprenants : l'aide dit pourquoi ils restent à part (demi-per diem)", paire && paire.aide.includes("41,45") && paire.aide.includes("49,85"), paire && paire.aide);
+  await p.evaluate(() => document.querySelector('#feuille-corps [data-p="revenu.externes"]').scrollIntoView({ block: "center" }));
+  await p.fill('#feuille-corps [data-p="revenu.externes"]', "2"); await p.waitForTimeout(250);
+  verifier("apprenants : le nombre d'externes est gardé", await p.evaluate(() => window.Wealthnord.etat().revenu.externes === 2));
+  verifier("en-tête et champs : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

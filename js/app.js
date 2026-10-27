@@ -119,13 +119,23 @@ window.Verrou.quandOuvert(function () {
      ============================================================ */
   // Un champ : libellé, puis saisie (nombre, liste, mois, date) ou interrupteur.
   function creerChamp(c, id, lier, confirmable) {
-    const ligne = el("div", "champ" + (c.t === "check" ? " case" : c.t === "select" || c.t === "month" || c.t === "date" ? " large" : ""));
+    const ligne = el("div", "champ" + (c.t === "check" ? " case" : c.t === "select" || c.t === "month" || c.t === "date" || c.t === "paire" ? " large" : ""));
     if (c.si) ligne.dataset.si = c.si;
     const lab = el("label", null, texteDe(c.l)); lab.htmlFor = id;
     let inp;
     if (c.t === "check") {
       inp = el("input", "interrupteur"); inp.type = "checkbox"; inp.setAttribute("role", "switch");
       ligne.append(lab, inp);
+    } else if (c.t === "paire") {
+      // Deux nombres sous un même libellé (p et p2), chacun avec son unité : résidents et externes.
+      const paire = el("div", "saisie-paire");
+      const nombre = (u, aria) => {
+        const boite = el("div", "saisie"), x = el("input"); x.type = "number"; x.step = c.s || 1; x.inputMode = "decimal"; x.min = "0";
+        x.setAttribute("aria-label", aria); boite.append(x, el("span", "unite", u)); paire.appendChild(boite); return x;
+      };
+      inp = nombre(c.u, `${texteDe(c.l)} : ${c.u}`);
+      const deuxieme = nombre(c.u2, `${texteDe(c.l)} : ${c.u2}`); deuxieme.id = id + "-2"; deuxieme.dataset.p = c.p2;
+      ligne.append(lab, paire);
     } else {
       const boite = el("div", "saisie");
       if (c.t === "select") {
@@ -2082,7 +2092,8 @@ window.Verrou.quandOuvert(function () {
     toast(`« ${plan.nom} » est maintenant votre plan ; l'ancien est gardé comme plan de comparaison.`, () => { S = avant; sauver(); tout(); });
   }
   // Ce qui change d'un plan à l'autre, en mots.
-  const DEF_CHAMPS = new Map(Object.values(CHAMPS).flat().filter(c => c.p).map(c => [c.p, c]));
+  const DEF_CHAMPS = new Map(Object.values(CHAMPS).flat().filter(c => c.p).flatMap(c => c.p2
+    ? [[c.p, { l: `${c.l} : ${c.u}` }], [c.p2, { l: `${c.l} : ${c.u2}` }]] : [[c.p, c]]));
   const SECTIONS_PLAN = { budget: "le budget", budgetTotaux: "le budget", dettes: "les dettes", objectifs: "les objectifs", "revenu.activites": "les activités en établissement",
     "revenu.lignes": "les autres revenus", "revenu.tarifs": "les tarifs", "impot.depensesProDetail": "les dépenses professionnelles", "epargne.reee": "le REEE", "actifs.autres": "les autres actifs", conjointe: "le ou la partenaire" };
   function differences(a, b, chemin = "", out = []) {
@@ -2730,6 +2741,20 @@ window.Verrou.quandOuvert(function () {
     }
   });
   document.addEventListener("change", e => { if (e.target.type === "checkbox" || e.target.tagName === "SELECT") e.target.dispatchEvent(new Event("input", { bubbles: true })); });
+  // Un champ à 0 s'efface au toucher : on tape par-dessus (sinon « 2 » devient « 20 » ou « 02 »).
+  // Laissé vide, il revient à 0 ; la valeur gardée ne change pas tant qu'on n'a rien tapé.
+  document.addEventListener("focusin", e => {
+    const inp = e.target;
+    if (inp.tagName !== "INPUT" || inp.type !== "number" || inp.value !== "0") return;
+    inp.dataset.zero = "1"; inp.value = "";
+    if (!inp.placeholder) inp.placeholder = "0";
+  });
+  document.addEventListener("focusout", e => {
+    const inp = e.target;
+    if (!inp.dataset || !inp.dataset.zero) return;
+    delete inp.dataset.zero;
+    if (inp.value === "") inp.value = "0";
+  });
   document.addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.conf) {
@@ -2792,6 +2817,8 @@ window.Verrou.quandOuvert(function () {
     nom = ALIAS[page] || page;
     if (sous && SOUS_ONGLETS[nom] && SOUS_ONGLETS[nom].some(([k]) => k === sous)) garderSous(nom, sous);
     if (!document.getElementById("v-" + nom)) nom = "apercu";
+    // Téléphone : les boutons du haut suivent la page, à droite de son titre.
+    document.querySelector(`#v-${nom} > .tete-page`).after(document.querySelector(".barre-outils"));
     document.getElementById("barre-pdf").hidden = nom !== "apercu";
     document.querySelectorAll(".nav [data-onglet], .barre-outils [data-onglet]").forEach(a => { if (a.dataset.onglet === nom) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     document.querySelectorAll(".vue").forEach(v => { v.hidden = v.id !== "v-" + nom; });
@@ -3024,11 +3051,20 @@ window.Verrou.quandOuvert(function () {
      sinon, les étapes selon l'appareil (iPhone, iPad, Mac, Firefox). */
   let invite = null;
   const installee = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-  const boutonsInstaller = () => document.querySelectorAll("[data-installer]");
+  // Déjà installée sur cet appareil : vu depuis l'app installée (Chrome, Edge et Android partagent ces données
+  // avec le navigateur), à l'installation, ou dit par la personne (iPhone : Safari ne peut pas le savoir).
+  // Si le navigateur propose de nouveau l'installation, c'est qu'elle a été désinstallée.
+  const CLE_INSTALLEE = "wm.installee";
+  const marqueeInstallee = () => { try { return localStorage.getItem(CLE_INSTALLEE) === "1"; } catch (e) { return false; } };
+  const marquerInstallee = oui => { try { if (oui) localStorage.setItem(CLE_INSTALLEE, "1"); else localStorage.removeItem(CLE_INSTALLEE); } catch (e) { /* non gardé */ } };
+  const boutonsInstaller = () => document.querySelectorAll(".barre-outils [data-installer], .nav [data-installer]");
   function majInstaller() {
-    const deja = installee();
+    if (installee()) marquerInstallee(true);
+    const deja = installee() || (marqueeInstallee() && !invite);
     boutonsInstaller().forEach(b => { b.hidden = deja; });
-    document.getElementById("carte-installer").hidden = deja;
+    // La carte de la page Données reste dans le navigateur, pour réinstaller au besoin.
+    document.getElementById("carte-installer").hidden = installee();
+    document.getElementById("installer-deja").hidden = !deja;
   }
   function etapesInstallation() {
     const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -3054,11 +3090,16 @@ window.Verrou.quandOuvert(function () {
       const ol = el("ol", "etapes"); e.etapes.forEach(x => ol.appendChild(el("li", null, x))); g.appendChild(ol); c.appendChild(g);
       if (e.note) c.appendChild(el("p", "aide", e.note));
       c.appendChild(el("p", "aide", "Vos données restent sur l'appareil. Pour les retrouver dans l'application installée ou sur un autre appareil : Données, Exporter une sauvegarde, puis Restaurer une sauvegarde."));
+      if (!marqueeInstallee()) {
+        const a = el("div", "feuille-actions"), deja = el("button", "bouton secondaire large", "Elle est déjà installée : masquer ce bouton"); deja.type = "button";
+        deja.addEventListener("click", () => { marquerInstallee(true); majInstaller(); feuille.close(); toast("Bouton masqué. Pour réinstaller : page Données."); });
+        a.appendChild(deja); c.appendChild(a);
+      }
     });
   }
-  window.addEventListener("beforeinstallprompt", ev => { ev.preventDefault(); invite = ev; majInstaller(); });
-  window.addEventListener("appinstalled", () => { invite = null; majInstaller(); toast("WealthMorand est installée."); });
-  boutonsInstaller().forEach(b => b.addEventListener("click", installer));
+  window.addEventListener("beforeinstallprompt", ev => { ev.preventDefault(); invite = ev; marquerInstallee(false); majInstaller(); });
+  window.addEventListener("appinstalled", () => { invite = null; marquerInstallee(true); majInstaller(); toast("WealthMorand est installée."); });
+  document.querySelectorAll("[data-installer]").forEach(b => b.addEventListener("click", installer));
   majInstaller();
 
   /* ============================================================
