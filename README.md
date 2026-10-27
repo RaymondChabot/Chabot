@@ -15,6 +15,14 @@ valeur nette.
   rien à un serveur.
 - **Exporter une sauvegarde** (page Données) crée une copie de vos données ;
   **Restaurer une sauvegarde** la recharge sur un autre appareil.
+- **Passer à un autre appareil** (page Données), sans compte : un lien qui
+  contient les données compressées et chiffrées (AES-GCM 256 bits, clé
+  tirée par PBKDF2-SHA-256 d'un code au hasard de 16 caractères, 80 bits).
+  Les données sont dans le fragment du lien (après `#`), que le navigateur
+  n'envoie jamais au serveur ; le code n'est affiché que sur l'appareil qui
+  envoie. L'autre appareil ouvre le lien (ou le colle dans Données,
+  « Recevoir avec un lien »), entre le code, voit ce qu'il reçoit, puis
+  confirme le remplacement. Un lien coupé ou un mauvais code est refusé.
 - **Verrou par phrase de passe** (facultatif, page Données) : les données
   gardées dans le navigateur sont chiffrées (AES-GCM 256 bits ; clé tirée de
   la phrase par PBKDF2-SHA-256, 600 000 itérations, sel au hasard). L'app

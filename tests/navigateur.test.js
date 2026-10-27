@@ -707,11 +707,49 @@ async function enteteEtChamps(b, base) {
   await ctx.close();
 }
 
+/* 26. Lien de transfert entre appareils : l'un crée le lien et affiche le code ; l'autre ouvre le lien (ou le colle),
+   entre le code, voit ce qu'il reçoit, puis confirme. Mauvais code et lien abîmé refusés ; la charge quitte l'adresse. */
+async function transfert(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "donnees" });
+  await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: base });
+  await remplacer(p, { "revenu.semaines": 41, "budget.0.montant": 1234 });
+  await p.click("#transfert-creer"); await p.waitForSelector("#transfert-code-affiche");
+  const code = await p.textContent("#transfert-code-affiche");
+  await p.click("#feuille-corps .actions .bouton:last-child"); await p.waitForTimeout(150);
+  const lien = await p.evaluate(() => navigator.clipboard.readText());
+  verifier("transfert : code de 16 caractères, lien avec la charge après #", /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/.test(code) && /^http:\/\/127\.0\.0\.1:\d+\/index\.html#transfert=[A-Za-z0-9_-]{60,}$/.test(lien), { code, taille: lien.length });
+  verifier("transfert : les données ne sont pas lisibles dans le lien", !/semaines|revenu|dettes/.test(lien));
+  const autre = await ouvrir(b, base, { page: "apercu" });
+  await autre.p.goto(lien); await pret(autre.p); await autre.p.waitForSelector("#transfert-code");
+  verifier("transfert : la charge quitte l'adresse ; l'autre appareil demande le code", await autre.p.evaluate(() => location.hash === "#apercu" && document.getElementById("feuille-titre").textContent === "Recevoir des données"));
+  await autre.p.fill("#transfert-code", "AAAA-BBBB-CCCC-DDDD"); await autre.p.click(".transfert-form [type=submit]"); await autre.p.waitForTimeout(900);
+  verifier("transfert : mauvais code refusé", (await autre.p.textContent(".transfert-form .message")).includes("Code incorrect"));
+  await autre.p.fill("#transfert-code", code.replace(/-/g, "").toLowerCase()); await autre.p.click(".transfert-form [type=submit]");
+  await autre.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 5000 });
+  const resume = await autre.p.textContent("#feuille-corps .feuille-intro");
+  verifier("transfert : ce qui arrive est décrit avant de remplacer", /^Données du .+ : \d+ dettes?, \d+ dépenses? inscrites?\. Elles remplaceront/.test(resume), resume);
+  await autre.p.click("#feuille-corps .bouton.danger"); await autre.p.waitForTimeout(300);
+  const recu = await autre.p.evaluate(() => { const S = window.Wealthnord.etat(); return { semaines: S.revenu.semaines, montant: S.budget[0].montant, exemple: S.meta.exemple, feuille: document.getElementById("feuille").open }; });
+  verifier("transfert : données remplacées par celles de l'autre appareil", recu.semaines === 41 && recu.montant === 1234 && !recu.exemple && !recu.feuille, recu);
+  await autre.ctx.close();
+  // Coller le lien dans l'app (iPhone : l'app installée garde ses propres données).
+  const troisieme = await ouvrir(b, base, { page: "donnees" });
+  await troisieme.p.click("#transfert-recevoir"); await troisieme.p.waitForSelector("#transfert-lien");
+  await troisieme.p.fill("#transfert-lien", lien.slice(0, -12)); await troisieme.p.fill("#transfert-code", code); await troisieme.p.click(".transfert-form [type=submit]"); await troisieme.p.waitForTimeout(900);
+  verifier("transfert : lien abîmé refusé", (await troisieme.p.textContent(".transfert-form .message")).includes("incomplet ou abîmé"));
+  await troisieme.p.fill("#transfert-lien", `Voici le lien : ${lien}`); await troisieme.p.click(".transfert-form [type=submit]");
+  await troisieme.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 5000 });
+  await troisieme.p.click("#feuille-corps .bouton.danger"); await troisieme.p.waitForTimeout(300);
+  verifier("transfert : lien collé dans l'app, puis reçu", await troisieme.p.evaluate(() => window.Wealthnord.etat().revenu.semaines === 41));
+  verifier("transfert : aucune erreur", erreurs.length + autre.erreurs.length + troisieme.erreurs.length === 0, [...erreurs, ...autre.erreurs, ...troisieme.erreurs]);
+  await troisieme.ctx.close(); await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert]) {
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

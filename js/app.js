@@ -2826,7 +2826,11 @@ window.Verrou.quandOuvert(function () {
     window.scrollTo(0, 0);
     if (R && !sansRendu) tout();   // les graphiques prennent la largeur de la page visible
   }
-  window.addEventListener("hashchange", () => ouvrir(location.hash.slice(1)));
+  window.addEventListener("hashchange", () => {
+    const t = lireTransfert();   // lien de transfert collé dans une page déjà ouverte
+    if (t) { ouvrir("apercu"); recevoirTransfert(t); return; }
+    ouvrir(location.hash.slice(1));
+  });
   // Le logo mène à l'accueil, même si on y est déjà (retour en haut).
   // Avant, le sceau s'affiche 0,3 seconde, comme à l'ouverture de l'app.
   const ecranSceau = document.querySelector(".ouverture");
@@ -2884,6 +2888,100 @@ window.Verrou.quandOuvert(function () {
     try { restaurer(d, true); } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
   });
   document.getElementById("fichier-annuler").addEventListener("click", () => { fermerFichier(); message("Rien n'a été changé."); });
+
+  /* Passer à un autre appareil, sans compte : un lien qui contient les données chiffrées (verrou.js) et un
+     code affiché seulement sur l'appareil qui envoie. L'autre appareil ouvre le lien, entre le code, puis
+     confirme avant que ses données soient remplacées. */
+  const boutonSimple = (texte, cls, f, type = "button") => { const b = el("button", "bouton " + cls, texte); b.type = type; if (f) b.addEventListener("click", f); return b; };
+  function champLibre(id, libelle, aide) {
+    const l = el("div", "champ large"), lab = el("label", null, libelle), boite = el("div", "saisie"), inp = el("input");
+    lab.htmlFor = id; inp.id = id; inp.type = "text"; inp.autocomplete = "off"; inp.spellcheck = false; inp.setAttribute("autocapitalize", "off");
+    boite.appendChild(inp); l.append(lab, boite, el("span"));
+    if (aide) l.appendChild(el("p", "aide", aide));
+    return { l, inp };
+  }
+  // Lien de transfert ouvert dans cette page (#transfert=…) : on le retire de l'adresse et on rend sa charge.
+  function lireTransfert() {
+    const m = /^#transfert=([A-Za-z0-9_-]+)$/.exec(location.hash);
+    if (!m) return null;
+    history.replaceState(null, "", location.pathname + location.search + "#apercu");
+    return m[1];
+  }
+  async function creerLienTransfert() {
+    if (!window.Verrou.disponible) { message("Ce navigateur ne peut pas chiffrer : ouvrez WealthMorand à son adresse habituelle (https)."); return; }
+    let t;
+    try { t = await window.Verrou.transfert.creer(JSON.stringify({ wealthmorand: "transfert", cree: new Date().toISOString(), donnees: racine() })); }
+    catch (e) { message("Le lien n'a pas pu être créé. Exportez plutôt une sauvegarde."); return; }
+    const lien = new URL("#transfert=" + t.charge, location.href).href;
+    ouvrirFeuille("Passer à un autre appareil", c => {
+      c.appendChild(el("p", "resume feuille-intro", "Vos données de maintenant, chiffrées dans un lien. Sans le code, le lien ne révèle rien ; il ne passe par aucun serveur de WealthMorand."));
+      const g1 = el("div", "groupe"); g1.appendChild(el("h3", null, "1. Envoyez ce lien à l'autre appareil"));
+      g1.appendChild(el("p", "aide", "AirDrop, courriel à vous-même ou Messages."));
+      const a = el("div", "actions");
+      if (navigator.share) a.appendChild(boutonSimple("Partager le lien", "", () => navigator.share({ title: "WealthMorand : transfert", url: lien }).catch(() => { /* partage annulé */ })));
+      a.appendChild(boutonSimple("Copier le lien", navigator.share ? "secondaire" : "", async () => {
+        try { await navigator.clipboard.writeText(lien); toast("Lien copié."); } catch (e) { toast("Copie impossible ici : utilisez Partager."); }
+      }));
+      g1.appendChild(a); c.appendChild(g1);
+      const g2 = el("div", "groupe"); g2.appendChild(el("h3", null, "2. Ouvrez-le là-bas, puis entrez ce code"));
+      const code = el("p", "code-transfert", t.code); code.id = "transfert-code-affiche";
+      g2.append(code, el("p", "aide", "Le code reste sur cet écran : ne l'envoyez pas avec le lien. Il disparaît quand vous fermez ce panneau."));
+      c.appendChild(g2);
+      c.appendChild(el("p", "aide", "Le lien contient vos données de maintenant : après d'autres changements, créez-en un nouveau. Sur iPhone, l'app installée garde ses propres données : pour les y recevoir, ouvrez l'app, puis Données, « Recevoir avec un lien », et collez le lien."));
+    });
+  }
+  function recevoirTransfert(charge) {
+    ouvrirFeuille("Recevoir des données", c => {
+      c.appendChild(el("p", "resume feuille-intro", charge ? "Des données envoyées d'un autre appareil. Entrez le code affiché sur celui-ci."
+        : "Collez le lien reçu, puis entrez le code affiché sur l'autre appareil."));
+      const form = el("form", "transfert-form"), lienRecu = charge ? null : champLibre("transfert-lien", "Lien reçu");
+      const code = champLibre("transfert-code", "Code", "16 lettres et chiffres, avec ou sans tirets.");
+      code.inp.setAttribute("autocapitalize", "characters"); code.inp.placeholder = "XXXX-XXXX-XXXX-XXXX";
+      const msg = el("p", "message"); msg.setAttribute("role", "status");
+      const ouvrirB = boutonSimple("Ouvrir", "", null, "submit"), actions = el("div", "actions");
+      actions.append(ouvrirB, boutonSimple("Annuler", "secondaire", () => feuille.close()));
+      if (lienRecu) form.appendChild(lienRecu.l);
+      form.append(code.l, actions, msg); c.appendChild(form);
+      form.addEventListener("submit", async e => {
+        e.preventDefault();
+        const ch = charge || ((/#transfert=([A-Za-z0-9_-]+)/.exec(lienRecu.inp.value) || [])[1]);
+        if (!ch) { msg.textContent = "Collez le lien complet : il contient « #transfert= »."; return; }
+        ouvrirB.disabled = true; msg.textContent = "Ouverture…";
+        let x;
+        try {
+          x = JSON.parse(await window.Verrou.transfert.ouvrir(ch, code.inp.value));
+          if (!x || x.wealthmorand !== "transfert" || !x.donnees || x.donnees.version !== 1) throw new Error("format");
+        } catch (err) {
+          ouvrirB.disabled = false;
+          msg.textContent = err.message === "code" ? "Code incorrect : vérifiez-le sur l'autre appareil."
+            : err.message === "ancien" ? "Ce navigateur est trop ancien pour ce lien : utilisez plutôt une sauvegarde (Exporter, puis Restaurer)."
+            : "Ce lien est incomplet ou abîmé : créez-en un nouveau sur l'autre appareil.";
+          return;
+        }
+        confirmerTransfert(c, x);
+      });
+      setTimeout(() => (lienRecu ? lienRecu.inp : code.inp).focus(), 50);
+    });
+  }
+  const pluriel = (n, un, plusieurs = un + "s") => `${n} ${n > 1 ? plusieurs : un}`;
+  // Données ouvertes : ce qu'elles contiennent, puis le remplacement, seulement si on le confirme.
+  function confirmerTransfert(c, x) {
+    const d = x.donnees, date = new Date(x.cree);
+    c.textContent = "";
+    c.appendChild(el("p", "resume feuille-intro", `Données du ${isFinite(date) ? date.toLocaleString("fr-CA", { dateStyle: "long", timeStyle: "short" }) : "jour du lien"} : `
+      + `${pluriel((d.dettes || []).length, "dette")}, ${pluriel((d.budget || []).filter(b => b.montant > 0).length, "dépense inscrite", "dépenses inscrites")}. Elles remplaceront celles de cet appareil.`));
+    if (!S.meta.exemple) c.appendChild(el("p", "aide", "Les données actuelles de cet appareil seront effacées. Pour les garder, exportez-en d'abord une sauvegarde."));
+    const a = el("div", "feuille-actions");
+    a.appendChild(boutonSimple("Remplacer mes données", "danger plein large", () => {
+      try { restaurer(d); } catch (err) { toast("Ces données ne sont pas une sauvegarde WealthMorand. Rien n'a été changé."); return; }
+      feuille.close(); ouvrir("apercu"); toast("Données reçues de l'autre appareil.");
+    }));
+    if (!S.meta.exemple) a.appendChild(boutonSimple("Exporter d'abord une sauvegarde de cet appareil", "secondaire large", () => document.getElementById("exporter").click()));
+    a.appendChild(boutonSimple("Annuler", "secondaire large", () => feuille.close()));
+    c.appendChild(a);
+  }
+  document.getElementById("transfert-creer").addEventListener("click", creerLienTransfert);
+  document.getElementById("transfert-recevoir").addEventListener("click", () => recevoirTransfert(null));
 
   /* Verrou par phrase de passe : l'activer, choisir le délai, changer la phrase, le retirer. */
   const LONGUEUR_PHRASE = 8;
@@ -3324,13 +3422,17 @@ window.Verrou.quandOuvert(function () {
     toast("Votre portrait est prêt. Précisez maintenant vos revenus et vos dépenses du mois.");
   }
 
+  const transfertRecu = lireTransfert();   // avant d'ouvrir la page : la charge est dans l'adresse
   ouvrir((location.hash || "#apercu").slice(1), true);
   tout();
   document.documentElement.classList.add("pret");
   // Premier lancement : rien d'enregistré et l'assistant jamais vu. Après l'écran d'ouverture, s'il y en a un.
+  // Un lien de transfert passe avant l'assistant : les données arrivent d'un autre appareil.
   let dejaVu = true;
   try { dejaVu = !!localStorage.getItem(CLE) || !!localStorage.getItem(ASSISTANT_VU); } catch (e) { /* stockage indisponible */ }
-  if (!dejaVu) setTimeout(ouvrirAssistant, document.documentElement.classList.contains("avec-ouverture") ? 1300 : 0);
+  const apresOuverture = document.documentElement.classList.contains("avec-ouverture") ? 1300 : 0;
+  if (transfertRecu) setTimeout(() => recevoirTransfert(transfertRecu), apresOuverture);
+  else if (!dejaVu) setTimeout(ouvrirAssistant, apresOuverture);
   if (typeof ResizeObserver !== "undefined") {
     let largeur = document.querySelector("main").clientWidth;
     new ResizeObserver(() => { const w = document.querySelector("main").clientWidth; if (Math.abs(w - largeur) > 4) { largeur = w; if (R) tout(); } }).observe(document.querySelector("main"));

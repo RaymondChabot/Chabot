@@ -522,6 +522,16 @@ a.tuile:hover { border-color: var(--trait); }
 .saisie .unite { font-size: 0.8rem; color: var(--discret); white-space: nowrap; }
 .champ.large { grid-template-columns: minmax(0, 1fr) 32px; }
 .saisie-paire { grid-column: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+/* Code du lien de transfert : gros, en chasse fixe, à recopier sur l'autre appareil. */
+.code-transfert {
+  margin: 6px 0 0; padding: 14px 10px; text-align: center; border-radius: var(--rayon-petit); background: var(--surface-2);
+  font: 650 clamp(1.15rem, 5.4vw, 1.5rem)/1.3 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.06em; color: var(--encre);
+  user-select: all; -webkit-user-select: all; overflow-wrap: anywhere;
+}
+.transfert-form .actions { margin-top: 14px; }
+.transfert-form .message { margin-top: 10px; }
+#transfert-code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.04em; text-transform: uppercase; text-align: left; }
+#transfert-code::placeholder { text-transform: none; }
 .champ.large .saisie-paire > .saisie { grid-column: auto; }
 .champ.large > label { grid-column: 1 / -1; font-size: 0.86rem; color: var(--encre-2); }
 .champ.large .saisie { grid-column: 1; }

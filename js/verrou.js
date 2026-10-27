@@ -93,10 +93,53 @@
     if (autre !== (cle ? versB64(sel) : null)) { fige = true; location.reload(); }
   });
 
+  /* Lien de transfert vers un autre appareil, sans compte ni serveur : les données, compressées puis
+     chiffrées (AES-GCM 256) avec un code au hasard de 16 caractères (80 bits), vont dans le fragment
+     du lien (après #), que le navigateur n'envoie jamais au serveur. Sans le code, le lien est illisible.
+     Charge : version (1), indicateurs (1 = compressée), longueur des données chiffrées (4, pour
+     reconnaître un lien coupé), sel (16), vecteur (12), données chiffrées. L'en-tête est authentifié. */
+  const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", ITER_TRANSFERT = 200000;   // ni 0, O, 1 ni I
+  const codeAuHasard = () => [...crypto.getRandomValues(new Uint8Array(16))].map(o => ALPHABET[o & 31]).join("").match(/.{4}/g).join("-");
+  const codeNu = c => String(c).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const versB64url = u8 => versB64(u8).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const deB64url = t => deB64(t.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((t.length + 3) % 4));
+  const parFlux = async (u8, flux) => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(flux)).arrayBuffer());
+  async function creerTransfert(texte) {
+    const code = codeAuHasard(), sel = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const brut = enc.encode(texte);
+    let comp = null;
+    try { if (typeof CompressionStream !== "undefined") comp = await parFlux(brut, new CompressionStream("deflate")); } catch (e) { /* sans compression */ }
+    const compresse = !!comp && comp.length < brut.length, corps = compresse ? comp : brut;
+    const tete = new Uint8Array(6); tete[0] = 1; tete[1] = compresse ? 1 : 0;
+    new DataView(tete.buffer).setUint32(2, corps.length + 16);   // + 16 : l'étiquette d'AES-GCM
+    const cle = await deriver(codeNu(code), sel, ITER_TRANSFERT);
+    const chiffre = new Uint8Array(await subtle.encrypt({ name: "AES-GCM", iv, additionalData: tete }, cle, corps));
+    const charge = new Uint8Array(34 + chiffre.length);
+    charge.set(tete); charge.set(sel, 6); charge.set(iv, 22); charge.set(chiffre, 34);
+    return { code, charge: versB64url(charge) };
+  }
+  // Erreurs : « format » (lien abîmé ou incomplet), « code » (mauvais code), « ancien » (navigateur sans décompression).
+  async function ouvrirTransfert(charge, code) {
+    let u8;
+    try { u8 = deB64url(String(charge).trim()); } catch (e) { throw new Error("format", { cause: e }); }
+    if (u8.length < 51 || u8[0] !== 1 || new DataView(u8.buffer).getUint32(2) !== u8.length - 34) throw new Error("format");
+    let corps;
+    try {
+      const cle = await deriver(codeNu(code), u8.slice(6, 22), ITER_TRANSFERT);
+      corps = new Uint8Array(await subtle.decrypt({ name: "AES-GCM", iv: u8.slice(22, 34), additionalData: u8.slice(0, 6) }, cle, u8.slice(34)));
+    } catch (e) { throw new Error("code", { cause: e }); }
+    if (u8[1] & 1) {
+      if (typeof DecompressionStream === "undefined") throw new Error("ancien");
+      corps = await parFlux(corps, new DecompressionStream("deflate"));
+    }
+    return dec.decode(corps);
+  }
+
   window.Verrou = {
     disponible: !!subtle,
     actif: () => !!cle,
     estChiffre,
+    transfert: { creer: creerTransfert, ouvrir: ouvrirTransfert },
     // app.js et rapport.js démarrent tout de suite sans verrou, sinon une fois la phrase entrée.
     quandOuvert(f) { if (ouvert) f(); else attente.push(f); },
     lire: () => (cle ? texteOuvert : localStorage.getItem(CLE)),
