@@ -33,6 +33,34 @@ valeur nette.
 - Ne versez jamais un fichier de données dans ce dépôt : `.gitignore`
   bloque les fichiers `*donnees*.json`.
 
+## Un résumé, puis le détail
+
+Chaque page s'ouvre sur son **résumé** : quelques cartes d'un chiffre
+chacune, alignées et de même hauteur sur ordinateur.
+
+- **Aperçu** : le surplus du mois ; ce mois-ci (dépenses, dettes, épargne,
+  surplus) ; quatre tuiles ; les 3 actions les plus importantes ; la
+  prochaine échéance et le prochain jalon.
+- **Revenu** : le net par mois, les heures, les visites et les patients
+  inscrits ; d'où vient le revenu ; ce que rapporte une demi-journée ou un
+  patient de plus. En résidence : le net par mois, la paie, le niveau et
+  le début de la pratique.
+- **Impôt** : le net de l'année, ce qu'il faut mettre de côté chaque mois,
+  l'impôt fédéral et celui du Québec ; chaque 100 $ gagnés ; le prochain
+  paiement (en résidence : la paie type, avec les retenues).
+- **Budget** : revenus nets, dépenses, dettes et épargne du mois ; les
+  dépenses par catégorie ; les dettes ; l'année (réserve, dépenses
+  annuelles).
+- **Patrimoine** : la valeur nette projetée ; placements, maison, dettes et
+  indépendance ; le prochain 1 000 $.
+
+**Voir tout le détail**, ou le lien « Détail » d'une carte, ouvre la page
+complète ; **Résumé**, en haut de la page, ou le bouton Retour y ramène.
+L'adresse suit : `#budget` pour le résumé, `#budget/detail` ou un
+sous-onglet (`#budget/dettes`) pour le détail. La page Données montre
+tout ; ses cartes moins utilisées (installation, valeurs confirmées,
+apparence et rapport, recommencer) se déplient au toucher.
+
 ## Ce qu'elle calcule
 
 Pour tout médecin de famille au Québec, dans tous les milieux : seul ou
@@ -195,6 +223,7 @@ npm ci                          # ESLint seulement
 npx eslint .                    # vérification du code
 node tests/calculs.test.js      # calculs
 node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
+SCENARIOS=transfert,residence node tests/navigateur.test.js   # quelques parcours seulement
 ```
 
 - `calculs.test.js` vérifie l'impôt contre l'outil officiel du ministère des
@@ -205,7 +234,8 @@ node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
   démarrage avec un ancien fichier, noms piégés, rapport, avis de nouvelle
   version, politique de sécurité du contenu, sous-onglets, verrou (données
   et sauvegardes chiffrées, mauvaise phrase, phrase changée, délai, retrait),
-  sommaire pour le comptable sur une seule page.
+  sommaire pour le comptable sur une seule page, résumé et détail de chaque
+  page (navigation, mêmes chiffres, cartes de même hauteur sur ordinateur).
 - GitHub Actions lance les trois à chaque publication sur `main`
   (`.github/workflows/tests.yml`). Cas fictifs seulement.
 

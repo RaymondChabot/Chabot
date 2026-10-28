@@ -255,6 +255,7 @@ main {
 .carte-repliable[open] > summary::after { transform: rotate(-135deg) translateY(-2px); }
 .carte-repliable[open] > summary { margin-bottom: 14px; }
 .repli-resume { grid-column: 1; font-size: 0.88rem; color: var(--discret); margin-top: 2px; }
+.carte-repliable > :not(summary) + :not(summary) { margin-top: 12px; }   /* l'espace qu'aurait donné la carte en colonne */
 .carte-sous { font-size: 0.82rem; color: var(--discret); }
 .lien-carte {
   border: 0; background: none; padding: 0; cursor: pointer; text-decoration: none;
@@ -280,6 +281,10 @@ main {
 .resume { font-size: 0.97rem; line-height: 1.5; }
 .resume strong { font-weight: 600; }
 .message { font-size: 0.9rem; min-height: 1.2em; }
+/* Dans une carte, une ligne vide ne laisse pas d'espace : l'aide vide disparaît ; le message d'état vide sort du flux
+   (toujours rendu, il est annoncé dès qu'il change). */
+.carte > .aide:empty:not([aria-live]) { display: none; }
+.carte > .message:empty { position: absolute; }
 
 /* ---------- Rangées (listes de valeurs) ---------- */
 .rangees { display: flex; flex-direction: column; margin: -4px 0; }
@@ -596,7 +601,7 @@ a.tuile:hover { border-color: var(--trait); }
   .nav a:hover { background: var(--surface-2); }
   .nav a[aria-current="page"] { background: var(--surface); color: var(--encre); font-weight: 600; box-shadow: var(--ombre); }
   .nav-donnees { display: flex !important; margin-top: auto; }
-  main { max-width: 760px; padding: 36px 32px 64px; }
+  main { width: 100%; max-width: 760px; padding: 36px 32px 64px; }   /* toute la largeur offerte : chaque page, la même colonne */
   .vue { gap: 16px; }
   .tete-page h1 { font-size: 2.6rem; }
   .carte { padding: 22px 24px; }
@@ -935,3 +940,57 @@ a.tuile:hover { border-color: var(--trait); }
 .saisie textarea { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--encre); font: 500 16px var(--police); padding: 9px 4px 9px 12px; resize: vertical; }
 .saisie textarea:focus-visible { outline: none; }
 @media print { .bandeau-plan { display: none !important; } }
+
+/* ============================================================
+   RÉSUMÉ ET DÉTAIL : chaque page s'ouvre sur son résumé (3 ou 4 cartes) ;
+   « Voir tout le détail » ou le lien d'une carte ouvre la page complète.
+   Espacements sur une grille de 8 px : 16 px entre les cartes, 16 px dedans.
+   ============================================================ */
+@media screen { .vue:not(.mode-detail) .detail-seul, .vue.mode-detail .resume-seul { display: none !important; } }
+.vue { gap: 16px; }
+.carte { padding: 16px; gap: 12px; }
+.tuiles { gap: 12px; grid-auto-rows: 1fr; }
+.tuile { padding: 14px 16px; gap: 2px; justify-content: flex-start; }
+.tuile-sous { margin-top: auto; padding-top: 4px; }
+.tuile-valeur { font-variant-numeric: tabular-nums; }
+.rangee-valeur, .mini-barres strong, .legende-cases strong { font-variant-numeric: tabular-nums; }
+
+/* Retour au résumé : au-dessus du titre, en mode détail. */
+.retour-resume { flex-basis: 100%; display: inline-flex; align-items: center; gap: 4px; width: max-content; min-height: 32px;
+  font: 600 0.88rem var(--police); color: var(--info); text-decoration: none; }
+.retour-resume::before { content: ""; width: 8px; height: 8px; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-right: 2px; }
+
+/* Bouton du bas du résumé : toute la largeur, sobre. */
+.bouton-detail { display: flex; justify-content: center; align-items: center; gap: 8px; text-decoration: none; }
+.bouton-detail::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-top: 2px solid currentColor; transform: rotate(45deg); }
+
+/* Barre empilée et sa légende en deux colonnes égales. */
+.barre-legende { display: flex; flex-direction: column; gap: 14px; }
+.legende-cases { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.legende-cases li { display: grid; grid-template-columns: 10px minmax(0, 1fr); column-gap: 8px; align-items: center; min-width: 0; }
+.legende-cases i { width: 10px; height: 10px; border-radius: 3px; }
+.legende-cases span { font-size: 0.84rem; line-height: 1.3; color: var(--discret); }
+.legende-cases strong { grid-column: 2; font-size: 1rem; font-weight: 600; }
+
+/* Barres horizontales : nom, barre, montant, sur une même ligne ; les montants alignés à droite. */
+.mini-barres { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.mini-barres li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 6px 12px; }
+.mini-barres .nom { font-size: 0.9rem; }
+.mini-barres .piste { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.mini-barres .piste span { display: block; height: 100%; border-radius: 999px; background: var(--marque); }
+.mini-barres strong { font-size: 0.94rem; font-weight: 600; text-align: right; }
+
+/* Portrait en une carte courte : la jauge et le bouton pour continuer. */
+.portrait-court .jauge span { background: var(--marque); }
+.portrait-court .bouton { align-self: flex-start; }
+
+/* Résumé : les tuiles sur toute la largeur passent à quatre de front quand la place le permet. */
+@media (min-width: 720px) { .tuiles.quatre { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 960px) {
+  .vue { gap: 20px; }
+  .carte { padding: 20px; gap: 14px; }
+}
+/* Grand écran : en résumé, les cartes d'une même rangée ont la même hauteur. */
+@media (min-width: 1100px) { .vue:not(.mode-detail) { align-items: stretch; } .vue:not(.mode-detail) > .hero { align-self: start; } }
+/* À l'impression, tout le détail, sans le résumé. */
+@media print { .retour-resume, .bouton-detail, .resume-seul { display: none !important; } }

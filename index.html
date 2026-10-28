@@ -74,7 +74,7 @@
     <div class="entete-impression" aria-hidden="true"><span class="marque-imp"><svg class="imp-arbre"><use href="#wm-arbre-i"/></svg><svg class="imp-nom"><use href="#wm-nom"/></svg></span><span id="impression-info"></span></div>
     <!-- ============ ACCUEIL ============ -->
     <section class="vue" id="v-apercu" aria-labelledby="h-apercu">
-      <header class="tete-page"><h1 id="h-apercu">Aperçu</h1><button type="button" class="bouton-modifier bouton-pdf" id="rapport-pdf">Rapport PDF</button></header>
+      <header class="tete-page"><a class="retour-resume detail-seul" href="#apercu">Résumé</a><h1 id="h-apercu">Aperçu</h1><button type="button" class="bouton-modifier bouton-pdf" id="rapport-pdf">Rapport PDF</button></header>
       <!-- Téléphone : les boutons empilés à droite du titre (le logo garde toute la largeur en haut). La barre suit
            la page ouverte ; Rapport PDF dans l'aperçu seulement. Cachée sur ordinateur. -->
       <div class="barre-outils">
@@ -96,31 +96,36 @@
         </div>
       </div>
       <div class="hero" id="ap-hero"></div>
-      <div class="carte portrait" id="ap-portrait" hidden>
+      <div class="carte resume-seul portrait-court" id="ap-r-portrait" hidden></div>
+      <div class="carte demi resume-seul" id="ap-r-mois"></div>
+      <div class="carte portrait detail-seul" id="ap-portrait" hidden>
         <div class="carte-tete"><h2 id="ap-portrait-titre">Votre portrait</h2><button type="button" class="lien-carte" id="ap-portrait-masquer">Masquer</button></div>
         <div class="jauge" role="progressbar" aria-labelledby="ap-portrait-titre" aria-valuemin="0" aria-valuemax="100"><span></span></div>
         <p class="aide">Facultatif, mais plus il est complet, plus vos chiffres sont justes. Un écran à la fois, avec des explications ; passez ce qui ne s'applique pas.</p>
         <div id="ap-portrait-liste"></div>
         <div class="actions"><button type="button" class="bouton" id="ap-portrait-suite">Continuer</button></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi detail-seul">
         <div class="carte-tete"><h2>Ce mois-ci</h2><span class="carte-sous">Votre part</span></div>
         <div id="ap-flux"></div>
       </div>
       <div class="tuiles demi" id="ap-tuiles"></div>
-      <div class="carte">
+      <div class="carte demi resume-seul" id="ap-r-actions"></div>
+      <div class="carte demi resume-seul" id="ap-r-avenir"></div>
+      <a class="bouton secondaire large bouton-detail resume-seul" href="#apercu/detail">Voir tout le détail</a>
+      <div class="carte detail-seul">
         <div class="carte-tete"><h2>À faire</h2></div>
         <ul class="a-faire" id="ap-actions"></ul>
       </div>
-      <div class="carte demi">
+      <div class="carte demi detail-seul">
         <div class="carte-tete"><h2>Prochaines échéances</h2></div>
         <div class="rangees" id="ap-echeances"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi detail-seul">
         <div class="carte-tete"><h2>Vos jalons</h2><a class="lien-carte" href="#avenir">Patrimoine</a></div>
         <div class="rangees" id="ap-jalons"></div>
       </div>
-      <div class="carte">
+      <div class="carte detail-seul">
         <div class="carte-tete"><h2>Total des dettes</h2><a class="lien-carte" href="#budget/dettes">Voir le plan</a></div>
         <p class="aide" id="ap-dettes-sous"></p>
         <div class="graphique" id="ap-graph-dettes"></div>
@@ -129,39 +134,43 @@
 
     <!-- ============ REVENU ============ -->
     <section class="vue" id="v-revenu" aria-labelledby="h-revenu" hidden>
-      <header class="tete-page"><h1 id="h-revenu">Revenu</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
+      <header class="tete-page"><a class="retour-resume detail-seul" href="#revenu">Résumé</a><h1 id="h-revenu">Revenu</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
       <div class="segment parcours" id="rv-parcours"></div>
-      <div class="choix-milieu pratique-seule">
+      <div class="choix-milieu pratique-seule detail-seul">
         <label for="rv-milieu">Pratique principale</label>
         <div class="saisie"><select id="rv-milieu"></select></div>
         <p class="aide" id="rv-milieu-aide"></p>
       </div>
-      <div class="segment pratique-seule" id="rv-mode"></div>
+      <div class="segment pratique-seule detail-seul" id="rv-mode"></div>
       <div class="hero" id="rv-hero"></div>
-      <div class="carte residence-seule" id="rv-residence" hidden>
+      <div class="tuiles quatre resume-seul" id="rv-r-tuiles"></div>
+      <div class="carte residence-seule detail-seul" id="rv-residence" hidden>
         <div class="carte-tete"><h2>Votre résidence</h2><button type="button" class="lien-carte" data-feuille="residence">Modifier</button></div>
         <div class="rangees" id="rv-residence-detail"></div>
         <p class="aide" id="rv-residence-note"></p>
       </div>
-      <div class="carte demi pratique-seule" id="rv-carte-modes">
+      <div class="carte demi resume-seul pratique-seule" id="rv-r-sources"></div>
+      <div class="carte demi resume-seul pratique-seule" id="rv-r-sens"></div>
+      <a class="bouton secondaire large bouton-detail resume-seul" href="#revenu/detail">Voir tout le détail</a>
+      <div class="carte demi pratique-seule detail-seul" id="rv-carte-modes">
         <div class="carte-tete"><h2>Comparer les modes</h2></div>
         <div id="rv-comparaison"></div>
         <p class="aide" id="rv-seuil"></p>
       </div>
-      <div class="carte demi pratique-seule" id="rv-carte-faits">
+      <div class="carte demi pratique-seule detail-seul" id="rv-carte-faits">
         <div class="carte-tete"><h2>Votre année en chiffres</h2></div>
         <div class="rangees" id="rv-faits"></div>
       </div>
-      <div class="carte demi pratique-seule" id="rv-carte-activites">
+      <div class="carte demi pratique-seule detail-seul" id="rv-carte-activites">
         <div class="carte-tete"><h2>Activités en établissement</h2></div>
         <div id="rv-activites"></div>
         <div class="actions"><button type="button" class="bouton secondaire" id="rv-ajout-activite">Ajouter une activité</button></div>
       </div>
-      <div class="carte demi" id="rv-carte-autres">
+      <div class="carte demi detail-seul" id="rv-carte-autres">
         <div class="carte-tete"><h2>Autres revenus</h2><button type="button" class="lien-carte" id="rv-autres-modifier">Modifier</button></div>
         <div id="rv-autres"></div>
       </div>
-      <div class="carte pratique-seule" id="rv-carte-sens">
+      <div class="carte pratique-seule detail-seul" id="rv-carte-sens">
         <div class="carte-tete"><h2 id="rv-sens-titre">Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>
         <div class="legende" id="rv-sens-legende"></div>
         <div class="graphique" id="rv-sens-graph"></div>
@@ -172,13 +181,13 @@
         </div>
         <p class="aide" id="rv-sens-note"></p>
       </div>
-      <div class="carte pratique-seule" id="rv-carte-source">
+      <div class="carte pratique-seule detail-seul" id="rv-carte-source">
         <div class="carte-tete"><h2>D'où vient le revenu</h2></div>
         <div id="rv-barres"></div>
         <div class="legende" id="rv-legende"></div>
         <div class="tableau-defile"><table class="tableau" id="rv-detail"></table></div>
       </div>
-      <div class="carte" id="rv-residence-ajout" hidden>
+      <div class="carte detail-seul" id="rv-residence-ajout" hidden>
         <div class="carte-tete"><h2 id="rv-residence-ajout-titre">En résidence ?</h2></div>
         <p class="aide" id="rv-residence-ajout-texte">Ajoutez votre salaire de résident (échelle de la FMRQ) et la date de début de votre pratique : l'app montre l'une ou l'autre, et vos projections passent de la résidence à la pratique à cette date.</p>
         <div class="actions"><button type="button" class="bouton secondaire" id="rv-residence-ajouter">Ajouter ma résidence</button></div>
@@ -187,41 +196,45 @@
 
     <!-- ============ IMPÔT ============ -->
     <section class="vue" id="v-impot" aria-labelledby="h-impot" hidden>
-      <header class="tete-page"><h1 id="h-impot">Impôt 2026</h1><button type="button" class="bouton-modifier" data-feuille="impot">Modifier</button></header>
+      <header class="tete-page"><a class="retour-resume detail-seul" href="#impot">Résumé</a><h1 id="h-impot">Impôt 2026</h1><button type="button" class="bouton-modifier" data-feuille="impot">Modifier</button></header>
       <div class="segment parcours" id="im-parcours"></div>
-      <div class="segment pratique-seule" id="im-mode"></div>
+      <div class="segment pratique-seule detail-seul" id="im-mode"></div>
       <div class="hero" id="im-hero"></div>
-      <div class="carte demi">
+      <div class="tuiles quatre resume-seul" id="im-r-tuiles"></div>
+      <div class="carte demi resume-seul" id="im-r-cent"></div>
+      <div class="carte demi resume-seul" id="im-r-payer"></div>
+      <a class="bouton secondaire large bouton-detail resume-seul" href="#impot/detail">Voir tout le détail</a>
+      <div class="carte demi detail-seul">
         <div class="carte-tete"><h2>Sur chaque 100 $ gagnés</h2></div>
         <div id="im-cent"></div>
       </div>
-      <div class="carte demi">
+      <div class="carte demi detail-seul">
         <div class="carte-tete"><h2 id="im-acomptes-titre">Mettre de côté et payer</h2></div>
         <div id="im-acomptes"></div>
       </div>
-      <div class="carte">
+      <div class="carte detail-seul">
         <div class="carte-tete"><h2 id="im-tableau-titre">Détail selon le mode</h2></div>
         <div class="tableau-defile"><table class="tableau" id="im-tableau"></table></div>
         <p class="aide" id="im-tableau-note"></p>
       </div>
-      <div class="carte demi">
+      <div class="carte demi detail-seul">
         <div class="carte-tete"><h2>Pour votre comptable</h2></div>
         <p class="aide">Une page à imprimer ou à enregistrer en PDF : revenus et déductions, impôt estimé, acomptes et échéances, documents à rassembler et points à valider ensemble.</p>
         <div class="actions"><button type="button" class="bouton secondaire" data-comptable>Sommaire pour le comptable</button></div>
       </div>
-      <div class="carte demi pratique-seule">
+      <div class="carte demi pratique-seule detail-seul">
         <div class="carte-tete"><h2>Dépenses professionnelles</h2><button type="button" class="lien-carte" id="im-pro-modifier">Modifier</button></div>
         <div id="im-pro"></div>
       </div>
-      <div class="carte">
+      <div class="carte detail-seul">
         <div class="carte-tete"><h2>Famille et couple</h2><button type="button" class="lien-carte" data-feuille="menage">Modifier</button></div>
         <div id="im-famille"></div>
       </div>
-      <details class="carte demi carte-repliable pratique-seule">
+      <details class="carte demi carte-repliable pratique-seule detail-seul">
         <summary><h2>Et avec une société ?</h2><span class="repli-resume" id="im-societe-resume"></span></summary>
         <div id="im-societe"></div>
       </details>
-      <details class="carte demi carte-repliable">
+      <details class="carte demi carte-repliable detail-seul">
         <summary><h2>Vérification officielle</h2><span class="repli-resume" id="im-verif-resume"></span></summary>
         <div id="im-verif"></div>
       </details>
@@ -229,58 +242,63 @@
 
     <!-- ============ BUDGET ============ -->
     <section class="vue" id="v-budget" aria-labelledby="h-budget" hidden>
-      <header class="tete-page"><h1 id="h-budget">Budget</h1><button type="button" class="bouton-modifier" data-feuille="menage">Ménage</button></header>
+      <header class="tete-page"><a class="retour-resume detail-seul" href="#budget">Résumé</a><h1 id="h-budget">Budget</h1><button type="button" class="bouton-modifier" data-feuille="menage">Ménage</button></header>
       <div class="segment parcours" id="bu-parcours"></div>
-      <div class="segment" id="bu-vue"></div>
+      <div class="segment detail-seul" id="bu-vue"></div>
       <div class="hero" id="bu-hero"></div>
-      <div class="onglets" id="bu-onglets"></div>
-      <div class="carte demi" data-sous="mois">
+      <div class="tuiles quatre resume-seul" id="bu-r-tuiles"></div>
+      <div class="carte resume-seul" id="bu-r-depenses"></div>
+      <div class="carte demi resume-seul" id="bu-r-dettes"></div>
+      <div class="carte demi resume-seul" id="bu-r-annee"></div>
+      <a class="bouton secondaire large bouton-detail resume-seul" href="#budget/detail">Voir tout le détail</a>
+      <div class="onglets detail-seul" id="bu-onglets"></div>
+      <div class="carte demi detail-seul" data-sous="mois">
         <div class="carte-tete"><h2>Revenus nets</h2><span class="carte-sous">Par mois</span></div>
         <div class="rangees" id="bu-revenus"></div>
       </div>
-      <div class="carte demi" data-sous="annee">
+      <div class="carte demi detail-seul" data-sous="annee">
         <div class="carte-tete"><h2>Votre surplus au fil des ans</h2><span class="carte-sous">Par mois</span></div>
         <div class="graphique" id="bu-surplus-graph"></div>
         <div class="rangees" id="bu-surplus"></div>
         <p class="aide" id="bu-surplus-note"></p>
       </div>
-      <div class="carte demi" data-sous="mois">
+      <div class="carte demi detail-seul" data-sous="mois">
         <div class="carte-tete"><h2>Reste à dépenser librement</h2><span class="carte-sous">Par mois, votre part</span></div>
         <div id="bu-reste"></div>
       </div>
-      <div class="carte demi" data-sous="mois">
+      <div class="carte demi detail-seul" data-sous="mois">
         <div class="carte-tete"><h2>Bilan du mois</h2><span class="carte-sous">Réel et budget</span></div>
         <div id="bu-bilan"></div>
       </div>
-      <div class="carte demi" data-sous="annee">
+      <div class="carte demi detail-seul" data-sous="annee">
         <div class="carte-tete"><h2>Bilan de l'année</h2><div class="segment petit compact" id="bu-annee-choix"></div></div>
         <div id="bu-annee"></div>
       </div>
-      <div class="carte" data-sous="annee">
+      <div class="carte detail-seul" data-sous="annee">
         <div class="carte-tete"><h2>L'année en un coup d'œil</h2><span class="carte-sous">Votre part</span></div>
         <div class="flux" id="bu-flux"></div>
         <p class="aide" id="bu-flux-sources"></p>
       </div>
-      <div class="carte" data-sous="annee">
+      <div class="carte detail-seul" data-sous="annee">
         <div class="carte-tete"><h2>Trésorerie des 12 prochains mois</h2><span class="carte-sous">Votre compte</span></div>
         <p class="resume" id="bu-tresorerie-resume"></p>
         <div class="graphique" id="bu-tresorerie-graph"></div>
         <div class="rangees" id="bu-tresorerie"></div>
         <p class="aide" id="bu-tresorerie-note"></p>
       </div>
-      <div class="carte" data-sous="mois">
+      <div class="carte detail-seul" data-sous="mois">
         <div class="carte-tete"><h2>Dépenses</h2><span class="carte-sous">Par mois</span></div>
         <div class="rangees" id="bu-depenses"></div>
       </div>
-      <div class="carte" data-sous="annee">
+      <div class="carte detail-seul" data-sous="annee">
         <div class="carte-tete"><h2>Dépenses annuelles</h2><button type="button" class="lien-carte" id="bu-annuelles-modifier">Calendrier</button></div>
         <div id="bu-annuelles"></div>
       </div>
-      <div class="carte" data-sous="dettes">
+      <div class="carte detail-seul" data-sous="dettes">
         <div class="carte-tete"><h2>Dettes</h2><span class="carte-sous">Solde</span></div>
         <div class="rangees" id="bu-dettes"></div>
       </div>
-      <div class="carte" data-sous="dettes">
+      <div class="carte detail-seul" data-sous="dettes">
         <div class="carte-tete"><h2>Plan de remboursement</h2><button type="button" class="lien-carte" data-feuille="strategie">Modifier</button></div>
         <p class="resume" id="de-resume"></p>
         <div class="legende" id="de-legende"></div>
@@ -293,7 +311,7 @@
         </div>
         <div class="actions"><button type="button" class="bouton secondaire petit" id="exporter-plan">Exporter le plan mois par mois (CSV)</button></div>
       </div>
-      <div class="carte" data-sous="dettes">
+      <div class="carte detail-seul" data-sous="dettes">
         <div class="carte-tete"><h2>Choisir la méthode</h2><span class="carte-sous">Valeur nette</span></div>
         <div class="rangees" id="de-methodes"></div>
         <p class="aide" id="de-methodes-note"></p>
@@ -302,73 +320,77 @@
 
     <!-- ============ AVENIR : ÉPARGNE ET VALEUR NETTE ============ -->
     <section class="vue" id="v-avenir" aria-labelledby="h-avenir" hidden>
-      <header class="tete-page"><h1 id="h-avenir">Patrimoine</h1><button type="button" class="bouton-modifier" data-feuille="epargne">Modifier</button></header>
-      <div class="segment" id="vn-scenario"></div>
-      <p class="aide hyp-ligne" id="vn-hyp"></p>
+      <header class="tete-page"><a class="retour-resume detail-seul" href="#avenir">Résumé</a><h1 id="h-avenir">Patrimoine</h1><button type="button" class="bouton-modifier" data-feuille="epargne">Modifier</button></header>
+      <div class="segment detail-seul" id="vn-scenario"></div>
+      <p class="aide hyp-ligne detail-seul" id="vn-hyp"></p>
       <div class="hero" id="vn-hero"></div>
-      <div class="onglets" id="pa-onglets"></div>
-      <div class="carte" data-sous="aujourdhui">
+      <div class="carte resume-seul" id="pa-r-graph"></div>
+      <div class="tuiles quatre resume-seul" id="pa-r-tuiles"></div>
+      <div class="carte resume-seul" id="pa-r-prochain"></div>
+      <a class="bouton secondaire large bouton-detail resume-seul" href="#avenir/detail">Voir tout le détail</a>
+      <div class="onglets detail-seul" id="pa-onglets"></div>
+      <div class="carte detail-seul" data-sous="aujourdhui">
         <div class="carte-tete"><h2>Bilan d'aujourd'hui</h2><span class="carte-sous" id="pa-bilan-sous"></span></div>
         <div class="bilan" id="pa-bilan"></div>
       </div>
-      <div class="carte" data-sous="projection">
+      <div class="carte detail-seul" data-sous="projection">
         <div class="carte-tete"><h2>Valeur nette projetée</h2><div class="segment petit compact" id="vn-vue"></div></div>
         <div class="legende" id="vn-legende"></div>
         <div class="graphique" id="vn-graph"></div>
         <div class="segment petit compact horizon" id="vn-horizon"></div>
         <p class="aide" id="vn-note"></p>
       </div>
-      <div class="carte" data-sous="aujourdhui">
+      <div class="carte detail-seul" data-sous="aujourdhui">
         <div class="carte-tete"><h2>Réel comparé au plan</h2></div>
         <div id="pa-reel"></div>
       </div>
-      <div class="carte demi" data-sous="aujourdhui">
+      <div class="carte demi detail-seul" data-sous="aujourdhui">
         <div class="carte-tete"><h2>Vos objectifs</h2></div>
         <div id="pa-objectifs"></div>
       </div>
-      <div class="carte demi" data-sous="aujourdhui">
+      <div class="carte demi detail-seul" data-sous="aujourdhui">
         <div class="carte-tete"><h2>Où mettre le prochain 1 000 $ ?</h2><span class="carte-sous">Dans 10 ans</span></div>
         <div id="pa-prochain"></div>
       </div>
-      <div class="carte demi" data-sous="projection">
+      <div class="carte demi detail-seul" data-sous="projection">
         <div class="carte-tete"><h2>Indépendance financière</h2><button type="button" class="lien-carte" id="pa-independance-modifier">Modifier</button></div>
         <div id="pa-independance"></div>
       </div>
-      <div class="carte demi" data-sous="placements">
+      <div class="carte demi detail-seul" data-sous="placements">
         <div class="carte-tete"><h2>Frais de gestion</h2><button type="button" class="lien-carte" data-feuille="epargne">Modifier</button></div>
         <div id="pa-frais"></div>
       </div>
-      <div class="carte demi" data-sous="placements">
+      <div class="carte demi detail-seul" data-sous="placements">
         <div class="carte-tete"><h2>Répartition des placements</h2><button type="button" class="lien-carte" data-feuille="epargne">Modifier</button></div>
         <div id="pa-repartition"></div>
       </div>
-      <div class="carte" data-sous="projection">
+      <div class="carte detail-seul" data-sous="projection">
         <div class="carte-tete"><h2>Probabilité de réussite</h2><button type="button" class="lien-carte" data-feuille="hypotheses">Hypothèses</button></div>
         <div id="pa-chances"></div>
       </div>
-      <div class="carte" data-sous="projection">
+      <div class="carte detail-seul" data-sous="projection">
         <div class="carte-tete"><h2>Comparer deux plans</h2></div>
         <div id="pa-plans"></div>
       </div>
-      <div class="carte" data-sous="projection">
+      <div class="carte detail-seul" data-sous="projection">
         <div class="carte-tete"><h2>De quoi elle est faite</h2></div>
         <div class="tableau-defile"><table class="tableau" id="vn-composition"></table></div>
         <p class="aide" id="vn-composition-note"></p>
       </div>
-      <div class="carte" data-sous="projection">
+      <div class="carte detail-seul" data-sous="projection">
         <div class="carte-tete"><h2>Selon le scénario</h2><button type="button" class="lien-carte" data-feuille="hypotheses">Hypothèses</button></div>
         <div class="rangees" id="vn-scenarios"></div>
         <p class="aide">Le scénario réaliste suit les Normes d'hypothèses de projection 2026 de l'Institut de planification financière et de FP Canada : inflation 2,1 %, immobilier résidentiel 3,1 %, salaires 3,1 %, actions de 6,3 à 7,5 % avant frais. Prudent et optimiste encadrent ces normes, comme le recommandent les planificateurs financiers.</p>
       </div>
-      <div class="carte demi" data-sous="placements">
+      <div class="carte demi detail-seul" data-sous="placements">
         <div class="carte-tete"><h2>REEE des enfants</h2><span class="carte-sous">À 17 ans</span></div>
         <div class="rangees" id="ep-reee"></div>
       </div>
-      <div class="carte demi" data-sous="placements">
+      <div class="carte demi detail-seul" data-sous="placements">
         <div class="carte-tete"><h2>REER</h2></div>
         <div id="ep-reer"></div>
       </div>
-      <div class="carte" data-sous="proches">
+      <div class="carte detail-seul" data-sous="proches">
         <div class="carte-tete"><h2>Si quelque chose m'arrive</h2><span class="carte-sous">Dossier pour vos proches</span></div>
         <div id="pa-dossier"></div>
       </div>
@@ -406,37 +428,37 @@
         <div class="carte-tete"><h2>Verrou par phrase de passe</h2><span class="carte-sous" id="verrou-etat"></span></div>
         <div id="verrou-reglages"></div>
       </div>
-      <div class="carte" id="carte-installer">
-        <div class="carte-tete"><h2>Installer l'application</h2></div>
+      <details class="carte carte-repliable" id="carte-installer">
+        <summary><h2>Installer l'application</h2><span class="repli-resume">Sur l'écran d'accueil, sans magasin d'applications</span></summary>
         <p class="aide">WealthMorand s'installe sur l'écran d'accueil comme une application : icône, plein écran, et fonctionne sans connexion. Rien à télécharger d'un magasin d'applications.</p>
         <p class="aide" id="installer-deja" hidden>Elle est déjà installée sur cet appareil : ouvrez-la depuis l'écran d'accueil. Le bouton ci-dessous sert à la réinstaller au besoin.</p>
         <div class="actions"><button type="button" class="bouton" data-installer>Installer WealthMorand</button></div>
         <p class="aide">Sur iPhone, l'application installée garde ses propres données, séparées de Safari : restaurez votre sauvegarde une fois dans l'application (page Données).</p>
-      </div>
-      <div class="carte">
-        <div class="carte-tete"><h2>Valeurs confirmées</h2><span class="carte-sous" id="fiabilite"></span></div>
+      </details>
+      <details class="carte carte-repliable">
+        <summary><h2>Valeurs confirmées</h2><span class="repli-resume" id="fiabilite"></span></summary>
         <div class="jauge" id="fiabilite-jauge" aria-hidden="true"><span></span></div>
         <p class="aide">Touchez <span class="puce-conf" aria-hidden="true">✓</span> à côté d'une valeur, dans les panneaux « Modifier », quand elle vient d'un document fiable : état de compte RAMQ, relevé de prêt, avis de cotisation.</p>
         <details class="plier">
           <summary>Valeurs à confirmer</summary>
           <ul class="liste-fiabilite" id="liste-a-confirmer"></ul>
         </details>
-      </div>
-      <div class="carte">
-        <div class="carte-tete"><h2>Apparence et rapport</h2></div>
+      </details>
+      <details class="carte carte-repliable">
+        <summary><h2>Apparence et rapport</h2><span class="repli-resume">Thème, rapport PDF et fiche d'une page</span></summary>
         <div class="segment" id="theme-choix"></div>
         <p class="aide">Le rapport complet, mis en page avec graphiques en couleurs : couverture et chiffres clés, revenu, impôt, budget, dettes, patrimoine, dossier pour vos proches s'il est rempli, hypothèses et sources. La fiche d'une page résume l'essentiel pour votre partenaire ou votre conseiller ; le sommaire pour le comptable rassemble, sur une page, les revenus, les déductions, l'impôt estimé, les échéances et les documents à fournir. Dans la fenêtre qui s'ouvre, choisissez « Enregistrer en PDF » (sur iPhone : Partager, puis Enregistrer dans Fichiers).</p>
         <div class="actions"><button type="button" class="bouton" id="imprimer">Créer le rapport PDF</button><button type="button" class="bouton secondaire" id="imprimer-fiche">Fiche d'une page</button><button type="button" class="bouton secondaire" data-comptable>Sommaire pour le comptable</button></div>
-      </div>
-      <div class="carte">
-        <div class="carte-tete"><h2>Recommencer</h2></div>
+      </details>
+      <details class="carte carte-repliable">
+        <summary><h2>Recommencer</h2><span class="repli-resume">Avec l'assistant, ou à partir de l'exemple</span></summary>
         <p class="aide">Remplace toutes vos valeurs : par vos réponses à quelques questions, ou par l'exemple. Exportez d'abord une sauvegarde si vous voulez les garder.</p>
         <div class="actions">
           <button type="button" class="bouton secondaire" id="reprendre-assistant">Recommencer avec l'assistant</button>
           <button type="button" class="bouton danger" id="reinitialiser">Revenir à l'exemple</button>
           <button type="button" class="bouton danger plein" id="confirmer-reinit" hidden>Oui, tout remplacer</button>
         </div>
-      </div>
+      </details>
     </section>
 
     <footer class="pied">Estimations seulement : ni avis fiscal, ni avis financier. Tarifs RAMQ : onglet B et Brochure no 1 (octobre 2026) ; paramètres fiscaux 2026.</footer>

@@ -1,5 +1,6 @@
 /* Tests de bout en bout dans Chromium : node tests/navigateur.test.js
    Démarre un petit serveur local, ouvre l'app et vérifie les parcours principaux.
+   Quelques scénarios seulement : SCENARIOS=transfert,residence node tests/navigateur.test.js
    Aucune donnée personnelle : l'exemple de départ et des situations fictives. */
 "use strict";
 const http = require("http");
@@ -68,7 +69,7 @@ async function exemple(b, base) {
   const e = await resultat(p);
   verifier("exemple : revenu calculé, clinique à l'acte", e.brut > 100000 && e.milieu === "clinique" && e.mode === "acte", e.brut);
   verifier("accueil : pas d'import", !(await p.$('#ap-exemple a[href="#donnees"]')) && !/import/i.test(await p.textContent("#ap-exemple")));
-  for (const page of ["apercu", "revenu", "impot", "budget", "avenir", "donnees"]) {
+  for (const page of ["apercu", "apercu/detail", "revenu", "revenu/detail", "impot", "impot/detail", "budget", "budget/detail", "avenir", "avenir/detail", "donnees"]) {
     await allerA(p, page);
     const d = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     verifier(`page ${page} : pas de défilement horizontal à 390 px`, d <= 0, d);
@@ -84,7 +85,7 @@ async function exemple(b, base) {
 
 /* 2. Montants de la Brochure no 1 : ils suivent la colonne et la liste ; une valeur modifiée reste ; « Rétablir ». */
 async function brochure(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { details: true, page: "revenu" });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { details: true, page: "revenu/detail" });
   let r = (await resultat(p)).r;
   verifier("exemple : colonne cabinet", r.forfaitInscription === 11.85 && r.suppVulnerableGuichet === 155.35 && r.perDiemResident === 55.35 && r.pctMixte === 63.58, r);
   await p.selectOption("#rv-milieu", "gmfu"); await p.waitForTimeout(300);
@@ -252,7 +253,7 @@ async function logo(b, base) {
 
 /* 11. Sous-onglets : Budget et Patrimoine montrent une partie à la fois ; un lien peut viser un onglet. */
 async function sousOnglets(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "budget" });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "budget/detail" });
   const visibles = page => p.evaluate(pg => [...document.querySelectorAll(`#v-${pg} .carte[data-sous]`)]
     .filter(c => getComputedStyle(c).display !== "none").map(c => c.dataset.sous), page);
   const budgetMois = await visibles("budget");
@@ -263,8 +264,8 @@ async function sousOnglets(b, base) {
   await allerA(p, "apercu");
   await allerA(p, "budget/dettes");
   const dettes = await visibles("budget");
-  verifier("sous-onglets : #budget/dettes ouvre les dettes", dettes.length > 0 && dettes.every(s => s === "dettes") && await p.evaluate(() => location.hash) === "#budget", dettes);
-  await allerA(p, "avenir");
+  verifier("sous-onglets : #budget/dettes ouvre les dettes", dettes.length > 0 && dettes.every(s => s === "dettes") && await p.evaluate(() => location.hash) === "#budget/dettes", dettes);
+  await allerA(p, "avenir/detail");
   const parOnglet = {};
   for (const [i, cle] of ["aujourdhui", "projection", "placements", "proches"].entries()) {
     await p.click(`#pa-onglets button:nth-child(${i + 1})`); await p.waitForTimeout(150);
@@ -275,7 +276,8 @@ async function sousOnglets(b, base) {
   const total = await p.evaluate(() => document.querySelectorAll("#v-avenir .carte[data-sous]").length);
   verifier("sous-onglets : aucune carte oubliée", Object.values(parOnglet).reduce((a, n) => a + n, 0) === total, { parOnglet, total });
   await p.reload(); await pret(p);
-  verifier("sous-onglets : l'onglet choisi est gardé", (await visibles("avenir")).every(s => s === "proches"));
+  await allerA(p, "avenir"); await allerA(p, "avenir/detail");
+  verifier("sous-onglets : l'onglet choisi est gardé", (await visibles("avenir")).every(s => s === "proches") && await p.evaluate(() => location.hash) === "#avenir/proches");
   verifier("sous-onglets : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
@@ -469,7 +471,7 @@ async function apercuCoherent(b, base) {
   await p.check('input[name="as-milieu"][value="gmfu"]'); await suivant(); await suivant();
   await p.check('input[name="as-logement"][value="proprietaire"]'); await suivant(); await suivant(); await suivant();
   await p.waitForTimeout(300);
-  const neuf = await p.evaluate(() => ({ etiquette: document.querySelector("#ap-hero .hero-etiquette").textContent, lien: !!document.querySelector('#ap-hero a[href="#budget"]') }));
+  const neuf = await p.evaluate(() => ({ etiquette: document.querySelector("#ap-hero .hero-etiquette").textContent, lien: !!document.querySelector('#ap-hero a[href="#budget/mois"]') }));
   verifier("aperçu sans dépenses : revenu net et lien vers le budget", neuf.etiquette === "Votre revenu net mensuel" && neuf.lien, neuf);
   await remplacer(p, { "budget.0.montant": 500 });
   verifier("aperçu avec une dépense : surplus", (await p.textContent("#ap-hero .hero-etiquette")) === "Votre surplus mensuel");
@@ -496,7 +498,7 @@ async function assistantMode(b, base) {
   await suivant(); await p.waitForTimeout(300);
   const r = await resultat(p);
   verifier("assistant : GMF-U au mixte", r.milieu === "gmfu" && r.mode === "mixte", { milieu: r.milieu, mode: r.mode });
-  await allerA(p, "impot");
+  await allerA(p, "impot/detail");
   const cartes = await p.evaluate(() => [...document.querySelectorAll("#v-impot details.carte-repliable")].map(d => ({ ouvert: d.open, resume: d.querySelector(".repli-resume").textContent })));
   verifier("impôt : deux cartes repliées, leur conclusion en vue", cartes.length === 2 && cartes.every(c => !c.ouvert && c.resume.length > 10), cartes);
   await p.click("#im-verif-resume");
@@ -533,7 +535,7 @@ async function rendementProfil(b, base) {
 /* 21. Lexique : les sigles de la RAMQ s'expliquent au toucher, jamais dans un bouton, un lien, une étiquette ou un titre ;
    Échap ferme la bulle (pas le panneau) et rend le focus au mot. */
 async function lexiqueRamq(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu" });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu/detail" });
   const termes = await p.evaluate(() => [...document.querySelectorAll("#v-revenu .terme")].map(x => x.dataset.terme));
   verifier("lexique : sigles marqués dans la page Revenu", ["EP 40", "DMÉ", "pratique polyvalente", "onglet B"].every(t => termes.includes(t)), termes);
   verifier("lexique : jamais dans un bouton, un lien, une étiquette ou un titre",
@@ -752,7 +754,7 @@ async function transfert(b, base) {
    En vue résidence, l'aperçu, le revenu, l'impôt, le budget et le rapport montrent la résidence (impôt retenu sur la
    paie) ; en vue pratique, la pratique comme avant. Les projections suivent le parcours dans les deux vues. */
 async function residence(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu" });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu/detail" });
   verifier("résidence : invitation dans la page Revenu", await p.evaluate(() => !document.getElementById("rv-residence-ajout").hidden));
   await p.click("#rv-residence-ajouter"); await p.waitForTimeout(300);
   const ajout = await p.evaluate(() => { const S = window.Wealthnord.etat(); return { active: S.residence.active, vue: S.residence.vue, date: S.residence.debutPratique, titre: document.getElementById("feuille-titre").textContent }; });
@@ -777,10 +779,17 @@ async function residence(b, base) {
   const rv = await p.evaluate(() => ({ carte: !document.getElementById("rv-residence").hidden, pratique: [...document.querySelectorAll("#v-revenu .pratique-seule")].every(x => x.hidden),
     detail: document.getElementById("rv-residence-detail").textContent, invitation: document.getElementById("rv-residence-ajout").hidden }));
   verifier("résidence : la page Revenu montre le salaire et cache la pratique", rv.carte && rv.pratique && rv.invitation && rv.detail.includes("Salaire de l'échelle, R2") && rv.detail.includes("Début de la pratique"), rv);
+  const rvr = await p.evaluate(() => ({ tuiles: [...document.querySelectorAll("#rv-r-tuiles .tuile-titre")].map(x => x.textContent), niveau: document.querySelector("#rv-r-tuiles .tuile:nth-child(3) .tuile-valeur").textContent,
+    cartes: [...document.querySelectorAll("#v-revenu .resume-seul")].filter(x => x.getClientRects().length).map(x => x.id || x.className) }));
+  verifier("résidence : le résumé du Revenu montre la paie et le niveau, pas la pratique", rvr.tuiles.join() === "Net par mois,Par paie,Niveau,Début de la pratique" && rvr.niveau === "R2"
+    && !rvr.cartes.includes("rv-r-sources") && !rvr.cartes.includes("rv-r-sens"), rvr);
   await allerA(p, "impot");
   const im = await p.evaluate(() => ({ titre: document.getElementById("im-acomptes-titre").textContent, tableau: document.getElementById("im-tableau").textContent,
     societe: document.getElementById("im-societe").closest(".carte").hidden }));
   verifier("résidence : l'impôt d'un salarié, retenu sur la paie", im.titre === "Retenues sur la paie" && im.tableau.includes("Assurance-emploi") && im.tableau.includes("scolarité") && im.societe, im);
+  const imr = await p.evaluate(() => ({ tuiles: [...document.querySelectorAll("#im-r-tuiles .tuile-titre")].map(x => x.textContent), paie: document.getElementById("im-r-payer").textContent }));
+  verifier("résidence : le résumé de l'impôt, sans chiffre répété, et la paie type", imr.tuiles.join() === "Net de l'année,Impôt fédéral,Impôt du Québec,Cotisations"
+    && ["Paie brute", "Impôt et cotisations retenus", "Paie nette"].every(t => imr.paie.includes(t)), imr);
   const tresorerie = await p.evaluate(() => window.Wealthnord.outils.tresorerie(window.Wealthnord.resultats()).mois.flatMap(m => m.ev.map(([n]) => n)));
   verifier("résidence : trésorerie sans acompte", !tresorerie.includes("Acompte provisionnel"), tresorerie);
   const rapport = await p.evaluate(() => { const W = window.Wealthnord.rapport, boite = document.getElementById("rapport");
@@ -796,11 +805,98 @@ async function residence(b, base) {
   await ctx.close();
 }
 
+/* 28. Résumé et détail : chaque page s'ouvre sur son résumé, quelques cartes d'un chiffre chacune ; « Voir tout le détail »
+   montre la page complète, et « Résumé » ou le bouton Retour y ramènent. Mêmes chiffres dans les deux. Sur ordinateur,
+   les cartes côte à côte ont la même hauteur et toutes les pages, la même largeur. */
+async function resumeDetail(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base);
+  // Ce qui se voit : les cartes du résumé ou celles du détail, jamais les deux.
+  const vus = pg => p.evaluate(pg => {
+    const v = document.getElementById("v-" + pg), vu = x => x.getClientRects().length > 0;
+    return { detail: v.classList.contains("mode-detail"), resume: [...v.querySelectorAll(".resume-seul")].filter(vu).length,
+      details: [...v.querySelectorAll(".detail-seul")].filter(vu).length, hauteur: document.documentElement.scrollHeight, adresse: location.hash };
+  }, pg);
+  for (const pg of ["apercu", "revenu", "impot", "budget", "avenir"]) {
+    await allerA(p, pg);
+    const r = await vus(pg);
+    verifier(`résumé : ${pg} s'ouvre sur son résumé`, !r.detail && r.resume >= 3 && r.details === 0 && r.adresse === "#" + pg, r);
+    await p.click(`#v-${pg} .bouton-detail`); await p.waitForTimeout(250);
+    const d = await vus(pg);
+    verifier(`détail : ${pg} montre tout, sans le résumé`, d.detail && d.resume === 0 && d.details >= 3 && d.adresse.startsWith(`#${pg}/`), d);
+    verifier(`résumé : ${pg} tient en moins de place que le détail`, r.hauteur < d.hauteur * 0.75, { resume: r.hauteur, detail: d.hauteur });
+    await p.click(`#v-${pg} .retour-resume`); await p.waitForTimeout(250);
+    const retour = await vus(pg);
+    verifier(`résumé : « Résumé » ramène au résumé de ${pg}`, !retour.detail && retour.details === 0 && retour.adresse === "#" + pg, retour);
+  }
+  // Les tuiles du résumé : quatre, chacune avec sa valeur.
+  const tuiles = await p.evaluate(() => ["rv-r-tuiles", "im-r-tuiles", "bu-r-tuiles", "pa-r-tuiles"].map(id =>
+    [...document.querySelectorAll(`#${id} .tuile`)].filter(t => t.querySelector(".tuile-valeur").textContent.trim()).length));
+  verifier("résumé : quatre tuiles remplies par page", tuiles.every(n => n === 4), tuiles);
+  // Aperçu : les 3 actions les plus importantes, tirées de la liste complète ; ce mois-ci, les montants du détail.
+  const ap = await p.evaluate(() => {
+    const textes = sel => [...document.querySelectorAll(sel)].map(x => x.textContent.replace(/\s/g, " "));
+    return { resume: textes("#ap-r-actions li"), tout: textes("#ap-actions li"), importants: textes("#ap-actions li .ico.important + span"),
+      lien: (document.querySelector("#ap-r-actions .lien-carte") || {}).textContent || "", mois: textes("#ap-r-mois .legende-cases strong"),
+      flux: document.getElementById("ap-flux").textContent.replace(/\s/g, " "), avenir: document.querySelectorAll("#ap-r-avenir .rangee").length };
+  });
+  verifier("résumé : trois actions, les importantes d'abord", ap.resume.length === Math.min(3, ap.tout.length) && ap.resume.every(t => ap.tout.includes(t))
+    && ap.resume.slice(0, Math.min(3, ap.importants.length)).every(t => ap.importants.includes(t)), ap);
+  verifier("résumé : « Tout voir » compte toutes les actions", ap.tout.length <= 3 || ap.lien === `Tout voir (${ap.tout.length})`, ap.lien);
+  verifier("résumé : ce mois-ci, les montants du détail ; la prochaine échéance et le prochain jalon", ap.mois.length === 4 && ap.mois.every(m => ap.flux.includes(m)) && ap.avenir === 2, ap);
+  // Impôt : chaque 100 $ se partage en entier ; Budget : le total des dettes.
+  const chiffres = await p.evaluate(() => {
+    const n = t => +t.replace(/[^\d,-]/g, "").replace(",", ".");
+    const cent = [...document.querySelectorAll("#im-r-cent .legende-cases strong")].reduce((t, x) => t + n(x.textContent), 0);
+    const dettes = document.querySelector("#bu-r-dettes .rangee-valeur");
+    return { cent, dettes: dettes ? n(dettes.textContent) : null, total: Math.round(window.Wealthnord.resultats().detteTotale) };
+  });
+  verifier("résumé : chaque 100 $ gagnés se partage en entier", Math.abs(chiffres.cent - 100) < 0.1, chiffres.cent);
+  verifier("résumé : le total des dettes", chiffres.dettes === chiffres.total, chiffres);
+  // Un lien du résumé ouvre le bon sous-onglet ; le bouton Retour revient au résumé.
+  await allerA(p, "budget");
+  await p.click("#bu-r-dettes .lien-carte"); await p.waitForTimeout(250);
+  const plan = await p.evaluate(() => ({ adresse: location.hash, cartes: [...document.querySelectorAll("#v-budget .carte[data-sous]")].filter(c => c.getClientRects().length).map(c => c.dataset.sous) }));
+  verifier("résumé : « Plan » ouvre les dettes", plan.adresse === "#budget/dettes" && plan.cartes.length > 0 && plan.cartes.every(c => c === "dettes"), plan);
+  await p.goBack(); await p.waitForTimeout(250);
+  const arriere = await vus("budget");
+  verifier("résumé : le bouton Retour revient au résumé", !arriere.detail && arriere.adresse === "#budget", arriere);
+  // Clavier : le focus suit (le lien touché disparaît) ; le lien d'évitement ne change pas de page. Le détail du Budget
+  // rouvre le sous-onglet gardé (Dettes, choisi plus haut).
+  await p.focus("#v-budget .bouton-detail"); await p.keyboard.press("Enter"); await p.waitForTimeout(250);
+  verifier("clavier : « Voir tout le détail » mène le focus au contenu", await p.evaluate(() => location.hash === "#budget/dettes" && document.activeElement.id === "contenu"));
+  await p.focus(".saut"); await p.keyboard.press("Enter"); await p.waitForTimeout(250);
+  verifier("clavier : « Aller au contenu » reste sur la page", await p.evaluate(() => location.hash === "#budget/dettes" && document.activeElement.id === "contenu" && !document.getElementById("v-budget").hidden));
+  await allerA(p, "apercu");
+  verifier("aperçu : la tuile Dettes ouvre le plan", !!(await p.$('#ap-tuiles a.tuile[href="#budget/dettes"]')));
+  // Données : toujours en entier ; les cartes moins utiles, repliées, leur conclusion en vue.
+  await allerA(p, "donnees");
+  const don = await p.evaluate(() => ({ adresse: location.hash, retour: document.querySelectorAll("#v-donnees .retour-resume").length,
+    cartes: [...document.querySelectorAll("#v-donnees details.carte-repliable")].map(d => ({ ouvert: d.open, resume: d.querySelector(".repli-resume").textContent })) }));
+  verifier("données : quatre cartes repliées, leur conclusion en vue", don.adresse === "#donnees" && don.retour === 0 && don.cartes.length === 4
+    && don.cartes.every(c => !c.ouvert && c.resume.length > 3) && /^\d+ sur \d+$/.test(don.cartes[1].resume), don);
+  await p.click("#v-donnees details.carte-repliable:nth-of-type(3) > summary"); await p.waitForTimeout(150);
+  verifier("données : une carte s'ouvre au toucher", await p.evaluate(() => document.getElementById("theme-choix").getClientRects().length > 0));
+  // Ordinateur : les cartes côte à côte, de même hauteur ; la même largeur sur chaque page.
+  await p.setViewportSize({ width: 1280, height: 900 });
+  const largeurs = [], paires = {};
+  for (const [pg, a, c] of [["apercu", "ap-r-actions", "ap-r-avenir"], ["revenu", "rv-r-sources", "rv-r-sens"], ["impot", "im-r-cent", "im-r-payer"], ["budget", "bu-r-dettes", "bu-r-annee"]]) {
+    await allerA(p, pg);
+    const m = await p.evaluate(([a, c]) => { const x = document.getElementById(a).getBoundingClientRect(), y = document.getElementById(c).getBoundingClientRect();
+      return { haut: Math.abs(x.top - y.top), hauteur: Math.abs(x.height - y.height), cote: y.left > x.right, main: document.querySelector("main").getBoundingClientRect().width }; }, [a, c]);
+    paires[pg] = m; largeurs.push(m.main);
+  }
+  verifier("ordinateur : les cartes côte à côte ont la même hauteur", Object.values(paires).every(m => m.cote && m.haut < 1 && m.hauteur < 1), paires);
+  verifier("ordinateur : la même largeur sur chaque page", largeurs.every(l => Math.abs(l - largeurs[0]) < 1), largeurs);
+  verifier("résumé et détail : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail]) {
+      if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
   } finally { await b.close(); srv.close(); }

@@ -867,6 +867,76 @@ window.Verrou.quandOuvert(function () {
     if (R.plusieursModes) segment(id, [["horaire", "Horaire"], ["mixte", "Mixte"], ["acte", "À l'acte"]], R.mode, v => changer("revenu.modeBudget", v), "Mode de rémunération utilisé");
   };
 
+  /* ============================================================
+     RÉSUMÉS : chaque page en 3 ou 4 cartes, un chiffre et une phrase chacune ;
+     « Détail » ou « Voir tout le détail » ouvre la page complète.
+     ============================================================ */
+  // Une carte du résumé : son titre, le lien vers le détail, puis son contenu (texte ou éléments).
+  function carteResume(id, titre, lien, ...contenu) {
+    const c = document.getElementById(id); c.textContent = "";
+    const tete = el("div", "carte-tete"); tete.appendChild(el("h2", null, titre));
+    if (lien) { const a = el("a", "lien-carte", lien[0]); a.href = lien[1]; tete.appendChild(a); }
+    c.appendChild(tete);
+    contenu.filter(Boolean).forEach(x => c.appendChild(typeof x === "string" ? el("p", "aide", x) : x));
+    return c;
+  }
+  // Tuiles : titre, valeur et sous-titre ; un lien au besoin.
+  function tuilesResume(id, items) {
+    const z = document.getElementById(id); z.textContent = "";
+    for (const t of items.filter(Boolean)) {
+      const a = el(t.href ? "a" : "div", "tuile"); if (t.href) a.href = t.href;
+      a.append(el("div", "tuile-titre", t.titre), el("div", "tuile-valeur", t.valeur));
+      if (t.sous) a.appendChild(el("div", "tuile-sous", t.sous));
+      z.appendChild(a);
+    }
+  }
+  // Une barre empilée, puis sa légende sur deux colonnes : [nom, montant, couleur].
+  function barreLegende(parts, format = $) {
+    const z = el("div", "barre-legende"), barre = el("div", "flux-barre");
+    barre.setAttribute("role", "img"); barre.setAttribute("aria-label", parts.map(([n, v]) => `${n} ${format(v)}`).join(", "));
+    parts.forEach(([, v, c]) => { if (v > 0) { const sp = el("span"); sp.style.flex = `${v} 0 0`; sp.style.background = c; barre.appendChild(sp); } });
+    const l = el("ul", "legende-cases");
+    parts.forEach(([n, v, c]) => { const li = el("li"), i = el("i"); i.style.background = c; li.append(i, el("span", null, n), el("strong", null, format(v))); l.appendChild(li); });
+    z.append(barre, l); return z;
+  }
+  // Barres horizontales, la plus grande en premier : [nom, montant].
+  function miniBarres(items, format = $) {
+    const max = Math.max(1, ...items.map(([, v]) => v)), ul = el("ul", "mini-barres");
+    items.forEach(([n, v]) => { const li = el("li"), piste = el("span", "piste"), b = el("span"); b.style.width = Math.max(1, v / max * 100) + "%";
+      piste.appendChild(b); li.append(el("span", "nom", n), el("strong", null, format(v)), piste); ul.appendChild(li); });
+    return ul;
+  }
+  // Les actions de « À faire » : une icône selon l'importance, puis le texte.
+  function listeActions(ul, liste) {
+    ul.textContent = "";
+    for (const { type, texte } of liste) {
+      const li = el("li"), ico = el("span", "ico " + type);
+      ico.appendChild(icone(type === "important" ? "alerte" : type === "bon" ? "ok" : "info"));
+      const lib = el("span", "visuellement-cache", type === "important" ? "Important : " : type === "bon" ? "Bien : " : "À noter : ");
+      const txt = el("span"); txt.append(lib, document.createTextNode(texte));
+      li.append(ico, txt); ul.appendChild(li);
+    }
+    return ul;
+  }
+  const ORDRE_ACTION = { important: 0, info: 1, bon: 2 };
+  // Aperçu : le portrait en une ligne, ce mois-ci, les 3 actions les plus importantes, la prochaine échéance et le prochain jalon.
+  function resumeApercu(R, actions, ech, jal) {
+    const pc = document.getElementById("ap-r-portrait"), P = portrait();
+    pc.hidden = S.meta.exemple || P.pct >= 100 || portraitMasque();
+    if (!pc.hidden) {
+      const suite = P.items.find(x => x.f < 1), j = el("div", "jauge"), b = el("button", "bouton petit", suite ? `Continuer : ${suite.titre.toLowerCase()}` : "Continuer");
+      j.setAttribute("role", "progressbar"); j.setAttribute("aria-valuemin", "0"); j.setAttribute("aria-valuemax", "100"); j.setAttribute("aria-valuenow", P.pct);
+      j.setAttribute("aria-label", "Portrait complété"); const sp = el("span"); sp.style.width = P.pct + "%"; j.appendChild(sp);
+      b.type = "button"; if (suite) b.addEventListener("click", suite.action);
+      carteResume("ap-r-portrait", `Votre portrait : ${P.pct} %`, ["Voir", "#apercu/detail"], j, b);
+    }
+    carteResume("ap-r-mois", "Ce mois-ci", ["Budget", "#budget"], barreLegende([["Dépenses", R.depMoi, SERIES[0]], ["Dettes", R.dettesMoi, SERIES[1]],
+      ["Épargne", R.epargneMoi, SERIES[2]], ["Surplus", Math.max(0, R.surplusMoi), SERIES[3]]]));
+    const top = [...actions].sort((x, y) => ORDRE_ACTION[x.type] - ORDRE_ACTION[y.type]).slice(0, 3);
+    carteResume("ap-r-actions", "À faire", actions.length > 3 ? [`Tout voir (${actions.length})`, "#apercu/detail"] : null, listeActions(el("ul", "a-faire"), top));
+    carteResume("ap-r-avenir", "À venir", ["Tout voir", "#apercu/detail"], rangees(el("div"), [ech[0], jal[0]]));
+  }
+
   function rendreApercu(R) {
     document.getElementById("ap-exemple").hidden = !S.meta.exemple;
     rendrePortrait();
@@ -875,7 +945,7 @@ window.Verrou.quandOuvert(function () {
     const enVue = !R.residenceActive ? "" : R.vueResidence ? " en résidence" : " en pratique";
     const quand = !R.residenceActive ? null : puce(R.vueResidence ? `R${R.res.niveau}, jusqu'en ${moisLong(moisAvant(R.debutPratique))}` : `Dès ${moisLong(R.debutPratique)}`);
     if (!S.meta.exemple && !categoriesBudget().some(categorieRemplie)) {
-      const lien = el("a", "lien-carte", "Entrez vos dépenses du mois"); lien.href = "#budget";
+      const lien = el("a", "lien-carte", "Entrez vos dépenses du mois"); lien.href = "#budget/mois";
       const suite = el("span"); suite.append(lien, document.createTextNode(" pour voir ce qu'il vous reste."));
       hero("ap-hero", "Votre revenu net mensuel" + enVue, $(R.netMoi), [suite, quand], R.netMoi);
     } else hero("ap-hero", "Votre surplus mensuel" + enVue, $(R.surplusMoi), [
@@ -908,18 +978,12 @@ window.Verrou.quandOuvert(function () {
     t.append(
       tuileLien("revenu", "Revenu brut", $(R.brutVue), R.vueResidence ? `Salaire de résident, R${R.res.niveau}` : libelleRevenu()),
       tuileLien("impot", "Net de l'année", $(R.netVue), R.vueResidence ? "Après impôt et retenues" : R.fraisPerso(R.mode) > 0 ? "Après impôt et frais" : "Après impôt"),
-      tuileLien("budget", "Dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
+      tuileLien("budget/dettes", "Dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
       tuileLien("avenir", "Valeur nette", $(p[0].moi), `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}`),
     );
 
-    const a = document.getElementById("ap-actions"); a.textContent = "";
-    const action = (type, texte) => {
-      const li = el("li"); const ico = el("span", "ico " + type);
-      ico.appendChild(icone(type === "important" ? "alerte" : type === "bon" ? "ok" : "info"));
-      const lib = el("span", "visuellement-cache", type === "important" ? "Important : " : type === "bon" ? "Bien : " : "À noter : ");
-      const txt = el("span"); txt.append(lib, document.createTextNode(texte));
-      li.append(ico, txt); a.appendChild(li);
-    };
+    // À faire : toute la liste dans le détail ; les trois plus importantes dans le résumé.
+    const actions = [], action = (type, texte) => actions.push({ type, texte });
     if (R.vueResidence) action("bon", "En résidence, l'impôt et les cotisations sont retenus sur chaque paie : rien à mettre de côté.");
     else if (R.societeActive) action("important", `La société garde environ ${$(R.impot.societe.impotSociete / 12)} par mois pour son impôt ; vous, environ ${$(R.impot.total / 12)} par mois pour l'impôt sur vos dividendes.`);
     else action("important", `Mettez ${pct((R.impot.total + R.primeMoi) / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$((R.impot.total + R.primeMoi) / 12)} par mois.`);
@@ -972,8 +1036,11 @@ window.Verrou.quandOuvert(function () {
     if (R.surplusMoi < 0) action("important", `Votre budget est négatif de ${$(-R.surplusMoi)} par mois : revoyez les dépenses ou leur partage.`);
     else action("bon", `Votre surplus de ${$(R.surplusMoi)} par mois va sur les dettes, dans l'ordre de la méthode choisie.`);
 
-    rangees("ap-echeances", echeances(R));
-    rangees("ap-jalons", jalons(R));
+    listeActions(document.getElementById("ap-actions"), actions);
+    const ech = echeances(R), jal = jalons(R);
+    rangees("ap-echeances", ech);
+    rangees("ap-jalons", jal);
+    resumeApercu(R, actions, ech, jal);
     document.getElementById("ap-dettes-sous").textContent = R.sim.libre
       ? `De ${$(R.detteTotale)} aujourd'hui à zéro en ${moisAn(R.sim.libre)}.`
       : "À ce rythme, la marge de crédit n'est jamais remboursée.";
@@ -1070,6 +1137,46 @@ window.Verrou.quandOuvert(function () {
   }
 
   const COURT_MODE = { horaire: "Horaire", mixte: "Mixte", acte: "À l'acte" };
+  // D'où vient le revenu d'un mode : chaque part, dans le détail et dans le résumé.
+  const PARTS_REVENU = [
+    ["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire ?? 0],
+    ["Visites", x => x.visites || 0],
+    ["Intervention de supervision", x => x.supervision || 0],
+    ["Forfaits de responsabilité", x => x.responsabilite || 0],
+    ["Demi-per diem de supervision", x => x.perDiem],
+    ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable],
+    ["Forfait GMF", x => x.forfaitGmf || 0],
+    ["Suppléments sans médecin", x => x.supplements],
+    ["Volume de patients", x => x.volume || 0],
+    ["Compensation des frais de cabinet", x => x.compensation || 0],
+    ["Activités en établissement", x => x.activites || 0],
+    ["Pratique polyvalente", x => x.polyvalence || 0],
+    ["Autres revenus", x => x.autres],
+  ];
+  // Revenu : le net en tuiles ; d'où vient le revenu ; ce que change une demi-journée ou un patient de plus.
+  function resumeRevenu(R) {
+    if (R.vueResidence) {
+      const x = R.res;
+      tuilesResume("rv-r-tuiles", [{ titre: "Net par mois", valeur: $(R.netVue / 12), sous: "Après impôt et retenues" }, { titre: "Par paie", valeur: $(R.impot.net / 26), sous: "Aux deux semaines" },
+        { titre: "Niveau", valeur: `R${x.niveau}`, sous: x.prochain ? `R${x.prochain.niveau} au ${dateLongue(x.prochain.date)}` : "Jusqu'à la pratique" },
+        { titre: "Début de la pratique", valeur: moisLong(R.debutPratique), sous: delaiMois(R.moisAvantPratique) }]);
+      return;
+    }
+    const g = R.rev, x = g[R.mode];
+    tuilesResume("rv-r-tuiles", [{ titre: "Net par mois", valeur: $(R.nets[R.mode] / 12), sous: R.fraisPerso(R.mode) > 0 ? "Après impôt et frais" : "Après impôt" },
+      { titre: "Heures en clinique", valeur: nb(g.heures, 0) + " h", sous: "Par année" }, { titre: "Visites", valeur: nb(g.nbVisites, 0), sous: "Par année, en clinique" },
+      { titre: "Patients inscrits", valeur: nb(g.inscritsFin, 0), sous: "En fin d'année" }]);
+    const l = PARTS_REVENU.map(([n, f]) => [n, f(x)]).filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
+    const autres = l.slice(4).reduce((t, [, v]) => t + v, 0);
+    carteResume("rv-r-sources", "D'où vient le revenu", ["Détail", "#revenu/detail"], miniBarres([...l.slice(0, 4), ...(autres > 0.5 ? [["Le reste", autres]] : [])]));
+    const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ, net = k => k + "Net";
+    const ecart = (liste, v) => { const a = liste.find(y => y.v === v), b = liste.find(y => y.v > v); return a && b ? (b[net(R.mode)] - a[net(R.mode)]) / (b.v - a.v) : null; };
+    const plusDJ = ecart(R.sensDJ, dj), plusPat = ecart(R.sensPat, pat);
+    carteResume("rv-r-sens", "Travailler un peu plus", ["Détail", "#revenu/detail"], rangees(el("div"), [
+      plusDJ != null && { titre: "Une demi-journée de plus par semaine", sous: `${nb(dj)} aujourd'hui`, valeur: signe(plusDJ), valeurSous: "net par année" },
+      plusPat != null && { titre: "Un patient de plus par demi-journée", sous: `${nb(pat)} aujourd'hui`, valeur: signe(plusPat), valeurSous: R.mode === "horaire" ? "au taux horaire, rien" : "net par année" },
+    ]));
+  }
   // Résidence : la carte du salaire en vue résidence ; sinon, l'invitation à l'ajouter (ou à la retirer, date passée).
   function rendreResidence(R) {
     const rs = S.residence || {}, ajout = document.getElementById("rv-residence-ajout");
@@ -1097,6 +1204,7 @@ window.Verrou.quandOuvert(function () {
   }
   function rendreRevenu(R) {
     rendreResidence(R);
+    resumeRevenu(R);
     if (R.vueResidence) { rendreAutresRevenus(); return; }
     // Pratique principale, en haut de la section.
     const choix = document.getElementById("rv-milieu");
@@ -1149,21 +1257,7 @@ window.Verrou.quandOuvert(function () {
 
     rendreSensibilite(R);
 
-    const parts = [
-      ["Heures ou forfait horaire", x => x.heures ?? x.forfaitHoraire ?? 0],
-      ["Visites", x => x.visites || 0],
-      ["Intervention de supervision", x => x.supervision || 0],
-      ["Forfaits de responsabilité", x => x.responsabilite || 0],
-      ["Demi-per diem de supervision", x => x.perDiem],
-      ["Forfaits d'inscription", x => x.forfaitInscription + x.forfaitVulnerable],
-      ["Forfait GMF", x => x.forfaitGmf || 0],
-      ["Suppléments sans médecin", x => x.supplements],
-      ["Volume de patients", x => x.volume || 0],
-      ["Compensation des frais de cabinet", x => x.compensation || 0],
-      ["Activités en établissement", x => x.activites || 0],
-      ["Pratique polyvalente", x => x.polyvalence || 0],
-      ["Autres revenus", x => x.autres],
-    ];
+    const parts = PARTS_REVENU;
     const zone = document.getElementById("rv-barres"); zone.textContent = ""; zone.className = "barres";
     const maxB = Math.max(...R.modes.map(m => g[m].total), 1);
     R.modes.forEach(k => {
@@ -1380,12 +1474,46 @@ window.Verrou.quandOuvert(function () {
     cent.appendChild(barre);
     cent.appendChild(rangees(el("div"), morceaux.map(([n, v, c]) => ({ titre: n, couleur: c, valeur: $2(v / brut * 100), valeurSous: $(v) + " par année" }))));
   }
+  // Où va chaque 100 $ gagné, selon la vue : [nom, montant de l'année, couleur], et le revenu de base.
+  function morceauxImpot(R) {
+    const I = R.impot, x = I.societe;
+    if (R.vueResidence) return { brut: Math.max(1, I.revenu + (I.autres || 0)), morceaux: [["Impôt fédéral", I.fed, SERIES[0]], ["Impôt du Québec", I.qc, SERIES[1]],
+      ["RRQ, RQAP et assurance-emploi", I.rrq + I.rqap + I.ae + I.fss, SERIES[2]], ["Cotisation syndicale et droits de scolarité", R.res.syndicat + R.res.scolarite, SERIES[3]],
+      ["Reste pour vous", R.netVue, SERIES[4]]].filter(([, v]) => v > 0.5) };
+    const brut = Math.max(1, I.revenu), dpro = Math.min(R.dproPerso, brut);
+    return { brut, morceaux: R.societeActive
+      ? [["Impôt de la société", x.impotSociete, SERIES[0]], ["Votre impôt sur les dividendes", I.fed + I.qc + I.fss, SERIES[1]],
+         ["Dépenses et frais de la société", x.depenses + x.frais, SERIES[3]], ["Laissé dans la société", x.retenu, SERIES[5]], ["Reste pour vous", I.net, SERIES[4]]]
+      : [["Impôt fédéral", I.fed, SERIES[0]], ["Impôt du Québec", I.qc, SERIES[1]], ["RRQ, RQAP et Fonds des services de santé", I.rrq + I.rqap + I.fss, SERIES[2]],
+         [R.rev[R.mode].fraisCabinet ? "Dépenses et frais de cabinet" : "Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", I.net - dpro, SERIES[4]]] };
+  }
+  // Impôt : les taux et le net en tuiles ; chaque 100 $ ; le prochain paiement (ou la retenue sur la paie).
+  function resumeImpot(R) {
+    const I = R.impot, t = I.totalGlobal ?? I.total, soc = R.societeActive && !R.vueResidence;
+    const net = { titre: soc ? "Net pour vous" : "Net de l'année", valeur: $(R.netVue), sous: R.vueResidence ? "Après impôt et retenues" : "Après impôt et frais" };
+    const fed = { titre: "Impôt fédéral", valeur: $(I.fed), sous: "Après l'abattement du Québec" }, qc = { titre: "Impôt du Québec", valeur: $(I.qc), sous: "Par année" };
+    tuilesResume("im-r-tuiles", R.vueResidence ? [net, fed, qc, { titre: "Cotisations", valeur: $(I.rrq + I.rqap + I.ae + I.fss), sous: "RRQ, RQAP et assurance-emploi" }]
+      : soc ? [net, { titre: "Vous, par mois", valeur: $(I.total / 12), sous: "Impôt sur vos dividendes" },
+        { titre: "Impôt de la société", valeur: $(I.societe.impotSociete), sous: "Par année" }, { titre: "Laissé dans la société", valeur: $(I.societe.retenu), sous: "Par année" }]
+      : [net, { titre: "À mettre de côté", valeur: $((t + R.primeMoi) / 12), sous: "Par mois, prime comprise" }, fed, qc]);
+    const m = morceauxImpot(R);
+    carteResume("im-r-cent", "Sur chaque 100 $ gagnés", ["Détail", "#impot/detail"], barreLegende(m.morceaux, v => $2(v / m.brut * 100)));
+    const prochain = echeances(R).find(x => /^Acompte|^Solde de l'impôt/.test(x.titre));
+    carteResume("im-r-payer", R.vueResidence ? "Retenu sur la paie" : "Prochain paiement", ["Détail", "#impot/detail"], rangees(el("div"), R.vueResidence ? [
+      { titre: "Paie brute", sous: "26 paies par année, en moyenne", valeur: $(I.revenu / 26) },
+      { titre: "Impôt et cotisations retenus", valeur: moins(I.total / 26) },
+      R.res.syndicat > 0 && { titre: "Cotisation syndicale", valeur: moins(R.res.syndicat / 26) },
+      { titre: "Paie nette", cls: "total", valeur: $(I.net / 26) },
+    ] : [
+      soc && { titre: "Société : acompte mensuel", sous: "Le dernier jour de chaque mois", valeur: $(I.societe.impotSociete / 12) },
+      prochain || { titre: "Aucun acompte prévu", sous: "Selon vos échéances" },
+    ]));
+  }
   // Vue résidence : un salarié ; l'impôt et les cotisations sont retenus sur chaque paie.
   function rendreImpotResidence(R) {
-    const I = R.impot, x = R.res, t = I.total, brut = Math.max(1, I.revenu + (I.autres || 0));
+    const I = R.impot, x = R.res, t = I.total;
     hero("im-hero", "Impôt et cotisations de l'année", $(t), [puce(`Taux moyen ${pct(I.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`)], t);
-    centDollars([["Impôt fédéral", I.fed, SERIES[0]], ["Impôt du Québec", I.qc, SERIES[1]], ["RRQ, RQAP et assurance-emploi", I.rrq + I.rqap + I.ae + I.fss, SERIES[2]],
-      ["Cotisation syndicale et droits de scolarité", x.syndicat + x.scolarite, SERIES[3]], ["Reste pour vous", R.netVue, SERIES[4]]].filter(([, v]) => v > 0.5), brut);
+    const m = morceauxImpot(R); centDollars(m.morceaux, m.brut);
     document.getElementById("im-acomptes-titre").textContent = "Retenues sur la paie";
     const a = document.getElementById("im-acomptes"); a.textContent = "";
     a.appendChild(el("p", "resume", `En résidence, votre établissement retient l'impôt et les cotisations sur chaque paie, aux deux semaines : pas d'acomptes provisionnels. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est aussi ce que rapporte chaque dollar cotisé au REER.`));
@@ -1418,6 +1546,7 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("im-tableau-note").textContent = "Salarié : impôt fédéral (après l'abattement du Québec) et du Québec, RRQ, RQAP et assurance-emploi de l'employé. Crédits : montant canadien pour emploi, cotisations, droits de scolarité (fédéral, et Québec à 8 %) et intérêts d'un prêt étudiant ; déductions : cotisation syndicale, REER et, au Québec, déduction pour travailleurs.";
   }
   function rendreImpot(R) {
+    resumeImpot(R);
     if (R.vueResidence) {
       rendreImpotResidence(R); rendreFamille(R); rendreVerification();
       document.getElementById("im-societe").closest(".carte").hidden = true;
@@ -1431,14 +1560,8 @@ window.Verrou.quandOuvert(function () {
     ], t);
 
     // Sur chaque 100 $ gagnés : où va le revenu brut.
-    const brut = Math.max(1, R.impot.revenu), cotis = R.impot.rrq + R.impot.rqap + R.impot.fss;
-    const dpro = Math.min(R.dproPerso, brut), x = R.impot.societe;
-    const morceaux = soc
-      ? [["Impôt de la société", x.impotSociete, SERIES[0]], ["Votre impôt sur les dividendes", R.impot.fed + R.impot.qc + R.impot.fss, SERIES[1]],
-         ["Dépenses et frais de la société", x.depenses + x.frais, SERIES[3]], ["Laissé dans la société", x.retenu, SERIES[5]], ["Reste pour vous", R.impot.net, SERIES[4]]]
-      : [["Impôt fédéral", R.impot.fed, SERIES[0]], ["Impôt du Québec", R.impot.qc, SERIES[1]], ["RRQ, RQAP et Fonds des services de santé", cotis, SERIES[2]],
-         [R.rev[R.mode].fraisCabinet ? "Dépenses et frais de cabinet" : "Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", R.impot.net - dpro, SERIES[4]]];
-    centDollars(morceaux, brut);
+    const m = morceauxImpot(R), x = R.impot.societe;
+    centDollars(m.morceaux, m.brut);
 
     const a = document.getElementById("im-acomptes"); a.textContent = "";
     a.appendChild(el("p", "resume", soc
@@ -1632,6 +1755,10 @@ window.Verrou.quandOuvert(function () {
     rendreAnnuelles(); rendreFlux(R); rendreTresorerie(R); rendreReste(R); rendreBilanMois(R); rendreBilanAnnee(R);
     // Dépenses : une rangée par catégorie ; toucher ouvre ses cases.
     const cats = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
+    // Ce qu'une catégorie coûte par mois, dans la vue choisie (vous, partenaire, ménage).
+    const valeurCat = g => { if (totalActif(g)) { const t = depensesEffectives().find(b => b.id === "total-" + g); return mensuel(t) * qui(t); }
+      return S.budget.filter(b => categorie(b) === g).reduce((t, b) => t + mensuel(b) * qui(b), 0); };
+    resumeBudget(R, V, cats.map(g => [g, valeurCat(g)]));
     rangees("bu-depenses", [
       ...cats.map(g => {
         if (totalActif(g)) { const t = depensesEffectives().find(b => b.id === "total-" + g); const v = mensuel(t) * qui(t);
@@ -1728,7 +1855,40 @@ window.Verrou.quandOuvert(function () {
       : "Même avec cet ajout, la marge n'est jamais remboursée.";
   }
 
+  // Budget : le mois en tuiles ; les dépenses par catégorie ; les dettes ; l'année (trésorerie, dépenses annuelles).
+  function resumeBudget(R, V, parCat) {
+    tuilesResume("bu-r-tuiles", [{ titre: "Revenus nets", valeur: $(V.rev), sous: "Par mois" }, { titre: "Dépenses", valeur: $(V.dep), sous: "Par mois" },
+      { titre: "Dettes", valeur: $(V.dettes), sous: "Paiements par mois" }, { titre: "Épargne", valeur: $(V.epargne), sous: "Par mois" }]);
+    const l = parCat.filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]), reste = l.slice(5).reduce((t, [, v]) => t + v, 0);
+    carteResume("bu-r-depenses", "Dépenses par catégorie", ["Détail", "#budget/mois"],
+      l.length ? miniBarres([...l.slice(0, 5), ...(reste > 0.5 ? [["Les autres", reste]] : [])]) : "Aucune dépense inscrite : ajoutez-les dans le détail.");
+    carteResume("bu-r-dettes", "Dettes", ["Plan", "#budget/dettes"], rangees(el("div"), S.dettes.length ? [
+      { titre: "Total aujourd'hui", sous: `${S.dettes.length} dette${S.dettes.length > 1 ? "s" : ""}`, valeur: $(R.detteTotale) },
+      { titre: "Plus aucune dette", sous: `Méthode ${NOMS_METHODES[R.methode].toLowerCase()}`, valeur: R.sim.libre ? moisAn(R.sim.libre) : "jamais" },
+    ] : [{ titre: "Aucune dette", sous: "Votre surplus va à l'épargne" }]));
+    const T = tresorerie(R), annuelles = lignesAnnuelles().reduce((t, x) => t + x.montant, 0);
+    carteResume("bu-r-annee", "L'année", ["Détail", "#budget/annee"], rangees(el("div"), [
+      { titre: "Réserve à garder", sous: T.reserve >= 100 ? `Le mois le plus serré : ${T.plusSerre.date.toLocaleDateString("fr-CA", { month: "long" })}` : "Aucun mois serré", valeur: $(Math.max(0, T.reserve)) },
+      { titre: "Dépenses annuelles", sous: annuelles ? `${$(annuelles / 12)} à mettre de côté par mois` : "Aucune inscrite", valeur: $(annuelles) },
+    ]));
+  }
+  // Patrimoine : la valeur nette projetée ; ce que vous possédez en tuiles ; où mettre le prochain 1 000 $.
+  function resumePatrimoine(R) {
+    const p = R.projection, x = p[0], F = independance(R, false);
+    const c = carteResume("pa-r-graph", "Valeur nette projetée", ["Projection", "#avenir/projection"]), g = el("div", "graphique");
+    c.appendChild(g);
+    graphiqueLignes(g, null, [{ nom: "Valeur nette", couleur: SERIES[0], valeurs: p.map((y, i) => y.moi / R.deflateur(i)) }], p.map(y => String(y.annee)),
+      { titre: "Valeur nette projetée", aire: true, hauteur: 170 });
+    tuilesResume("pa-r-tuiles", [{ titre: "Placements", valeur: $(x.placements), sous: "REER, CELI, comptes" },
+      R.locataire ? { titre: "Logement", valeur: "Locataire", sous: "Aucune maison" } : { titre: "Équité de la maison", valeur: $(x.equiteMoi), sous: "Votre part" },
+      { titre: "Dettes", valeur: $(R.detteTotale), sous: R.sim.libre ? `Remboursées en ${moisAn(R.sim.libre)}` : "Jamais remboursées" },
+      { titre: "Indépendance", valeur: F.annee ? String(F.annee) : "—", sous: F.annee ? `${nb(F.mult)} fois vos dépenses` : "Pas sur l'horizon" }]);
+    const o = optionsProchain(R)[0];
+    carteResume("pa-r-prochain", "Le prochain 1 000 $", ["Détail", "#avenir/aujourdhui"], rangees(el("div"), [
+      { titre: o.titre, sous: o.sous, ico: "ok", cls: "choisi", valeur: $(o.v), valeurSous: "dans 10 ans" }]));
+  }
   function rendreAvenir(R) {
+    resumePatrimoine(R);
     const cj = R.couple;
     segment("vn-scenario", Object.entries(SCENARIOS), R.scenario, v => changer("scenarios.choisi", v), "Scénario");
     const h = R.hyp, hyp = document.getElementById("vn-hyp"); hyp.textContent = "";
@@ -2861,8 +3021,8 @@ window.Verrou.quandOuvert(function () {
     const items = [
       { titre: "Votre situation", sous: "Famille, pratique, logement, dettes", f: S.meta.exemple ? 0 : 1, poids: 15, action: ouvrirAssistant },
       { titre: "Vos revenus", sous: "Pratique, clientèle, activités, autres revenus", f: vus().revenu || ancienParcours("revenus") ? 1 : 0, poids: 35, action: () => { ouvrir("revenu"); ouvrirSection("revenu"); } },
-      { titre: "Votre budget", sous: `${nCat} catégorie${nCat > 1 ? "s" : ""} remplie${nCat > 1 ? "s" : ""}`, f: Math.min(1, nCat / viseCat), poids: 35, action: () => ouvrir("budget") },
-      { titre: "Votre patrimoine", sous: "Épargne, biens et objectifs", f: epargne ? 1 : 0, poids: 10, action: () => { voir("patrimoine"); ouvrir("avenir"); } },
+      { titre: "Votre budget", sous: `${nCat} catégorie${nCat > 1 ? "s" : ""} remplie${nCat > 1 ? "s" : ""}`, f: Math.min(1, nCat / viseCat), poids: 35, action: () => ouvrir("budget/mois") },
+      { titre: "Votre patrimoine", sous: "Épargne, biens et objectifs", f: epargne ? 1 : 0, poids: 10, action: () => { voir("patrimoine"); ouvrir("avenir/aujourdhui"); } },
       { titre: "Une copie de sauvegarde", sous: "Vos données ne vivent que dans ce navigateur", f: S.meta.dernierExport ? 1 : 0, poids: 5, action: () => ouvrir("donnees") },
     ];
     const total = items.reduce((t, x) => t + x.poids, 0);
@@ -3008,23 +3168,36 @@ window.Verrou.quandOuvert(function () {
   function garderSous(page, cle) { try { localStorage.setItem("wm.sous." + page, cle); } catch (e) { /* préférence non gardée */ } }
   function appliquerSous(page) {
     const cle = sousChoisi(page);
-    segment(page === "budget" ? "bu-onglets" : "pa-onglets", SOUS_ONGLETS[page], cle, v => { garderSous(page, v); tout(); }, page === "budget" ? "Sections du budget" : "Sections du patrimoine");
+    segment(page === "budget" ? "bu-onglets" : "pa-onglets", SOUS_ONGLETS[page], cle, v => {
+      garderSous(page, v); history.replaceState(null, "", `#${page}/${v}`); tout();
+    }, page === "budget" ? "Sections du budget" : "Sections du patrimoine");
     document.querySelectorAll(`#v-${page} .carte[data-sous]`).forEach(c => c.classList.toggle("hors-onglet", c.dataset.sous !== cle));
   }
+  /* Chaque page : son résumé (#budget), ou tout son détail (#budget/detail, ou un sous-onglet : #budget/dettes).
+     Le bouton Retour du téléphone ramène du détail au résumé. */
   function ouvrir(nom, sansRendu) {
     const [page, sous] = String(nom).split("/");
     nom = ALIAS[page] || page;
-    if (sous && SOUS_ONGLETS[nom] && SOUS_ONGLETS[nom].some(([k]) => k === sous)) garderSous(nom, sous);
+    const sousOnglet = sous && SOUS_ONGLETS[nom] && SOUS_ONGLETS[nom].some(([k]) => k === sous);
+    if (sousOnglet) garderSous(nom, sous);
     if (!document.getElementById("v-" + nom)) nom = "apercu";
+    const detail = sous === "detail" || !!sousOnglet || nom === "donnees";
+    document.getElementById("v-" + nom).classList.toggle("mode-detail", detail);
+    const adresse = "#" + nom + (detail && nom !== "donnees" ? "/" + (SOUS_ONGLETS[nom] ? sousChoisi(nom) : "detail") : "");
     // Téléphone : les boutons du haut suivent la page, à droite de son titre.
     document.querySelector(`#v-${nom} > .tete-page`).after(document.querySelector(".barre-outils"));
     document.getElementById("barre-pdf").hidden = nom !== "apercu";
     document.querySelectorAll(".nav [data-onglet], .barre-outils [data-onglet]").forEach(a => { if (a.dataset.onglet === nom) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     document.querySelectorAll(".vue").forEach(v => { v.hidden = v.id !== "v-" + nom; });
-    if (location.hash !== "#" + nom) history.replaceState(null, "", "#" + nom);
+    if (location.hash !== adresse) history.replaceState(null, "", adresse);
+    // Le lien touché (« Voir tout le détail », « Résumé ») disparaît : le focus va au début du contenu.
+    const actif = document.activeElement;
+    if (actif && actif !== document.body && !actif.getClientRects().length) document.getElementById("contenu").focus({ preventScroll: true });
     window.scrollTo(0, 0);
     if (R && !sansRendu) tout();   // les graphiques prennent la largeur de la page visible
   }
+  // Lien d'évitement : le focus va au contenu de la page ouverte, sans en changer.
+  document.querySelector(".saut").addEventListener("click", e => { e.preventDefault(); document.getElementById("contenu").focus(); });
   window.addEventListener("hashchange", () => {
     const t = lireTransfert();   // lien de transfert collé dans une page déjà ouverte
     if (t) { ouvrir("apercu"); recevoirTransfert(t); return; }
