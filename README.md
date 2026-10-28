@@ -32,6 +32,15 @@ valeur nette.
   effacer les données de l'appareil et restaurer une sauvegarde).
 - Ne versez jamais un fichier de données dans ce dépôt : `.gitignore`
   bloque les fichiers `*donnees*.json`.
+- **Comptes de synchronisation** (en préparation) : un compte, celui de la
+  personne qui utilise l'app, pour synchroniser le téléphone et
+  l'ordinateur sans code. Projet Supabase gratuit, région Canada ; une ligne
+  par compte (`supabase/schema.sql`), protégée ligne par ligne. Le mot de
+  passe ne quitte pas l'appareil : il donne, par PBKDF2-SHA-256, un mot de
+  passe de connexion pour Supabase et, séparément, la clé AES-GCM qui
+  chiffre les données avant l'envoi. Les inscriptions sont fermées une fois
+  le compte créé. Préparation du projet : `docs/comptes-claude-chrome.md`,
+  un script pour Claude dans Chrome.
 
 ## Un résumé, puis le détail
 
