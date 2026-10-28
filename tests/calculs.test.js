@@ -310,5 +310,35 @@ verifier("résidence : droits de scolarité, crédit fédéral (taux de base, ap
 verifier("résidence : la cotisation syndicale se déduit et sort de la paie", C.impotMixte({ salaire: 70000, syndicat: 600 }).total < sansScol.total
   && proche(sansScol.net - C.impotMixte({ salaire: 70000, syndicat: 600 }).net, 600 - (sansScol.total - C.impotMixte({ salaire: 70000, syndicat: 600 }).total), 1e-6));
 
+/* 24. Paramètres 2027, provisoires : ceux de 2026 indexés selon la formule officielle (IPC de Statistique Canada,
+   octobre à septembre) : fédéral 2,6 % (montants au dollar), Québec 3,15 % (paliers au multiple de 5 $). La même
+   formule redonne les taux officiels de 2026 : 2,0 % et 2,05 %. Assurance-emploi 2027 : 70 800 $ et 1,27 % au Québec. */
+const P7 = C.P2027;
+verifier("2027 : paliers fédéraux indexés de 2,6 %, au dollar", P7.federal.tranches.slice(0, 4).map(t => t[0]).join() === "60045,120088,186157,265203"
+  && P7.federal.bpaMax === 16880 && P7.federal.bpaMin === 15215 && P7.montantEmploi === 1540, P7.federal.tranches.map(t => t[0]).join());
+verifier("2027 : paliers du Québec indexés de 3,15 %, au multiple de 5 $", P7.quebec.tranches.slice(0, 3).map(t => t[0]).join() === "56055,112105,136410"
+  && P7.quebec.montantBase === 19549, P7.quebec.tranches.map(t => t[0]).join());
+verifier("2027 : assurance-emploi, crédit pour dividendes, taux inchangés ; 2026 intact", P7.ae.max === 70800 && P7.ae.taux === 0.0127 && P7.dividendes.creditQuebec === 0.0269
+  && P7.federal.tranches[1][1] === 0.205 && C.P2026.federal.tranches[0][0] === 58523 && C.P2026.ae.max === 68900);
+verifier("2027 : marqués provisoires ; 2026 avant, 2027 ensuite", P7.provisoire && !C.P2026.provisoire && C.parametres(2025) === C.P2026 && C.parametres(2026) === C.P2026
+  && C.parametres(2027) === P7 && C.parametres(2031) === P7);
+const impot26 = C.impotParticulier({ revenu: 200000, depensesPro: 20000 }).total;
+C.utiliserAnnee(2027);
+const impot27 = C.impotParticulier({ revenu: 200000, depensesPro: 20000 }).total, verif27 = C.avecAnnee(2026, () => C.parametresActifs().annee);
+C.utiliserAnnee(2026);
+verifier("2027 : à revenu égal, un peu moins d'impôt (paliers indexés) ; un calcul ponctuel en 2026 revient ensuite à 2027",
+  impot27 < impot26 && impot26 - impot27 < 2000 && verif27 === 2026, { impot26, impot27 });
+
+/* 25. Le plan qui avance : la projection relève les soldes des placements après k mois ; après 12 mois, ce sont
+   ceux de la fin de la première année. */
+const optProj = { annees: 3, anneeDepart: 2026, rendement: 5, reer: { solde: 20000, cotisationAnnuelle: 6000 }, celi: { solde: 10000, cotisationAnnuelle: 3000 },
+  celiapp: { solde: 0, cotisationAnnuelle: 8000 }, encaisse: 0, maison: { valeur: 0, part: 0, croissance: 0 }, dettes: [], objectifs: [{ solde: 0, mensuel: 100, mois: 24 }] };
+const simVide = C.simulerDettes([], { debut: "2026-10", methode: "avalanche" });
+const proj12 = C.projeterValeurNette({ ...optProj, releveMois: 12 }, simVide), proj3 = C.projeterValeurNette({ ...optProj, releveMois: 3 }, simVide);
+verifier("plan qui avance : relevé à 12 mois = fin de la première année", proche(proj12.releve.reer, proj12[1].reer, 1e-6) && proche(proj12.releve.celi, proj12[1].celi, 1e-6)
+  && proche(proj12.releve.celiapp, proj12[1].celiapp, 1e-6) && proche(proj12.releve.objectifs[0], 1200, 1e-6), proj12.releve);
+verifier("plan qui avance : relevé à 3 mois, entre le départ et la fin de l'année", proj3.releve.reer > 20000 + 3 * 500 && proj3.releve.reer < proj12.releve.reer
+  && proche(proj3.releve.objectifs[0], 300, 1e-6) && C.projeterValeurNette(optProj, simVide).releve === null, proj3.releve);
+
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

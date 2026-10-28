@@ -452,6 +452,8 @@ window.Verrou.quandOuvert(function () {
   }
   function calculer() {
     const R = {};
+    // Paramètres d'impôt de l'année du plan : 2026, puis 2027 (provisoires jusqu'aux montants officiels).
+    R.parametres = C.utiliserAnnee(+String(S.strategie.debut).slice(0, 4) || new Date().getFullYear());
     // Pratique principale : GMF ou clinique (à l'acte), GMF-U ou CLSC (trois modes), plus les activités.
     R.milieu = MILIEUX[S.revenu.milieu] ? S.revenu.milieu : "clinique";
     R.modes = MILIEUX[R.milieu].modes;
@@ -487,7 +489,7 @@ window.Verrou.quandOuvert(function () {
     // Première année de pratique : celle du début de la pratique, après la résidence ; sinon celle du début de la
     // simulation. Son impôt se paie d'un coup le 30 avril suivant ; les acomptes commencent cette année-là.
     R.premiereAnnee = S.revenu.annee === "premiere" || R.residenceActive;
-    R.anImpotPremiere = (R.residenceActive ? +R.debutPratique.slice(0, 4) : an0 || new Date().getFullYear()) + 1;
+    R.anImpotPremiere = (R.residenceActive ? +R.debutPratique.slice(0, 4) : +S.revenu.anneePremiere || an0 || new Date().getFullYear()) + 1;
     // Délai réel jusqu'au début de la pratique : le plan, lui, part du début de la simulation.
     const auj = new Date();
     R.moisAvantPratiqueAuj = moisEntre(`${auj.getFullYear()}-${String(auj.getMonth() + 1).padStart(2, "0")}`, R.debutPratique);
@@ -779,7 +781,7 @@ window.Verrou.quandOuvert(function () {
     R.detteTotale = S.dettes.reduce((a, d) => a + d.solde, 0);
 
     // Valeur nette : maison (sa valeur croît, l'hypothèque payée devient de l'équité), autos, placements.
-    const projeter = (h, sim, m = methode, rendements = null) => C.projeterValeurNette({
+    const projeter = (h, sim, m = methode, rendements = null, releveMois = 0) => C.projeterValeurNette({ releveMois,
       annees: ANNEES, anneeDepart: +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear(),
       rendement: h.rendement, rendements, reer: S.epargne.reer, celi: S.epargne.celi, celiapp: S.epargne.celiapp, encaisse: S.epargne.encaisse,
       maison: R.locataire ? { valeur: 0, part: 0, croissance: 0, partMenage: 0 }
@@ -796,6 +798,8 @@ window.Verrou.quandOuvert(function () {
     }, sim);
     // Méthodes comparées sur la valeur nette à l'horizon : elle tient compte des intérêts, de l'argent
     // en attente d'un renouvellement et des placements faits après la dernière dette.
+    // Soldes des placements après k mois, selon le plan : le plan qui repart du mois courant.
+    R.releveApres = k => projeter(R.hyp, R.sim, methode, null, k).releve;
     R.vnMethodes = {};
     for (const m of METHODES) { const pr = projeter(R.hyp, R.sims[m], m); R.vnMethodes[m] = pr[pr.length - 1]; }
     R.recommandee = METHODES.filter(m => m !== "minimum").reduce((a, m) => R.vnMethodes[m].moi > R.vnMethodes[a].moi ? m : a, "avalanche");
@@ -1014,6 +1018,10 @@ window.Verrou.quandOuvert(function () {
     if (R.residenceActive && !S.residence.debutPratique) action("important", `Inscrivez la date de début de votre pratique (Revenu, Modifier) : l'app suppose ${moisLong(R.debutPratique)}.`);
     if (S.residence && S.residence.active && !R.residenceActive) action("info", "Votre date de début de pratique est passée : l'app compte maintenant votre pratique. Si c'est fait, retirez la résidence (Revenu, Modifier).");
     if (S.revenu.annee === "premiere" && !R.residenceActive) action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total + R.primeMoi)} seront à payer d'un coup le 30 avril ${R.anImpotPremiere}.`);
+    if (S.meta.planAvance && S.meta.planAvance === S.strategie.debut && S.meta.planAvance === moisCle(new Date()))
+      action("info", `Le plan part maintenant de ${moisLong(S.strategie.debut)}, avec les soldes prévus : comparez-les à vos relevés et corrigez au besoin (Budget, Dettes ; Patrimoine, Aujourd'hui).`);
+    if (S.revenu.annee === "premiere" && !R.residenceActive && +S.revenu.anneePremiere && +String(S.strategie.debut).slice(0, 4) > +S.revenu.anneePremiere)
+      action("info", `Votre première année de pratique (${S.revenu.anneePremiere}) est terminée : quand votre clientèle sera bâtie, choisissez « Année type » (Revenu, Modifier).`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     // En résidence, le régime d'assurance collective de l'entente de la FMRQ couvre les médicaments (art. 28.10).
     if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si vous y êtes inscrit(e), décochez le régime public (Budget, bouton Ménage) ; la prime de 766 $ ne s'applique pas.");
@@ -1517,10 +1525,12 @@ window.Verrou.quandOuvert(function () {
       prochain || { titre: "Aucun acompte prévu", sous: "Selon vos échéances" },
     ]));
   }
+  // Paramètres de l'année pas encore officiels : montants indexés selon la formule officielle.
+  const pucePrevue = R => R.parametres.provisoire ? puce(`Montants ${R.parametres.annee} provisoires`) : null;
   // Vue résidence : un salarié ; l'impôt et les cotisations sont retenus sur chaque paie.
   function rendreImpotResidence(R) {
     const I = R.impot, x = R.res, t = I.total;
-    hero("im-hero", "Impôt et cotisations de l'année", $(t), [puce(`Taux moyen ${pct(I.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`)], t);
+    hero("im-hero", "Impôt et cotisations de l'année", $(t), [puce(`Taux moyen ${pct(I.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`), pucePrevue(R)], t);
     const m = morceauxImpot(R); centDollars(m.morceaux, m.brut);
     document.getElementById("im-acomptes-titre").textContent = "Retenues sur la paie";
     const a = document.getElementById("im-acomptes"); a.textContent = "";
@@ -1554,6 +1564,7 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("im-tableau-note").textContent = "Salarié : impôt fédéral (après l'abattement du Québec) et du Québec, RRQ, RQAP et assurance-emploi de l'employé. Crédits : montant canadien pour emploi, cotisations, droits de scolarité (fédéral, et Québec à 8 %) et intérêts d'un prêt étudiant ; déductions : cotisation syndicale, REER et, au Québec, déduction pour travailleurs.";
   }
   function rendreImpot(R) {
+    document.getElementById("h-impot").textContent = `Impôt ${R.parametres.annee}`;
     resumeImpot(R);
     if (R.vueResidence) {
       rendreImpotResidence(R); rendreFamille(R); rendreVerification();
@@ -1564,7 +1575,7 @@ window.Verrou.quandOuvert(function () {
     choixMode("im-mode");
     document.getElementById("im-acomptes-titre").textContent = "Mettre de côté et payer";
     hero("im-hero", soc ? "Impôt de l'année : société et vous" : "Impôt et cotisations de l'année", $(t), [
-      puce(`Taux moyen ${pct(R.impot.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`),
+      puce(`Taux moyen ${pct(R.impot.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`), pucePrevue(R),
     ], t);
 
     // Sur chaque 100 $ gagnés : où va le revenu brut.
@@ -1697,7 +1708,8 @@ window.Verrou.quandOuvert(function () {
   // Refait les cas de l'outil officiel avec le calcul de WealthMorand et montre les écarts.
   const CHAMPS_VERIF = [["qc", "Impôt du Québec"], ["fed", "Impôt fédéral"], ["rrq", "RRQ"], ["rqap", "RQAP"], ["ae", "Assurance-emploi"],
     ["af", "Allocation famille"], ["fournitures", "Fournitures scolaires"], ["ace", "Allocation canadienne pour enfants"], ["prime", "Prime d'assurance médicaments"]];
-  function casCalcul(v) {
+  function casCalcul(v) { return C.avecAnnee(2026, () => casCalcul2026(v)); }   // l'outil officiel porte sur 2026
+  function casCalcul2026(v) {
     let a = C.impotSalarie({ salaire: v.salaires[0] }), b = v.couple ? C.impotSalarie({ salaire: v.salaires[1] }) : null;
     if (v.couple) [a, b] = C.transfertsConjoints(a, b);
     const somme = k => a[k] + (b ? b[k] : 0);
@@ -2028,6 +2040,7 @@ window.Verrou.quandOuvert(function () {
   }
   function tout() {
     R = calculer();
+    document.getElementById("pied-parametres").textContent = `paramètres fiscaux ${R.parametres.annee}${R.parametres.provisoire ? " (provisoires)" : ""}`;
     appliquerVue(R);
     appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
     rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
@@ -2416,7 +2429,7 @@ window.Verrou.quandOuvert(function () {
     return d;
   }
   // Résultats d'un autre état (votre plan ou un plan B), sans toucher à l'affichage.
-  function calculerAvec(donnees) { const sauf = S; S = donnees; try { return calculer(); } finally { S = sauf; } }
+  function calculerAvec(donnees) { const sauf = S; S = donnees; try { return calculer(); } finally { S = sauf; C.utiliserAnnee(+String(S.strategie.debut).slice(0, 4)); } }
   function entrerPlan(i) {
     if (planActif !== null) sortirPlan(true);
     principal = S; planActif = i; S = principal.plans[i].donnees;
@@ -3230,6 +3243,72 @@ window.Verrou.quandOuvert(function () {
     clearTimeout(finSceau); finSceau = setTimeout(() => ecranSceau.classList.remove("eclair"), 500);
   }));
 
+  /* ============================================================
+     LE PLAN SUIT LE CALENDRIER : au premier lancement d'un nouveau mois, le plan repart du mois
+     courant. Soldes des dettes et des placements selon le plan (paiements, cotisations, rendement du
+     scénario) ; un niveau de résidence de plus chaque 1er juillet ; fin de la résidence à la date de
+     début de la pratique ; un an de plus aux enfants chaque 1er janvier. L'avis permet d'annuler pour
+     ce mois-ci ; « À faire » invite à comparer les soldes aux relevés.
+     ============================================================ */
+  function avancerPlan(s0, r0, versMois) {
+    const k = moisEntre(s0.strategie.debut, versMois);
+    if (!(k > 0)) return null;
+    const s = clone(s0), [an0, mo0] = String(s0.strategie.debut).split("-").map(Number);
+    const passages = mois => { let n = 0; for (let m = 1; m <= k; m++) if (new Date(an0, mo0 - 1 + m, 1).getMonth() + 1 === mois) n++; return n; };
+    // Dettes : le solde au début du mois courant, après les paiements prévus.
+    const soldes = (r0.sim.mois[k - 1] || {}).soldes || s.dettes.map(() => 0);
+    s.dettes.forEach((d, i) => { d.solde = Math.round((soldes[i] || 0) * 100) / 100; });
+    // Placements : la projection, mois par mois.
+    const p = r0.releveApres(k);
+    if (p) {
+      s.epargne.reer.solde = Math.round(p.reer); s.epargne.celi.solde = Math.round(p.celi);
+      if (s.epargne.celiapp) {
+        s.epargne.celiapp.solde = Math.round(p.celiapp);
+        if (s.epargne.celiapp.cotisationsVersees !== "" && s.epargne.celiapp.cotisationsVersees != null) s.epargne.celiapp.cotisationsVersees = Math.round(p.cumulCeliapp);
+      }
+      if (r0.couple) s.conjointe.epargne = Math.round(p.conj);
+      if (r0.societeActive) s.societe.solde = Math.round(p.soc);
+      // Objectifs dans un compte dédié, pas encore échus : ce qui est mis de côté.
+      let j = 0;
+      r0.objectifs.forEach((o, i) => { if (!o.dedie) return; if (o.mois > k && s.objectifs[i]) s.objectifs[i].deja = Math.round(p.objectifs[j]); j++; });
+    }
+    // Résidence : un niveau de plus chaque 1er juillet ; à la date de début de la pratique, elle prend fin.
+    const rs = s.residence, niveauAvant = rs && rs.active ? +rs.niveau || 1 : null;
+    let pratique = false;
+    if (rs && rs.active) {
+      if (!/^\d{4}-\d{2}$/.test(rs.debutPratique || "")) rs.debutPratique = r0.debutPratique;   // la date supposée devient fixe
+      rs.niveau = String(Math.min(8, niveauAvant + passages(7)));
+      if (moisEntre(versMois, rs.debutPratique) <= 0) {
+        pratique = true; rs.active = false;
+        Object.assign(s.revenu, { annee: "premiere", anneePremiere: +rs.debutPratique.slice(0, 4) });
+      }
+    }
+    if (s.revenu.annee === "premiere" && !+s.revenu.anneePremiere) s.revenu.anneePremiere = r0.anImpotPremiere - 1;
+    const janviers = passages(1);
+    if (janviers) s.epargne.reee.enfants.forEach(e => { e.age = (+e.age || 0) + janviers; });
+    s.strategie.debut = versMois;
+    s.meta.planAvance = versMois;
+    return { s, niveauAvant, niveauApres: rs && rs.active ? +rs.niveau : null, pratique };
+  }
+  // Nouveau mois : pas pour l'exemple, ni pour un plan B, ni si on a annulé pour ce mois-ci.
+  function avancerSiNouveauMois() {
+    const ici = moisCle(new Date());
+    if (S.meta.exemple || S.meta.planRefuse === ici || planActif) return null;
+    R = calculer();
+    const x = avancerPlan(S, R, ici);
+    if (!x) return null;
+    const avant = clone(S);
+    S = x.s; sauver();
+    const quoi = [`Plan avancé à ${moisLong(ici)} : soldes des dettes et des placements selon le plan`];
+    if (x.pratique) quoi.push("votre pratique a commencé, la résidence est terminée");
+    else if (x.niveauApres && x.niveauApres !== x.niveauAvant) quoi.push(`résidence au niveau R${x.niveauApres}`);
+    return { texte: quoi.join(" ; ") + ".", annuler: () => {
+      S = avant; S.meta.planRefuse = ici; sauver(); tout();
+      toast(`Plan gardé à ${moisLong(avant.strategie.debut)} pour ce mois-ci.`);
+    } };
+  }
+  const annoncerAvance = (av, avant = "") => toast(avant + av.texte, av.annuler, "Annuler", 12000);
+
   /* Import et export */
   const message = t => { document.getElementById("donnees-message").textContent = t; };
   // Verrou activé : la sauvegarde est chiffrée avec la même phrase de passe.
@@ -3247,8 +3326,10 @@ window.Verrou.quandOuvert(function () {
   function restaurer(d, chiffree) {
     if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
     sortirPlan(true); S = normaliser(fusion(clone(EXEMPLE), migrer(d))); S.meta.exemple = false; sauver();
+    const avance = avancerSiNouveauMois();
     tout(); message(`Sauvegarde restaurée : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`
       + (chiffree && !window.Verrou.actif() ? " Le verrou n'est pas activé sur cet appareil : activez-le ci-dessous pour garder vos données chiffrées." : ""));
+    return avance;
   }
   // Sauvegarde chiffrée : on demande sa phrase de passe (celle de l'appareil qui l'a exportée).
   const formFichier = document.getElementById("fichier-chiffre"), phraseFichier = document.getElementById("fichier-phrase");
@@ -3261,7 +3342,7 @@ window.Verrou.quandOuvert(function () {
       try {
         const d = JSON.parse(lecteur.result);
         if (window.Verrou.estChiffre(d)) { fichierChiffre = d; formFichier.hidden = false; phraseFichier.focus(); message(""); return; }
-        fermerFichier(); restaurer(d);
+        fermerFichier(); const av = restaurer(d); if (av) annoncerAvance(av);
       } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
     };
     lecteur.readAsText(f); e.target.value = "";
@@ -3272,7 +3353,7 @@ window.Verrou.quandOuvert(function () {
     let d;
     try { d = JSON.parse(await window.Verrou.ouvrirFichier(fichierChiffre, phraseFichier.value)); } catch (err) { message("Phrase de passe incorrecte pour cette sauvegarde."); phraseFichier.select(); return; }
     fermerFichier();
-    try { restaurer(d, true); } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
+    try { const av = restaurer(d, true); if (av) annoncerAvance(av); } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
   });
   document.getElementById("fichier-annuler").addEventListener("click", () => { fermerFichier(); message("Rien n'a été changé."); });
 
@@ -3360,8 +3441,10 @@ window.Verrou.quandOuvert(function () {
     if (!S.meta.exemple) c.appendChild(el("p", "aide", "Les données actuelles de cet appareil seront effacées. Pour les garder, exportez-en d'abord une sauvegarde."));
     const a = el("div", "feuille-actions");
     a.appendChild(boutonSimple("Remplacer mes données", "danger plein large", () => {
-      try { restaurer(d); } catch (err) { toast("Ces données ne sont pas une sauvegarde WealthMorand. Rien n'a été changé."); return; }
-      feuille.close(); ouvrir("apercu"); toast("Données reçues de l'autre appareil.");
+      let av;
+      try { av = restaurer(d); } catch (err) { toast("Ces données ne sont pas une sauvegarde WealthMorand. Rien n'a été changé."); return; }
+      feuille.close(); ouvrir("apercu");
+      if (av) annoncerAvance(av, "Données reçues de l'autre appareil. "); else toast("Données reçues de l'autre appareil.");
     }));
     if (!S.meta.exemple) a.appendChild(boutonSimple("Exporter d'abord une sauvegarde de cet appareil", "secondaire large", () => document.getElementById("exporter").click()));
     a.appendChild(boutonSimple("Annuler", "secondaire large", () => feuille.close()));
@@ -3782,7 +3865,8 @@ window.Verrou.quandOuvert(function () {
     // En résidence : la pratique à venir commence par une première année.
     const residence = A.statut === "residence";
     s.residence = { ...s.residence, active: residence, niveau: String(A.niveau || 1), debutPratique: residence ? A.debutPratique || "" : "", vue: "residence" };
-    Object.assign(s.revenu, { milieu: A.milieu, annee: A.premiere || residence ? "premiere" : "type", modeBudget: MILIEUX[A.milieu].modes.includes(A.mode) ? A.mode : MILIEUX[A.milieu].modes[0],
+    Object.assign(s.revenu, { milieu: A.milieu, annee: A.premiere || residence ? "premiere" : "type",
+      anneePremiere: residence ? +String(A.debutPratique || "").slice(0, 4) || 0 : A.premiere ? auj.getFullYear() : 0, modeBudget: MILIEUX[A.milieu].modes.includes(A.mode) ? A.mode : MILIEUX[A.milieu].modes[0],
       demiJournees: dj, enseignement: gmfu ? Math.min(2, dj) : 0, residents: gmfu ? 1 : 0, demiJourneesSRV: A.srv || 0, patientsSRV: 12,
       semaines: 46, semainesArrivee: 46, autresRevenus: 0,
       activites: TYPES_ASSISTANT.filter(k => A["act_" + k] && A["actN_" + k] > 0).map(k => ({ id: nouvelId("a"), type: k, nom: "", nombre: A["actN_" + k], frequence: "mois", cycle: 6,
@@ -3833,7 +3917,9 @@ window.Verrou.quandOuvert(function () {
 
   const transfertRecu = lireTransfert();   // avant d'ouvrir la page : la charge est dans l'adresse
   ouvrir((location.hash || "#apercu").slice(1), true);
+  const avance = transfertRecu ? null : avancerSiNouveauMois();   // nouveau mois : le plan repart du mois courant
   tout();
+  if (avance) annoncerAvance(avance);
   document.documentElement.classList.add("pret");
   // Premier lancement : rien d'enregistré et l'assistant jamais vu. Après l'écran d'ouverture, s'il y en a un.
   // Un lien de transfert passe avant l'assistant : les données arrivent d'un autre appareil.

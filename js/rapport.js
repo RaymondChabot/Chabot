@@ -111,7 +111,7 @@ window.Verrou.quandOuvert(function () {
   }
   function pageImpotResidence(S, R, totalImpot) {
     const I = R.impot, x = R.res;
-    return page("Impôt 2026", "En résidence : salarié. L'établissement retient l'impôt fédéral et du Québec, le RRQ, le RQAP et l'assurance-emploi sur chaque paie.", `
+    return page(`Impôt ${R.parametres.annee}`, "En résidence : salarié. L'établissement retient l'impôt fédéral et du Québec, le RRQ, le RQAP et l'assurance-emploi sur chaque paie.", `
       <div class="rp-kpis rp-kpis-4">
         ${kpi("Impôt de l'année", $(totalImpot), "Impôt et cotisations")}
         ${kpi("Taux moyen", pct(I.tauxMoyen, 1), "Du revenu brut")}
@@ -271,7 +271,7 @@ window.Verrou.quandOuvert(function () {
       ...(proL.length ? proL.map(l => ({ c: [O.ITEMS_PRO.get(l.k).nom, $(O.annuelLigne(l))] })) : [{ c: ["Total estimé", $(R.depensesPro)] }]),
       ...(proL.length > 1 ? [{ cls: "total", c: ["Total", $(R.depensesPro)] }] : []),
     ];
-    if (!res) pages.push(page("Impôt 2026", soc ? "Pratique incorporée : la société paie ses dépenses et son impôt, puis vous verse des dividendes non déterminés." : "Travail autonome : impôt fédéral et du Québec, RRQ des deux parts, RQAP et Fonds des services de santé.", `
+    if (!res) pages.push(page(`Impôt ${R.parametres.annee}`, soc ? "Pratique incorporée : la société paie ses dépenses et son impôt, puis vous verse des dividendes non déterminés." : "Travail autonome : impôt fédéral et du Québec, RRQ des deux parts, RQAP et Fonds des services de santé.", `
       <div class="rp-kpis rp-kpis-4">
         ${kpi("Impôt de l'année", $(totalImpot), soc ? "Société et vous" : "Impôt et cotisations")}
         ${kpi("Taux moyen", pct(R.impot.tauxMoyen, 1), "Du revenu brut")}
@@ -405,7 +405,7 @@ window.Verrou.quandOuvert(function () {
         <li>RAMQ : tarifs de l'onglet B du manuel de rémunération à l'acte et Brochure no 1 (consultés le 25 octobre 2026), en cabinet ou en établissement selon la pratique : annexe XIV (taux horaire), annexe XXIII (mixte), EP 40 (forfaits, suppléments, volume de patients, pratique polyvalente) et EP 42 (demi-per diem). À l'acte : règles d'avant la Loi 2. Tarifs et montants modifiables dans l'app.</li>
         <li>Collège des médecins du Québec : grille tarifaire 2026-2027 ; ACPM : cotisations 2027 au Québec ; FMOQ : infolettres sur l'entente.</li>
         <li>CELIAPP : Agence du revenu du Canada (8 000 $ par année, 40 000 $ à vie).</li>
-        <li>Tables d'impôt fédérales et du Québec 2026 ; RRQ, RQAP, assurance-emploi et Fonds des services de santé 2026.</li>
+        <li>${R.parametres.provisoire ? `Impôt ${R.parametres.annee}, montants provisoires : ceux de 2026 indexés selon la formule officielle (fédéral ${nb(R.parametres.index.federal * 100, 1)} %, Québec ${nb(R.parametres.index.quebec * 100, 2)} %, indice des prix de Statistique Canada) ; assurance-emploi selon le rapport actuariel 2027 du BSIF ; RRQ et RQAP de 2026, en attendant.` : "Tables d'impôt fédérales et du Québec 2026 ; RRQ, RQAP, assurance-emploi et Fonds des services de santé 2026."}</li>
         <li>Allocation canadienne pour enfants, Allocation famille et prime d'assurance médicaments 2026.</li>
         <li>Normes d'hypothèses de projection 2026, Institut de planification financière et FP Canada.</li>
         <li>Loi sur l'intérêt : intérêt hypothécaire à taux fixe composé deux fois par année.</li>
@@ -468,9 +468,9 @@ window.Verrou.quandOuvert(function () {
 
   /* Sommaire pour le comptable : sur une page, ce qu'il faut pour les déclarations de l'année
      (revenus, déductions, impôt estimé, échéances, documents à rassembler, points à valider). */
-  const AN_IMPOT = 2026;   // année des paramètres fiscaux de calc.js
   // En résidence : un salarié (T4 et relevé 1), sa part des droits de scolarité, et l'année de transition à venir.
   function comptableResidence(S, R, date) {
+    const AN_IMPOT = R.parametres.annee;   // année des paramètres d'impôt du plan
     const I = R.impot, x = R.res, P = O.votreP(), suivante = AN_IMPOT + 1, reer = S.epargne.reer.cotisationAnnuelle, celiapp = R.celiappAnnee(0);
     const union = !R.couple ? "Personne seule" : S.conjointe.lien === "fait" ? (R.coupleFiscal ? "Conjoints de fait : couple pour l'impôt" : "Conjoints de fait depuis moins de 12 mois : imposés seuls") : "Mariés ou unis civilement";
     const revenus = [
@@ -525,6 +525,7 @@ window.Verrou.quandOuvert(function () {
   }
   function comptable(S, R, date) {
     if (R.vueResidence) return comptableResidence(S, R, date);
+    const AN_IMPOT = R.parametres.annee;
     const I = R.impot, soc = R.societeActive, g = R.rev[R.mode], x = I.societe, perso = I.total, premiere = S.revenu.annee === "premiere";
     const P = O.votreP(), suivante = AN_IMPOT + 1;
     const frais = soc ? 0 : g.fraisCabinet, reer = S.epargne.reer.cotisationAnnuelle, celiapp = R.celiappAnnee(0);

@@ -70,6 +70,17 @@ sous-onglet (`#budget/dettes`) pour le détail. La page Données montre
 tout ; ses cartes moins utilisées (installation, valeurs confirmées,
 apparence et rapport, recommencer) se déplient au toucher.
 
+## Le plan suit le calendrier
+
+Au premier lancement d'un nouveau mois, le plan repart du mois courant : les
+soldes des dettes et des placements prennent les valeurs prévues par le plan
+(paiements, cotisations, rendement du scénario), le niveau de résidence monte
+au 1er juillet, la résidence prend fin à la date de début de la pratique, et
+les enfants ont un an de plus chaque 1er janvier. Un avis permet d'annuler
+pour ce mois-ci ; « À faire » invite à comparer les soldes aux relevés. La
+première année de pratique garde son année : son solde d'impôt reste dû le
+30 avril suivant ; une fois l'année passée, « À faire » propose l'année type.
+
 ## Ce qu'elle calcule
 
 Pour tout médecin de famille au Québec, dans tous les milieux : seul ou
@@ -251,6 +262,7 @@ npx eslint .                    # vérification du code
 node tests/calculs.test.js      # calculs
 node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
 SCENARIOS=transfert,residence node tests/navigateur.test.js   # quelques parcours seulement
+HORLOGE=2027-03-15 node tests/navigateur.test.js   # toute la suite, comme à une autre date
 ```
 
 - `calculs.test.js` vérifie l'impôt contre l'outil officiel du ministère des
@@ -263,7 +275,9 @@ SCENARIOS=transfert,residence node tests/navigateur.test.js   # quelques parcour
   et sauvegardes chiffrées, mauvaise phrase, phrase changée, délai, retrait),
   sommaire pour le comptable sur une seule page, résumé et détail de chaque
   page (navigation, mêmes chiffres, cartes de même hauteur sur ordinateur),
-  passage du temps (horloge fixée : délais, première année de pratique).
+  passage du temps (horloge fixée : délais, première année de pratique),
+  plan qui suit le calendrier (soldes prévus, Annuler, niveau de résidence,
+  enfants, impôt 2027 provisoire).
 - GitHub Actions lance les trois à chaque publication sur `main`
   (`.github/workflows/tests.yml`). Cas fictifs seulement.
 
@@ -290,6 +304,21 @@ dossier racine.
 
 ## Sources des paramètres
 
+- Impôt 2027, provisoire : l'année du plan choisit ses paramètres (2026,
+  puis 2027 dès le 1er janvier 2027). En attendant les montants officiels,
+  ceux de 2026 sont indexés selon la formule officielle : moyenne de
+  l'indice des prix à la consommation d'octobre 2025 à septembre 2026, sur
+  celle de l'année d'avant (Statistique Canada, tableau 18-10-0004-01,
+  consulté le 28 octobre 2026). Fédéral : 2,6 % (Canada, ensemble ;
+  montants au dollar). Québec : 3,15 % (Québec, ensemble ; la même formule
+  redonne 2,85 % pour 2025 et 2,05 % pour 2026 ; paliers et montants de
+  garde au multiple de 5 $). Assurance-emploi 2027 : maximum assurable de
+  70 800 $ et taux prévu de 1,27 % au Québec (Rapport actuariel 2027 sur le
+  taux de cotisation d'assurance-emploi, BSIF, 14 septembre 2026). RRQ,
+  RQAP, prime d'assurance médicaments et Allocation canadienne pour enfants :
+  ceux de 2026, en attendant. La page Impôt et le rapport l'indiquent
+  (« Montants 2027 provisoires ») ; la vérification officielle reste faite
+  avec 2026, l'année de l'outil du ministère des Finances.
 - Résidence : Entente relative aux conditions de travail des médecins
   résidents (FMRQ-MSSS, 2021-2028), annexe I (échelles salariales, primes
   de responsabilité de garde et d'enseignement), art. 12.26 et 13.10

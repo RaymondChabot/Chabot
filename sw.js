@@ -1,7 +1,7 @@
 /* WealthMorand : fonctionne hors ligne. Réseau d'abord, pour recevoir les mises
    à jour ; copie en cache en secours. Les données personnelles ne passent
    jamais ici : elles restent dans le stockage local du navigateur. */
-const CACHE = "wealthmorand-v51";
+const CACHE = "wealthmorand-v52";
 const FICHIERS = [
   "./", "index.html", "styles.css", "js/demarrage.js", "js/calc.js", "js/verrou.js", "js/catalogues.js", "js/interface.js", "js/app.js", "js/rapport.js", "manifest.webmanifest",
   "polices/inter.woff2", "polices/newsreader.woff2",

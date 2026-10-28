@@ -17,10 +17,10 @@
   const moisCourant = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
   const EXEMPLE = {
     version: 1,
-    meta: { exemple: true, misAJour: null },
+    meta: { exemple: true, misAJour: null, planAvance: "", planRefuse: "" },
     confirmes: {},
     revenu: {
-      milieu: "clinique", annee: "premiere", modeBudget: "acte",
+      milieu: "clinique", annee: "premiere", anneePremiere: 0, modeBudget: "acte",
       // 38 semaines en clinique : 52, moins 6 de vacances et environ 8 à l'hôpital.
       demiJournees: 7, enseignement: 0, heuresParDJ: 4, semaines: 38, patientsParDJ: 6,
       demiJourneesSRV: 1, patientsSRV: 12,
