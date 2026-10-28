@@ -1,0 +1,4 @@
+{
+  "install": "bash .cursor/install.sh",
+  "start": "git config user.name WealthMorand && git config user.email wealthmorand@example.invalid"
+}

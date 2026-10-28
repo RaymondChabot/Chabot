@@ -1,0 +1,13 @@
+---
+description: Règles de WealthMorand pour tous les agents
+alwaysApply: true
+---
+Lis `AGENTS.md` à la racine du dépôt avant toute action, et respecte-le. L'essentiel :
+
+- Aucun nom de personne, aucun courriel réel, aucune donnée personnelle, nulle part (code, commits, PR, rapports).
+- Avant le premier commit : `git config user.name "WealthMorand"` et `git config user.email "wealthmorand@example.invalid"`. Aucune ligne `Co-authored-by` avec un nom de personne.
+- Jamais de commit ni de push sur `main`, jamais de force-push : une branche `cursor/<sujet>` et une pull request par sujet.
+- Aucune ressource externe, aucune nouvelle dépendance d'exécution ; ne touche pas la version du cache dans `sw.js`.
+- Tout montant officiel cite sa source ; n'invente jamais un montant.
+- Avant une PR de code : `npx eslint .`, `node tests/calculs.test.js` et `node tests/navigateur.test.js` passent.
+- Interface en français (Canada), vouvoiement, mots neutres.

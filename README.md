@@ -235,6 +235,14 @@ fait l'objet d'une entente finale entre la FMOQ et le gouvernement
 (13 août 2026) ; il n'est pas encore en vigueur et ses montants restent à
 fixer : l'app ne le calcule pas.
 
+## Avec d'autres agents
+
+`AGENTS.md` donne les règles du dépôt à tout agent de code (Cursor et autres) :
+confidentialité, identité des commits, jamais sur `main`, conventions,
+décisions déjà prises. `docs/cursor/audits.md` décrit les audits en parallèle
+avec les agents de Cursor dans le nuage, la synthèse, puis les corrections en
+pull requests relues avant d'être intégrées.
+
 ## Tests
 
 ```
