@@ -19,6 +19,6 @@
   ],
   "shortcuts": [
     { "name": "Budget", "url": "./#budget", "icons": [{ "src": "icones/icone-192.png", "sizes": "192x192" }] },
-    { "name": "Avenir", "url": "./#avenir", "icons": [{ "src": "icones/icone-192.png", "sizes": "192x192" }] }
+    { "name": "Patrimoine", "url": "./#avenir", "icons": [{ "src": "icones/icone-192.png", "sizes": "192x192" }] }
   ]
 }

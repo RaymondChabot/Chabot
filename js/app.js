@@ -484,6 +484,13 @@ window.Verrou.quandOuvert(function () {
     R.moisAvantPratique = moisEntre(S.strategie.debut, R.debutPratique);
     R.residenceActive = !!rs.active && R.moisAvantPratique > 0;
     R.vueResidence = R.residenceActive && rs.vue !== "pratique";
+    // Première année de pratique : celle du début de la pratique, après la résidence ; sinon celle du début de la
+    // simulation. Son impôt se paie d'un coup le 30 avril suivant ; les acomptes commencent cette année-là.
+    R.premiereAnnee = S.revenu.annee === "premiere" || R.residenceActive;
+    R.anImpotPremiere = (R.residenceActive ? +R.debutPratique.slice(0, 4) : an0 || new Date().getFullYear()) + 1;
+    // Délai réel jusqu'au début de la pratique : le plan, lui, part du début de la simulation.
+    const auj = new Date();
+    R.moisAvantPratiqueAuj = moisEntre(`${auj.getFullYear()}-${String(auj.getMonth() + 1).padStart(2, "0")}`, R.debutPratique);
     // Le niveau monte au 1er juillet ; m : mois depuis le début de la simulation.
     const julletDans = (7 - mo0 + 12) % 12 || 12;
     const niveauAu = m => Math.min(8, (+rs.niveau || 1) + (m >= julletDans ? Math.floor((m - julletDans) / 12) + 1 : 0));
@@ -1002,10 +1009,11 @@ window.Verrou.quandOuvert(function () {
     if (!S.meta.exemple && !(S.bilans || []).some(b => b.mois === moisPasse() && (b.recu != null || b.depense != null)))
       action("info", `Faites le bilan de ${nomMois(moisPasse())} (page Budget) : ce que vous avez reçu et dépensé, comparé au budget.`);
     R.objectifs.filter(o => !o.atteint && !o.mois).forEach(o => action("important", `L'objectif « ${o.nom || "sans nom"} » n'est pas atteint à la date visée : choisissez une nouvelle date (page Patrimoine).`));
-    if (R.residenceActive) action(R.moisAvantPratique <= 6 ? "important" : "info", `Début de la pratique en ${moisLong(R.debutPratique)}, ${delaiMois(R.moisAvantPratique)} : la première année, aucun acompte n'est exigé, mais le solde de l'impôt arrive le 30 avril suivant.${R.vueResidence ? " Basculez sur « Pratique » pour la préparer." : ""}`);
+    if (R.residenceActive && R.moisAvantPratiqueAuj > 0) action(R.moisAvantPratiqueAuj <= 6 ? "important" : "info", `Début de la pratique en ${moisLong(R.debutPratique)}, ${delaiMois(R.moisAvantPratiqueAuj)} : la première année, aucun acompte n'est exigé, mais le solde de l'impôt arrive le 30 avril ${R.anImpotPremiere}.${R.vueResidence ? " Basculez sur « Pratique » pour la préparer." : ""}`);
+    if (R.residenceActive && R.moisAvantPratiqueAuj <= 0) action("important", `Votre pratique a commencé en ${moisLong(R.debutPratique)}, mais votre plan part de ${moisLong(S.strategie.debut)}, en résidence : mettez vos soldes à jour, puis le début de la simulation (Budget, Dettes : Plan de remboursement, Modifier).`);
     if (R.residenceActive && !S.residence.debutPratique) action("important", `Inscrivez la date de début de votre pratique (Revenu, Modifier) : l'app suppose ${moisLong(R.debutPratique)}.`);
     if (S.residence && S.residence.active && !R.residenceActive) action("info", "Votre date de début de pratique est passée : l'app compte maintenant votre pratique. Si c'est fait, retirez la résidence (Revenu, Modifier).");
-    if (S.revenu.annee === "premiere" && !R.vueResidence) action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total + R.primeMoi)} seront à payer d'un coup le 30 avril.`);
+    if (S.revenu.annee === "premiere" && !R.residenceActive) action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total + R.primeMoi)} seront à payer d'un coup le 30 avril ${R.anImpotPremiere}.`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     // En résidence, le régime d'assurance collective de l'entente de la FMRQ couvre les médicaments (art. 28.10).
     if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si vous y êtes inscrit(e), décochez le régime public (Budget, bouton Ménage) ; la prime de 766 $ ne s'applique pas.");
@@ -1051,8 +1059,8 @@ window.Verrou.quandOuvert(function () {
   // Prochaines échéances : impôt, acomptes, REER, déclarations, renouvellements, REEE.
   function echeances(R) {
     const auj = new Date(); auj.setHours(0, 0, 0, 0);
-    const an = auj.getFullYear(), anImpot = (+String(S.strategie.debut).slice(0, 4) || an) + 1;
-    const l = [], premiere = S.revenu.annee === "premiere", t = R.impot.total + R.primeMoi;   // prime d'assurance médicaments : avec l'impôt du Québec
+    const an = auj.getFullYear(), anImpot = R.anImpotPremiere;
+    const l = [], premiere = R.premiereAnnee, t = R.impot.total + R.primeMoi;   // prime d'assurance médicaments : avec l'impôt du Québec
     const prochaine = (m, j) => { const d = new Date(an, m, j); return d < auj ? new Date(an + 1, m, j) : d; };
     // En résidence, l'impôt est retenu sur la paie : ni acomptes ni solde de première année.
     if (premiere && !R.vueResidence) l.push({ date: new Date(anImpot, 3, 30), titre: "Solde de l'impôt", sous: "Première année : fédéral et Québec", valeur: $(t) });
@@ -1159,7 +1167,7 @@ window.Verrou.quandOuvert(function () {
       const x = R.res;
       tuilesResume("rv-r-tuiles", [{ titre: "Net par mois", valeur: $(R.netVue / 12), sous: "Après impôt et retenues" }, { titre: "Par paie", valeur: $(R.impot.net / 26), sous: "Aux deux semaines" },
         { titre: "Niveau", valeur: `R${x.niveau}`, sous: x.prochain ? `R${x.prochain.niveau} au ${dateLongue(x.prochain.date)}` : "Jusqu'à la pratique" },
-        { titre: "Début de la pratique", valeur: moisLong(R.debutPratique), sous: delaiMois(R.moisAvantPratique) }]);
+        { titre: "Début de la pratique", valeur: moisLong(R.debutPratique), sous: delaiMois(R.moisAvantPratiqueAuj) }]);
       return;
     }
     const g = R.rev, x = g[R.mode];
@@ -1197,7 +1205,7 @@ window.Verrou.quandOuvert(function () {
       { titre: "Total brut", cls: "total", valeur: $(x.brut) },
       { titre: "Net après impôt et retenues", sous: `Environ ${$(R.impot.net / 26)} par paie, aux deux semaines${x.scolarite ? ` ; moins ${$(x.scolarite)} de droits de scolarité par année` : ""}`, valeur: $(net) },
       x.prochain && { titre: `Au ${dateLongue(x.prochain.date)} : R${x.prochain.niveau}`, sous: "Une année de formation de plus", valeur: $(x.prochain.total + x.autres) },
-      { titre: "Début de la pratique", sous: delaiMois(R.moisAvantPratique), valeur: moisLong(R.debutPratique) },
+      { titre: "Début de la pratique", sous: delaiMois(R.moisAvantPratiqueAuj), valeur: moisLong(R.debutPratique) },
     ]);
     document.getElementById("rv-residence-note").textContent = "Échelle de l'entente FMRQ-MSSS 2021-2028 (annexe I), avec l'ajustement de 0,11 % du 31 mars 2026 (avis de la RAMQ du 16 juillet 2026) ; "
       + "hausse de 3,5 % le 1er avril 2027, puis, après l'entente, la hausse des revenus du scénario. Basculez sur « Pratique » pour voir et préparer la pratique.";
@@ -1567,8 +1575,7 @@ window.Verrou.quandOuvert(function () {
     a.appendChild(el("p", "resume", soc
       ? `La société garde environ ${$(x.impotSociete / 12)} par mois pour son impôt. Vous, mettez de côté environ ${$(perso / 12)} par mois pour l'impôt sur vos dividendes. Votre taux marginal, société comprise, est de ${pct(R.tauxMarginal, 0)}.`
       : `Mettez de côté ${pct((t + R.primeMoi) / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ, soit environ ${$((t + R.primeMoi) / 12)} par mois. Votre taux marginal de ${pct(R.tauxMarginal, 0)} est l'impôt sur chaque dollar de plus facturé${Math.abs(R.tauxDeduction - R.tauxMarginal) > 0.01 ? `, après les frais de cabinet ; chaque dollar cotisé au REER vous rapporte ${pct(R.tauxDeduction, 0)}` : ", et ce que rapporte chaque dollar cotisé au REER"}.`));
-    const premiere = S.revenu.annee === "premiere";
-    const an = (+String(S.strategie.debut).slice(0, 4) || 2026) + 1;
+    const premiere = R.premiereAnnee, an = R.anImpotPremiere;
     a.appendChild(rangees(el("div"), [
       soc && { titre: "Société : acomptes mensuels", sous: "Impôt de la société, le dernier jour de chaque mois", valeur: $(x.impotSociete / 12), valeurSous: "par mois" },
       ...(premiere
@@ -2008,7 +2015,7 @@ window.Verrou.quandOuvert(function () {
   // propres à la pratique se cachent et ceux de la résidence paraissent.
   const moisLong = cle => { const [a, m] = String(cle).split("-").map(Number); return new Date(a, m - 1, 1).toLocaleDateString("fr-CA", { month: "long", year: "numeric" }); };
   const moisAvant = cle => { const [a, m] = String(cle).split("-").map(Number); return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, "0")}`; };
-  const delaiMois = n => n <= 0 ? "maintenant" : n < 12 ? `dans ${n} mois` : `dans ${nb(Math.floor(n / 12), 0)} an${n >= 24 ? "s" : ""}${n % 12 ? ` et ${n % 12} mois` : ""}`;
+  const delaiMois = n => n < 0 ? "déjà commencée" : n === 0 ? "ce mois-ci" : n < 12 ? `dans ${n} mois` : `dans ${nb(Math.floor(n / 12), 0)} an${n >= 24 ? "s" : ""}${n % 12 ? ` et ${n % 12} mois` : ""}`;
   function appliquerVue(R) {
     document.querySelectorAll(".pratique-seule").forEach(e => { e.hidden = R.vueResidence; });
     document.querySelectorAll(".residence-seule").forEach(e => { e.hidden = !R.vueResidence; });
@@ -2288,8 +2295,8 @@ window.Verrou.quandOuvert(function () {
     // Dépenses par catégorie (votre part), les quatre plus grandes, puis le reste.
     const qui = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0, parCat = new Map();
     for (const b of depensesEffectives()) parCat.set(categorie(b), (parCat.get(categorie(b)) || 0) + mensuel(b) * qui(b) * 12);
-    const cats = [...parCat].filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
-    const grandes = cats.slice(0, 4), reste = cats.slice(4).reduce((t, [, v]) => t + v, 0);
+    const cats = [...parCat].filter(([n, v]) => v > 0.5 && n !== "Autres dépenses").sort((a, b) => b[1] - a[1]);
+    const grandes = cats.slice(0, 4), reste = cats.slice(4).reduce((t, [, v]) => t + v, 0) + (parCat.get("Autres dépenses") || 0);
     const fin = [...grandes.map(([n, v]) => [n, v, SERIES[0]]), ["Autres dépenses", reste, SERIES[0]],
       ["Paiements de dettes", R.dettesMoi * 12, SERIES[1]], ["Épargne", R.epargneMoi * 12, SERIES[2]], ["Surplus", Math.max(0, R.surplusMoi * 12), SERIES[3]]].filter(([, v]) => v > 0.5);
     return { sources, T, milieu, net, fin };
@@ -2305,7 +2312,7 @@ window.Verrou.quandOuvert(function () {
   function tresorerie(R) {
     const res = R.vueResidence, g = R.rev[R.mode], soc = R.societeActive && !res, part = S.menage.partCommunMoi / 100, t = soc || res ? 0 : R.impot.total;
     const auj = new Date(), an0 = auj.getFullYear(), m0 = auj.getMonth();
-    const premiere = S.revenu.annee === "premiere", anImpot = (+String(S.strategie.debut).slice(0, 4) || an0) + 1;
+    const premiere = R.premiereAnnee, anImpot = R.anImpotPremiere;
     // Montants versés d'un coup (en société, la RAMQ paie la société : ils n'arrivent pas dans votre compte).
     const inscription = soc || res ? 0 : g.forfaitInscription, vulnerables = soc || res ? 0 : g.forfaitVulnerable, juin = soc || res ? 0 : (g.volume || 0) + (g.polyvalence || 0);
     // Dépenses annuelles à un mois précis (votre part) ; celles de la pratique, si vous les payez vous-même.
@@ -3043,7 +3050,15 @@ window.Verrou.quandOuvert(function () {
   document.getElementById("bu-annuelles-modifier").addEventListener("click", feuilleAnnuelles);
   document.getElementById("exporter-tableur").addEventListener("click", exporterTableur);
   document.getElementById("imprimer-fiche").addEventListener("click", () => window.Wealthnord.rapport && window.Wealthnord.rapport.imprimer({ fiche: true }));
-  document.querySelectorAll("[data-comptable]").forEach(b => b.addEventListener("click", () => window.Wealthnord.rapport && window.Wealthnord.rapport.imprimer({ comptable: true })));
+  // Pendant la résidence, l'année d'imposition est celle d'un salarié : le sommaire suit la résidence, même en vue Pratique.
+  function imprimerComptable() {
+    if (!window.Wealthnord.rapport) return;
+    const vue = S.residence && S.residence.vue, basculer = R.residenceActive && !R.vueResidence;
+    if (basculer) { S.residence.vue = "residence"; R = calculer(); }
+    try { window.Wealthnord.rapport.imprimer({ comptable: true }); }
+    finally { if (basculer) { S.residence.vue = vue; R = calculer(); } }
+  }
+  document.querySelectorAll("[data-comptable]").forEach(b => b.addEventListener("click", imprimerComptable));
   document.getElementById("bandeau-plan-sortir").addEventListener("click", () => sortirPlan());
   document.getElementById("pa-independance-modifier").addEventListener("click", feuilleIndependance);
   document.getElementById("ap-portrait-masquer").addEventListener("click", () => {
@@ -3664,7 +3679,7 @@ window.Verrou.quandOuvert(function () {
       c.appendChild(asChoix("Où en êtes-vous ?", "statut", [["pratique", "En pratique"], ["residence", "En résidence", "Salaire de résident (échelle de la FMRQ) jusqu'au début de la pratique"]]));
       const residence = A.statut === "residence";
       if (residence) c.appendChild(asGroupe(
-        creerChamp({ l: "Votre niveau sur l'échelle", t: "select", o: [1, 2, 3, 4, 5, 6, 7, 8].map(n => [String(n), `R${n} : ${$(C.salaireResident({ niveau: n, date: "2026-04-01" }).salaire)}`]) }, "as-niveau", inp => {
+        creerChamp({ l: "Votre niveau sur l'échelle", t: "select", o: [1, 2, 3, 4, 5, 6, 7, 8].map(n => [String(n), `R${n} : ${$(C.salaireResident({ niveau: n, date: moisCle(new Date()) + "-01" }).salaire)}`]) }, "as-niveau", inp => {
           inp.value = A.niveau; inp.addEventListener("change", () => { A.niveau = inp.value; });
         }, false),
         creerChamp({ l: "Début de la pratique", t: "month" }, "as-debutPratique", inp => {

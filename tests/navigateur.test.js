@@ -32,9 +32,10 @@ function verifier(nom, condition, detail) {
 }
 
 // Une page neuve, dans son propre contexte (stockage vide) ; l'assistant ne s'ouvre pas tout seul.
-async function ouvrir(b, base, { largeur = 390, details = false, sw = false, page = "apercu" } = {}) {
+async function ouvrir(b, base, { largeur = 390, details = false, sw = false, page = "apercu", horloge = null } = {}) {
   const ctx = await b.newContext({ viewport: { width: largeur, height: 844 }, acceptDownloads: true, serviceWorkers: sw ? "allow" : "block" });
   const p = await ctx.newPage(), erreurs = [];
+  if (horloge) await p.clock.setFixedTime(new Date(horloge));
   p.on("pageerror", e => erreurs.push(String(e)));
   p.on("console", m => { if (m.type() === "error") erreurs.push(m.text()); });
   await ctx.addInitScript(d => {
@@ -754,7 +755,7 @@ async function transfert(b, base) {
    En vue résidence, l'aperçu, le revenu, l'impôt, le budget et le rapport montrent la résidence (impôt retenu sur la
    paie) ; en vue pratique, la pratique comme avant. Les projections suivent le parcours dans les deux vues. */
 async function residence(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu/detail" });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu/detail", horloge: "2026-10-28T10:00:00" });
   verifier("résidence : invitation dans la page Revenu", await p.evaluate(() => !document.getElementById("rv-residence-ajout").hidden));
   await p.click("#rv-residence-ajouter"); await p.waitForTimeout(300);
   const ajout = await p.evaluate(() => { const S = window.Wealthnord.etat(); return { active: S.residence.active, vue: S.residence.vue, date: S.residence.debutPratique, titre: document.getElementById("feuille-titre").textContent }; });
@@ -801,6 +802,15 @@ async function residence(b, base) {
   const q = await p.evaluate(() => { const R = window.Wealthnord.resultats(); return { vue: R.vueResidence, surplus: R.surplusMoi, vn: R.projection[10].moi, hero: document.querySelector("#ap-hero .hero-etiquette").textContent }; });
   verifier("bascule : la vue Pratique, comme sans résidence", !q.vue && Math.abs(q.surplus - avant.surplus) < 0.01 && q.hero.includes("en pratique"), { q, avant });
   verifier("bascule : mêmes projections dans les deux vues ; la résidence les change", Math.abs(q.vn - r.vn) < 0.01 && r.vn < avant.vn, { pratique: q.vn, residence: r.vn, sans: avant.vn });
+  const prem = await p.evaluate(() => ({ ech: [...document.querySelectorAll("#ap-echeances .rangee")].map(x => x.textContent.replace(/\s+/g, " ")),
+    impot: document.getElementById("im-acomptes").textContent.replace(/\s+/g, " "),
+    treso: window.Wealthnord.outils.tresorerie(window.Wealthnord.resultats()).mois.flatMap(m => m.ev.map(([n]) => `${m.date.getFullYear()} ${n}`)).filter(x => /Acompte|Solde/.test(x)) }));
+  verifier("bascule : première année de pratique en 2027, solde le 30 avril 2028, aucun acompte en 2027", prem.ech.some(x => /^30avrSolde de l'impôt.*2028$/.test(x))
+    && !prem.ech.some(x => /Acompte/.test(x) && x.endsWith("2027")) && prem.impot.includes("30 avril 2028") && prem.treso.length === 0, prem);
+  const comptable = await p.evaluate(() => { const boite = document.getElementById("rapport"); window.print = () => {};
+    document.querySelector("[data-comptable]").click(); const t = boite.textContent; boite.textContent = ""; document.body.classList.remove("impression-rapport");
+    return { t, vue: window.Wealthnord.resultats().vueResidence, choix: window.Wealthnord.etat().residence.vue }; });
+  verifier("bascule : le sommaire du comptable décrit l'année en résidence, et la vue Pratique reste choisie", comptable.t.includes("salarié") && comptable.t.includes("T4") && !comptable.vue && comptable.choix === "pratique", { vue: comptable.vue, choix: comptable.choix });
   verifier("résidence : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
@@ -891,11 +901,27 @@ async function resumeDetail(b, base) {
   await ctx.close();
 }
 
+/* 29. Le temps passe : plan commencé en octobre 2026, en résidence jusqu'en juillet 2027. Le délai jusqu'à la pratique
+   se compte depuis aujourd'hui ; une fois la date passée, « À faire » demande de faire partir le plan du mois courant. */
+async function tempsQuiPasse(b, base) {
+  const lire = async horloge => {
+    const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu", horloge });
+    await remplacer(p, { "strategie.debut": "2026-10", "residence.active": true, "residence.niveau": "2", "residence.debutPratique": "2027-07", "residence.vue": "residence" });
+    const o = await p.evaluate(() => ({ tuile: document.querySelector("#rv-r-tuiles .tuile:nth-child(4) .tuile-sous").textContent, faire: document.getElementById("ap-actions").textContent }));
+    await ctx.close(); return { ...o, erreurs };
+  };
+  const janvier = await lire("2027-01-15T10:00:00"), aout = await lire("2027-08-02T10:00:00");
+  verifier("temps : en janvier 2027, la pratique dans 6 mois", janvier.tuile === "dans 6 mois" && janvier.faire.includes("Début de la pratique en juillet 2027, dans 6 mois"), janvier.tuile);
+  verifier("temps : en août 2027, la pratique est commencée ; le plan est à faire avancer", aout.tuile === "déjà commencée" && aout.faire.includes("Votre pratique a commencé en juillet 2027")
+    && !aout.faire.includes("Début de la pratique en juillet 2027,"), aout.tuile);
+  verifier("temps : aucune erreur", janvier.erreurs.length + aout.erreurs.length === 0, [...janvier.erreurs, ...aout.erreurs]);
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

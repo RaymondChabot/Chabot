@@ -81,7 +81,13 @@ rapport) montre l'une ou l'autre ; les projections et le plan des dettes
 suivent le parcours dans les deux vues : la résidence, puis la pratique à
 cette date. L'année de transition réunit le salaire et le revenu de
 pratique dans un même calcul d'impôt (RRQ de l'employé, puis des deux
-parts sous les maximums ; assurance-emploi sur le salaire seulement).
+parts sous les maximums ; assurance-emploi sur le salaire seulement). La
+première année de pratique est celle du début de la pratique : son impôt
+se paie le 30 avril suivant, sans acomptes. Le délai jusqu'à la pratique se
+compte depuis aujourd'hui ; une fois la date passée, « À faire » demande de
+mettre les soldes à jour et de faire partir le plan du mois courant. Le
+sommaire pour le comptable décrit l'année en résidence, même en vue
+Pratique.
 
 Au premier lancement, un **assistant de départ** pose quelques questions
 (famille, enfants, pratique, logement, dettes) et bâtit le point de départ
@@ -213,8 +219,12 @@ Revenu affiche tous les détails.
   le masque) ; la page Données garde de quoi réinstaller. Un champ à 0
   s'efface au toucher : on tape par-dessus.
 
-À l'acte : règles d'avant la Loi 2 (le mode composé n'est pas en vigueur),
-avec frais de cabinet (pourcentage de la facturation et montant fixe).
+À l'acte : règles en vigueur avant la Loi 2, avec frais de cabinet
+(pourcentage de la facturation et montant fixe). Le mode de rémunération
+composé de la première ligne (prise en charge, actes et taux horaire) a
+fait l'objet d'une entente finale entre la FMOQ et le gouvernement
+(13 août 2026) ; il n'est pas encore en vigueur et ses montants restent à
+fixer : l'app ne le calcule pas.
 
 ## Tests
 
@@ -235,7 +245,8 @@ SCENARIOS=transfert,residence node tests/navigateur.test.js   # quelques parcour
   version, politique de sécurité du contenu, sous-onglets, verrou (données
   et sauvegardes chiffrées, mauvaise phrase, phrase changée, délai, retrait),
   sommaire pour le comptable sur une seule page, résumé et détail de chaque
-  page (navigation, mêmes chiffres, cartes de même hauteur sur ordinateur).
+  page (navigation, mêmes chiffres, cartes de même hauteur sur ordinateur),
+  passage du temps (horloge fixée : délais, première année de pratique).
 - GitHub Actions lance les trois à chaque publication sur `main`
   (`.github/workflows/tests.yml`). Cas fictifs seulement.
 
