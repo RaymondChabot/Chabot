@@ -1157,6 +1157,11 @@ async function etSi(b, base) {
   await p.click("#essai-dj-plus"); await p.waitForTimeout(100);
   await p.click("#rv-r-modes .essai .actions .bouton:not(.secondaire)"); await p.waitForTimeout(200);
   verifier("et si : Garder ces valeurs met le plan à jour", await p.evaluate(() => window.Wealthnord.etat().revenu.demiJournees === 9 && !document.querySelector("#rv-r-modes .essai .actions")));
+  const heure = await p.evaluate(() => { const R = window.Wealthnord.resultats(), g = R.rev;
+    return { app: R.parHeure.mixte, attendu: (g.mixte.total - g.activites - g.polyvalence - g.mixte.autres - g.mixte.fraisCabinet) / g.heures,
+      horaire: R.parHeure.horaire, texte: document.getElementById("rv-r-modes").textContent }; });
+  verifier("à l'heure : par heure en clinique, après frais ; au taux horaire, au moins le tarif horaire", Math.abs(heure.app - heure.attendu) < 1e-6 && heure.horaire >= 99
+    && heure.texte.includes("/h") && heure.texte.includes("par heure en clinique"), heure);
   verifier("et si : rien ne déborde ; aucune erreur", !(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)) && erreurs.length === 0, erreurs);
   await ctx.close();
 }

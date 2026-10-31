@@ -615,7 +615,12 @@ window.Verrou.quandOuvert(function () {
     R.sensDJ = sens([...new Set([4, 5, 6, 7, 8, 9, 10, dj])].filter(n => n >= Math.max(1, ens)).sort((a, b) => a - b), v => ({ demiJournees: v }));
     R.sensPat = sens([...new Set([3, 4, 5, 6, 7, 8, pat])].sort((a, b) => a - b), v => ({ patientsParDJ: v }));
     // « Et si… » : le brut et le net de chaque mode pour d'autres demi-journées et d'autres patients.
-    R.essaiModes = x => { const g = revenuDe(x); return Object.fromEntries(R.modes.map(md => [md, { brut: g[md].total, net: R.netPour(g[md].total, g[md].fraisCabinet) }])); };
+    // Par heure en clinique : ce que la pratique rapporte (sans les activités en établissement ni les autres revenus),
+    // après les frais de cabinet, avant l'impôt, divisé par les heures en clinique (et, au taux horaire, la garde sur place).
+    const parHeure = (g, md) => { const h = g.heures + (md === "horaire" ? g.garde : 0);
+      return h > 0 ? (g[md].total - g.activites - g.polyvalence - g[md].autres - g[md].fraisCabinet) / h : null; };
+    R.parHeure = Object.fromEntries(R.modes.map(md => [md, parHeure(R.rev, md)]));
+    R.essaiModes = x => { const g = revenuDe(x); return Object.fromEntries(R.modes.map(md => [md, { brut: g[md].total, net: R.netPour(g[md].total, g[md].fraisCabinet), heure: parHeure(g, md) }])); };
     // REER : impôt sans cotisation, et avec une cotisation donnée (au revenu de l'année).
     const baseMode = { ...base, depensesPro: depensesMode(mode), revenu: R.brut };
     const impotVue = x => R.vueResidence ? impotResidence(x) : impotDe({ ...baseMode, ...x });
@@ -1450,10 +1455,10 @@ window.Verrou.quandOuvert(function () {
     // « Et si… » : d'autres patients et d'autres demi-journées, pour cet écran seulement, jusqu'à « Garder ces valeurs ».
     const r = S.revenu, planPat = +r.patientsParDJ || 0, planDJ = +r.demiJournees || 0, minDJ = Math.max(1, R.milieu === "gmfu" ? +r.enseignement || 0 : 0);
     const e = U.essai || { pat: planPat, dj: planDJ }, essai = e.pat !== planPat || e.dj !== planDJ;
-    const v = essai ? R.essaiModes({ patientsParDJ: e.pat, demiJournees: e.dj }) : Object.fromEntries(R.modes.map(m => [m, { brut: R.rev[m].total, net: R.nets[m] }]));
+    const v = essai ? R.essaiModes({ patientsParDJ: e.pat, demiJournees: e.dj }) : Object.fromEntries(R.modes.map(m => [m, { brut: R.rev[m].total, net: R.nets[m], heure: R.parHeure[m] }]));
     const meilleur = R.modes.reduce((a, m) => v[m].net > v[a].net ? m : a, R.modes[0]);
     const second = R.modes.filter(m => m !== meilleur).reduce((a, m) => !a || v[m].net > v[a].net ? m : a, null);
-    const lignesModes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: `Brut ${$(v[m].brut)}${m === R.mode ? " · dans votre budget" : ""}`,
+    const lignesModes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: `Brut ${$(v[m].brut)}${v[m].heure != null ? ` · ${$(v[m].heure)}/h` : ""}${m === R.mode ? " · dans votre budget" : ""}`,
       valeur: $(v[m].net), valeurSous: essai ? `${signe(v[m].net - R.nets[m])} sur votre plan` : R.societeActive ? "pour vous, par année" : "net par année", cls: m === meilleur ? "choisi" : null }));
     const ecartNet = second ? v[meilleur].net - v[second].net : 0;
     const phrase = second ? `${NOMS_MODE_ACTES[meilleur]} rapporte le plus : ${$(ecartNet)} net de plus que ${AU_MODE[second].replace(/^au /, "le ").replace(/^à /, "")} par année.` : "";
@@ -1478,7 +1483,9 @@ window.Verrou.quandOuvert(function () {
       revenir.addEventListener("click", () => { U.essai = null; tout(); });
       a.append(garder, revenir); bloc.appendChild(a);
     }
-    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"], rangees(el("div"), lignesModes), el("p", "conclusion", phrase), bloc);
+    const h = R.modes.filter(m => v[m].heure != null), mh = h.length ? h.reduce((a, m) => v[m].heure > v[a].heure ? m : a, h[0]) : null;
+    const note = el("p", "aide", mh ? `$/h : par heure en clinique, après les frais de cabinet et avant l'impôt, sans les activités en établissement. À l'heure, ${NOMS_MODE_ACTES[mh].toLowerCase()} paie le mieux (${$(v[mh].heure)}).` : "");
+    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"], rangees(el("div"), lignesModes), el("p", "conclusion", phrase), note, bloc);
     if (U.essaiFocus) { const f = document.getElementById(U.essaiFocus); U.essaiFocus = null; if (f && !f.disabled) f.focus(); }
   }
   const signe$2 = v => (v >= 0 ? "+" : "−") + $2(Math.abs(v));

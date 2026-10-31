@@ -139,7 +139,9 @@ chaque mode après impôt et frais, le meilleur en évidence, et l'écart sur
 l'année ; le chiffre du haut compare le même net. « Et si… » : deux
 réglages + et − (patients par demi-journée, demi-journées par semaine)
 font bouger les trois modes en direct, sans toucher au plan, jusqu'à
-« Garder ces valeurs ».
+« Garder ces valeurs ». Pour chaque mode, aussi le revenu par heure en
+clinique (après les frais de cabinet, avant l'impôt, sans les activités en
+établissement), et le mode qui paie le mieux à l'heure.
 
 **Comparer les actes** (sous-onglet du détail de Revenu, dès qu'il y a
 plusieurs modes) : les résultats d'abord, les réglages se déplient pour
