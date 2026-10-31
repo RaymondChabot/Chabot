@@ -250,9 +250,10 @@ fixer : l'app ne le calcule pas.
 
 `AGENTS.md` donne les règles du dépôt à tout agent de code (Cursor et autres) :
 confidentialité, identité des commits, jamais sur `main`, conventions,
-décisions déjà prises. `docs/cursor/audits.md` décrit les audits en parallèle
-avec les agents de Cursor dans le nuage, la synthèse, puis les corrections en
-pull requests relues avant d'être intégrées.
+décisions déjà prises. `docs/cursor/audit-complet.md` est le méga-audit en un
+seul document, à coller dans un seul agent : 11 volets par ordre de priorité,
+synthèse en lots de corrections, une seule pull request de rapports.
+`docs/cursor/audits.md` découpe le même travail en 11 agents en parallèle.
 
 ## Tests
 
