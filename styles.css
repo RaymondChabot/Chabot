@@ -504,7 +504,9 @@ a.tuile:hover { border-color: var(--trait); }
 @keyframes glisser { from { transform: translateX(40px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 @keyframes fondu { from { opacity: 0; } to { opacity: 1; } }
 
-/* ---------- Comparer les actes (Revenu) ---------- */
+/* ---------- Comparer les actes (Revenu) : carte en tête du résumé, sous-onglet du détail ---------- */
+.carte-accent { border-color: var(--marque); }
+.carte-accent > .bouton { margin-top: 2px; }
 .champs-rapides { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); column-gap: 20px; margin: 2px 0 10px; }
 .champs-rapides .champ { grid-template-columns: minmax(0, 1fr) minmax(96px, 128px); }
 .champs-rapides .champ > span:last-child:empty { display: none; }

@@ -1034,8 +1034,14 @@ async function comparerActes(b, base) {
   await p.click("#rv-dj-plan"); await p.waitForTimeout(300);
   verifier("actes : « Selon mon plan » revient à la demi-journée du plan", await p.evaluate(() => window.Wealthnord.etat().revenu.demiJourneeType === null));
   await allerA(p, "revenu"); await p.waitForTimeout(200);
-  const resume = await p.evaluate(() => { const c = document.getElementById("rv-r-actes"); return { lien: c.querySelector("a.lien-carte").getAttribute("href"), texte: c.textContent }; });
-  verifier("actes : la carte du résumé mène au sous-onglet", resume.lien === "#revenu/actes" && resume.texte.includes("La supervision") && resume.texte.includes("Ma demi-journée"), resume);
+  const resume = await p.evaluate(() => {
+    const c = document.getElementById("rv-r-actes"), hero = document.getElementById("rv-hero"), sources = document.getElementById("rv-r-sources");
+    return { lien: c.querySelector("a.lien-carte").getAttribute("href"), bouton: c.querySelector("a.bouton").getAttribute("href"),
+      texte: c.textContent, vu: !!c.offsetParent, sousLeChiffre: c.getBoundingClientRect().top > hero.getBoundingClientRect().top,
+      avantLeReste: !sources.offsetParent || c.getBoundingClientRect().top < sources.getBoundingClientRect().top };
+  });
+  verifier("actes : la carte du résumé, sous le chiffre, mène au sous-onglet", resume.lien === "#revenu/actes" && resume.bouton === "#revenu/actes"
+    && resume.vu && resume.sousLeChiffre && resume.avantLeReste && resume.texte.includes("La supervision") && resume.texte.includes("Ma demi-journée"), resume);
   await allerA(p, "revenu/detail");
   verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent));
   verifier("actes : aucune erreur", erreurs.length === 0, erreurs);

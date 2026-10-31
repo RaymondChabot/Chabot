@@ -1343,13 +1343,16 @@ window.Verrou.quandOuvert(function () {
       + "Payés à 100 % du tarif dans tous les modes : à l'acte, au mixte (annexe XXIII, par. 2.11) et au taux horaire, à l'acte pour ces services sans facturer d'heures pour ce temps. "
       + "L'examen se facture à part, sauf le rapport d'évaluation médicale (09944). Sans majoration selon le territoire.";
 
-    // Résumé de Revenu : la carte qui mène ici.
+    // Résumé de Revenu : la carte est sous le chiffre. Elle ouvre le sous-onglet.
     const suivi = actes.find(a => a.cle === "suivi");
-    carteResume("rv-r-actes", "Comparer les actes", ["Ouvrir", "#revenu/actes"], rangees(el("div"), [
-      gmfu ? { titre: "Au mixte : supervision ou visites", sous: "Par demi-journée d'enseignement", valeur: so.meilleur === "visites" ? "Les visites" : "La supervision", valeurSous: `${signe$2(Math.abs(so.ecart))} par demi-journée` }
-        : { titre: "Un suivi", sous: o.lieu === "cabinet" ? "En cabinet" : "En établissement", valeur: $2(suivi.acte), valeurSous: `${$2(suivi.mixte)} au mixte` },
-      { titre: "Ma demi-journée", sous: plan ? "Selon votre plan" : "Celle que vous avez inscrite", valeur: NOMS_MODE_ACTES[meilleur], valeurSous: `${$2(dj[meilleur].net)}` },
-    ]));
+    const carte = carteResume("rv-r-actes", "Comparer les actes", ["Ouvrir", "#revenu/actes"],
+      el("p", "aide", "Chaque acte, votre demi-journée, et les formulaires de la CNESST : à l'acte, au mixte et au taux horaire."),
+      rangees(el("div"), [
+        gmfu ? { titre: "Au mixte : supervision ou visites", sous: "Par demi-journée d'enseignement", valeur: so.meilleur === "visites" ? "Les visites" : "La supervision", valeurSous: `${signe$2(Math.abs(so.ecart))} par demi-journée` }
+          : { titre: "Un suivi", sous: o.lieu === "cabinet" ? "En cabinet" : "En établissement", valeur: $2(suivi.acte), valeurSous: `${$2(suivi.mixte)} au mixte` },
+        { titre: "Ma demi-journée", sous: plan ? "Selon votre plan" : "Celle que vous avez inscrite", valeur: NOMS_MODE_ACTES[meilleur], valeurSous: `${$2(dj[meilleur].net)}` },
+      ]));
+    const aller = el("a", "bouton large", "Comparer les actes"); aller.href = "#revenu/actes"; carte.appendChild(aller);
   }
   const signe$2 = v => (v >= 0 ? "+" : "−") + $2(Math.abs(v));
   // À l'heure, selon la durée de chaque acte : la durée se change dans le tableau (le focus reste pendant la saisie).
