@@ -127,6 +127,13 @@ avec un enfant commun : avant, chacun est imposé seul.
 L'essentiel suffit pour commencer ; le bouton **Optimiser** du panneau
 Revenu affiche tous les détails.
 
+**Outils avancés** : probabilité de réussite, répartition et frais des
+placements, trésorerie de douze mois, bilan et flux de l'année, choix de la
+méthode de remboursement, comparer deux plans, détail pour le comptable et
+société restent cachés par défaut, pour des pages épurées. Un lien au bas de
+chaque page les nomme et les montre ; l'interrupteur est aussi dans Données
+(Apparence et rapport). Rien n'est retiré.
+
 **Vos trois modes** (résumé de Revenu, en GMF-U et en CLSC) : le net de
 chaque mode après impôt et frais, le meilleur en évidence, et l'écart sur
 l'année ; le chiffre du haut compare le même net.

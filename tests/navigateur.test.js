@@ -33,7 +33,7 @@ function verifier(nom, condition, detail) {
 }
 
 // Une page neuve, dans son propre contexte (stockage vide) ; l'assistant ne s'ouvre pas tout seul.
-async function ouvrir(b, base, { largeur = 390, details = false, sw = false, page = "apercu", horloge = null } = {}) {
+async function ouvrir(b, base, { largeur = 390, details = false, sw = false, page = "apercu", horloge = null, avance = true } = {}) {
   const ctx = await b.newContext({ viewport: { width: largeur, height: 844 }, acceptDownloads: true, serviceWorkers: sw ? "allow" : "block" });
   const p = await ctx.newPage(), erreurs = [];
   // HORLOGE=2027-03-15 : toute la suite comme à une autre date (pour trouver les tests qui dépendent du jour).
@@ -43,8 +43,9 @@ async function ouvrir(b, base, { largeur = 390, details = false, sw = false, pag
   await ctx.addInitScript(d => {
     window.__csp = [];
     document.addEventListener("securitypolicyviolation", e => window.__csp.push(e.violatedDirective));
-    try { localStorage.setItem("wm.assistant", "1"); sessionStorage.setItem("wm.ouverture", "1"); if (d) localStorage.setItem("wm.details", "1"); } catch (e) { /* stockage indisponible */ }
-  }, details);
+    try { localStorage.setItem("wm.assistant", "1"); sessionStorage.setItem("wm.ouverture", "1"); if (d.details) localStorage.setItem("wm.details", "1");
+      if (d.avance && localStorage.getItem("wm.avance") === null) localStorage.setItem("wm.avance", "1"); } catch (e) { /* stockage indisponible */ }
+  }, { details, avance });
   await p.goto(`${base}/index.html#${page}`);
   await pret(p);
   return { ctx, p, erreurs };
@@ -1118,6 +1119,27 @@ async function comparerActes(b, base) {
   await ctx.close();
 }
 
+/* 32. Outils avancés : cachés par défaut ; le lien au bas de la page dit lesquels et les montre ; le choix est gardé,
+   et l'interrupteur de la page Données le reflète. Rien n'est retiré. */
+async function outilsAvances(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "avenir/projection", avance: false });
+  const avant = await p.evaluate(() => { const z = document.querySelector("#v-avenir > .plus-outils");
+    return { proba: !!document.querySelector("#pa-proba, #v-avenir .avance h2") && [...document.querySelectorAll("#v-avenir .avance")].every(c => !c.offsetParent),
+      lien: z && !!z.offsetParent && z.textContent, debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }; });
+  verifier("avancés : cachés par défaut ; le lien les nomme", avant.proba && avant.lien && avant.lien.includes("Afficher les outils avancés") && avant.lien.includes("Probabilité de réussite") && !avant.debord, avant);
+  await p.click("#v-avenir > .plus-outils button"); await p.waitForTimeout(250);
+  const apres = await p.evaluate(() => ({ vus: [...document.querySelectorAll("#v-avenir .avance")].filter(c => !c.classList.contains("hors-onglet")).every(c => !!c.offsetParent),
+    pref: localStorage.getItem("wm.avance"), texte: document.querySelector("#v-avenir > .plus-outils button").textContent }));
+  verifier("avancés : un toucher les montre, et le choix est gardé", apres.vus && apres.pref === "1" && apres.texte === "Masquer les outils avancés", apres);
+  await p.reload(); await pret(p); await allerA(p, "donnees");
+  verifier("avancés : après un rechargement, toujours là ; l'interrupteur de Données le dit", await p.evaluate(() => document.documentElement.classList.contains("outils-avances") && document.getElementById("outils-avances").checked));
+  await p.evaluate(() => { const c = document.getElementById("outils-avances"); c.closest("details").open = true; });
+  await p.click("#outils-avances"); await p.waitForTimeout(200);
+  verifier("avancés : l'interrupteur les cache de nouveau", await p.evaluate(() => !document.documentElement.classList.contains("outils-avances") && localStorage.getItem("wm.avance") === "0"));
+  verifier("avancés : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 30. Le plan suit le calendrier : au premier lancement d'un nouveau mois, il repart du mois courant ; les soldes ne
    bougent pas (la personne les met à jour avec ses relevés). L'avis permet d'annuler pour ce mois-ci, sans perdre une
    modification faite pendant l'avis. Niveau de résidence au 1er juillet ; enfants et privilège au 1er janvier ;
@@ -1174,7 +1196,7 @@ async function planCalendrier(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

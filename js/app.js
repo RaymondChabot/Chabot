@@ -2386,6 +2386,32 @@ window.Verrou.quandOuvert(function () {
     }
     for (const id of ["v-apercu", "v-revenu", "v-impot", "v-budget"]) document.getElementById(id).classList.toggle("avec-parcours", R.residenceActive);
   }
+  /* Outils avancés : les cartes marquées « avance » ne s'affichent que sur demande. Au bas de chaque page
+     de détail, un lien les montre (et dit lesquelles) ou les cache. Le choix est gardé sur cet appareil. */
+  const outilsAvances = () => document.documentElement.classList.contains("outils-avances");
+  function basculerAvances(on) {
+    document.documentElement.classList.toggle("outils-avances", on);
+    try { localStorage.setItem("wm.avance", on ? "1" : "0"); } catch (e) { /* préférence non gardée */ }
+    tout();
+  }
+  function liensAvances() {
+    const on = outilsAvances();
+    document.getElementById("outils-avances").checked = on;
+    document.querySelectorAll(".vue").forEach(v => {
+      const cartes = [...v.querySelectorAll(".avance")].filter(c => !c.classList.contains("hors-onglet") && !c.hidden);
+      let z = v.querySelector(":scope > .plus-outils");
+      if (!cartes.length) { if (z) z.hidden = true; return; }
+      if (!z) {
+        z = el("div", "plus-outils detail-seul"); const b = el("button"); b.type = "button";
+        b.addEventListener("click", () => basculerAvances(!outilsAvances())); z.append(b, el("p", "aide"));
+        v.appendChild(z);
+      }
+      z.hidden = false;
+      z.querySelector("button").textContent = on ? "Masquer les outils avancés" : "Afficher les outils avancés";
+      z.querySelector(".aide").textContent = on ? "" : cartes.map(c => (c.querySelector("h2") || {}).textContent).filter(Boolean).join(" · ");
+    });
+  }
+  document.getElementById("outils-avances").addEventListener("change", e => { e.stopPropagation(); basculerAvances(e.target.checked); });
   function tout() {
     R = calculer();
     document.getElementById("pied-parametres").textContent = `paramètres fiscaux ${R.parametres.annee}${R.parametres.provisoire ? " (provisoires)" : ""}`;
@@ -2397,6 +2423,7 @@ window.Verrou.quandOuvert(function () {
     lexique(document.querySelector("main"), LEXIQUE);
     if (feuille.open) lexique(corps, LEXIQUE);
     document.querySelectorAll(".onglets").forEach(indiceDefilement);
+    liensAvances();
   }
   // Sous-onglets qui débordent : un fondu au bord droit, tant qu'il reste des onglets à voir.
   function indiceDefilement(o) { o.classList.toggle("defile-plus", o.scrollLeft + o.clientWidth < o.scrollWidth - 2); }

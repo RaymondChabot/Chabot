@@ -988,6 +988,12 @@ a.tuile:hover { border-color: var(--trait); }
    Espacements sur une grille de 8 px : 16 px entre les cartes, 16 px dedans.
    ============================================================ */
 @media screen { .vue:not(.mode-detail) .detail-seul, .vue.mode-detail .resume-seul { display: none !important; } }
+/* Outils avancés : cachés tant qu'on ne les demande pas (Données, ou le lien au bas de la page). */
+@media screen { html:not(.outils-avances) .avance { display: none !important; } }
+.plus-outils { grid-column: 1 / -1; text-align: center; margin: 4px 0 0; }
+.plus-outils button { min-height: 44px; padding: 8px 14px; border: 0; background: none; color: var(--discret); font: inherit; font-size: 0.9rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--trait); }
+.plus-outils button:hover { color: var(--encre); }
+.plus-outils .aide { margin-top: 0; font-size: 0.8rem; }
 .vue { gap: 16px; }
 .carte { padding: 16px; gap: 12px; }
 .tuiles { gap: 12px; grid-auto-rows: 1fr; }
