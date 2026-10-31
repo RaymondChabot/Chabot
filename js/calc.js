@@ -448,6 +448,91 @@
   }
 
   /* ============================================================
+     COMPARER LES ACTES : ce que rapporte chaque acte selon le mode, l'intervention de supervision ou
+     les visites des apprenants, une demi-journée de votre choix, et les formulaires de la CNESST.
+     ============================================================ */
+  /* Actes courants (manuel de la RAMQ, onglet B, voir TARIFS_LIEU). Au taux horaire, le temps passé est payé,
+     plus le forfait de responsabilité (patient vulnérable inscrit) ou le supplément de l'examen (EP 40,
+     par. 6.02 B, 8.01, 7.02 B). Durée : celle que la personne prévoit, pour comparer à l'heure (valeur de
+     départ seulement, à ajuster). */
+  const ACTES = [
+    { cle: "suivi", nom: "Suivi", codes: "15803, 15804", duree: 15 },
+    { cle: "suiviV", nom: "Suivi, patient vulnérable", codes: "15823, 15824", duree: 20, horaire: "forfaitResponsabilite" },
+    { cle: "perioV", nom: "Périodique, patient vulnérable", codes: "15819, 15820", duree: 30, horaire: "forfaitResponsabilite" },
+    { cle: "pedia", nom: "Périodique pédiatrique", codes: "15813, 15814", duree: 20, horaire: "suppExamenEnfant" },
+    { cle: "gross", nom: "Suivi de grossesse", codes: "15811, 15812", duree: 15, horaire: "suppSuiviGrossesse" },
+    { cle: "pecNonVuln", nom: "Prise en charge", codes: "15801, 15802", duree: 30 },
+    { cle: "pecVuln", nom: "Prise en charge, patient vulnérable", codes: "15821, 15822", duree: 45, horaire: "forfaitResponsabilite" },
+    { cle: "srvMineure", nom: "Sans rendez-vous, mineure", codes: "15765, 15766", duree: 10 },
+    { cle: "srvComplexe", nom: "Sans rendez-vous, complexe", codes: "15773, 15774", duree: 15 },
+  ];
+  /* Formulaires de la CNESST et de l'IVAC (annexe XIII de l'Entente, en vigueur depuis le 1er avril 2025 ; manuel
+     de la RAMQ consulté le 25 octobre 2026). Payés à 100 % du tarif dans tous les modes : à l'acte ; au mixte
+     (annexe XXIII, par. 2.11) ; au taux horaire, à l'acte pour ces services, sans facturer d'heures pour ce temps.
+     L'examen se facture à part, sauf le rapport d'évaluation médicale (09944). Sans majoration selon le territoire. */
+  const CNESST = [
+    { code: "09926", nom: "Attestation médicale", tarif: 27.57 },
+    { code: "09927", nom: "Rapport sommaire de prise en charge", tarif: 26.96 },
+    { code: "09928", nom: "Rapport d'évolution", tarif: 26.96 },
+    { code: "09930", nom: "Rapport final", tarif: 31.86 },
+    { code: "09929", nom: "Information médicale complémentaire écrite", tarif: 128.67 },
+    { code: "09909", nom: "Rapport complémentaire", tarif: 159.31 },
+    { code: "09907", nom: "Bilan médical", tarif: 165.43 },
+    { code: "09908", nom: "Opinion avant consolidation : lien d'emploi", tarif: 140.93 },
+    { code: "09922", nom: "Mesures de réadaptation avant consolidation", tarif: 61.27 },
+    { code: "09971", nom: "Assignation temporaire d'un travail", tarif: 102.94 },
+    { code: "09970", nom: "Retrait préventif de la travailleuse enceinte ou qui allaite", tarif: 85.78 },
+    { code: "09944", nom: "Rapport d'évaluation médicale, examen compris", tarif: 520.81 },
+    { code: "15795", nom: "IVAC : évaluation médicale", tarif: 27.57 },
+    { code: "15796", nom: "IVAC : rapport médical", tarif: 26.96 },
+    { code: "15797", nom: "IVAC : rapport final", tarif: 31.86 },
+  ];
+  // Montants d'un lieu, avec ceux que la personne a changés (o.montants), et la majoration du territoire.
+  const baseActes = o => {
+    const lieu = o.lieu === "cabinet" ? "cabinet" : "etablissement";
+    return { lieu, palier: o.palier ? 1 : 0, T: { ...TARIFS_LIEU[lieu], ...(o.tarifs || {}) }, D: { ...RAMQ, ...montantsLieu(lieu, o.liste), ...(o.montants || {}) },
+      maj: 1 + (+o.majorationPct || 0) / 100, pctActe: (o.pctActe ?? 100) / 100 };
+  };
+  // Chaque acte : à l'acte, sa part au mixte, ce qui s'ajoute au taux horaire ; et à l'heure, selon sa durée.
+  function valeurActes(o = {}) {
+    const { palier, T, D, maj, pctActe } = baseActes(o);
+    return ACTES.map(a => {
+      const tarif = (+T[a.cle][palier] || 0) * maj, duree = Math.max(1, +(o.durees || {})[a.cle] || a.duree), parHeure = 60 / duree;
+      const enPlus = a.horaire ? (+D[a.horaire] || 0) * maj : 0, acte = tarif * pctActe, mixte = tarif * D.pctMixte / 100;
+      return { ...a, tarif, duree, acte, mixte, horaireEnPlus: enPlus,
+        heure: { acte: acte * parHeure, mixte: D.forfaitHoraireMixte * maj + mixte * parHeure, horaire: D.tarifHoraire * maj + enPlus * parHeure } };
+    });
+  }
+  /* Une demi-journée d'enseignement au mixte, en GMF-U (annexe XXIII, B-2, par. 3.1) : l'intervention de supervision
+     (au plus 3,5 h, 5 h l'après-midi ; un seul acte, quel que soit le nombre d'apprenants) ou les visites des
+     apprenants, plus celles que le superviseur fait lui-même pendant le bloc. Le forfait horaire et le demi-per diem
+     (EP 42) sont les mêmes dans les deux cas. Seuil : visites à partir desquelles les visites rapportent plus. */
+  function supervisionOuVisites(o = {}) {
+    const { D, maj } = baseActes(o);
+    const H = Math.max(0, +o.heuresParDJ || 0), heures = Math.min(H, o.apresMidi ? SUPERVISION_MAX_APRES_MIDI : D.supervisionMaxH);
+    const resid = Math.max(0, +o.residents || 0), ext = Math.max(0, +o.externes || 0);
+    const nbVisites = resid * Math.max(0, o.patientsParResident ?? 4.5) + ext * Math.max(0, o.patientsParExterne ?? 2.5) + Math.max(0, +o.pendant || 0);
+    const parVisite = Math.max(0, +o.tarifMoyen || 0) * maj * D.pctMixte / 100;
+    const supervision = heures * D.acteSupervision * maj * D.pctSupervision / 100, visites = nbVisites * parVisite;
+    return { heures, nbVisites, parVisite, supervision, visites, ecart: visites - supervision, meilleur: visites > supervision + 0.005 ? "visites" : "acte",
+      seuil: parVisite > 0 ? supervision / parVisite : null, forfait: H * D.forfaitHoraireMixte * maj, perDiem: (resid * D.perDiemResident + ext * D.perDiemExterne) * maj };
+  }
+  // Une demi-journée de votre choix : les actes et les formulaires comptés, au taux horaire, au mixte et à l'acte,
+  // avant et après les frais de cabinet (à l'acte ; aussi aux autres modes si la clinique les exige).
+  function demiJourneeActes(o = {}) {
+    const { D, maj, pctActe } = baseActes(o), actes = valeurActes(o), n = o.nombres || {}, H = Math.max(0, +o.heuresParDJ || 0);
+    let tarifs = 0, enPlus = 0, patients = 0;
+    for (const a of actes) { const k = Math.max(0, +n[a.cle] || 0); tarifs += k * a.tarif; enPlus += k * a.horaireEnPlus; patients += k; }
+    const formulaires = CNESST.reduce((t, f) => t + Math.max(0, +n[f.code] || 0) * f.tarif, 0);
+    const frais = Math.max(0, Math.min(100, +o.fraisCabinetPct || 0)) / 100;
+    const mode = (brut, applique) => ({ brut, net: brut * (1 - (applique ? frais : 0)) });
+    return { patients, formulaires, heures: H,
+      horaire: mode(H * D.tarifHoraire * maj + enPlus + formulaires, o.fraisTousModes),
+      mixte: mode(H * D.forfaitHoraireMixte * maj + tarifs * D.pctMixte / 100 + formulaires, o.fraisTousModes),
+      acte: mode(tarifs * pctActe + formulaires, true) };
+  }
+
+  /* ============================================================
      IMPÔT 2026 : particulier (travailleur autonome)
      ============================================================ */
   function cotisationsAutonome(revenuNet) {
@@ -999,7 +1084,7 @@
     return { plafondQc, admissibleQc, taux, creditQc: admissibleQc * taux, plafondFed, deduction };
   }
 
-  const Calc = { CELIAPP, celiappParAn, P2026, P2027, parametres, utiliserAnnee, avecAnnee, parametresActifs: () => PAR, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, SUPERVISION_MAX_APRES_MIDI, partAssiduite, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { CELIAPP, celiappParAn, ACTES, CNESST, valeurActes, supervisionOuVisites, demiJourneeActes, P2026, P2027, parametres, utiliserAnnee, avecAnnee, parametresActifs: () => PAR, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, SUPERVISION_MAX_APRES_MIDI, partAssiduite, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil, fraisGarde };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

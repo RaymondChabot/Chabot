@@ -135,42 +135,44 @@
     <!-- ============ REVENU ============ -->
     <section class="vue" id="v-revenu" aria-labelledby="h-revenu" hidden>
       <header class="tete-page"><a class="retour-resume detail-seul" href="#revenu">Résumé</a><h1 id="h-revenu">Revenu</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
+      <div class="onglets detail-seul" id="rv-onglets"></div>
       <div class="segment parcours" id="rv-parcours"></div>
-      <div class="choix-milieu pratique-seule detail-seul">
+      <div class="choix-milieu pratique-seule detail-seul" data-sous="detail">
         <label for="rv-milieu">Pratique principale</label>
         <div class="saisie"><select id="rv-milieu"></select></div>
         <p class="aide" id="rv-milieu-aide"></p>
       </div>
-      <div class="segment pratique-seule detail-seul" id="rv-mode"></div>
+      <div class="segment pratique-seule detail-seul" id="rv-mode" data-sous="detail"></div>
       <div class="hero" id="rv-hero"></div>
       <div class="tuiles quatre resume-seul" id="rv-r-tuiles"></div>
-      <div class="carte residence-seule detail-seul" id="rv-residence" hidden>
+      <div class="carte residence-seule detail-seul" id="rv-residence" data-sous="detail" hidden>
         <div class="carte-tete"><h2>Votre résidence</h2><button type="button" class="lien-carte" data-feuille="residence">Modifier</button></div>
         <div class="rangees" id="rv-residence-detail"></div>
         <p class="aide" id="rv-residence-note"></p>
       </div>
       <div class="carte demi resume-seul pratique-seule" id="rv-r-sources"></div>
       <div class="carte demi resume-seul pratique-seule" id="rv-r-sens"></div>
+      <div class="carte resume-seul" id="rv-r-actes"></div>
       <a class="bouton secondaire large bouton-detail resume-seul" href="#revenu/detail">Voir tout le détail</a>
-      <div class="carte demi pratique-seule detail-seul" id="rv-carte-modes">
+      <div class="carte demi pratique-seule detail-seul" id="rv-carte-modes" data-sous="detail">
         <div class="carte-tete"><h2>Comparer les modes</h2></div>
         <div id="rv-comparaison"></div>
         <p class="aide" id="rv-seuil"></p>
       </div>
-      <div class="carte demi pratique-seule detail-seul" id="rv-carte-faits">
+      <div class="carte demi pratique-seule detail-seul" id="rv-carte-faits" data-sous="detail">
         <div class="carte-tete"><h2>Votre année en chiffres</h2></div>
         <div class="rangees" id="rv-faits"></div>
       </div>
-      <div class="carte demi pratique-seule detail-seul" id="rv-carte-activites">
+      <div class="carte demi pratique-seule detail-seul" id="rv-carte-activites" data-sous="detail">
         <div class="carte-tete"><h2>Activités en établissement</h2></div>
         <div id="rv-activites"></div>
         <div class="actions"><button type="button" class="bouton secondaire" id="rv-ajout-activite">Ajouter une activité</button></div>
       </div>
-      <div class="carte demi detail-seul" id="rv-carte-autres">
+      <div class="carte demi detail-seul" id="rv-carte-autres" data-sous="detail">
         <div class="carte-tete"><h2>Autres revenus</h2><button type="button" class="lien-carte" id="rv-autres-modifier">Modifier</button></div>
         <div id="rv-autres"></div>
       </div>
-      <div class="carte pratique-seule detail-seul" id="rv-carte-sens">
+      <div class="carte pratique-seule detail-seul" id="rv-carte-sens" data-sous="detail">
         <div class="carte-tete"><h2 id="rv-sens-titre">Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>
         <div class="legende" id="rv-sens-legende"></div>
         <div class="graphique" id="rv-sens-graph"></div>
@@ -181,13 +183,44 @@
         </div>
         <p class="aide" id="rv-sens-note"></p>
       </div>
-      <div class="carte pratique-seule detail-seul" id="rv-carte-source">
+      <div class="carte pratique-seule detail-seul" id="rv-carte-source" data-sous="detail">
         <div class="carte-tete"><h2>D'où vient le revenu</h2></div>
         <div id="rv-barres"></div>
         <div class="legende" id="rv-legende"></div>
         <div class="tableau-defile"><table class="tableau" id="rv-detail"></table></div>
       </div>
-      <div class="carte detail-seul" id="rv-residence-ajout" hidden>
+      <!-- Comparer les actes : un sous-onglet du détail. -->
+      <div class="carte detail-seul" id="rv-carte-supervision" data-sous="actes">
+        <div class="carte-tete"><h2>Supervision ou visites des apprenants</h2><div class="segment petit compact" id="rv-sup-moment"></div></div>
+        <p class="aide" id="rv-sup-intro"></p>
+        <div class="champs-rapides" id="rv-sup-champs"></div>
+        <div class="rangees" id="rv-sup-resultat"></div>
+        <p class="conclusion" id="rv-sup-conclusion"></p>
+        <div class="actions" id="rv-sup-actions"></div>
+        <div class="tableau-defile"><table class="tableau" id="rv-sup-table"></table></div>
+      </div>
+      <div class="carte detail-seul" id="rv-carte-actes" data-sous="actes">
+        <div class="carte-tete"><h2>Ce que rapporte chaque acte</h2></div>
+        <div class="choix-actes"><div class="segment petit" id="rv-actes-lieu"></div><div class="segment petit" id="rv-actes-palier"></div></div>
+        <h3>Par acte</h3>
+        <div class="tableau-defile"><table class="tableau" id="rv-actes-table"></table></div>
+        <h3>À l'heure, selon la durée</h3>
+        <div class="tableau-defile"><table class="tableau" id="rv-actes-heure"></table></div>
+        <p class="aide" id="rv-actes-note"></p>
+      </div>
+      <div class="carte detail-seul" id="rv-carte-demijournee" data-sous="actes">
+        <div class="carte-tete"><h2>Ma demi-journée</h2><button type="button" class="lien-carte" id="rv-dj-plan">Selon mon plan</button></div>
+        <p class="aide" id="rv-dj-intro"></p>
+        <div class="champs-rapides" id="rv-dj-champs"></div>
+        <div class="rangees" id="rv-dj-resultat"></div>
+        <p class="conclusion" id="rv-dj-conclusion"></p>
+      </div>
+      <div class="carte detail-seul" id="rv-carte-cnesst" data-sous="actes">
+        <div class="carte-tete"><h2>Formulaires de la CNESST</h2></div>
+        <div class="tableau-defile"><table class="tableau" id="rv-cnesst"></table></div>
+        <p class="aide" id="rv-cnesst-note"></p>
+      </div>
+      <div class="carte detail-seul" id="rv-residence-ajout" data-sous="detail" hidden>
         <div class="carte-tete"><h2 id="rv-residence-ajout-titre">En résidence ?</h2></div>
         <p class="aide" id="rv-residence-ajout-texte">Ajoutez votre salaire de résident (échelle de la FMRQ) et la date de début de votre pratique : l'app montre l'une ou l'autre, et vos projections passent de la résidence à la pratique à cette date.</p>
         <div class="actions"><button type="button" class="bouton secondaire" id="rv-residence-ajouter">Ajouter ma résidence</button></div>
