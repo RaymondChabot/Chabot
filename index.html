@@ -283,7 +283,12 @@
       <div class="segment detail-seul" id="bu-vue"></div>
       <div class="hero" id="bu-hero"></div>
       <div class="tuiles quatre resume-seul" id="bu-r-tuiles"></div>
-      <div class="carte resume-seul" id="bu-r-depenses"></div>
+      <div class="carte resume-seul" id="bu-r-depenses">
+        <div class="carte-tete"><h2>Dépenses du mois</h2><a class="lien-carte" href="#budget/mois">Détail</a></div>
+        <div id="bu-r-editeur" hidden></div>
+        <div id="bu-r-barres"></div>
+        <div class="actions" id="bu-r-actions"></div>
+      </div>
       <div class="carte demi resume-seul" id="bu-r-dettes"></div>
       <div class="carte demi resume-seul" id="bu-r-annee"></div>
       <a class="bouton secondaire large bouton-detail resume-seul" href="#budget/detail">Voir tout le détail</a>
@@ -298,14 +303,14 @@
         <div class="rangees" id="bu-surplus"></div>
         <p class="aide" id="bu-surplus-note"></p>
       </div>
-      <div class="carte demi detail-seul" data-sous="mois">
-        <div class="carte-tete"><h2>Reste à dépenser librement</h2><span class="carte-sous">Par mois, votre part</span></div>
+      <details class="carte demi carte-repliable detail-seul" data-sous="mois">
+        <summary><h2>Reste à dépenser librement</h2><span class="repli-resume" id="bu-reste-resume"></span></summary>
         <div id="bu-reste"></div>
-      </div>
-      <div class="carte demi detail-seul" data-sous="mois">
-        <div class="carte-tete"><h2>Bilan du mois</h2><span class="carte-sous">Réel et budget</span></div>
+      </details>
+      <details class="carte demi carte-repliable detail-seul" data-sous="mois">
+        <summary><h2>Bilan du mois</h2><span class="repli-resume" id="bu-bilan-resume"></span></summary>
         <div id="bu-bilan"></div>
-      </div>
+      </details>
       <div class="carte demi detail-seul" data-sous="annee">
         <div class="carte-tete"><h2>Bilan de l'année</h2><div class="segment petit compact" id="bu-annee-choix"></div></div>
         <div id="bu-annee"></div>
@@ -324,7 +329,16 @@
       </div>
       <div class="carte detail-seul" data-sous="mois">
         <div class="carte-tete"><h2>Dépenses</h2><span class="carte-sous">Par mois</span></div>
-        <div class="rangees" id="bu-depenses"></div>
+        <div class="actions" id="bu-detail-actions"></div>
+        <div id="bu-simple" hidden></div>
+        <details id="bu-postes">
+          <summary>Chaque poste</summary>
+          <div class="rangees" id="bu-depenses"></div>
+          <details class="repli-liste" id="bu-cats-vides">
+            <summary>Catégories sans montant</summary>
+            <div class="rangees" id="bu-depenses-vides"></div>
+          </details>
+        </details>
       </div>
       <div class="carte detail-seul" data-sous="annee">
         <div class="carte-tete"><h2>Dépenses annuelles</h2><button type="button" class="lien-carte" id="bu-annuelles-modifier">Calendrier</button></div>

@@ -237,6 +237,26 @@ async function budget(b, base) {
   const a = await p.evaluate(() => ({ annee: document.getElementById("bu-annee").textContent.replace(/\s/g, " "), bilan: document.getElementById("bu-bilan").textContent }));
   verifier("bilan de l'année : mois notés et mois le plus cher", a.annee.includes("2 mois notés") && a.annee.includes("Mois le plus cher"), a.annee);
   verifier("report par catégorie : Alimentation", a.bilan.includes("Report par catégorie") && a.bilan.includes("Alimentation"), a.bilan);
+  await allerA(p, "budget/mois");
+  const calme = await p.evaluate(() => ({
+    titres: [...document.querySelectorAll("#bu-depenses .rangee")].filter(x => x.offsetParent).map(x => x.querySelector(".rangee-titre").textContent),
+    vides: document.getElementById("bu-cats-vides").open,
+    reste: document.getElementById("bu-reste").closest("details").open,
+    bilan: document.getElementById("bu-bilan-resume").textContent,
+  }));
+  verifier("budget : les catégories vides et le bilan sont repliés", !calme.vides && !calme.reste && calme.titres.includes("Logement") && !calme.titres.includes("Enfants") && calme.bilan.length > 3, calme);
+  await allerA(p, "budget");
+  const avant = await p.evaluate(() => Math.round(window.Wealthnord.resultats().depMoi));
+  await p.click("#bu-passer-estimation"); await p.waitForTimeout(300);
+  const estime = await p.evaluate(() => { const S = window.Wealthnord.etat();
+    return { actif: S.budgetSimple.actif, reste: S.budgetSimple.reste, dep: Math.round(window.Wealthnord.resultats().depMoi),
+      loyer: document.getElementById("bu-loyer-resume").value, vu: !!document.getElementById("bu-r-editeur").offsetParent }; });
+  verifier("budget : l'estimation reprend le loyer et le reste, sans changer le total", estime.actif && estime.vu && estime.loyer === "1800" && estime.reste === avant - 1800 && estime.dep === avant, { estime, avant });
+  await p.fill("#bu-reste-resume", "1000"); await p.waitForTimeout(400);
+  verifier("budget : changer le reste change les dépenses du mois", await p.evaluate(() => Math.round(window.Wealthnord.resultats().depMoi) === 2800));
+  await p.click("#bu-revenir-detail"); await p.waitForTimeout(300);
+  const retour = await p.evaluate(() => ({ actif: window.Wealthnord.etat().budgetSimple.actif, dep: Math.round(window.Wealthnord.resultats().depMoi), bouton: !!document.getElementById("bu-passer-estimation") }));
+  verifier("budget : le détail de chaque poste revient, avec le même total", !retour.actif && retour.dep === avant && retour.bouton, { retour, avant });
   verifier("budget : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
@@ -915,7 +935,9 @@ async function resumeDetail(b, base) {
     await p.click(`#v-${pg} .bouton-detail`); await p.waitForTimeout(250);
     const d = await vus(pg);
     verifier(`détail : ${pg} montre tout, sans le résumé`, d.detail && d.resume === 0 && d.details >= 3 && d.adresse.startsWith(`#${pg}/`), d);
-    verifier(`résumé : ${pg} tient en moins de place que le détail`, r.hauteur < d.hauteur * 0.75, { resume: r.hauteur, detail: d.hauteur });
+    // Budget : le détail du mois replie le bilan et les catégories vides, il reste donc proche du résumé.
+    const plafond = pg === "budget" ? 1 : 0.75;
+    verifier(`résumé : ${pg} tient en moins de place que le détail`, r.hauteur < d.hauteur * plafond, { resume: r.hauteur, detail: d.hauteur });
     await p.click(`#v-${pg} .retour-resume`); await p.waitForTimeout(250);
     const retour = await vus(pg);
     verifier(`résumé : « Résumé » ramène au résumé de ${pg}`, !retour.detail && retour.details === 0 && retour.adresse === "#" + pg, retour);

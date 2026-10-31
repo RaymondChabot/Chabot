@@ -257,6 +257,9 @@ main {
 .carte-repliable[open] > summary { margin-bottom: 14px; }
 .repli-resume { grid-column: 1; font-size: 0.88rem; color: var(--discret); margin-top: 2px; }
 .carte-repliable > :not(summary) + :not(summary) { margin-top: 12px; }   /* l'espace qu'aurait donné la carte en colonne */
+#bu-postes > summary, .repli-liste > summary { list-style: none; cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--discret); font-size: 0.92rem; }
+#bu-postes > summary::-webkit-details-marker, .repli-liste > summary::-webkit-details-marker { display: none; }
+.repli-liste { margin-top: 4px; }
 .carte-sous { font-size: 0.82rem; color: var(--discret); }
 .lien-carte {
   border: 0; background: none; padding: 0; cursor: pointer; text-decoration: none;

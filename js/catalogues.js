@@ -102,6 +102,8 @@
     },
     // Catégories du budget où l'on inscrit un seul total plutôt que le détail.
     budgetTotaux: {},
+    // Estimation : le loyer, puis tout le reste en un seul montant. Le détail des postes reste gardé.
+    budgetSimple: { actif: false, reste: 0, qui: "moi" },
     // Objectifs d'épargne (montant et date) ; relevés de la valeur nette et plan de référence.
     objectifs: [],
     suivi: { reference: null, instantanes: [] },

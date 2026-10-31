@@ -14,10 +14,20 @@ window.Verrou.quandOuvert(function () {
 
   // Dépenses prises en compte : les lignes, sauf dans les catégories où l'on a choisi un total.
   const totalActif = g => S.budgetTotaux && S.budgetTotaux[g] && S.budgetTotaux[g].actif;
-  const depensesEffectives = () => [
+  const depensesDuDetail = () => [
     ...S.budget.filter(b => !totalActif(categorie(b))),
     ...Object.entries(S.budgetTotaux || {}).filter(([, t]) => t.actif).map(([g, t]) => ({ id: "total-" + g, k: null, cat: g, nom: g + " (total)", montant: +t.montant || 0, periode: "mois", qui: t.qui || "moi" })),
   ];
+  // Estimation : le loyer, plus un seul montant pour tout le reste. Les postes détaillés restent en mémoire.
+  const budgetSimpleActif = () => !!(S.budgetSimple && S.budgetSimple.actif);
+  const depensesEffectives = () => {
+    if (!budgetSimpleActif()) return depensesDuDetail();
+    const qui = S.budgetSimple.qui || "moi";
+    return [
+      ...S.budget.filter(b => b.k === "loyer"),
+      { id: "simple-reste", k: null, cat: "Autres dépenses", nom: "Le reste des dépenses", montant: Math.max(0, +S.budgetSimple.reste || 0), periode: "mois", qui },
+    ];
+  };
 
   /* ---------- État ---------- */
   const clone = o => JSON.parse(JSON.stringify(o));
@@ -1005,7 +1015,9 @@ window.Verrou.quandOuvert(function () {
     else action("important", `Mettez ${pct((R.impot.total + R.primeMoi) / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$((R.impot.total + R.primeMoi) / 12)} par mois.`);
     // Après l'assistant : ce qu'il reste à entrer.
     if (S.meta.assistant) {
-      if (depensesEffectives().filter(b => b.montant > 0 && b.k !== "loyer").length < 3) action("important", "Entrez vos dépenses du mois (page Budget) : épicerie, électricité, assurances, transport… Sans elles, le surplus est surestimé.");
+      const depensesInsuffisantes = budgetSimpleActif() ? !(S.budgetSimple.reste > 0) && !S.budget.some(b => b.k === "loyer" && b.montant > 0)
+        : depensesEffectives().filter(b => b.montant > 0 && b.k !== "loyer").length < 3;
+      if (depensesInsuffisantes) action("important", "Entrez vos dépenses du mois (page Budget) : le loyer et le reste, ou chaque poste. Sans elles, le surplus est surestimé.");
       if (!R.vueResidence && (S.revenu.activites || []).some(x => x.calcul !== "patients" && ACTIVITES[x.type] && x.parJour === ACTIVITES[x.type].parJour))
         action("info", "Vérifiez le revenu par jour de vos activités en établissement (page Revenu) : les valeurs de départ sont indicatives.");
       if (!S.epargne.encaisse && !S.epargne.reer.solde && !S.epargne.celi.solde && !S.epargne.reer.droits) action("info", "Ajoutez votre épargne et vos droits REER (page Patrimoine, bouton Modifier).");
@@ -2010,24 +2022,34 @@ window.Verrou.quandOuvert(function () {
       { titre: "Total", cls: "total", valeur: $(V.rev) },
     ]);
     rendreAnnuelles(); rendreFlux(R); rendreTresorerie(R); rendreReste(R); rendreBilanMois(R); rendreBilanAnnee(R);
-    // Dépenses : une rangée par catégorie ; toucher ouvre ses cases.
+    rendreEstimationBudget();
+    // Dépenses : une rangée par catégorie ; toucher ouvre ses cases. Les catégories vides restent repliées.
     const cats = [...CATALOGUE.map(x => x.cat), "Autres dépenses"];
     // Ce qu'une catégorie coûte par mois, dans la vue choisie (vous, partenaire, ménage).
-    const valeurCat = g => { if (totalActif(g)) { const t = depensesEffectives().find(b => b.id === "total-" + g); return mensuel(t) * qui(t); }
+    const valeurCat = g => { if (totalActif(g)) { const t = depensesDuDetail().find(b => b.id === "total-" + g); return t ? mensuel(t) * qui(t) : 0; }
       return S.budget.filter(b => categorie(b) === g).reduce((t, b) => t + mensuel(b) * qui(b), 0); };
     resumeBudget(R, V, cats.map(g => [g, valeurCat(g)]));
+    const lignesCat = cats.map(g => {
+      if (totalActif(g)) { const t = depensesDuDetail().find(b => b.id === "total-" + g); const v = t ? mensuel(t) * qui(t) : 0;
+        return { titre: g, sous: "Total estimé", valeur: $(v), action: () => feuilleCategorie(g), vide: v < 0.5 }; }
+      const l = S.budget.filter(b => categorie(b) === g);
+      const n = l.filter(b => b.montant > 0).length;
+      const v = l.reduce((s, b) => s + mensuel(b) * qui(b), 0);
+      return { titre: g, sous: n ? `${n} dépense${n > 1 ? "s" : ""}` : "Rien d'inscrit", valeur: n ? $(v) : "—", cls: n ? null : "vide", vide: !n, action: () => feuilleCategorie(g) };
+    });
     rangees("bu-depenses", [
-      ...cats.map(g => {
-        if (totalActif(g)) { const t = depensesEffectives().find(b => b.id === "total-" + g); const v = mensuel(t) * qui(t);
-          return { titre: g, sous: "Total estimé", valeur: $(v), action: () => feuilleCategorie(g) }; }
-        const l = S.budget.filter(b => categorie(b) === g);
-        const n = l.filter(b => b.montant > 0).length;
-        const v = l.reduce((s, b) => s + mensuel(b) * qui(b), 0);
-        return { titre: g, sous: n ? `${n} dépense${n > 1 ? "s" : ""}` : "Rien d'inscrit", valeur: n ? $(v) : "—", cls: n ? null : "vide", action: () => feuilleCategorie(g) };
-      }),
+      ...lignesCat.filter(x => !x.vide),
       { titre: vue === "conjointe" ? "Son épargne" : "Épargne : REEE, REER, CELI, objectifs", sous: vue === "conjointe" ? "Bouton Ménage" : vue === "menage" && R.epargneConjointe ? `La vôtre et celle de ${votreP()}` : "Page Patrimoine", valeur: $(V.epargne) },
       { titre: "Total des dépenses et de l'épargne", cls: "total", valeur: $(V.dep + V.epargne) },
     ]);
+    const vides = lignesCat.filter(x => x.vide);
+    const detVides = document.getElementById("bu-cats-vides");
+    detVides.hidden = vides.length === 0;
+    if (vides.length) { detVides.querySelector("summary").textContent = `Catégories sans montant (${nb(vides.length, 0)})`; rangees("bu-depenses-vides", vides); }
+    const postes = document.getElementById("bu-postes");
+    const simple = budgetSimpleActif();
+    postes.open = !simple;
+    postes.querySelector("summary").textContent = simple ? "Chaque poste, sans l'utiliser dans le calcul" : "Les catégories";
     rangees("bu-dettes", [
       ...S.dettes.map((d, i) => {
         const fin = R.sim.dettes[i] && R.sim.dettes[i].fin;
@@ -2112,13 +2134,63 @@ window.Verrou.quandOuvert(function () {
       : "Même avec cet ajout, la marge n'est jamais remboursée.";
   }
 
-  // Budget : le mois en tuiles ; les dépenses par catégorie ; les dettes ; l'année (trésorerie, dépenses annuelles).
+  // Estimation du mois : deux champs stables (le focus reste pendant la saisie).
+  function monterEditeurBudget(id, suffix) {
+    const z = document.getElementById(id);
+    if (z.dataset.monte !== "1") {
+      z.dataset.monte = "1"; z.textContent = "";
+      z.appendChild(el("p", "aide", "Le loyer, puis tout le reste en un seul montant par mois. Épicerie, transport, assurances : inutile de les séparer pour commencer."));
+      const g = el("div", "champs-rapides");
+      const champ = (cle, label, ecrire) => g.appendChild(creerChamp({ l: label, u: "$/mois", s: 50 }, cle, inp => {
+        inp.addEventListener("input", () => { const v = valeur(inp); if (v === null) return; ecrire(v); S.meta.exemple = false; plusTard(); });
+      }, false));
+      champ("bu-loyer-" + suffix, "Loyer", v => { const l = S.budget.find(b => b.k === "loyer"); if (l) l.montant = v; });
+      champ("bu-reste-" + suffix, "Le reste des dépenses", v => { S.budgetSimple = { ...(S.budgetSimple || {}), actif: true, reste: v, qui: (S.budgetSimple || {}).qui || "moi" }; });
+      z.appendChild(g);
+    }
+    const loyer = S.budget.find(b => b.k === "loyer");
+    const a = document.getElementById("bu-loyer-" + suffix), r = document.getElementById("bu-reste-" + suffix);
+    if (a && a !== document.activeElement && loyer) a.value = String(loyer.montant || 0);
+    if (r && r !== document.activeElement) r.value = String((S.budgetSimple && S.budgetSimple.reste) || 0);
+  }
+  function montantHorsLoyer() {
+    return Math.round(depensesDuDetail().filter(b => b.k !== "loyer").reduce((t, b) => t + mensuel(b), 0));
+  }
+  function choisirNiveauBudget(niveau) {
+    S.budgetSimple = { actif: niveau === "estimation", reste: (S.budgetSimple && S.budgetSimple.reste) || 0, qui: (S.budgetSimple && S.budgetSimple.qui) || "moi" };
+    if (niveau === "estimation" && !(S.budgetSimple.reste > 0)) S.budgetSimple.reste = montantHorsLoyer();
+    S.meta.exemple = false; sauver(); tout();
+  }
+  function rendreEstimationBudget() {
+    const simple = budgetSimpleActif();
+    const detail = document.getElementById("bu-simple");
+    detail.hidden = !simple;
+    if (simple) monterEditeurBudget("bu-simple", "detail");
+    const actions = document.getElementById("bu-detail-actions");
+    actions.textContent = "";
+    const b = el("button", "bouton secondaire", simple ? "Détailler chaque poste" : "Estimer : loyer et le reste");
+    b.type = "button"; b.id = simple ? "bu-detail-revenir" : "bu-detail-estimer";
+    b.addEventListener("click", () => choisirNiveauBudget(simple ? "detail" : "estimation"));
+    actions.appendChild(b);
+  }
+  // Budget : le mois en tuiles ; les dépenses (estimation ou catégories) ; les dettes ; l'année.
   function resumeBudget(R, V, parCat) {
     tuilesResume("bu-r-tuiles", [{ titre: "Revenus nets", valeur: $(V.rev), sous: "Par mois" }, { titre: "Dépenses", valeur: $(V.dep), sous: "Par mois" },
       { titre: "Dettes", valeur: $(V.dettes), sous: "Paiements par mois" }, { titre: "Épargne", valeur: $(V.epargne), sous: "Par mois" }]);
-    const l = parCat.filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]), reste = l.slice(5).reduce((t, [, v]) => t + v, 0);
-    carteResume("bu-r-depenses", "Dépenses par catégorie", ["Détail", "#budget/mois"],
-      l.length ? miniBarres([...l.slice(0, 5), ...(reste > 0.5 ? [["Les autres", reste]] : [])]) : "Aucune dépense inscrite : ajoutez-les dans le détail.");
+    const simple = budgetSimpleActif();
+    const ed = document.getElementById("bu-r-editeur"), barres = document.getElementById("bu-r-barres"), actions = document.getElementById("bu-r-actions");
+    ed.hidden = !simple; barres.hidden = simple;
+    if (simple) monterEditeurBudget("bu-r-editeur", "resume");
+    else {
+      const l = parCat.filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]), reste = l.slice(4).reduce((t, [, v]) => t + v, 0);
+      barres.textContent = "";
+      barres.appendChild(l.length ? miniBarres([...l.slice(0, 4), ...(reste > 0.5 ? [["Les autres", reste]] : [])]) : el("p", "aide", "Aucune dépense inscrite."));
+    }
+    actions.textContent = "";
+    const b = el("button", "bouton secondaire", simple ? "Détailler chaque poste" : "Estimer : loyer et le reste");
+    b.type = "button"; b.id = simple ? "bu-revenir-detail" : "bu-passer-estimation";
+    b.addEventListener("click", () => choisirNiveauBudget(simple ? "detail" : "estimation"));
+    actions.appendChild(b);
     carteResume("bu-r-dettes", "Dettes", ["Plan", "#budget/dettes"], rangees(el("div"), S.dettes.length ? [
       { titre: "Total aujourd'hui", sous: `${S.dettes.length} dette${S.dettes.length > 1 ? "s" : ""}`, valeur: $(R.detteTotale) },
       { titre: "Plus aucune dette", sous: `Méthode ${NOMS_METHODES[R.methode].toLowerCase()}`, valeur: R.sim.libre ? moisAn(R.sim.libre) : "jamais" },
@@ -2345,6 +2417,8 @@ window.Verrou.quandOuvert(function () {
     z.appendChild(el("p", "aide" + (x.libre < 0 ? " avertissement" : ""), x.libre < 0
       ? "Vos dépenses fixes, vos dettes et votre épargne dépassent votre revenu net : revoyez-les avant tout."
       : `Vous y avez prévu ${$(x.variables)} de dépenses variables (épicerie, essence, sorties…). Ce que vous ne dépensez pas va aux dettes, puis au placement : c'est votre surplus de ${$(Math.max(0, R.surplusMoi))}.`));
+    const rs = document.getElementById("bu-reste-resume");
+    if (rs) rs.textContent = x.libre < 0 ? "Au-dessus du revenu" : `${$(x.libre)} par mois`;
   }
 
   /* ============================================================
@@ -2410,6 +2484,8 @@ window.Verrou.quandOuvert(function () {
     }
     const a = el("div", "actions"), bt = el("button", "bouton secondaire", (S.bilans || []).some(b => b.mois === passe && (b.recu != null || b.depense != null)) ? `Revoir le bilan de ${nomMois(passe)}` : `Faire le bilan de ${nomMois(passe)}`);
     bt.type = "button"; bt.addEventListener("click", () => feuilleBilan(passe)); a.appendChild(bt); z.appendChild(a);
+    const br = document.getElementById("bu-bilan-resume");
+    if (br) br.textContent = l.length ? nomMois(l[0].mois) : "Pas encore noté";
   }
 
   /* ============================================================
