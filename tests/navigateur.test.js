@@ -240,15 +240,18 @@ async function budget(b, base) {
   await ctx.close();
 }
 
-/* 10. Logo : l'arbre à côté du nom ; au clic, le sceau 0,3 seconde, puis l'accueil. */
+/* 10. Logo : le lion à côté du nom (étoile) ; au clic, la séquence du sceau, puis l'accueil. */
 async function logo(b, base) {
   const { ctx, p, erreurs } = await ouvrir(b, base, { page: "budget" });
-  verifier("en-tête : l'arbre seul", await p.evaluate(() => document.querySelector(".barre-haut .marque-ico use").getAttribute("href") === "#wm-arbre"));
+  verifier("en-tête : le lion seul", await p.evaluate(() => document.querySelector(".barre-haut .marque-ico use").getAttribute("href") === "#wm-lion"));
+  verifier("nom : une étoile entre Wealth et Morand", await p.evaluate(() => !!document.querySelector("#wm-nom .etoile")));
+  const motifs = await p.evaluate(() => [...document.querySelectorAll(".ouverture .motif")].map(n => n.getAttribute("class")));
+  verifier("ouverture : six motifs, le lion en dernier", motifs.join("|") === "motif motif-cedre|motif motif-balance|motif motif-boussole|motif motif-cerf|motif motif-racines|motif motif-lion", motifs);
   await p.click(".barre-haut a.marque");
-  const pendant = await p.evaluate(() => new Promise(r => setTimeout(() => r(document.querySelector(".ouverture").classList.contains("eclair")), 150)));
-  await p.waitForTimeout(600);
-  const apres = await p.evaluate(() => ({ eclair: document.querySelector(".ouverture").classList.contains("eclair"), page: location.hash }));
-  verifier("logo : sceau au clic, puis l'accueil", pendant && !apres.eclair && apres.page === "#apercu", apres);
+  const pendant = await p.evaluate(() => new Promise(r => setTimeout(() => r(document.querySelector(".ouverture").classList.contains("joue")), 80)));
+  await p.waitForTimeout(1600);
+  const apres = await p.evaluate(() => ({ joue: document.querySelector(".ouverture").classList.contains("joue"), page: location.hash }));
+  verifier("logo : animation au clic, puis l'accueil", pendant && !apres.joue && apres.page === "#apercu", apres);
   verifier("logo : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }

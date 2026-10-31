@@ -3408,15 +3408,18 @@ window.Verrou.quandOuvert(function () {
     ouvrir(location.hash.slice(1));
   });
   // Le logo mène à l'accueil, même si on y est déjà (retour en haut).
-  // Avant, le sceau s'affiche 0,3 seconde, comme à l'ouverture de l'app.
+  // La même séquence qu'à l'ouverture : les motifs défilent, le sceau reste, on termine sur le lion.
   const ecranSceau = document.querySelector(".ouverture");
   let finSceau = null;
+  function jouerOuverture() {
+    document.documentElement.classList.remove("avec-ouverture");
+    ecranSceau.classList.remove("joue"); void ecranSceau.offsetWidth; ecranSceau.classList.add("joue");
+    clearTimeout(finSceau); finSceau = setTimeout(() => ecranSceau.classList.remove("joue"), 1400);
+  }
   document.querySelectorAll("a.marque").forEach(a => a.addEventListener("click", e => {
     e.preventDefault();
-    document.documentElement.classList.remove("avec-ouverture");   // l'écran d'ouverture ne repart pas ensuite
-    ecranSceau.classList.remove("eclair"); void ecranSceau.offsetWidth; ecranSceau.classList.add("eclair");
-    setTimeout(() => ouvrir("apercu"), 120);
-    clearTimeout(finSceau); finSceau = setTimeout(() => ecranSceau.classList.remove("eclair"), 500);
+    jouerOuverture();
+    ouvrir("apercu");
   }));
 
   /* ============================================================
@@ -4134,7 +4137,7 @@ window.Verrou.quandOuvert(function () {
   // Un lien de transfert passe avant l'assistant : les données arrivent d'un autre appareil.
   let dejaVu = true;
   try { dejaVu = !!localStorage.getItem(CLE) || !!localStorage.getItem(ASSISTANT_VU); } catch (e) { /* stockage indisponible */ }
-  const apresOuverture = document.documentElement.classList.contains("avec-ouverture") ? 1300 : 0;
+  const apresOuverture = document.documentElement.classList.contains("avec-ouverture") ? 1400 : 0;
   if (transfertRecu) setTimeout(() => recevoirTransfert(transfertRecu), apresOuverture);
   else if (!dejaVu) setTimeout(ouvrirAssistant, apresOuverture);
   if (typeof ResizeObserver !== "undefined") {

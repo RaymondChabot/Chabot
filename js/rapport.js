@@ -81,7 +81,7 @@ window.Verrou.quandOuvert(function () {
   const kpi = (titre, valeur, sous, cls) => `<div class="rp-kpi ${cls || ""}"><span>${esc(titre)}</span><strong>${esc(valeur)}</strong>${sous ? `<em>${esc(sous)}</em>` : ""}</div>`;
   const tableau = (entetes, rangs, cls) => `<table class="rp-table ${cls || ""}"><thead><tr>${entetes.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${
     rangs.map(r => `<tr class="${r.cls || ""}">${r.c.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
-  const marque = `<svg class="rp-logo" aria-hidden="true"><use href="#wm-arbre-i"/></svg>`;
+  const marque = `<svg class="rp-logo" aria-hidden="true"><use href="#wm-lion-i"/></svg>`;
   const page = (titre, intro, contenu) => `<section class="rp-page">
     <header class="rp-tete">${marque}<svg class="rp-nom" aria-hidden="true"><use href="#wm-nom"/></svg><span class="rp-tete-titre">${esc(titre)}</span></header>
     <h1>${esc(titre)}</h1>${intro ? `<p class="rp-intro">${esc(intro)}</p>` : ""}${contenu}</section>`;

@@ -135,31 +135,48 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 /* Le logo vit dans un sprite (en haut de index.html) : symboles teints par la couleur du texte. */
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .marque { display: inline-flex; align-items: center; gap: 11px; min-width: 0; color: var(--marque); text-decoration: none; border-radius: 12px; }
-/* Téléphone : l'arbre et le nom prennent toute la largeur et grandissent avec l'écran (jusqu'à 440 px de
-   large) ; le nom remplit la place à droite de l'arbre (rapport 1200 / 78, losange compris). */
-.marque-ico { height: clamp(38px, 12vw, 54px); width: auto; aspect-ratio: 288 / 342; flex: none; }
+/* Téléphone : le lion et le nom prennent toute la largeur et grandissent avec l'écran (jusqu'à 440 px de
+   large) ; le nom remplit la place à droite du lion (rapport 1200 / 78, étoile comprise). */
+.marque-ico { height: clamp(38px, 12vw, 54px); width: auto; aspect-ratio: 263 / 202; flex: none; }
 .marque-nom { flex: 1 1 0; min-width: 0; width: auto; height: auto; aspect-ratio: 1200 / 78; }
 .barre-haut { gap: 10px; }
 .barre-haut .marque { display: flex; flex: 1 1 auto; max-width: 440px; gap: clamp(9px, 2.8vw, 13px); }
 
-/* Écran d'ouverture : le sceau apparaît, puis s'efface (une fois par session, sans bloquer les clics). */
+/* Écran d'ouverture : le sceau reste fixe, seul le motif du centre change
+   (cèdre, balance, rose des vents, cerf, arbre, lion), puis l'app paraît.
+   Même séquence au clic sur le logo. Ne bloque pas les clics. */
 .ouverture { display: none; }
-.avec-ouverture .ouverture {
+.avec-ouverture .ouverture,
+.ouverture.joue {
   position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
   background: var(--fond); color: var(--marque); pointer-events: none;
-  animation: ouverture-fin 0.45s ease 1s forwards;
+  animation: ouverture-fin 0.4s ease 0.86s forwards;
 }
-.ouverture-sceau { width: min(56vw, 230px); height: min(56vw, 230px); animation: ouverture-sceau 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.ouverture-sceau { width: min(56vw, 230px); height: min(56vw, 230px); animation: ouverture-sceau 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.ouverture .motif { opacity: 0; }
+.avec-ouverture .motif-cedre, .ouverture.joue .motif-cedre { animation: motif-passe 130ms steps(1, end) 0ms forwards; }
+.avec-ouverture .motif-balance, .ouverture.joue .motif-balance { animation: motif-passe 130ms steps(1, end) 130ms forwards; }
+.avec-ouverture .motif-boussole, .ouverture.joue .motif-boussole { animation: motif-passe 130ms steps(1, end) 260ms forwards; }
+.avec-ouverture .motif-cerf, .ouverture.joue .motif-cerf { animation: motif-passe 130ms steps(1, end) 390ms forwards; }
+.avec-ouverture .motif-racines, .ouverture.joue .motif-racines { animation: motif-passe 130ms steps(1, end) 520ms forwards; }
+.avec-ouverture .motif-lion, .ouverture.joue .motif-lion { animation: motif-reste 1ms linear 650ms forwards; }
+@keyframes motif-passe { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes motif-reste { to { opacity: 1; } }
 @keyframes ouverture-fin { to { opacity: 0; visibility: hidden; } }
 @keyframes ouverture-sceau { from { opacity: 0; transform: scale(0.94); } }
-/* Clic sur le logo : le même écran, 0,3 seconde, pendant que l'accueil s'ouvre derrière. */
-.ouverture.eclair {
-  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
-  background: var(--fond); color: var(--marque); pointer-events: none;
-  animation: ouverture-fin 0.15s ease 0.3s forwards;
+@media (prefers-reduced-motion: reduce) {
+  .ouverture-sceau,
+  .avec-ouverture .motif-cedre, .ouverture.joue .motif-cedre,
+  .avec-ouverture .motif-balance, .ouverture.joue .motif-balance,
+  .avec-ouverture .motif-boussole, .ouverture.joue .motif-boussole,
+  .avec-ouverture .motif-cerf, .ouverture.joue .motif-cerf,
+  .avec-ouverture .motif-racines, .ouverture.joue .motif-racines,
+  .avec-ouverture .motif-lion, .ouverture.joue .motif-lion { animation: none; }
+  .ouverture .motif { opacity: 0; }
+  .ouverture .motif-lion { opacity: 1; }
+  .avec-ouverture .ouverture,
+  .ouverture.joue { animation: ouverture-fin 0.2s ease 0.2s forwards; }
 }
-.ouverture.eclair .ouverture-sceau { animation: ouverture-sceau 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-@media (prefers-reduced-motion: reduce) { .ouverture-sceau, .ouverture.eclair .ouverture-sceau { animation: none; } }
 /* Verrou : tant que les données chiffrées ne sont pas ouvertes, l'app reste cachée. */
 .verrou { display: none; }
 .verrouille .barre-haut, .verrouille .barre-outils, .verrouille .app, .verrouille .saut { display: none; }
@@ -677,7 +694,7 @@ a.tuile:hover { border-color: var(--trait); }
   .entete-impression { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #d9d7cf; padding-bottom: 8px; margin-bottom: 10px; font-size: 9pt; color: #6f6d66; }
   .ouverture { display: none !important; }
   .marque-imp { display: flex; align-items: center; gap: 8px; color: #b48a4a; }
-  .imp-arbre { width: 20px; height: 24px; }
+  .imp-arbre { width: 26px; height: 20px; }
   .imp-nom { width: 138px; height: 9px; }
   .pied { margin-top: 12px; }
 }
@@ -777,7 +794,7 @@ a.tuile:hover { border-color: var(--trait); }
 .rp-page:last-child { break-after: auto; }
 .rp-tete { display: flex; align-items: center; gap: 7px; font: 500 10.5pt "Newsreader", Georgia, serif; border-bottom: 1px solid #e6e4dd; padding-bottom: 6px; }
 .rp-tete-titre { margin-left: auto; font: 600 7.5pt "Inter", sans-serif; color: #6f6d66; text-transform: uppercase; letter-spacing: 0.09em; }
-.rp-logo { width: 15px; height: 18px; flex: none; color: #b48a4a; }
+.rp-logo { width: 18px; height: 14px; flex: none; color: #b48a4a; }
 .rp-nom { width: 123px; height: 8px; flex: none; color: #b48a4a; }
 .rp-page > h1 { font: 450 23pt/1.1 "Newsreader", Georgia, serif; letter-spacing: -0.01em; margin: 4px 0 0; }
 .rp-intro { color: #45443f; font-size: 9pt; margin: 0; max-width: 92%; }
