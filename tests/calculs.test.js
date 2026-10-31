@@ -110,6 +110,37 @@ const gt = C.revenuGmfu({ ...rev, fraisCabinetPct: 30, fraisCabinetTousModes: tr
 verifier("frais : tous les modes si demandé", gt.horaire.fraisCabinet > 0 && gt.mixte.fraisCabinet > 0);
 verifier("frais : le seuil de l'acte monte avec le pourcentage", gf.seuilActe > g.seuilActe);
 
+/* 7b. Seuils d'une demi-journée : mixte contre horaire (forfait de responsabilité compris), acte contre mixte. */
+const revSeul = { ...rev, residents: 0, externes: 0, enseignement: 0, fraisCabinetPct: 0, fraisCabinetMois: 0, fraisCabinetTousModes: false,
+  mix: { suivi: 100, suiviV: 0, perioV: 0, pedia: 0, gross: 0 }, heuresParDJ: 4, inscritsDebut: 600, annee: "type", patientsParDJ: 5, semaines: 46, demiJournees: 9 };
+const gSeul = C.revenuGmfu(revSeul);
+const tvS = 36.95, pctS = 0.6358, HS = 4, thS = 99.48, fhS = 59.68, parS = tvS * pctS;
+verifier("seuil mixte : sans forfait de responsabilité, même chiffre que l'heure contre les visites",
+  proche(gSeul.seuilMixte, (thS - fhS) * HS / parS, 1e-6) && proche(gSeul.seuilMixte, gSeul.seuilPatients, 1e-9), gSeul.seuilMixte);
+verifier("seuil acte-mixte : le forfait horaire du mixte, divisé par l'écart d'une visite",
+  proche(gSeul.seuilActeMixte, HS * fhS / (tvS - parS), 1e-6), gSeul.seuilActeMixte);
+const auDessus = C.revenuGmfu({ ...revSeul, patientsParDJ: Math.floor(gSeul.seuilMixte + 1e-9) + 1 });
+const enDessous = C.revenuGmfu({ ...revSeul, patientsParDJ: Math.floor(gSeul.seuilMixte + 1e-9) });
+verifier("seuil mixte : dès l'entier au-dessus, le mixte mène ; en dessous, l'horaire",
+  auDessus.demiJourneeClinique.mixte > auDessus.demiJourneeClinique.horaire
+  && enDessous.demiJourneeClinique.horaire >= enDessous.demiJourneeClinique.mixte - 0.02, { auDessus: auDessus.demiJourneeClinique, enDessous: enDessous.demiJourneeClinique });
+const acteDessus = C.revenuGmfu({ ...revSeul, patientsParDJ: Math.floor(gSeul.seuilActeMixte + 1e-9) + 1 });
+verifier("seuil acte-mixte : dès l'entier au-dessus, l'acte mène", acteDessus.demiJourneeClinique.acte > acteDessus.demiJourneeClinique.mixte, acteDessus.demiJourneeClinique);
+const gvS = C.revenuGmfu({ ...revSeul, mix: { suivi: 0, suiviV: 100, perioV: 0, pedia: 0, gross: 0 } });
+const parVuln = 45.20 * pctS, respS = 8.25;
+verifier("seuil mixte : le forfait de responsabilité (8,25 $) repousse le seuil",
+  proche(gvS.seuilMixte, (thS - fhS) * HS / (parVuln - respS), 1e-6) && gvS.seuilMixte > gvS.seuilPatients, gvS.seuilMixte);
+const gfS = C.revenuGmfu({ ...revSeul, fraisCabinetPct: 30 });
+verifier("seuil acte-mixte : 30 % de frais à l'acte seulement le repousse",
+  proche(gfS.seuilActeMixte, HS * fhS / (tvS * 0.7 - parS), 1e-6) && gfS.seuilActeMixte > gSeul.seuilActeMixte, gfS.seuilActeMixte);
+const fixeS = 500 * 12 / (46 * 9);
+const gmS = C.revenuGmfu({ ...revSeul, fraisCabinetMois: 500 });
+verifier("seuil acte-mixte : 500 $ par mois étalés sur les demi-journées de clinique",
+  proche(gmS.seuilActeMixte, (HS * fhS + fixeS) / (tvS - parS), 1e-6), gmS.seuilActeMixte);
+verifier("seuil : les frais exigés dans les trois modes ne déplacent pas le mixte",
+  proche(C.revenuGmfu({ ...revSeul, fraisCabinetPct: 30, fraisCabinetMois: 500, fraisCabinetTousModes: true }).seuilMixte, gSeul.seuilMixte, 1e-6)
+  && proche(C.revenuGmfu({ ...revSeul, fraisCabinetPct: 30, fraisCabinetTousModes: true }).seuilActeMixte, gSeul.seuilActeMixte, 1e-6));
+
 /* 9. SRV et activités en établissement. */
 const gs = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12 });
 verifier("SRV : 12 visites de plus par semaine", gs.nbVisites - g.nbVisites === 12 * 46 && gs.acte.visites > g.acte.visites);

@@ -1007,14 +1007,16 @@ async function tempsQuiPasse(b, base) {
   verifier("temps : aucune erreur", [janvier, aout, refus].every(x => x.erreurs.length === 0), [...janvier.erreurs, ...aout.erreurs, ...refus.erreurs]);
 }
 
-/* 31. Comparer les actes (Revenu, sous-onglet) : supervision ou visites des apprenants, choix appliqué au plan ;
-   durée d'un acte ; ma demi-journée, puis celle du plan ; carte du résumé ; aucun débordement. */
+/* 31. Comparer les actes (Revenu, sous-onglet, GMF-U seulement) : supervision ou visites des apprenants,
+   choix appliqué au plan ; durée d'un acte ; ma demi-journée, puis celle du plan ; carte du résumé ;
+   seuils de rémunération ; hors GMF-U, la section disparaît. Aucun débordement. */
 async function comparerActes(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu/actes" });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu" });
   await remplacer(p, { "revenu.milieu": "gmfu", "revenu.lieuTarifs": "auto", "revenu.modeBudget": "mixte", "revenu.residents": 1, "revenu.externes": 1, "revenu.patientsParResident": 4.5,
     "revenu.patientsParExterne": 2.5, "revenu.heuresParDJ": 3.5, "revenu.enseignement": 2, "revenu.enseignementApresMidi": 0, "revenu.demiJournees": 8, "revenu.semaines": 40,
-    "revenu.annee": "type", "revenu.inscritsDebut": 600, "revenu.patientsPendantSupervision": 0, "revenu.supervisionFacturation": "visites",
+    "revenu.annee": "type", "revenu.inscritsDebut": 600, "revenu.patientsPendantSupervision": 0, "revenu.supervisionFacturation": "visites", "revenu.patientsParDJ": 6,
     "revenu.mix": { suivi: 100, suiviV: 0, perioV: 0, pedia: 0, gross: 0 } });
+  await allerA(p, "revenu/actes");
   const vue = await p.evaluate(() => ({ hash: location.hash, onglets: [...document.querySelectorAll("#rv-onglets button")].map(x => x.textContent),
     visibles: [...document.querySelectorAll("#v-revenu .carte")].filter(c => c.offsetParent).map(c => c.id), conclusion: document.getElementById("rv-sup-conclusion").textContent,
     bouton: (document.querySelector("#rv-sup-actions button") || {}).textContent || "", debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
@@ -1035,15 +1037,40 @@ async function comparerActes(b, base) {
   verifier("actes : « Selon mon plan » revient à la demi-journée du plan", await p.evaluate(() => window.Wealthnord.etat().revenu.demiJourneeType === null));
   await allerA(p, "revenu"); await p.waitForTimeout(200);
   const resume = await p.evaluate(() => {
-    const c = document.getElementById("rv-r-actes"), hero = document.getElementById("rv-hero"), sources = document.getElementById("rv-r-sources");
+    const c = document.getElementById("rv-r-actes"), s = document.getElementById("rv-r-seuils"), hero = document.getElementById("rv-hero"), sources = document.getElementById("rv-r-sources");
     return { lien: c.querySelector("a.lien-carte").getAttribute("href"), bouton: c.querySelector("a.bouton").getAttribute("href"),
-      texte: c.textContent, vu: !!c.offsetParent, sousLeChiffre: c.getBoundingClientRect().top > hero.getBoundingClientRect().top,
-      avantLeReste: !sources.offsetParent || c.getBoundingClientRect().top < sources.getBoundingClientRect().top };
+      texte: c.textContent, seuils: s.textContent, vu: !!c.offsetParent, seuilsVu: !!s.offsetParent,
+      sousLeChiffre: c.getBoundingClientRect().top > hero.getBoundingClientRect().top,
+      seuilsDabord: s.getBoundingClientRect().top < c.getBoundingClientRect().top,
+      avantLeReste: !sources.offsetParent || c.getBoundingClientRect().top < sources.getBoundingClientRect().top,
+      debord: document.documentElement.scrollWidth > document.documentElement.clientWidth };
   });
   verifier("actes : la carte du résumé, sous le chiffre, mène au sous-onglet", resume.lien === "#revenu/actes" && resume.bouton === "#revenu/actes"
     && resume.vu && resume.sousLeChiffre && resume.avantLeReste && resume.texte.includes("La supervision") && resume.texte.includes("Ma demi-journée"), resume);
+  verifier("seuils : dès tant de patients le mixte, puis l'acte ; dès tant de visites la supervision", resume.seuilsVu && resume.seuilsDabord && !resume.debord
+    && resume.seuils.includes("Quand changer de mode") && resume.seuils.includes("patients par demi-journée")
+    && resume.seuils.includes("Mixte plutôt que l'horaire") && resume.seuils.includes("L'acte plutôt que le mixte")
+    && resume.seuils.includes("Visites plutôt que la supervision") && resume.seuils.includes("Dès 6") && resume.seuils.includes("Dès 10")
+    && resume.seuils.includes("3 résidents") && resume.seuils.includes("4,5"), resume.seuils);
   await allerA(p, "revenu/detail");
-  verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent));
+  verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent
+    && document.getElementById("rv-seuil").textContent.includes("dès") && document.getElementById("rv-seuil").textContent.includes("forfait de responsabilité")));
+  await remplacer(p, { "revenu.milieu": "clsc" });
+  await allerA(p, "revenu");
+  const clsc = await p.evaluate(() => {
+    const s = document.getElementById("rv-r-seuils");
+    return { hash: location.hash, seuils: !!s.offsetParent, actes: document.getElementById("rv-r-actes").hidden, texte: s.textContent,
+      onglet: document.getElementById("rv-onglets").hidden, debord: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+  });
+  verifier("seuils : en CLSC, les patients par demi-journée, sans Comparer les actes", clsc.seuils && clsc.actes && clsc.onglet && !clsc.debord
+    && clsc.texte.includes("patients par demi-journée") && clsc.texte.includes("Dès") && !clsc.texte.includes("supervision"), clsc);
+  await allerA(p, "revenu/actes");
+  verifier("actes : en CLSC, l'adresse revient au détail du revenu", await p.evaluate(() => location.hash === "#revenu/detail" && !document.getElementById("rv-carte-supervision").offsetParent));
+  await remplacer(p, { "revenu.milieu": "clinique" });
+  await allerA(p, "revenu/actes");
+  const clinique = await p.evaluate(() => ({ hash: location.hash, actes: document.getElementById("rv-r-actes").hidden, seuils: document.getElementById("rv-r-seuils").hidden,
+    onglet: document.getElementById("rv-onglets").hidden, sup: !!document.getElementById("rv-carte-supervision").offsetParent }));
+  verifier("actes : en clinique, ni la section ni les seuils", clinique.hash === "#revenu/detail" && clinique.actes && clinique.seuils && clinique.onglet && !clinique.sup, clinique);
   verifier("actes : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }

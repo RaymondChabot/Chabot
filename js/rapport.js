@@ -15,6 +15,7 @@ window.Verrou.quandOuvert(function () {
   const C = i => `var(--s${(i % 7) + 1})`;
   const moins = v => Math.abs(v) < 0.5 ? "—" : $(-v);
   const COURT_MODE = { horaire: "Horaire", mixte: "Mixte", acte: "À l'acte" };
+  const desN = s => s == null || !isFinite(s) ? "—" : nb(s < 0 ? 0 : Math.floor(s + 1e-9) + 1, 0);
 
   /* ---------- Graphiques (SVG statiques) ---------- */
   function pasJoli(x) {
@@ -236,7 +237,7 @@ window.Verrou.quandOuvert(function () {
         ${plusieurs ? legende(M.map(m => ({ nom: NOM_MODE[m], couleur: COULEUR_MODE[m], ligne: true }))) : ""}
         ${lignes({ x: R.sensDJ.map(x => `${x.v} d.-j.`), series: M.map(m => ({ nom: NOM_MODE[m], couleur: COULEUR_MODE[m], valeurs: R.sensDJ.map(x => x[m + "Net"]) })), baseLibre: true, hauteur: serre ? 130 : acts.length || autresL.length ? 160 : 190, titre: "Revenu net selon les demi-journées" })}
         ${tableau(["Demi-journées", ...colsSens], R.sensDJ.filter(x => !serre || Math.abs(x.v - dj) <= 2).map(x => ({ cls: x.v === dj ? "choisi" : "", c: [`${x.v}${x.v === dj ? " (vous)" : ""}`, ...(plusieurs ? M.map(m => $(x[m + "Net"])) : [$(x[mode]), $(x[mode + "Net"])])] })), "compact")}
-        <p class="rp-note">Après impôt${M.some(m => g[m].fraisCabinet > 0) ? " et frais de cabinet" : ""}. ${plusieurs ? `Le mixte dépasse l'horaire au-delà de ${g.seuilPatients != null ? nb(g.seuilPatients) : "—"} patients par demi-journée ; l'acte, au-delà de ${g.seuilActe != null ? nb(g.seuilActe) : "—"}. ` : ""}À l'acte : règles d'avant la Loi 2.</p>
+        <p class="rp-note">Après impôt${M.some(m => g[m].fraisCabinet > 0) ? " et frais de cabinet" : ""}. ${plusieurs ? `Dès ${desN(g.seuilMixte)} patients par demi-journée, le mixte dépasse le taux horaire ; dès ${desN(g.seuilActeMixte)}, l'acte dépasse le mixte. Le forfait de responsabilité du taux horaire est compris. ` : ""}À l'acte : règles d'avant la Loi 2.</p>
       </div>`));
 
     /* 3. Impôt */

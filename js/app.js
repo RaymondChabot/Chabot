@@ -870,6 +870,8 @@ window.Verrou.quandOuvert(function () {
      RENDUS
      ============================================================ */
   const NOM_MODE = { horaire: "Taux horaire", mixte: "Taux mixte", acte: "À l'acte" };
+  // Premier entier où le mode d'après l'emporte (à égalité, les deux rapportent autant).
+  const des = seuil => seuil == null || !isFinite(seuil) ? null : seuil < 0 ? 0 : Math.floor(seuil + 1e-9) + 1;
   const AU_MODE = { horaire: "au taux horaire", mixte: "au taux mixte", acte: "à l'acte" };
   const COULEUR_MODE = { horaire: SERIES[0], mixte: SERIES[1], acte: SERIES[2] };
   // Libellé du revenu utilisé : pratique principale et mode.
@@ -1353,6 +1355,62 @@ window.Verrou.quandOuvert(function () {
         { titre: "Ma demi-journée", sous: plan ? "Selon votre plan" : "Celle que vous avez inscrite", valeur: NOMS_MODE_ACTES[meilleur], valeurSous: `${$2(dj[meilleur].net)}` },
       ]));
     const aller = el("a", "bouton large", "Comparer les actes"); aller.href = "#revenu/actes"; carte.appendChild(aller);
+    carte.hidden = R.milieu !== "gmfu" || !!R.vueResidence;
+  }
+  // Quand un mode de rémunération devient plus payant qu'un autre, selon les tarifs de la personne.
+  function rendreSeuils(R) {
+    const carte = document.getElementById("rv-r-seuils");
+    const montrer = R.plusieursModes && !R.vueResidence;
+    carte.hidden = !montrer;
+    if (!montrer) { carte.textContent = ""; return; }
+    const r = S.revenu, g = R.rev, pat = Math.max(0, +r.patientsParDJ || 0), dj = g.demiJourneeClinique;
+    const fraisPct = +r.fraisCabinetPct || 0, fraisMois = +r.fraisCabinetMois || 0;
+    let aide = "Une demi-journée de clinique, selon vos tarifs. Le forfait de responsabilité du taux horaire est compris. Les forfaits d'inscription, de volume et de GMF sont les mêmes dans les trois modes : ils ne changent pas ces seuils.";
+    if (fraisPct > 0 || fraisMois > 0) aide += r.fraisCabinetTousModes
+      ? " Vos frais de cabinet s'appliquent aux trois modes : ils ne les déplacent pas."
+      : ` Frais de cabinet comptés à l'acte seulement : ${[fraisPct > 0 ? `${nb(fraisPct, 1)} %` : "", fraisMois > 0 ? `${$(fraisMois)} par mois` : ""].filter(Boolean).join(" et ")}.`;
+    const cote = (haut, bas, apres, avant) => Math.abs(dj[haut] - dj[bas]) < 0.05 ? "les deux rapportent autant" : dj[haut] > dj[bas] ? apres : avant;
+    const ligne = (titre, seuil, sous) => {
+      const n = des(seuil);
+      if (n == null) return { titre, sous, valeur: "Jamais", valeurSous: "pour ces visites" };
+      if (n === 0) return { titre, sous, valeur: "Toujours", valeurSous: "même sans patient" };
+      return { titre, sous: `Vous en voyez ${nb(pat)} : ${sous}.`, valeur: `Dès ${nb(n, 0)}`, valeurSous: "par demi-journée" };
+    };
+    const lignesSeuil = [
+      ligne("Mixte plutôt que l'horaire", g.seuilMixte, g.seuilMixte == null
+        ? "Le mixte ne dépasse pas l'horaire : le forfait de responsabilité laisse plus par visite que la part du tarif au mixte."
+        : cote("mixte", "horaire", "le mixte rapporte déjà plus", "le taux horaire rapporte encore plus")),
+      ligne("L'acte plutôt que le mixte", g.seuilActeMixte, g.seuilActeMixte == null
+        ? "L'acte ne dépasse pas le mixte avec la part payée et vos frais de cabinet."
+        : cote("acte", "mixte", "l'acte rapporte déjà plus", "le mixte rapporte encore plus")),
+    ];
+    if (R.milieu === "gmfu") {
+      const o = optionsActes(R), T = Math.min(+r.enseignement || 0, +r.demiJournees || 0);
+      const pm = U.supMoment ? U.supMoment === "pm" : T > 0 && (+r.enseignementApresMidi || 0) >= T;
+      const so = C.supervisionOuVisites({ ...o, heuresParDJ: r.heuresParDJ, apresMidi: pm, residents: r.residents, externes: r.externes,
+        patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision });
+      const n = des(so.seuil);
+      const morceau = (q, un, plusieurs) => {
+        const p = Math.max(0, +q || 0);
+        if (!(p > 0) || n == null || n === 0) return "";
+        const c = Math.ceil((n - 1e-9) / p);
+        return `${nb(c, 0)} ${c > 1 ? plusieurs : un} à ${nb(p)} patient${p === 1 ? "" : "s"} chacun`;
+      };
+      const parts = [morceau(r.patientsParResident, "résident", "résidents"), morceau(r.patientsParExterne, "externe", "externes")].filter(Boolean);
+      const exemple = parts.length ? ` Par exemple, ${parts.join(", ou ")}.` : "";
+      const ou = Math.abs(so.ecart) < 0.05 ? "les deux rapportent autant" : so.ecart > 0 ? "facturer les visites rapporte plus" : "l'intervention de supervision rapporte plus";
+      const sous = n == null
+        ? "Inscrivez vos types de visites pour comparer l'intervention de supervision et les visites des apprenants."
+        : `Au mixte.${exemple} Vous en comptez ${nb(so.nbVisites)} : ${ou}.`;
+      lignesSeuil.push({ titre: "Visites plutôt que la supervision", sous, valeur: n == null ? "—" : n === 0 ? "Toujours" : `Dès ${nb(n, 0)}`, valeurSous: n == null ? "" : "par demi-journée" });
+    }
+    const noms = { horaire: "le taux horaire", mixte: "le mixte", acte: "l'acte" };
+    const meilleurs = ["horaire", "mixte", "acte"].filter(m => dj[m] >= Math.max(dj.horaire, dj.mixte, dj.acte) - 0.05);
+    const conclusion = meilleurs.length === 1
+      ? `Avec ${nb(pat)} patients par demi-journée, ${noms[meilleurs[0]]} rapporte le plus pour ces visites.`
+      : `Avec ${nb(pat)} patients par demi-journée, ${meilleurs.map(m => noms[m]).join(" et ")} rapportent autant pour ces visites.`;
+    carteResume("rv-r-seuils", "Quand changer de mode", ["Détail", "#revenu/detail"],
+      el("p", "aide", aide), rangees(el("div"), lignesSeuil), el("p", "conclusion", conclusion));
   }
   const signe$2 = v => (v >= 0 ? "+" : "−") + $2(Math.abs(v));
   // À l'heure, selon la durée de chaque acte : la durée se change dans le tableau (le focus reste pendant la saisie).
@@ -1396,6 +1454,7 @@ window.Verrou.quandOuvert(function () {
 
   function rendreRevenu(R) {
     rendreActes(R);
+    rendreSeuils(R);
     rendreResidence(R);
     resumeRevenu(R);
     if (R.vueResidence) { rendreAutresRevenus(); return; }
@@ -1441,10 +1500,12 @@ window.Verrou.quandOuvert(function () {
       comp.appendChild(rangees(el("div"), autres.map((m, i) => ({ titre: `${NOM_MODE[m]} par rapport ${AU_MODE[R.mode]}`,
         sous: R.societeActive ? `Laissé dans la société : ${signe(R.impots[m].societe.retenu - R.impots[R.mode].societe.retenu)}` : `Après impôt et frais : ${signe(R.nets[m] - R.nets[R.mode])}`,
         valeur: signe(g[m].total - g[R.mode].total), cls: i === 0 ? "total" : null }))));
+      const dPat = s => { const n = des(s); return n == null ? null : n === 0 ? "dès le premier patient" : `dès ${nb(n, 0)} patient${n > 1 ? "s" : ""}`; };
+      const mD = dPat(g.seuilMixte), aD = dPat(g.seuilActeMixte);
       document.getElementById("rv-seuil").textContent = [
-        g.seuilPatients != null ? `En clinique, le mixte paie plus que l'horaire au-delà de ${nb(g.seuilPatients)} patients par demi-journée` : "Sans pourcentage sur les visites, le mixte paie toujours moins en clinique",
-        g.seuilActe != null ? ` ; l'acte, au-delà de ${nb(g.seuilActe)}.` : ".",
-        ` Vous en voyez ${nb(S.revenu.patientsParDJ)}.`,
+        mD ? `En clinique, le mixte rapporte plus que l'horaire ${mD} par demi-journée` : "En clinique, le mixte ne dépasse pas l'horaire",
+        aD ? ` ; l'acte dépasse le mixte ${aD} par demi-journée.` : " ; l'acte ne dépasse pas le mixte.",
+        ` Vous en voyez ${nb(S.revenu.patientsParDJ)}. Le forfait de responsabilité du taux horaire est compris.`,
       ].join("");
     }
 
@@ -3367,31 +3428,47 @@ window.Verrou.quandOuvert(function () {
     budget: [["mois", "Ce mois-ci"], ["annee", "L'année"], ["dettes", "Dettes"]],
     avenir: [["aujourdhui", "Aujourd'hui"], ["projection", "Projection"], ["placements", "Placements"], ["proches", "Proches"]],
   };
+  // Comparer les actes : en GMF-U seulement (supervision). Ailleurs, l'onglet n'existe pas.
+  function ongletsDe(page) {
+    const tous = SOUS_ONGLETS[page];
+    if (!tous) return null;
+    if (page === "revenu" && S.revenu.milieu !== "gmfu") return tous.filter(([k]) => k !== "actes");
+    return tous;
+  }
   function sousChoisi(page) {
+    const onglets = ongletsDe(page);
     let v = null;
     try { v = localStorage.getItem("wm.sous." + page); } catch (e) { /* préférence non gardée */ }
-    return SOUS_ONGLETS[page].some(([k]) => k === v) ? v : SOUS_ONGLETS[page][0][0];
+    return onglets.some(([k]) => k === v) ? v : onglets[0][0];
   }
   function garderSous(page, cle) { try { localStorage.setItem("wm.sous." + page, cle); } catch (e) { /* préférence non gardée */ } }
   const BARRE_SOUS = { revenu: ["rv-onglets", "Sections du revenu"], budget: ["bu-onglets", "Sections du budget"], avenir: ["pa-onglets", "Sections du patrimoine"] };
   function appliquerSous(page) {
+    const onglets = ongletsDe(page), barre = document.getElementById(BARRE_SOUS[page][0]);
+    if (onglets.length < 2) { barre.hidden = true; barre.textContent = ""; delete barre.dataset.cle; }
+    else {
+      barre.hidden = false;
+      segment(BARRE_SOUS[page][0], onglets, sousChoisi(page), v => {
+        garderSous(page, v); history.replaceState(null, "", `#${page}/${v}`); tout();
+      }, BARRE_SOUS[page][1]);
+    }
     const cle = sousChoisi(page);
-    segment(BARRE_SOUS[page][0], SOUS_ONGLETS[page], cle, v => {
-      garderSous(page, v); history.replaceState(null, "", `#${page}/${v}`); tout();
-    }, BARRE_SOUS[page][1]);
     document.querySelectorAll(`#v-${page} [data-sous]`).forEach(c => c.classList.toggle("hors-onglet", c.dataset.sous !== cle));
+    if (page === "revenu" && S.revenu.milieu !== "gmfu" && location.hash === "#revenu/actes") history.replaceState(null, "", "#revenu/detail");
   }
   /* Chaque page : son résumé (#budget), ou tout son détail (#budget/detail, ou un sous-onglet : #budget/dettes).
      Le bouton Retour du téléphone ramène du détail au résumé. */
   function ouvrir(nom, sansRendu) {
-    const [page, sous] = String(nom).split("/");
+    let [page, sous] = String(nom).split("/");
     nom = ALIAS[page] || page;
-    const sousOnglet = sous && SOUS_ONGLETS[nom] && SOUS_ONGLETS[nom].some(([k]) => k === sous);
+    if (nom === "revenu" && sous === "actes" && S.revenu.milieu !== "gmfu") sous = "detail";
+    const onglets = ongletsDe(nom);
+    const sousOnglet = !!(sous && onglets && onglets.some(([k]) => k === sous));
     if (sousOnglet) garderSous(nom, sous);
     if (!document.getElementById("v-" + nom)) nom = "apercu";
     const detail = sous === "detail" || !!sousOnglet || nom === "donnees";
     document.getElementById("v-" + nom).classList.toggle("mode-detail", detail);
-    const adresse = "#" + nom + (detail && nom !== "donnees" ? "/" + (SOUS_ONGLETS[nom] ? sousChoisi(nom) : "detail") : "");
+    const adresse = "#" + nom + (detail && nom !== "donnees" ? "/" + (onglets ? sousChoisi(nom) : "detail") : "");
     // Téléphone : les boutons du haut suivent la page, à droite de son titre.
     document.querySelector(`#v-${nom} > .tete-page`).after(document.querySelector(".barre-outils"));
     document.getElementById("barre-pdf").hidden = nom !== "apercu";

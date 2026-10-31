@@ -428,23 +428,48 @@
     mixte.fraisCabinet = frais(mixte, r.fraisCabinetTousModes);
     acte.fraisCabinet = frais(acte, true);
 
-    // Seuil : nombre de patients par demi-journée clinique où le mixte égale l'horaire (à 100 % du tarif horaire).
-    const parVisite = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0, TF) * maj * m("pctMixte") / 100;
+    // Seuils d'une demi-journée de rendez-vous, au palier de fin d'année. Les forfaits communs
+    // (inscription, volume, GMF) sont les mêmes dans les trois modes : ils ne déplacent pas le seuil.
+    const palierFin = inscritsFin >= 499.999 ? 1 : 0;
+    const tarifMoyenSeuil = tarifVisite(r.mix, palierFin, TF);
+    const parVisite = tarifMoyenSeuil * maj * m("pctMixte") / 100;
+    // Sans le forfait de responsabilité : le mixte égale l'heure (à 100 % du tarif horaire).
     const seuil = parVisite > 0 ? (m("tarifHoraire") - m("forfaitHoraireMixte")) * maj * H / parVisite : null;
-    const parVisiteActe = tarifVisite(r.mix, inscritsFin >= 499.999 ? 1 : 0, TF) * maj * pctActe / 100;
+    const parVisiteActe = tarifMoyenSeuil * maj * pctActe / 100;
     // Au seuil, chaque visite à l'acte, après le pourcentage remis à la clinique, égale l'heure au taux horaire.
-    const netVisite = parVisiteActe * (1 - (r.fraisCabinetPct || 0) / 100) / (r.fraisCabinetTousModes ? 1 - (r.fraisCabinetPct || 0) / 100 : 1);
+    const fA = Math.max(0, Math.min(100, +r.fraisCabinetPct || 0)) / 100;
+    const fAutres = r.fraisCabinetTousModes ? fA : 0;
+    const netVisite = parVisiteActe * (1 - fA) / (r.fraisCabinetTousModes ? 1 - fA : 1);
     const seuilActe = netVisite > 0 ? m("tarifHoraire") * maj * H / netVisite : null;
+    // Forfait de responsabilité et suppléments d'examen : au taux horaire seulement
+    // (EP 40, par. 6.02 B, 8.01 et 7.02 B). Le supplément unique du premier trimestre n'est pas ici :
+    // il ne suit pas le nombre de patients de la demi-journée.
+    const respParPatient = ((partVisite(r.mix, "suiviV") + partVisite(r.mix, "perioV")) * m("forfaitResponsabilite")
+      + partVisite(r.mix, "pedia") * m("suppExamenEnfant") + partVisite(r.mix, "gross") * m("suppSuiviGrossesse")) * maj;
+    // Montant fixe remis à la clinique, étalé sur les demi-journées de rendez-vous (pas l'enseignement).
+    const djAn = W * C;
+    const fixeDJ = djAn > 0 ? Math.max(0, +r.fraisCabinetMois || 0) * 12 / djAn : 0;
+    const fixeHoraire = r.fraisCabinetTousModes ? fixeDJ : 0, fixeActe = fixeDJ;
+    const partHoraire = respParPatient * (1 - fAutres), partMixte = parVisite * (1 - fAutres), partActe = parVisiteActe * (1 - fA);
+    const baseHoraire = H * m("tarifHoraire") * maj * (1 - fAutres) - fixeHoraire;
+    const baseMixte = H * m("forfaitHoraireMixte") * maj * (1 - fAutres) - fixeHoraire;
+    // Patients où le mixte égale l'horaire, forfait de responsabilité compris.
+    const gainMixte = partMixte - partHoraire;
+    const seuilMixte = gainMixte > 1e-9 ? (baseHoraire - baseMixte) / gainMixte : null;
+    // Patients où l'acte égale le mixte, après les frais de cabinet.
+    const gainActe = partActe - partMixte;
+    const seuilActeMixte = gainActe > 1e-9 ? (baseMixte + fixeActe) / gainActe : null;
+    const nClin = Math.max(0, +r.patientsParDJ || 0);
+    const demiJourneeClinique = { horaire: baseHoraire + nClin * partHoraire, mixte: baseMixte + nClin * partMixte, acte: nClin * partActe - fixeActe };
 
     // Revenu moyen par patient, à 100 % du tarif, au palier de fin d'année : rendez-vous et sans rendez-vous.
-    const palierFin = inscritsFin >= 499.999 ? 1 : 0;
     const tarifMoyenRdv = tarifVisite(r.mix, palierFin, TF) * maj, tarifMoyenSrv = tarifSrv(palierFin) * maj;
     // Hausse du tarif moyen d'une visite au palier de 500 inscrits.
     const t0 = tarifVisite(r.mix, 0, TF), gainPalier = t0 > 0 ? tarifVisite(r.mix, 1, TF) / t0 - 1 : 0;
     return { heures, garde, heuresHoraire, heuresAuDela, gardeAuDela, autresAuDela, plafondHeures, perteHeures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, vulnerablesFin, semainesPalierHaut, gainPalier,
       patientsVus, forfaitGmfPossible, detailCompensation, activites, detailActivites, basePolyvalence, polyvalence, pctPolyvalence, anneePratique, detailVolume, examens,
       visitesApprenants: W * T * apprenants, heuresSupervision: heuresSup, tarifMoyenRdv, tarifMoyenSrv,
-      horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
+      horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe, seuilMixte, seuilActeMixte, demiJourneeClinique };
   }
 
   /* ============================================================
