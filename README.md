@@ -136,7 +136,10 @@ chaque page les nomme et les montre ; l'interrupteur est aussi dans Données
 
 **Vos trois modes** (résumé de Revenu, en GMF-U et en CLSC) : le net de
 chaque mode après impôt et frais, le meilleur en évidence, et l'écart sur
-l'année ; le chiffre du haut compare le même net.
+l'année ; le chiffre du haut compare le même net. « Et si… » : deux
+réglages + et − (patients par demi-journée, demi-journées par semaine)
+font bouger les trois modes en direct, sans toucher au plan, jusqu'à
+« Garder ces valeurs ».
 
 **Comparer les actes** (sous-onglet du détail de Revenu, dès qu'il y a
 plusieurs modes) : les résultats d'abord, les réglages se déplient pour

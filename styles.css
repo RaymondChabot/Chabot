@@ -514,6 +514,18 @@ a.tuile:hover { border-color: var(--trait); }
 .champs-rapides .champ { grid-template-columns: minmax(0, 1fr) minmax(96px, 128px); }
 .champs-rapides .champ > span:last-child:empty { display: none; }
 .choix-actes { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 2px 0 12px; }
+/* « Et si… » de la carte Vos trois modes : deux réglages + et −, en direct. */
+.essai { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--grille); }
+.essai-titre { font-family: var(--police-titre); font-size: 1.08rem; font-weight: 500; margin: 0 0 6px; }
+.essai-reglage { display: grid; grid-template-columns: minmax(84px, 1fr) 44px 52px 44px auto; align-items: center; gap: 6px; min-height: 48px; }
+.essai-nom { font-size: 0.94rem; }
+.essai-valeur { text-align: center; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.essai-unite { font-size: 0.8rem; color: var(--discret); }
+.pas { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--trait); background: var(--surface); color: var(--encre); font: 600 1.2rem/1 var(--police); cursor: pointer; }
+.pas:hover:not(:disabled) { border-color: var(--encre); }
+.pas:disabled { opacity: 0.35; cursor: default; }
+.essai-statut { margin: 6px 0 0; }
+@media (max-width: 360px) { .essai-reglage { grid-template-columns: 1fr 44px 44px 44px; } .essai-unite { grid-column: 1 / -1; margin-top: -6px; } }
 /* Aller plus loin : les champs et les tableaux d'une carte, repliés sous ses résultats. */
 .plus-loin { margin-top: 8px; border-top: 1px solid var(--grille); }
 .plus-loin > summary { list-style: none; cursor: pointer; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--discret); font-size: 0.92rem; }

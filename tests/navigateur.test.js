@@ -1140,6 +1140,27 @@ async function outilsAvances(b, base) {
   await ctx.close();
 }
 
+/* 33. « Et si… » dans Vos trois modes : + et − changent les nets en direct, sans toucher au plan ; « Garder ces valeurs »
+   l'applique ; « Revenir à mon plan » l'annule. Le focus reste sur le bouton touché. */
+async function etSi(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu" });
+  await remplacer(p, { "revenu.milieu": "gmfu", "revenu.modeBudget": "mixte", "revenu.lieuTarifs": "auto", "revenu.patientsParDJ": 6, "revenu.demiJournees": 8, "revenu.enseignement": 2 });
+  const nets = () => p.evaluate(() => [...document.querySelectorAll("#rv-r-modes .rangee .rangee-valeur")].map(x => +x.textContent.replace(/[^\d]/g, "")));
+  const avant = await nets();
+  await p.click("#essai-pat-plus"); await p.click("#essai-pat-plus"); await p.waitForTimeout(150);
+  const apres = await nets(), etat = await p.evaluate(() => ({ plan: window.Wealthnord.etat().revenu.patientsParDJ, focus: document.activeElement && document.activeElement.id,
+    statut: document.querySelector("#rv-r-modes .essai-statut").textContent, valeur: document.querySelector("#rv-r-modes .essai-valeur").textContent }));
+  verifier("et si : deux patients de plus font monter le mixte et l'acte, pas le plan", apres[1] > avant[1] && apres[2] > avant[2] && etat.plan === 6 && etat.valeur === "8"
+    && etat.focus === "essai-pat-plus" && etat.statut.includes("Votre plan : 6"), { avant, apres, etat });
+  await p.click("#rv-r-modes .essai .actions .bouton.secondaire"); await p.waitForTimeout(150);
+  verifier("et si : Revenir à mon plan", (await nets()).join() === avant.join());
+  await p.click("#essai-dj-plus"); await p.waitForTimeout(100);
+  await p.click("#rv-r-modes .essai .actions .bouton:not(.secondaire)"); await p.waitForTimeout(200);
+  verifier("et si : Garder ces valeurs met le plan à jour", await p.evaluate(() => window.Wealthnord.etat().revenu.demiJournees === 9 && !document.querySelector("#rv-r-modes .essai .actions")));
+  verifier("et si : rien ne déborde ; aucune erreur", !(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)) && erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 30. Le plan suit le calendrier : au premier lancement d'un nouveau mois, il repart du mois courant ; les soldes ne
    bougent pas (la personne les met à jour avec ses relevés). L'avis permet d'annuler pour ce mois-ci, sans perdre une
    modification faite pendant l'avis. Niveau de résidence au 1er juillet ; enfants et privilège au 1er janvier ;
@@ -1196,7 +1217,7 @@ async function planCalendrier(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

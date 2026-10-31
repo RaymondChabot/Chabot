@@ -614,6 +614,8 @@ window.Verrou.quandOuvert(function () {
     const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ, ens = R.milieu === "gmfu" ? S.revenu.enseignement : 0;
     R.sensDJ = sens([...new Set([4, 5, 6, 7, 8, 9, 10, dj])].filter(n => n >= Math.max(1, ens)).sort((a, b) => a - b), v => ({ demiJournees: v }));
     R.sensPat = sens([...new Set([3, 4, 5, 6, 7, 8, pat])].sort((a, b) => a - b), v => ({ patientsParDJ: v }));
+    // « Et si… » : le brut et le net de chaque mode pour d'autres demi-journées et d'autres patients.
+    R.essaiModes = x => { const g = revenuDe(x); return Object.fromEntries(R.modes.map(md => [md, { brut: g[md].total, net: R.netPour(g[md].total, g[md].fraisCabinet) }])); };
     // REER : impôt sans cotisation, et avec une cotisation donnée (au revenu de l'année).
     const baseMode = { ...base, depensesPro: depensesMode(mode), revenu: R.brut };
     const impotVue = x => R.vueResidence ? impotResidence(x) : impotDe({ ...baseMode, ...x });
@@ -1445,13 +1447,39 @@ window.Verrou.quandOuvert(function () {
     const carte = document.getElementById("rv-r-modes"), montrer = R.plusieursModes && !R.vueResidence;
     carte.hidden = !montrer;
     if (!montrer) { carte.textContent = ""; return; }
-    const g = R.rev, meilleur = R.modes.reduce((a, m) => R.nets[m] > R.nets[a] ? m : a, R.modes[0]);
-    const second = R.modes.filter(m => m !== meilleur).reduce((a, m) => !a || R.nets[m] > R.nets[a] ? m : a, null);
-    const lignesModes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: `Brut ${$(g[m].total)}${m === R.mode ? " · dans votre budget" : ""}`,
-      valeur: $(R.nets[m]), valeurSous: R.societeActive ? "pour vous, par année" : "net par année", cls: m === meilleur ? "choisi" : null }));
-    const ecartNet = second ? R.nets[meilleur] - R.nets[second] : 0;
+    // « Et si… » : d'autres patients et d'autres demi-journées, pour cet écran seulement, jusqu'à « Garder ces valeurs ».
+    const r = S.revenu, planPat = +r.patientsParDJ || 0, planDJ = +r.demiJournees || 0, minDJ = Math.max(1, R.milieu === "gmfu" ? +r.enseignement || 0 : 0);
+    const e = U.essai || { pat: planPat, dj: planDJ }, essai = e.pat !== planPat || e.dj !== planDJ;
+    const v = essai ? R.essaiModes({ patientsParDJ: e.pat, demiJournees: e.dj }) : Object.fromEntries(R.modes.map(m => [m, { brut: R.rev[m].total, net: R.nets[m] }]));
+    const meilleur = R.modes.reduce((a, m) => v[m].net > v[a].net ? m : a, R.modes[0]);
+    const second = R.modes.filter(m => m !== meilleur).reduce((a, m) => !a || v[m].net > v[a].net ? m : a, null);
+    const lignesModes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: `Brut ${$(v[m].brut)}${m === R.mode ? " · dans votre budget" : ""}`,
+      valeur: $(v[m].net), valeurSous: essai ? `${signe(v[m].net - R.nets[m])} sur votre plan` : R.societeActive ? "pour vous, par année" : "net par année", cls: m === meilleur ? "choisi" : null }));
+    const ecartNet = second ? v[meilleur].net - v[second].net : 0;
     const phrase = second ? `${NOMS_MODE_ACTES[meilleur]} rapporte le plus : ${$(ecartNet)} net de plus que ${AU_MODE[second].replace(/^au /, "le ").replace(/^à /, "")} par année.` : "";
-    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"], rangees(el("div"), lignesModes), el("p", "conclusion", phrase));
+    // Les boutons + et − : le focus reste sur le bouton touché.
+    const pas = (id, etiquette, delta, ok) => { const b = el("button", "pas", delta > 0 ? "+" : "−"); b.type = "button"; b.id = id; b.setAttribute("aria-label", etiquette); b.disabled = !ok;
+      b.addEventListener("click", () => { const x = U.essai || { pat: planPat, dj: planDJ };
+        U.essai = id.startsWith("essai-pat") ? { ...x, pat: Math.max(0, x.pat + delta) } : { ...x, dj: Math.min(12, Math.max(minDJ, x.dj + delta)) };
+        U.essaiFocus = id; tout(); }); return b; };
+    const reglage = (nom, valeur, unite, cle, min, max) => { const z = el("div", "essai-reglage");
+      z.append(el("span", "essai-nom", nom), pas(`essai-${cle}-moins`, `${nom} : un de moins`, -1, valeur > min),
+        el("strong", "essai-valeur", nb(valeur, 1)), pas(`essai-${cle}-plus`, `${nom} : un de plus`, 1, valeur < max), el("span", "essai-unite", unite)); return z; };
+    const bloc = el("div", "essai");
+    bloc.append(el("p", "essai-titre", "Et si…"), reglage("Patients", e.pat, "par demi-journée", "pat", 0, 60), reglage("Demi-journées", e.dj, "par semaine", "dj", minDJ, 12));
+    const statut = el("p", "aide essai-statut"); statut.setAttribute("aria-live", "polite");
+    statut.textContent = essai ? `Essai : ${nb(e.pat, 1)} patients, ${nb(e.dj, 0)} demi-journées. Votre plan : ${nb(planPat, 1)} et ${nb(planDJ, 0)}.` : "Touchez + ou − pour voir les trois modes bouger.";
+    bloc.appendChild(statut);
+    if (essai) {
+      const a = el("div", "actions");
+      const garder = el("button", "bouton", "Garder ces valeurs"); garder.type = "button";
+      garder.addEventListener("click", () => { S.revenu.patientsParDJ = e.pat; S.revenu.demiJournees = e.dj; U.essai = null; S.meta.exemple = false; sauver(); tout(); toast("Votre plan est à jour."); });
+      const revenir = el("button", "bouton secondaire", "Revenir à mon plan"); revenir.type = "button";
+      revenir.addEventListener("click", () => { U.essai = null; tout(); });
+      a.append(garder, revenir); bloc.appendChild(a);
+    }
+    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"], rangees(el("div"), lignesModes), el("p", "conclusion", phrase), bloc);
+    if (U.essaiFocus) { const f = document.getElementById(U.essaiFocus); U.essaiFocus = null; if (f && !f.disabled) f.focus(); }
   }
   const signe$2 = v => (v >= 0 ? "+" : "−") + $2(Math.abs(v));
   // À l'heure, selon la durée de chaque acte : la durée se change dans le tableau (le focus reste pendant la saisie).
