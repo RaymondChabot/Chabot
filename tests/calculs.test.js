@@ -174,11 +174,20 @@ verifier("suppléments 19957 à 19960 en établissement", proche(C.revenuGmfu(gp
 const gv = C.revenuGmfu({ ...rev, inscritsDebut: 1000, partVulnerable: 30 });
 verifier("volume : 15 000 $ à 1 000 inscrits, plus les suppléments au-delà de 500 et de 200 vulnérables", proche(gv.horaire.volume, 15000 + 250 * 5.23 + 250 * 10.46 + 100 * 5.23, 1e-6));
 verifier("volume : sans assiduité de 80 %, le montant seulement", proche(C.revenuGmfu({ ...rev, inscritsDebut: 1000, partVulnerable: 30, assiduite80: false }).horaire.volume, 15000, 1e-9));
+// Assiduité (EP 40, par. 15.05) : 100 % des suppléments à 80 %, 75 % de 75 à 79 %, 50 % de 70 à 74 % ; le forfait n'en dépend pas.
+const vol80 = C.montantsVolume(1200, 400, "80"), vol75 = C.montantsVolume(1200, 400, "75"), vol70 = C.montantsVolume(1200, 400, "70"), vol0 = C.montantsVolume(1200, 400, "0");
+verifier("assiduité : 8 629,50 $ à 80 %, 6 472,13 $ à 75 %, la moitié à 70 %, rien sous 70 % ; forfait de 15 000 $ dans tous les cas",
+  proche(vol80.supplements, 8629.5, 1e-6) && proche(vol75.supplements, 6472.125, 1e-6) && proche(vol70.supplements, 4314.75, 1e-6) && vol0.supplements === 0
+  && [vol80, vol75, vol70, vol0].every(v => v.montant === 15000), { vol75: vol75.supplements });
+verifier("volume : inscriptions comptées en double pour le seul forfait (par. 4.16)", C.montantsVolume(500, 0).total === 0 && C.montantsVolume(500, 0, "80", 500).montant === 15000
+  && C.montantsVolume(500, 0, "80", 250).montant === 7500 && C.montantsVolume(500, 0, "80", 500).supplements === 0);
 verifier("volume : 7 500 $ de 750 à 999, rien sous 750", C.montantsVolume(800, 0).montant === 7500 && C.montantsVolume(999, 0).montant === 7500 && C.montantsVolume(749, 0).montant === 0 && g.horaire.volume === 0);
 const hospT = { ...hosp, type: "hospitalisation" };
 verifier("polyvalence : 5 % des activités à 1 000 inscrits", proche(C.revenuGmfu({ ...rev, inscritsDebut: 1000, activites: [hospT] }).horaire.polyvalence, totalHosp * 0.05, 0.01));
 verifier("polyvalence : première année, 10 % dès 300 inscrits", C.revenuGmfu({ ...rev, annee: "premiere", inscritsDebut: 0, nouveauxGuichet: 300, activites: [hospT] }).pctPolyvalence === 10);
 verifier("polyvalence : seuils de la 3e année", C.tauxPolyvalence(650, 0, 3) === 5 && C.tauxPolyvalence(399, 0, 3) === 0 && C.tauxPolyvalence(650, 0, 5) === 0);
+verifier("polyvalence : aussi les centres de détention, jeunesse et de réadaptation (par. 16.01)",
+  ["detention", "jeunesse", "readaptation"].every(t => C.revenuGmfu({ ...rev, inscritsDebut: 1000, activites: [{ ...hosp, type: t }] }).horaire.polyvalence > 0));
 verifier("polyvalence : pas sur la garde ni sur une autre activité", C.revenuGmfu({ ...rev, inscritsDebut: 1000, activites: [{ ...hosp, type: "garde" }, { ...hosp, type: "autre" }] }).horaire.polyvalence === 0);
 verifier("forfait GMF : 9,35 $ par inscrit vu (80 % par défaut)", proche(C.revenuGmfu({ ...rev, membreGmf: true }).horaire.forfaitGmf, 500 * 0.8 * 9.35, 1e-6) && g.horaire.forfaitGmf === 0 && proche(g.forfaitGmfPossible, 500 * 0.8 * 9.35, 1e-6));
 verifier("forfait GMF : chaque nouveau patient compte", proche(C.revenuGmfu({ ...gpe, membreGmf: true, pctPatientsVus: 50 }).horaire.forfaitGmf, 100 * 9.35, 1e-6));
@@ -252,14 +261,18 @@ const gGross = C.revenuGmfu({ ...rev, grossessesAn: 4 });
 verifier("grossesse : nombre inscrit, 4 × 35,60 $ de plus que sans grossesse", proche(gGross.horaire.responsabilite - C.revenuGmfu({ ...rev, grossessesAn: 0 }).horaire.responsabilite, 4 * 35.6, 1e-6)
   && gGross.acte.total === g.acte.total && gGross.mixte.total === g.mixte.total);
 
-/* 21. Taux horaire : garde sur place au-delà du plafond annuel, payée à 94 % plutôt qu'à 71,8 %, au plus 528 h
-   (annexe XIV, par. 5.03 et 5.05). Les heures au-delà se partagent au prorata entre garde et autres heures. */
+/* 21. Taux horaire : les heures en clinique remplissent d'abord le plafond annuel ; la garde sur place faite en excédent
+   est payée à 94 % plutôt qu'à 71,8 %, au plus 528 h (annexe XIV, par. 5.02, 5.03 et 5.05). Cas de l'audit B-01. */
+const casGarde = (W, N, H, garde) => C.revenuGmfu({ ...rev, enseignement: 0, residents: 0, semaines: W, demiJournees: N, heuresParDJ: H, heuresMax100: 1540, heuresGardeSurPlace: garde });
+const gA = casGarde(42, 8, 3.5, 600), gB = casGarde(40, 10, 4, 400), gC = casGarde(44, 10, 3.5, 600);
+verifier("garde, cas A : 1 176 h en clinique + 600 h de garde : 236 h de garde à 94 %", gA.heures === 1176 && proche(gA.gardeAuDela, 236, 1e-9) && proche(gA.autresAuDela, 0, 1e-9)
+  && proche(gA.perteHeures, 236 * 0.06 * 99.48, 1e-6), { garde: gA.gardeAuDela, perte: gA.perteHeures });
+verifier("garde, cas B : 1 600 h + 400 h : 400 h à 94 %, 60 h à 71,8 % (perte 4 070,72 $)", proche(gB.gardeAuDela, 400, 1e-9) && proche(gB.autresAuDela, 60, 1e-9)
+  && proche(gB.perteHeures, 4070.72, 0.01), gB.perteHeures);
+verifier("garde, cas C : 1 540 h + 600 h : 528 h à 94 %, 72 h à 71,8 % (perte 5 171,37 $)", proche(gC.gardeAuDela, 528, 1e-9) && proche(gC.autresAuDela, 72, 1e-9)
+  && proche(gC.perteHeures, 5171.37, 0.01), gC.perteHeures);
 const sansGardeH = C.revenuGmfu({ ...rev, heuresMax100: 1540 }), hc = sansGardeH.heures;
 const avecGardeH = C.revenuGmfu({ ...rev, heuresMax100: 1540, heuresGardeSurPlace: 600 });
-const totalH = hc + 600, auDelaH = Math.max(0, totalH - 1540), gardeH = Math.min(528, auDelaH * 600 / totalH);
-verifier("garde : heures au-delà du plafond partagées au prorata", proche(avecGardeH.gardeAuDela, gardeH, 1e-9) && proche(avecGardeH.autresAuDela, auDelaH - gardeH, 1e-9) && avecGardeH.heures === hc,
-  { hc, auDelaH, gardeH });
-verifier("garde : 94 % pour la garde, 71,8 % pour le reste", proche(avecGardeH.horaire.heures, (totalH - gardeH * 0.06 - (auDelaH - gardeH) * 0.282) * 99.48, 1e-6));
 verifier("garde : au plus 528 h à 94 %", C.revenuGmfu({ ...rev, heuresMax100: 1540, heuresGardeSurPlace: 5000 }).gardeAuDela === 528);
 verifier("garde : sous le plafond, tout à 100 %", proche(C.revenuGmfu({ ...rev, heuresMax100: 5000, heuresGardeSurPlace: 200 }).horaire.heures, (hc + 200) * 99.48, 1e-6));
 verifier("garde : le mixte et l'acte ne changent pas", avecGardeH.mixte.total === sansGardeH.mixte.total && avecGardeH.acte.total === sansGardeH.acte.total);
@@ -328,6 +341,31 @@ const impot27 = C.impotParticulier({ revenu: 200000, depensesPro: 20000 }).total
 C.utiliserAnnee(2026);
 verifier("2027 : à revenu égal, un peu moins d'impôt (paliers indexés) ; un calcul ponctuel en 2026 revient ensuite à 2027",
   impot27 < impot26 && impot26 - impot27 < 2000 && verif27 === 2026, { impot26, impot27 });
+
+/* 27. Règles de la RAMQ de l'audit B : transfert (lettre d'entente no 304), compensation par jour civil, supervision,
+   après-midi, DMÉ. */
+const transf = typeTransfert => C.revenuGmfu({ ...rev, milieu: "clinique", lieuTarifs: "cabinet", ...C.montantsLieu("cabinet", 1), annee: "premiere", enseignement: 0, residents: 0,
+  semaines: 12, semainesArrivee: 1, inscritsDebut: 0, nouveauxTransferes: 100, partVulnerable: 100, typeTransfert });
+const tChang = transf("changement"), tBloc = transf("bloc");
+verifier("transfert : changement de médecin, aucun supplément ; forfaits au prorata, le mois du transfert au premier médecin (11/12)",
+  tChang.horaire.supplements === 0 && proche(tChang.horaire.forfaitInscription, 1185 * 11 / 12, 1e-6) && proche(tChang.horaire.forfaitVulnerable, 6250 * 11 / 12, 1e-6),
+  { insc: tChang.horaire.forfaitInscription, vuln: tChang.horaire.forfaitVulnerable });
+verifier("transfert en bloc (lettre d'entente no 304) : suppléments du guichet, 100 × 155,35 $", proche(tBloc.horaire.supplements, 15535, 1e-6)
+  && proche(tBloc.horaire.forfaitInscription, tChang.horaire.forfaitInscription, 1e-9), tBloc.horaire.supplements);
+const compSrv = memeJour => C.compensationCabinet({ patientsParDJ: 12, demiJourneesSRV: 1, patientsSRV: 20, srvMemeJour: memeJour, membreGmf: true, annee: "type" }, 38, 7, 0);
+verifier("compensation : 64,80 $ au plus par jour civil ; le SRV le même jour partage le plafond (12 312 $ ou 9 849,60 $)",
+  proche(compSrv(false).jour, 12312, 1e-6) && proche(compSrv(true).jour, 9849.6, 1e-6), { separe: compSrv(false).jour, meme: compSrv(true).jour });
+const sup = (o = {}) => C.revenuGmfu({ ...rev, semaines: 40, demiJournees: 8, enseignement: 2, heuresParDJ: 4, residents: 1, inscritsDebut: 600, ...o });
+verifier("supervision : les patients vus pendant le bloc ne se facturent pas avec l'intervention ; avec les visites des apprenants, oui",
+  proche(sup({ patientsPendantSupervision: 3 }).mixte.visites, sup().mixte.visites, 1e-9)
+  && sup({ patientsPendantSupervision: 3, supervisionFacturation: "visites" }).mixte.visites > sup({ supervisionFacturation: "visites" }).mixte.visites
+  && sup({ patientsPendantSupervision: 3 }).acte.visites > sup().acte.visites);
+verifier("supervision : 3,5 h l'avant-midi, jusqu'à 5 h l'après-midi (2 473,07 $ de plus pour 80 demi-journées de 4 h)",
+  proche(sup().mixte.supervision, 40 * 2 * 3.5 * 99.48 * 0.6215, 1e-6) && proche(sup({ enseignementApresMidi: 2 }).mixte.supervision - sup().mixte.supervision, 2473.07, 0.01)
+  && proche(sup({ enseignementApresMidi: 1 }).mixte.supervision, 40 * (3.5 + 4) * 99.48 * 0.6215, 1e-6));
+const dme = o => C.compensationCabinet({ patientsParDJ: 0, membreGmf: false, annee: "type", ...o }, 40, 8, 600).dme;
+verifier("DMÉ : hors GMF, licences et équipements ; le lien Internet et le commutateur (19977) seulement si réclamé", proche(dme({}), 4 * (459.90 + 287.45), 1e-6)
+  && proche(dme({ dmeInternet: true }), 4 * (459.90 + 287.45 + 700.35), 1e-6) && proche(dme({ dmeInternet: true, membreGmf: true }), 4 * 459.90, 1e-6));
 
 /* 25. CELIAPP (ARC, « Cotiser à un CELIAPP », 31 octobre 2026) : droits de 8 000 $ par année, plus le report des droits
    inutilisés de l'année d'avant (au plus 8 000 $), et 40 000 $ à vie. Versements par mois dans la projection. */

@@ -156,6 +156,8 @@
   const PCT_AU_DELA = 71.8;
   // Garde sur place au-delà du plafond annuel : 94 % du tarif, au plus 528 heures (annexe XIV, par. 5.03 et 5.05).
   const PCT_GARDE = 94, GARDE_MAX_94 = 528;
+  // Supervision en GMF-U : au plus 5 h l'après-midi (annexe XXIII, GMF-U, point 3.1 ii), code 42097).
+  const SUPERVISION_MAX_APRES_MIDI = 5;
   // Visites de suivi par grossesse, pour estimer les grossesses prises en charge quand leur nombre n'est pas inscrit.
   const VISITES_PAR_GROSSESSE = 10;
   const E = TARIFS_LIEU.etablissement;
@@ -224,40 +226,56 @@
   }
   /* Volume de patients (EP 40), par année civile, versé en juin de l'année suivante : montant
      supplémentaire selon les inscrits actifs au 31 décembre (par. 4.15 : 7 500 $ de 750 à 999,
-     15 000 $ à 1 000 et plus) et suppléments par patient au-delà des seuils (par. 15.01, depuis le
-     1er janvier 2019), si le taux d'assiduité atteint 80 % (par. 15.03). */
+     15 000 $ à 1 000 et plus), où certaines inscriptions comptent en double (par. 4.16 : patients
+     A, B et C du guichet et de la lettre d'entente no 321 des douze derniers mois, vulnérables
+     inscrits dans les douze mois après une attribution du guichet, puis, dès 500 inscrits, les
+     vulnérables au-delà de 40 % des inscriptions) ; la personne en inscrit le nombre. Suppléments
+     par patient au-delà des seuils (par. 15.01, depuis le 1er janvier 2019), sur le nombre brut,
+     selon le taux d'assiduité (par. 15.03 et 15.05) : 100 % à 80 % ou plus, 75 % de 75 à 79 %,
+     50 % de 70 à 74 %, rien en dessous. */
   const VOLUME_INSCRITS = [[500, 0], [750, 5.23], [1000, 10.46], [1500, 15.69], [Infinity, 20.92]];
   const VOLUME_VULNERABLES = [[200, 0], [300, 5.23], [500, 10.46], [Infinity, 15.69]];
-  function montantsVolume(inscrits, vulnerables, assiduite = true) {
-    const n = Math.round(inscrits), nv = Math.round(vulnerables);
-    const montant = n >= 1000 ? 15000 : n >= 750 ? 7500 : 0;
-    const supplements = assiduite ? parTranches(n, VOLUME_INSCRITS) + parTranches(nv, VOLUME_VULNERABLES) : 0;
-    return { montant, supplements, total: montant + supplements };
+  // Part des suppléments selon le taux d'assiduité (« 80 », « 75 », « 70 », « 0 ») ; vrai ou faux : l'ancienne case.
+  const partAssiduite = a => a === true || a === undefined || a === null ? 1 : a === false ? 0 : +a >= 80 ? 1 : +a >= 75 ? 0.75 : +a >= 70 ? 0.5 : 0;
+  function montantsVolume(inscrits, vulnerables, assiduite = true, enDouble = 0) {
+    const n = Math.round(inscrits), nv = Math.round(vulnerables), pondere = n + Math.max(0, Math.round(+enDouble || 0));
+    const montant = pondere >= 1000 ? 15000 : pondere >= 750 ? 7500 : 0;
+    const supplements = partAssiduite(assiduite) * (parTranches(n, VOLUME_INSCRITS) + parTranches(nv, VOLUME_VULNERABLES));
+    return { montant, supplements, total: montant + supplements, pondere };
   }
   /* Pratique polyvalente (EP 40, par. 16.00) : majoration de la rémunération des activités en
-     établissement (urgence, hospitalisation, CHSLD, obstétrique, soins palliatifs), selon les inscrits
+     établissement (par. 16.01 : urgence, malades admis, CHSLD, obstétrique, soins palliatifs, centre de
+     détention, centre jeunesse, centre de réadaptation ; l'évacuation aéromédicale compte comme
+     l'urgence ; aussi les constats de décès et le soutien préhospitalier, et la santé publique avec
+     la garde en disponibilité rémunérée), selon les inscrits
      actifs au 31 décembre : 2,5 %, 5 % ou 10 %, avec des seuils plus bas pendant les quatre premières
      années de pratique (par. 16.04). Au-delà de 245 patients vulnérables, chacun compte pour 2,5 (par. 16.03). */
   const SEUILS_POLYVALENCE = { 1: [100, 200, 300], 2: [250, 400, 600], 3: [400, 600, 900], 4: [550, 800, 1200], 5: [700, 1000, 1500] };
-  const ACTIVITES_POLYVALENTES = ["urgence", "hospitalisation", "obstetrique", "palliatifs", "chsld"];
+  const ACTIVITES_POLYVALENTES = ["urgence", "hospitalisation", "obstetrique", "palliatifs", "chsld", "detention", "jeunesse", "readaptation", "prehospitalier", "santePublique"];
   function tauxPolyvalence(inscrits, vulnerables, anneePratique) {
     const n = Math.round(inscrits + Math.max(0, vulnerables - 245) * 1.5);
     const [a, b, c] = SEUILS_POLYVALENCE[borne(Math.floor(+anneePratique || 5), 1, 5)];
     return n >= c ? 10 : n >= b ? 5 : n >= a ? 2.5 : 0;
   }
   /* Compensation des frais de cabinet, en cabinet seulement (EP 40) : par jour de pratique, 32,40 $ si l'on voit
-     au moins 6 patients inscrits, 64,80 $ à 12 ou plus, au plus 64,80 $ par jour (par. 14.01, codes 19928 et 19929) ;
-     au sans rendez-vous, 10 et 20 patients. Les demi-journées de rendez-vous vont par deux dans une journée ; une
-     demi-journée de sans rendez-vous compte pour une journée. DMÉ, dès 150 inscrits ou, la première année du
-     permis, sans égard au nombre (par. 17.01) : licences, 459,90 $ par trimestre ; hors GMF, équipements,
-     287,45 $ par trimestre en plus. */
+     au moins 6 patients inscrits, 64,80 $ à 12 ou plus, au plus 64,80 $ par jour civil (par. 14.01, codes 19928 et
+     19929) ; au sans rendez-vous, 10 et 20 patients. Les demi-journées de rendez-vous vont par deux dans une journée.
+     Une demi-journée de sans rendez-vous compte pour une journée, sauf si elle tombe le même jour qu'une demi-journée
+     de rendez-vous (r.srvMemeJour) : les deux demi-journées partagent alors le plafond de 64,80 $. DMÉ, dès
+     150 inscrits ou, la première année du permis, sans égard au nombre (par. 17.01, taxes incluses) : licences,
+     459,90 $ par trimestre (19978) ; hors GMF, équipements, 287,45 $ par trimestre en plus (19976), et le lien
+     Internet et le commutateur, 700,35 $ par trimestre (19977), qu'un seul médecin du cabinet réclame. */
   const parJourCabinet = (n, [haut, bas]) => n >= haut ? 64.80 : n >= bas ? 32.40 : 0;
   function compensationCabinet(r, semaines, demiJournees, inscrits) {
     const p = Math.max(0, r.patientsParDJ || 0), srv = Math.max(0, r.demiJourneesSRV || 0), pSrv = Math.max(0, r.patientsSRV || 0);
-    const jours = Math.floor(demiJournees / 2), seule = demiJournees - 2 * jours >= 1;
-    const parSemaine = jours * parJourCabinet(2 * p, [12, 6]) + (seule ? parJourCabinet(p, [12, 6]) : 0) + srv * parJourCabinet(pSrv, [20, 10]);
+    // Même jour : chaque demi-journée de SRV prend la place d'une demi-journée de rendez-vous dans une journée.
+    const mixtes = r.srvMemeJour ? Math.min(Math.floor(srv), Math.floor(demiJournees)) : 0;
+    const rdv = demiJournees - mixtes, jours = Math.floor(rdv / 2), seule = rdv - 2 * jours >= 1;
+    const parSemaine = jours * parJourCabinet(2 * p, [12, 6]) + (seule ? parJourCabinet(p, [12, 6]) : 0) + (srv - mixtes) * parJourCabinet(pSrv, [20, 10])
+      + mixtes * Math.min(64.80, parJourCabinet(p, [12, 6]) + parJourCabinet(pSrv, [20, 10]));
     const dmeOk = inscrits >= 150 || r.annee === "premiere";
-    const jour = Math.max(0, semaines) * parSemaine, dme = dmeOk ? 4 * (459.90 + (r.membreGmf ? 0 : 287.45)) : 0;
+    const jour = Math.max(0, semaines) * parSemaine;
+    const dme = dmeOk ? 4 * (459.90 + (r.membreGmf ? 0 : 287.45 + (r.dmeInternet ? 700.35 : 0))) : 0;
     return { jour, dme, total: jour + dme };
   }
   function revenuGmfu(r) {
@@ -266,15 +284,20 @@
     const D = { ...RAMQ, ...montantsLieu(lieuTarifs(r), r.listeEnseignement) }, m = k => r[k] ?? D[k];
     const SRV = Math.max(0, r.demiJourneesSRV || 0), patientsSRV = Math.max(0, r.patientsSRV || 0);
     const T = Math.min(r.enseignement, N), C = Math.max(N - T, 0);
-    const heuresSup = Math.min(H, m("supervisionMaxH"));
+    // Supervision payée au plus 3,5 h l'avant-midi et le soir, 5 h l'après-midi (annexe XXIII, GMF-U, point 3.1 ii) :
+    // codes 42096 de 8 h à 12 h, 42097 de 12 h à 18 h, 42098 de 18 h à 24 h). Heures par demi-journée d'enseignement.
+    const Tpm = Math.min(T, Math.max(0, +r.enseignementApresMidi || 0));
+    const heuresSup = T > 0 ? ((T - Tpm) * Math.min(H, m("supervisionMaxH")) + Tpm * Math.min(H, SUPERVISION_MAX_APRES_MIDI)) / T : 0;
     // Clientèle : non vulnérables, vulnérables et très vulnérables (parts des inscrits).
     const vt = borne((r.partTresVulnerable || 0) / 100, 0, 1), v = borne(r.partVulnerable / 100, 0, 1 - vt), nv = 1 - v - vt;
     const premiere = r.annee === "premiere";
     // Apprenants en GMF-U : visites des résidents et des externes par demi-journée d'enseignement.
     // À l'acte, le superviseur les facture ; au mixte, il choisit pour la demi-journée ces visites ou
     // l'intervention de supervision (annexe XXIII, B-2, par. 3.1) ; au taux horaire, ses heures sont payées.
+    // Avec l'intervention de supervision, les patients que le superviseur voit lui-même pendant le bloc ne se
+    // facturent pas (point 3.1 ii), conditions 2 et 4) : seuls ceux vus avant ou après le bloc.
     const resid = Math.max(0, r.residents || 0), ext = Math.max(0, r.externes || 0);
-    const parSupervision = r.supervisionFacturation === "visites";
+    const visitesApprenants = r.supervisionFacturation === "visites", pendant = Math.max(0, r.patientsPendantSupervision || 0);
     const apprenants = resid * (r.patientsParResident ?? 4.5) + ext * (r.patientsParExterne ?? 2.5);
     // Sans rendez-vous : part des visites ponctuelles complexes.
     const pc = borne((r.pctSrvComplexe || 0) / 100, 0, 1);
@@ -284,7 +307,12 @@
     // pas sur les suppléments à l'inscription ni sur les montants liés au volume.
     const maj = 1 + (r.majorationPct || 0) / 100;
 
-    const nouveaux = premiere ? r.nouveauxGuichet + r.nouveauxSansMedecin + r.nouveauxTransferes : 0;
+    // Patients transférés, déjà inscrits ailleurs : changement de médecin (aucun supplément), ou transfert en bloc de la
+    // lettre d'entente no 304 (suppléments du guichet, 19957, 19959 et 19960, à la première visite, art. 4 d)). Dans les
+    // deux cas, le forfait d'inscription et le forfait annuel d'un vulnérable se partagent en mois entiers, le mois du
+    // transfert restant au premier médecin (EP 40, par. 4.06 et 6.01 F ; lettre no 304, art. 4 f)).
+    const transferes = premiere ? Math.max(0, r.nouveauxTransferes || 0) : 0, enBloc = r.typeTransfert === "bloc";
+    const nouveaux = premiere ? r.nouveauxGuichet + r.nouveauxSansMedecin + transferes : 0;
     // Année type : de nouveaux patients chaque année, qui remplacent les départs (la clientèle reste stable).
     // Ils donnent leurs suppléments d'inscription et une visite de prise en charge.
     const anGuichet = premiere ? 0 : Math.max(0, +r.nouveauxAnGuichet || 0), anSansMedecin = premiere ? 0 : Math.max(0, +r.nouveauxAnSansMedecin || 0);
@@ -297,8 +325,8 @@
     const g2 = borne((r.partGroupe2 || 0) / 100, 0, 1), g34 = borne((r.partGroupe34 || 0) / 100, 0, 1 - g2);
     const forfaitAnnuel = v * m("forfaitVulnerable") * (1 + 0.5 * g2 + g34) + vt * m("forfaitTresVulnerable");
 
-    let visitesMixte = 0, visitesAppr = 0, visitesSrv = 0, nbVisites = 0, nbPriseEnCharge = 0, forfaitVulnNouveaux = 0, semainesPalierHaut = 0;
-    let visitesPropres = 0;
+    let visitesMixte = 0, visitesAppr = 0, visitesPendant = 0, visitesSrv = 0, nbVisites = 0, nbPriseEnCharge = 0, forfaitVulnNouveaux = 0, semainesPalierHaut = 0;
+    let visitesPropres = 0, partInscriptionTransferes = 0;
     for (let k = 0; k < W; k++) {
       const palier = inscrits >= 499.999 ? 1 : 0;
       if (palier) semainesPalierHaut++;
@@ -307,30 +335,34 @@
       const pec = Math.min(arrivees + remplacements, visitesSem);
       const tarifPec = nv * TF.pecNonVuln[palier] + (v + vt) * TF.pecVuln[palier];
       const tv = tarifVisite(r.mix, palier, TF);
-      visitesMixte += pec * tarifPec + (visitesSem - pec) * tv + T * (r.patientsPendantSupervision || 0) * tv;
+      visitesMixte += pec * tarifPec + (visitesSem - pec) * tv;
+      visitesPendant += T * pendant * tv;
       visitesAppr += T * apprenants * tv;
       visitesSrv += SRV * patientsSRV * tarifSrv(palier);
-      nbVisites += visitesSem + T * (r.patientsPendantSupervision || 0) + T * apprenants + SRV * patientsSRV;
+      nbVisites += visitesSem + T * pendant + T * apprenants + SRV * patientsSRV;
       nbPriseEnCharge += pec;
-      visitesPropres += visitesSem - pec + T * (r.patientsPendantSupervision || 0);
-      // Forfait vulnérable : payé à partir du mois d'inscription (EP 40, par. 6.01).
-      const mois = Math.floor((k / W) * 12);
-      forfaitVulnNouveaux += arrivees * forfaitAnnuel * (12 - mois) / 12;
+      visitesPropres += visitesSem - pec + T * pendant;
+      // Forfait vulnérable : payé à partir du mois d'inscription (EP 40, par. 6.01) ; pour un patient transféré,
+      // à partir du mois suivant.
+      const mois = Math.floor((k / W) * 12), arrT = k < etalement ? transferes / etalement : 0;
+      forfaitVulnNouveaux += (arrivees - arrT) * forfaitAnnuel * (12 - mois) / 12 + arrT * forfaitAnnuel * Math.max(0, 11 - mois) / 12;
+      partInscriptionTransferes += arrT * Math.max(0, 11 - mois) / 12;
       inscrits += arrivees;
     }
     const inscritsFin = inscrits, vulnerablesFin = inscritsFin * (v + vt);
 
     // Forfaits, suppléments et montants liés au volume : identiques dans tous les modes.
-    const forfaitInscription = inscritsFin * m("forfaitInscription") * maj;   // payé en entier (EP 40, par. 4.08)
+    // Payé en entier pour une inscription nouvelle (EP 40, par. 4.08) ; au prorata des mois pour un transfert.
+    const forfaitInscription = (inscritsFin - transferes + partInscriptionTransferes) * m("forfaitInscription") * maj;
     const forfaitVulnerable = (inscritsDepart * forfaitAnnuel + forfaitVulnNouveaux) * maj;
     // Patient sans médecin de famille : non vulnérable (19957), vulnérable hors guichet (19958),
     // vulnérable du guichet (19959), très vulnérable du guichet (19960).
     const suppNouveaux = (guichet, sansMedecin) => guichet * (nv * m("suppNonVulnerable") + v * m("suppVulnerableGuichet") + vt * m("suppTresVulnerable"))
       + sansMedecin * (nv * m("suppNonVulnerable") + (v + vt) * m("suppVulnerableHorsGuichet"));
-    let supplements = premiere ? suppNouveaux(r.nouveauxGuichet, r.nouveauxSansMedecin) : suppNouveaux(anGuichet, anSansMedecin);
+    let supplements = premiere ? suppNouveaux(r.nouveauxGuichet + (enBloc ? transferes : 0), r.nouveauxSansMedecin) : suppNouveaux(anGuichet, anSansMedecin);
     // Prime d'inscription individuelle d'une entente ponctuelle, par nouveau patient de la première année (0 si aucune).
     if (premiere) supplements += (r.nouveauxGuichet + r.nouveauxSansMedecin) * (r.primeInscription || 0);
-    const detailVolume = montantsVolume(inscritsFin, vulnerablesFin, r.assiduite80 !== false), volume = detailVolume.total;
+    const detailVolume = montantsVolume(inscritsFin, vulnerablesFin, r.assiduite ?? r.assiduite80, r.inscriptionsEnDouble), volume = detailVolume.total;
     // Forfait GMF : chaque nouveau patient à son inscription, et les inscrits vus au moins une fois dans l'année.
     const patientsVus = nouveaux + inscritsDepart * borne((r.pctPatientsVus ?? 80) / 100, 0, 1);
     const forfaitGmfPossible = patientsVus * m("forfaitGmf"), forfaitGmf = r.membreGmf ? forfaitGmfPossible : 0;
@@ -348,13 +380,14 @@
     const commun = forfaitInscription + forfaitVulnerable + forfaitGmf + supplements + volume + perDiem + compensation + activites + polyvalence + autres;
     const base = { perDiem, forfaitInscription, forfaitVulnerable, forfaitGmf, supplements, volume, compensation, activites, polyvalence, autres };
 
-    // Taux horaire (annexe XIV) : à 100 % jusqu'au plafond annuel (par. 5.02). Au-delà, la garde sur place
-    // à 94 %, au plus 528 h (par. 5.03 et 5.05), et les autres heures à 71,8 % (par. 5.04). Les heures au-delà
-    // du plafond se partagent entre la garde et les autres heures au prorata de leurs heures de l'année.
+    // Taux horaire (annexe XIV) : à 100 % jusqu'au plafond annuel (par. 5.02). Les heures en clinique remplissent
+    // d'abord le plafond ; la garde sur place faite en plus de ces heures le complète, puis celle faite en excédent
+    // est payée à 94 %, au plus 528 h (par. 5.03 et 5.05) ; les autres heures au-delà, à 71,8 % (par. 5.04).
     const heures = W * (N + SRV) * H, plafondHeures = Math.max(0, m("heuresMax100"));
     const garde = Math.max(0, +r.heuresGardeSurPlace || 0), heuresHoraire = heures + garde;
     const heuresAuDela = Math.max(0, heuresHoraire - plafondHeures);
-    const gardeAuDela = heuresHoraire > 0 ? Math.min(GARDE_MAX_94, heuresAuDela * garde / heuresHoraire) : 0, autresAuDela = heuresAuDela - gardeAuDela;
+    const gardeExcedent = Math.max(0, garde - Math.max(0, plafondHeures - heures));
+    const gardeAuDela = Math.min(GARDE_MAX_94, gardeExcedent), autresAuDela = heuresAuDela - gardeAuDela;
     const perteHeures = (gardeAuDela * (1 - PCT_GARDE / 100) + autresAuDela * (1 - PCT_AU_DELA / 100)) * m("tarifHoraire") * maj;
     // En plus des heures : forfait de responsabilité à chaque examen d'un patient vulnérable inscrit (visites de
     // suivi et périodiques des patients vulnérables, prises en charge de patients vulnérables), supplément à chaque
@@ -375,15 +408,15 @@
     // pour la demi-journée d'enseignement, ou les visites des apprenants.
     const mixte = {
       forfaitHoraire: heures * m("forfaitHoraireMixte") * maj,
-      visites: (visitesMixte + visitesSrv + (parSupervision ? visitesAppr : 0)) * maj * m("pctMixte") / 100,
-      supervision: parSupervision ? 0 : W * T * heuresSup * m("acteSupervision") * maj * m("pctSupervision") / 100,
+      visites: (visitesMixte + visitesSrv + (visitesApprenants ? visitesAppr + visitesPendant : 0)) * maj * m("pctMixte") / 100,
+      supervision: visitesApprenants ? 0 : W * T * heuresSup * m("acteSupervision") * maj * m("pctSupervision") / 100,
       ...base,
     };
     mixte.total = mixte.forfaitHoraire + mixte.visites + mixte.supervision + commun;
     // À l'acte : chaque visite au tarif de l'entente (100 % par défaut), celles des apprenants comprises
     // (l'intervention de supervision n'existe qu'au mixte), sans forfait horaire.
     const pctActe = r.pctActe ?? 100;
-    const acte = { visites: (visitesMixte + visitesSrv + visitesAppr) * maj * pctActe / 100, ...base };
+    const acte = { visites: (visitesMixte + visitesSrv + visitesAppr + visitesPendant) * maj * pctActe / 100, ...base };
     acte.total = acte.visites + commun;
     // Frais de cabinet (loyer, personnel, équipement) remis à la clinique : un pourcentage
     // de la facturation RAMQ de la clinique (sans la compensation des frais de cabinet, les
@@ -410,7 +443,7 @@
     const t0 = tarifVisite(r.mix, 0, TF), gainPalier = t0 > 0 ? tarifVisite(r.mix, 1, TF) / t0 - 1 : 0;
     return { heures, garde, heuresHoraire, heuresAuDela, gardeAuDela, autresAuDela, plafondHeures, perteHeures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, vulnerablesFin, semainesPalierHaut, gainPalier,
       patientsVus, forfaitGmfPossible, detailCompensation, activites, detailActivites, basePolyvalence, polyvalence, pctPolyvalence, anneePratique, detailVolume, examens,
-      visitesApprenants: W * T * apprenants, tarifMoyenRdv, tarifMoyenSrv,
+      visitesApprenants: W * T * apprenants, heuresSupervision: heuresSup, tarifMoyenRdv, tarifMoyenSrv,
       horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe };
   }
 
@@ -966,7 +999,7 @@
     return { plafondQc, admissibleQc, taux, creditQc: admissibleQc * taux, plafondFed, deduction };
   }
 
-  const Calc = { CELIAPP, celiappParAn, P2026, P2027, parametres, utiliserAnnee, avecAnnee, parametresActifs: () => PAR, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { CELIAPP, celiappParAn, P2026, P2027, parametres, utiliserAnnee, avecAnnee, parametresActifs: () => PAR, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, SUPERVISION_MAX_APRES_MIDI, partAssiduite, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil, fraisGarde };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

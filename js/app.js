@@ -49,6 +49,9 @@ window.Verrou.quandOuvert(function () {
       for (const [k, ancien] of [["pctMixte", 60], ["acteSupervision", 114.2], ["pctSupervision", 60]]) if (+d.revenu[k] === ancien) d.revenu[k] = C.RAMQ[k];
       // Forfait GMF (EP 33) : décoché dans les données d'avant, jusqu'à ce qu'on le confirme.
       d.revenu.membreGmf ??= false;
+      // Assiduité : l'ancienne case (80 % ou plus) devient un taux (80, 75, 70 ou 0).
+      if (d.revenu.assiduite === undefined && d.revenu.assiduite80 !== undefined) d.revenu.assiduite = d.revenu.assiduite80 === false ? "0" : "80";
+      delete d.revenu.assiduite80;
       // Compensation des frais de cabinet : un montant déjà inscrit reste ; sinon, elle est calculée.
       d.revenu.compensationMode ??= d.revenu.compensationCabinet > 0 ? "manuel" : "auto";
       // Tarifs enregistrés avant les deux colonnes (cabinet, établissement) : s'ils sont ceux de départ
@@ -1146,9 +1149,9 @@ window.Verrou.quandOuvert(function () {
         action("info", `Encore ${nb(prochain - n, 0)} patients inscrits pour une majoration de ${nb(taux, 1)} % de vos activités en établissement (pratique polyvalente), environ ${$(g.basePolyvalence * (taux - g.pctPolyvalence) / 100)} de plus.`);
       }
     }
-    if (rv.assiduite80 === false) {
-      const perdu = C.montantsVolume(g.inscritsFin, g.vulnerablesFin, true).supplements;
-      if (perdu > 0) action("info", `Avec un taux d'assiduité de 80 %, vous recevriez ${$(perdu)} de suppléments au volume (EP 40, par. 15.03).`);
+    if (C.partAssiduite(rv.assiduite) < 1) {
+      const perdu = C.montantsVolume(g.inscritsFin, g.vulnerablesFin, "80").supplements - g.detailVolume.supplements;
+      if (perdu > 0) action("info", `Avec un taux d'assiduité de 80 %, vous recevriez ${$(perdu)} de plus en suppléments au volume (EP 40, par. 15.03 et 15.05).`);
     }
     if (!rv.membreGmf && !S.confirmes["revenu.membreGmf"] && g.forfaitGmfPossible > 0)
       action("info", `${R.milieu === "gmfu" ? "Un GMF-U est un GMF : le" : R.milieu === "clsc" ? "Si votre CLSC fait partie d'un GMF, le" : "Si votre clinique est un GMF, le"} forfait de 9,35 $ par patient vu dans l'année (code 08875) ajouterait environ ${$(g.forfaitGmfPossible)}. Vérifiez-le, puis cochez ou non « Membre d'un GMF » (Revenu, Modifier).`);
@@ -3690,7 +3693,7 @@ window.Verrou.quandOuvert(function () {
     gmfu: "Taux horaire, mixte ou à l'acte ; enseignement",
     clsc: "Taux horaire, mixte ou à l'acte",
   };
-  const TYPES_ASSISTANT = Object.keys(ACTIVITES).filter(k => k !== "autre");
+  const TYPES_ASSISTANT = ["urgence", "hospitalisation", "obstetrique", "palliatifs", "chsld", "garde"].filter(k => ACTIVITES[k]);
   let A = null, etape = 0;
   const reponsesVides = () => ({ famille: null, depuis12mois: true, enfantCommun: false, partenaire: "salarie", revenuPartenaire: 0,
     enfants: [], milieu: null, mode: "horaire", demiJournees: 8, srv: 0, premiere: true, incorporee: false,

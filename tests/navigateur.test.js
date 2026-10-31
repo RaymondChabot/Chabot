@@ -773,10 +773,12 @@ async function transfert(b, base) {
   const autre = await ouvrir(b, base, { page: "apercu" });
   await autre.p.goto(lien); await pret(autre.p); await autre.p.waitForSelector("#transfert-code");
   verifier("transfert : la charge quitte l'adresse ; l'autre appareil demande le code", await autre.p.evaluate(() => location.hash === "#apercu" && document.getElementById("feuille-titre").textContent === "Recevoir des données"));
-  await autre.p.fill("#transfert-code", "AAAA-BBBB-CCCC-DDDD"); await autre.p.click(".transfert-form [type=submit]"); await autre.p.waitForTimeout(900);
+  // Le déchiffrement (600 000 itérations) peut prendre quelques secondes quand la suite charge la machine.
+  const messageDe = (q, texte) => q.waitForFunction(t => ((document.querySelector(".transfert-form .message") || {}).textContent || "").includes(t), texte, { timeout: 20000 }).catch(() => {});
+  await autre.p.fill("#transfert-code", "AAAA-BBBB-CCCC-DDDD"); await autre.p.click(".transfert-form [type=submit]"); await messageDe(autre.p, "Code incorrect");
   verifier("transfert : mauvais code refusé", (await autre.p.textContent(".transfert-form .message")).includes("Code incorrect"));
   await autre.p.fill("#transfert-code", code.replace(/-/g, "").toLowerCase()); await autre.p.click(".transfert-form [type=submit]");
-  await autre.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 5000 });
+  await autre.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 20000 });
   const resume = await autre.p.textContent("#feuille-corps .feuille-intro");
   verifier("transfert : ce qui arrive est décrit avant de remplacer", /^Données du .+ : \d+ dettes?, \d+ dépenses? inscrites?\. Elles remplaceront/.test(resume), resume);
   await autre.p.click("#feuille-corps .bouton.danger"); await autre.p.waitForTimeout(300);
@@ -786,10 +788,10 @@ async function transfert(b, base) {
   // Coller le lien dans l'app (iPhone : l'app installée garde ses propres données).
   const troisieme = await ouvrir(b, base, { page: "donnees" });
   await troisieme.p.click("#transfert-recevoir"); await troisieme.p.waitForSelector("#transfert-lien");
-  await troisieme.p.fill("#transfert-lien", lien.slice(0, -12)); await troisieme.p.fill("#transfert-code", code); await troisieme.p.click(".transfert-form [type=submit]"); await troisieme.p.waitForTimeout(900);
+  await troisieme.p.fill("#transfert-lien", lien.slice(0, -12)); await troisieme.p.fill("#transfert-code", code); await troisieme.p.click(".transfert-form [type=submit]"); await messageDe(troisieme.p, "incomplet ou abîmé");
   verifier("transfert : lien abîmé refusé", (await troisieme.p.textContent(".transfert-form .message")).includes("incomplet ou abîmé"));
   await troisieme.p.fill("#transfert-lien", `Voici le lien : ${lien}`); await troisieme.p.click(".transfert-form [type=submit]");
-  await troisieme.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 5000 });
+  await troisieme.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 20000 });
   await troisieme.p.click("#feuille-corps .bouton.danger"); await troisieme.p.waitForTimeout(300);
   verifier("transfert : lien collé dans l'app, puis reçu", await troisieme.p.evaluate(() => window.Wealthnord.etat().revenu.semaines === 41));
   verifier("transfert : aucune erreur", erreurs.length + autre.erreurs.length + troisieme.erreurs.length === 0, [...erreurs, ...autre.erreurs, ...troisieme.erreurs]);

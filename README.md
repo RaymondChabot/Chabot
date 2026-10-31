@@ -147,7 +147,8 @@ Revenu affiche tous les détails.
   établissement. Tous les tarifs, forfaits et suppléments se modifient ;
   majoration selon le territoire. En plus : activités en établissement
   (urgence, hospitalisation, obstétrique, soins palliatifs, CHSLD, gardes,
-  autre), par semaine, par mois, par année ou toutes les N semaines, au
+  centres de détention, jeunesse et de réadaptation, constats de décès et
+  soutien préhospitalier, santé publique, autre), par semaine, par mois, par année ou toutes les N semaines, au
   revenu par jour ou aux patients par jour × revenu par patient ; autres
   revenus (formulaires, expertises, médico-administratif, enseignement,
   location, placements) et lignes libres.
@@ -345,19 +346,27 @@ dossier racine.
   vigueur depuis 2018 ou 2019 :
   - Taux horaire (annexe XIV) : 99,48 $ l'heure, à 100 % jusqu'à
     1 540 heures par année (jusqu'à 880 heures de plus si le chef de
-    département l'autorise), puis 71,8 % ; la garde sur place au-delà du
-    plafond, à 94 %, jusqu'à 528 heures (par. 5.03 et 5.05), au prorata
-    des heures de l'année.
+    département l'autorise), puis 71,8 % ; les heures en clinique
+    remplissent d'abord le plafond, et la garde sur place faite en
+    excédent est payée à 94 %, jusqu'à 528 heures (par. 5.02, 5.03 et
+    5.05).
   - Mixte en CLSC et en GMF-U (annexe XXIII, sections B-1 et B-2) :
     forfait horaire de 59,68 $, 63,58 % du tarif des services médicaux ;
     intervention de supervision en GMF-U à 24,87 $ par 15 minutes, payée
-    à 62,15 %, jusqu'à 3,5 heures par demi-journée.
+    à 62,15 %, jusqu'à 3,5 heures l'avant-midi et le soir et 5 heures
+    l'après-midi ; avec elle, les patients vus pendant le bloc ne se
+    facturent pas (point 3.1).
   - EP 40 : forfait d'inscription (11,85 $ en cabinet, 8,95 $ en
     établissement), forfait annuel d'un patient vulnérable (62,50 $ et
     47 $, jusqu'à 200 % selon les catégories), suppléments à l'inscription
-    d'un patient sans médecin de famille (codes 19957 à 19960), montants
-    liés au volume de patients (par. 4.15 et 15.01) et majoration de la
-    pratique polyvalente (par. 16.00). La majoration temporaire des
+    d'un patient sans médecin de famille (codes 19957 à 19960) ; patients
+    transférés : forfaits au prorata des mois, suppléments du guichet pour
+    un transfert en bloc (lettre d'entente no 304) ; montants liés au
+    volume de patients (par. 4.15, inscriptions en double du par. 4.16
+    inscrites par la personne, suppléments du par. 15.01 selon
+    l'assiduité, 100 %, 75 % ou 50 %, par. 15.05) ; compensation des frais
+    de cabinet au plus 64,80 $ par jour civil (par. 14.01) ; majoration de
+    la pratique polyvalente (par. 16.00, secteurs du par. 16.01). La majoration temporaire des
     suppléments (par. 18.01) a pris fin le 30 avril 2021 ; la limite de
     150 patients du guichet après 4 ans (ancien par. 13.02) est abolie
     depuis le 1er janvier 2023.
@@ -370,7 +379,8 @@ dossier racine.
     ou suivis de grossesse ÷ 10). À l'acte et au mixte, ils sont compris dans
     le tarif des visites (note du tableau-synthèse des visites). DMÉ : dès
     150 inscrits, ou sans égard au nombre la première année du permis
-    (par. 17.01).
+    (par. 17.01) ; hors GMF, le lien Internet et le commutateur (19977) si
+    vous le réclamez.
   - EP 42 (médecin enseignant) : demi-per diem par résident et par externe,
     en établissement ou en cabinet reconnu, liste 1 ou liste 2.
 - Sans rendez-vous : visites ponctuelles mineures (15765, 15766) et
