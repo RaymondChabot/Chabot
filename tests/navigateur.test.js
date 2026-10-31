@@ -471,7 +471,8 @@ async function apercuCoherent(b, base) {
   await p.click("#ap-assistant");
   const suivant = () => p.click("#as-suivant");
   await suivant(); await p.check('input[name="as-famille"][value="seul"]'); await suivant(); await suivant();
-  await p.check('input[name="as-milieu"][value="gmfu"]'); await suivant(); await suivant();
+  await p.check('input[name="as-milieu"][value="gmfu"]'); await suivant();
+  await p.fill("#as-patientsParDJ", "8"); await suivant(); await suivant(); await suivant();
   await p.check('input[name="as-logement"][value="proprietaire"]'); await suivant(); await suivant(); await suivant();
   await p.waitForTimeout(300);
   const neuf = await p.evaluate(() => ({ etiquette: document.querySelector("#ap-hero .hero-etiquette").textContent, lien: !!document.querySelector('#ap-hero a[href="#budget/mois"]') }));
@@ -479,6 +480,48 @@ async function apercuCoherent(b, base) {
   await remplacer(p, { "budget.0.montant": 500 });
   verifier("aperçu avec une dépense : surplus", (await p.textContent("#ap-hero .hero-etiquette")) === "Votre surplus mensuel");
   verifier("aperçu : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
+/* 18 b. Assistant depuis un stockage vide : la pratique ne garde rien de la clientèle, du rythme ni des frais de
+   l'exemple ; les semaines en clinique, 52 moins les vacances ; dépenses professionnelles à 0 ; prêt étudiant avec son
+   taux et son paiement (aucun paiement : intérêts seulement) ; « Vos revenus » n'est pas coché à la simple ouverture. */
+async function assistantVide(b, base) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+  const p = await ctx.newPage(), erreurs = [];
+  p.on("pageerror", e => erreurs.push(String(e)));
+  await ctx.addInitScript(() => { try { sessionStorage.setItem("wm.ouverture", "1"); } catch (e) { /* stockage indisponible */ } });
+  await p.goto(`${base}/index.html`); await pret(p);
+  await p.waitForSelector("#assistant[open]", { timeout: 5000 });
+  const suivant = () => p.click("#as-suivant"), message = () => p.textContent("#as-message");
+  await suivant(); await p.check('input[name="as-famille"][value="seul"]'); await suivant(); await suivant();
+  await p.check('input[name="as-milieu"][value="clinique"]'); await suivant();
+  await suivant();
+  verifier("assistant vide : les patients par demi-journée sont demandés", (await message()).includes("patients que vous voyez par demi-journée"), await message());
+  await p.fill("#as-patientsParDJ", "9"); await p.fill("#as-vacances", "7"); await suivant();
+  await p.fill("#as-inscrits", "0"); await p.fill("#as-nouveaux", "300"); await p.fill("#as-vulnerables", "25"); await p.fill("#as-fraisPct", "28");
+  await suivant(); await suivant();
+  await p.check('input[name="as-logement"][value="locataire"]'); await p.fill("#as-loyer", "1500"); await suivant();
+  await p.check("#as-pret"); await p.fill("#as-pretSolde", "40000"); await suivant();
+  verifier("assistant vide : le taux du prêt étudiant est demandé", (await message()).includes("taux de votre prêt étudiant"), await message());
+  await p.fill("#as-pretTaux", "6.45"); await suivant();
+  const recap = await p.textContent("#as-corps");
+  verifier("assistant vide : le récapitulatif montre la semaine et la clientèle", recap.includes("9 patients") && recap.includes("45 semaines en clinique") && recap.includes("300 nouveaux attendus")
+    && recap.includes("25 % vulnérables") && recap.includes("28 % remis à la clinique") && recap.includes("Sans partenaire"), recap);
+  await suivant(); await p.waitForTimeout(300);
+  const x = await p.evaluate(() => { const S = window.Wealthnord.etat(), r = S.revenu, d = S.dettes.find(z => z.creditImpot);
+    return { pdj: r.patientsParDJ, guichet: r.nouveauxGuichet, vuln: r.partVulnerable, frais: r.fraisCabinetPct, semaines: r.semaines, transf: r.nouveauxTransferes, sans: r.nouveauxSansMedecin,
+      pro: S.impot.depensesPro, exemple: S.meta.exemple, pret: d && { taux: d.taux, paiement: d.paiement, interets: d.interetsSeulement }, gmf: r.membreGmf, gmfConfirme: !!S.confirmes["revenu.membreGmf"] }; });
+  verifier("assistant vide : rien de l'exemple dans la pratique", x.pdj === 9 && x.guichet === 300 && x.vuln === 25 && x.frais === 28 && x.semaines === 45 && x.transf === 0 && x.sans === 0
+    && x.pro === 0 && !x.exemple && !x.gmf && x.gmfConfirme, x);
+  verifier("assistant vide : prêt étudiant au taux inscrit, intérêts seulement sans paiement", x.pret && x.pret.taux === 6.45 && x.pret.paiement === 0 && x.pret.interets, x.pret);
+  // Ouvrir le panneau Revenu ne coche pas « Vos revenus » ; changer un champ, oui.
+  await allerA(p, "revenu"); await p.click("#v-revenu .bouton-modifier"); await p.waitForTimeout(300);
+  const vuAvant = await p.evaluate(() => !!(window.Wealthnord.etat().meta.vus || {}).revenu);
+  await p.fill("#c-revenu-patientsParDJ", "10"); await p.waitForTimeout(200);
+  const vuApres = await p.evaluate(() => !!(window.Wealthnord.etat().meta.vus || {}).revenu);
+  verifier("assistant vide : ouvrir le panneau Revenu ne compte pas comme rempli ; changer un champ, oui", !vuAvant && vuApres, { vuAvant, vuApres });
+  verifier("assistant vide : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
 
@@ -495,7 +538,7 @@ async function assistantMode(b, base) {
   await p.check('input[name="as-milieu"][value="gmfu"]');
   verifier("assistant : taux horaire coché d'office", await p.isChecked('input[name="as-mode"][value="horaire"]'));
   await p.check('input[name="as-mode"][value="mixte"]');
-  await suivant(); await suivant();
+  await suivant(); await p.fill("#as-patientsParDJ", "8"); await suivant(); await suivant(); await suivant();
   await p.check('input[name="as-logement"][value="locataire"]'); await suivant(); await suivant();
   verifier("assistant : le mode dans le récapitulatif", (await p.textContent("#as-corps")).includes("GMF-U · taux mixte"));
   await suivant(); await p.waitForTimeout(300);
@@ -983,7 +1026,7 @@ async function planCalendrier(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

@@ -12,7 +12,7 @@
      Un médecin qui débute en GMF (non universitaire), payé à l'acte :
      7 demi-journées de rendez-vous à 6 patients et 1 demi-journée de
      sans rendez-vous à 12 patients ; une semaine d'hospitalisation toutes
-     les 6 semaines (environ 16 patients par jour). Seul(e), locataire.
+     les 6 semaines (environ 16 patients par jour). Sans partenaire, locataire.
      ============================================================ */
   const moisCourant = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
   const EXEMPLE = {
@@ -423,7 +423,7 @@
       { g: "Votre pratique" },
       { p: "impot.structure", l: "Les paiements de la RAMQ sont versés", t: "select", o: [["particulier", "À vous : travail autonome, sans société"], ["societe", "À votre société (pratique incorporée)"]] },
       { g: "Déductions" },
-      { p: "impot.depensesProMode", l: "Dépenses professionnelles", t: "select", o: [["total", "Un total"], ["detail", "Le détail, ligne par ligne"]], h: "Collège des médecins, FMOQ, ACPM, formation, équipement… Payées par la société si vous êtes incorporé(e)." },
+      { p: "impot.depensesProMode", l: "Dépenses professionnelles", t: "select", o: [["total", "Un total"], ["detail", "Le détail, ligne par ligne"]], h: "Collège des médecins, FMOQ, ACPM, formation, équipement… Payées par la société si votre pratique est incorporée." },
       { p: "impot.depensesPro", l: "Total des dépenses professionnelles", u: "$/an", s: 100, si: "impot.depensesProMode=total" },
       { p: "epargne.reer.cotisationAnnuelle", l: "Cotisation REER de l'année", u: "$/an", s: 100 },
       { g: "Société" },
@@ -439,15 +439,15 @@
       { p: "menage.partCommunMoi", l: "Votre part des dépenses partagées", u: "%", h: "Le reste des dépenses partagées est payé par l'autre personne du ménage. Sans partage, laissez 100 %." },
       { g: "Couple" },
       { p: "conjointe.active", l: "Vous vivez en couple", t: "check", h: "Revenus, impôt, dépenses partagées et part de la maison de l'autre personne." },
-      { p: "conjointe.lien", l: "Votre union", t: "select", o: [["maries", "Mariés ou en union civile"], ["fait", "Conjoints de fait"]], si: "conjointe.active" },
+      { p: "conjointe.lien", l: "Votre union", t: "select", o: [["maries", "Mariage ou union civile"], ["fait", "Union de fait"]], si: "conjointe.active" },
       { p: "conjointe.depuis12mois", l: "Vie commune depuis au moins 12 mois", t: "check", si: "conjointe.active&conjointe.lien=fait", h: "Pour l'impôt et les allocations, des conjoints de fait forment un couple après 12 mois de vie commune, ou dès qu'ils ont un enfant ensemble. Avant : chacun est imposé comme une personne seule." },
       { p: "conjointe.enfantCommun", l: "Vous avez un enfant ensemble", t: "check", si: "conjointe.active&conjointe.lien=fait" },
       { p: "conjointe.designation", l: "Désigner cette personne comme", t: "select", o: [["partenaire", "Partenaire"], ["conjointe", "Conjointe"], ["conjoint", "Conjoint"]], si: "conjointe.active" },
-      { p: "conjointe.statut", l: "Son travail", t: "select", o: [["salarie", "Salarié(e)"], ["autonome", "À son compte : travail autonome, médecin…"], ["sans", "Sans revenu de travail : études, maison, congé"]], si: "conjointe.active" },
+      { p: "conjointe.statut", l: "Son travail", t: "select", o: [["salarie", "Un emploi salarié"], ["autonome", "À son compte : travail autonome, médecine…"], ["sans", "Sans revenu de travail : études, maison, congé"]], si: "conjointe.active" },
       { p: "conjointe.salaire", l: "Son salaire brut", u: "$/an", s: 500, si: "conjointe.active&conjointe.statut=salarie" },
       { p: "conjointe.rpa", l: "Ses cotisations au régime de retraite de l'employeur", u: "$/an", s: 100, si: "conjointe.active&conjointe.statut=salarie" },
       { p: "conjointe.syndicat", l: "Ses cotisations syndicales ou professionnelles", u: "$/an", s: 50, si: "conjointe.active&conjointe.statut=salarie" },
-      { p: "conjointe.revenuAutonome", l: "Son revenu brut d'entreprise", u: "$/an", s: 500, si: "conjointe.active&conjointe.statut=autonome", h: "Pour un(e) médecin : paiements de la RAMQ et autres honoraires." },
+      { p: "conjointe.revenuAutonome", l: "Son revenu brut d'entreprise", u: "$/an", s: 500, si: "conjointe.active&conjointe.statut=autonome", h: "Pour une pratique médicale : paiements de la RAMQ et autres honoraires." },
       { p: "conjointe.depensesAutonome", l: "Ses dépenses d'entreprise déductibles", u: "$/an", s: 100, si: "conjointe.active&conjointe.statut=autonome" },
       { p: "conjointe.autresRevenus", l: "Ses autres revenus imposables", u: "$/an", s: 100, si: "conjointe.active" },
       { p: "conjointe.medicamentsPublic", l: "Son assurance médicaments : régime public", t: "check", si: "conjointe.active", h: "La prime se paie avec l'impôt du Québec. Décochez en cas d'assurance collective au travail." },

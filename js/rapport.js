@@ -472,7 +472,7 @@ window.Verrou.quandOuvert(function () {
   function comptableResidence(S, R, date) {
     const AN_IMPOT = R.parametres.annee;   // année des paramètres d'impôt du plan
     const I = R.impot, x = R.res, P = O.votreP(), suivante = AN_IMPOT + 1, reer = S.epargne.reer.cotisationAnnuelle, celiapp = R.celiappAnnee(0);
-    const union = !R.couple ? "Personne seule" : S.conjointe.lien === "fait" ? (R.coupleFiscal ? "Conjoints de fait : couple pour l'impôt" : "Conjoints de fait depuis moins de 12 mois : imposés seuls") : "Mariés ou unis civilement";
+    const union = !R.couple ? "Sans partenaire" : S.conjointe.lien === "fait" ? (R.coupleFiscal ? "Union de fait : couple pour l'impôt" : "Union de fait de moins de 12 mois : chaque personne imposée seule") : "Mariage ou union civile";
     const revenus = [
       { c: [`Salaire de résident, R${x.niveau} (T4, relevé 1)`, $(x.salaire)] },
       ...(x.garde + x.enseignement > 0 ? [{ c: ["Primes de responsabilité", $(x.garde + x.enseignement)] }] : []),
@@ -537,7 +537,7 @@ window.Verrou.quandOuvert(function () {
     const somme = cles => cles.reduce((t, k) => t + (budget.get(k) || 0), 0);
     const medicaux = ["dentiste", "orthodontie", "lunettes", "medicaments", "assuranceSante"].filter(k => budget.get(k) > 0);
     const union = !R.couple ? "Personne seule" : S.conjointe.lien === "fait"
-      ? (R.coupleFiscal ? "Conjoints de fait : couple pour l'impôt" : "Conjoints de fait depuis moins de 12 mois : imposés seuls") : "Mariés ou unis civilement";
+      ? (R.coupleFiscal ? "Union de fait : couple pour l'impôt" : "Union de fait de moins de 12 mois : chaque personne imposée seule") : "Mariage ou union civile";
     const enfants = R.ages.length ? `${R.ages.length} enfant${R.ages.length > 1 ? "s" : ""} de moins de 18 ans (${R.ages.join(", ")} ans)` : "aucun enfant à charge";
 
     const revenus = soc ? [

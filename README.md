@@ -114,8 +114,12 @@ sommaire pour le comptable décrit l'année en résidence, même en vue
 Pratique.
 
 Au premier lancement, un **assistant de départ** pose quelques questions
-(famille, enfants, pratique, logement, dettes) et bâtit le point de départ
-à partir des réponses ; l'exemple fictif reste offert. La carte **Votre
+(famille, enfants, pratique, semaine, clientèle, activités, logement,
+dettes) et bâtit le point de départ à partir des réponses : patients par
+demi-journée, semaines de vacances, patients inscrits et nouveaux, part de
+vulnérables, frais de cabinet, taux et paiement des prêts. Rien de la
+clientèle ni des frais de l'exemple n'est gardé ; les dépenses
+professionnelles partent de 0. L'exemple fictif reste offert. La carte **Votre
 portrait** de l'aperçu montre ce qui est rempli et propose la suite. Des conjoints de
 fait ne forment un couple pour l'impôt qu'après 12 mois de vie commune ou
 avec un enfant commun : avant, chacun est imposé seul.

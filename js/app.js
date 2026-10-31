@@ -243,7 +243,6 @@ window.Verrou.quandOuvert(function () {
   };
   function ouvrirSection(nom) {
     const [titre, champs] = FEUILLES[nom];
-    if (nom === "revenu") voir("revenu");
     ouvrirFeuille(titre, c => {
       if (nom === "revenu") {
         c.appendChild(el("p", "aide feuille-intro", "L'essentiel suffit pour commencer. Pour optimiser, affichez tous les détails : tarifs, forfaits, suppléments, apprenants, majoration selon le territoire."));
@@ -1027,7 +1026,7 @@ window.Verrou.quandOuvert(function () {
       action("info", `Votre première année de pratique (${S.revenu.anneePremiere}) est terminée : quand votre clientèle sera bâtie, choisissez « Année type » (Revenu, Modifier).`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     // En résidence, le régime d'assurance collective de l'entente de la FMRQ couvre les médicaments (art. 28.10).
-    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si vous y êtes inscrit(e), décochez le régime public (Budget, bouton Ménage) ; la prime de 766 $ ne s'applique pas.");
+    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si cette assurance collective vous couvre, décochez le régime public (Budget, bouton Ménage) ; la prime de 766 $ ne s'applique pas.");
     else if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
       action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 766 $ par adulte en 2026, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
     const auj = new Date(S.strategie.debut + "-01T00:00:00");
@@ -1347,7 +1346,7 @@ window.Verrou.quandOuvert(function () {
       c.appendChild(el("p", "aide", "Collège des médecins, FMOQ, ACPM, formation, équipement, abonnements… Choisissez « Ligne par ligne » pour les détailler et optimiser."));
       return;
     }
-    c.appendChild(el("p", "aide", "Montant et période. Déductibles du revenu imposable ; payées par la société si vous êtes incorporé(e)."));
+    c.appendChild(el("p", "aide", "Montant et période. Déductibles du revenu imposable ; payées par la société si votre pratique est incorporée."));
     S.impot.depensesProDetail.forEach((x, i) => {
       const it = ITEMS_PRO.get(x.k), l = el("div", "ligne-depense ligne-revenu" + (x.montant > 0 ? " remplie" : ""));
       const nom = el("label", null, it.nom); nom.htmlFor = `dp-${x.k}`;
@@ -1657,7 +1656,7 @@ window.Verrou.quandOuvert(function () {
       ? `Allocations familiales : ${$(R.allocations)} par année, soit ${$(R.allocations / 12)} par mois, sur un revenu net familial de ${$(R.netFedFamille)}${nEnf ? ` et ${nEnf} enfant${nEnf > 1 ? "s" : ""}` : ""}.`
       : `Allocations familiales : montant inscrit à la main, ${$(R.allocations)} par année.`) +
       (R.couple ? (S.famille.versementA === "conjointe" ? ` Elles sont versées à ${votreP()}.` : " Elles vous sont versées.") : "")));
-    if (R.couple && !R.coupleFiscal) z.appendChild(el("p", "aide", `Conjoints de fait depuis moins de 12 mois, sans enfant commun : pour l'impôt de cette année, vous et ${votreP()} êtes imposés comme des personnes seules. Pas de transfert de crédits ; allocations et prime d'assurance médicaments selon le revenu de chacun. Dès l'an prochain, après 12 mois de vie commune, vous formerez un couple pour l'impôt : l'avenir en tient compte.`));
+    if (R.couple && !R.coupleFiscal) z.appendChild(el("p", "aide", `Union de fait de moins de 12 mois, sans enfant commun : pour l'impôt de cette année, vous et ${votreP()} êtes chacun une personne seule. Pas de transfert de crédits ; allocations et prime d'assurance médicaments selon le revenu de chacun. Dès l'an prochain, après 12 mois de vie commune, vous formerez un couple pour l'impôt : l'avenir en tient compte.`));
     if (S.famille.calculAuto) {
       if (!nEnf) z.appendChild(el("p", "aide", "Ajoutez les enfants et leur âge dans la page Patrimoine pour calculer les allocations."));
       else z.appendChild(rangees(el("div"), [
@@ -3099,6 +3098,7 @@ window.Verrou.quandOuvert(function () {
       if (inp.dataset.p === "revenu.milieu") { choisirMilieu(v); return; }
       if (inp.dataset.p.startsWith("revenu.tarifs.")) S.revenu.tarifsModifies = true;
       if (inp.dataset.p === "revenu.membreGmf") S.confirmes["revenu.membreGmf"] = true;   // l'alerte de l'Aperçu disparaît
+      if (inp.dataset.p.startsWith("revenu.")) vus().revenu = true;   // le portrait : vos revenus, précisés
       ecrire(inp.dataset.p, v); S.meta.exemple = false;
       // Résidence cochée : la vue Résidence, et le 1er juillet qui vient comme début de pratique, à préciser.
       if (inp.dataset.p === "residence.active" && v) { S.residence.vue = "residence"; if (!S.residence.debutPratique) { S.residence.debutPratique = R.debutPratique; remplirChamps(); } }
@@ -3694,10 +3694,11 @@ window.Verrou.quandOuvert(function () {
   let A = null, etape = 0;
   const reponsesVides = () => ({ famille: null, depuis12mois: true, enfantCommun: false, partenaire: "salarie", revenuPartenaire: 0,
     enfants: [], milieu: null, mode: "horaire", demiJournees: 8, srv: 0, premiere: true, incorporee: false,
+    patientsParDJ: null, patientsSRV: null, heuresParDJ: 4, vacances: 6, inscrits: 0, nouveaux: 0, vulnerables: 0, membreGmf: null, fraisPct: 0,
     statut: "pratique", niveau: "1", debutPratique: (() => { const d = new Date(); return `${d.getMonth() >= 6 ? d.getFullYear() + 1 : d.getFullYear()}-07`; })(),
     ...Object.fromEntries(TYPES_ASSISTANT.flatMap(k => [["act_" + k, false], ["actN_" + k, 4]])),
     logement: null, loyer: 0, maison: 0, hypotheque: 0, tauxHyp: 4.5, paiementHyp: 0, partMaison: 50,
-    marge: false, margeSolde: 0, margeTaux: 4.5, pret: false, pretSolde: 0, auto: false, autoSolde: 0, autoPaiement: 0 });
+    marge: false, margeSolde: 0, margeTaux: 4.5, pret: false, pretSolde: 0, pretTaux: null, pretPaiement: 0, auto: false, autoSolde: 0, autoTaux: null, autoPaiement: 0 });
   const enCouple = () => A.famille === "maries" || A.famille === "fait";
 
   // Morceaux de formulaire : choix illustrés (boutons radio), nombres, cases.
@@ -3716,9 +3717,9 @@ window.Verrou.quandOuvert(function () {
     return f;
   }
   const asGroupe = (...champs) => { const g = el("div", "as-groupe"); champs.filter(Boolean).forEach(x => g.appendChild(x)); return g; };
-  const asNombre = (l, cle, u, s, h) => creerChamp({ l, u, s, h }, "as-" + cle, inp => {
-    inp.value = A[cle] || ""; inp.placeholder = "0";
-    inp.addEventListener("input", () => { A[cle] = valeur(inp) ?? 0; });
+  const asNombre = (l, cle, u, s, h, vide = false) => creerChamp({ l, u, s, h }, "as-" + cle, inp => {
+    inp.value = A[cle] || (vide && A[cle] === 0 ? "0" : ""); inp.placeholder = vide ? "" : "0";
+    inp.addEventListener("input", () => { A[cle] = vide ? valeur(inp) : valeur(inp) ?? 0; });
   }, false);
   const asCase = (l, cle, h, refaire) => creerChamp({ l, t: "check", h }, "as-" + cle, inp => {
     inp.checked = !!A[cle];
@@ -3734,11 +3735,11 @@ window.Verrou.quandOuvert(function () {
       } else c.appendChild(el("p", "aide", "À la fin, vos valeurs actuelles seront remplacées. Exportez d'abord une sauvegarde (page Données) si vous voulez les garder."));
     } },
     { titre: "Votre situation familiale", valide: () => A.famille ? "" : "Choisissez votre situation familiale.", rendre: c => {
-      c.appendChild(asChoix("Vous êtes", "famille", [["seul", "Seul(e)"], ["maries", "En couple : mariés ou union civile"], ["fait", "En couple : conjoints de fait"]]));
+      c.appendChild(asChoix("Votre situation", "famille", [["seul", "Sans partenaire"], ["maries", "En couple : mariage ou union civile"], ["fait", "En couple : union de fait"]]));
       if (A.famille === "fait") c.appendChild(asGroupe(asCase("Vie commune depuis au moins 12 mois", "depuis12mois"),
         asCase("Vous avez un enfant ensemble", "enfantCommun", "Pour l'impôt et les allocations, des conjoints de fait forment un couple après 12 mois de vie commune, ou dès qu'ils ont un enfant ensemble.")));
       if (!enCouple()) return;
-      c.appendChild(asChoix("Le travail de votre partenaire", "partenaire", [["salarie", "Salarié(e)"], ["autonome", "À son compte", "Travail autonome, médecin…"], ["sans", "Sans revenu de travail", "Études, maison, congé"]]));
+      c.appendChild(asChoix("Le travail de votre partenaire", "partenaire", [["salarie", "Un emploi salarié"], ["autonome", "À son compte", "Travail autonome, médecine…"], ["sans", "Sans revenu de travail", "Études, maison, congé"]]));
       if (A.partenaire !== "sans") c.appendChild(asGroupe(asNombre(A.partenaire === "salarie" ? "Son salaire brut" : "Son revenu brut d'entreprise", "revenuPartenaire", "$/an", 1000)));
     } },
     { titre: "Vos enfants", rendre: c => {
@@ -3773,10 +3774,29 @@ window.Verrou.quandOuvert(function () {
         ["horaire", "Taux horaire", "Les heures, plus des forfaits et des suppléments"],
         ["mixte", "Mixte", "Un forfait par heure, plus une part du tarif des visites"],
         ["acte", "À l'acte", "Chaque visite payée selon son tarif"]]));
+    } },
+    { titre: "Votre semaine", valide: () => A.demiJournees > 0 && !(A.patientsParDJ > 0) ? "Inscrivez le nombre de patients que vous voyez par demi-journée de rendez-vous."
+      : A.srv > 0 && !(A.patientsSRV > 0) ? "Inscrivez le nombre de patients par demi-journée de sans rendez-vous." : "", rendre: c => {
+      const residence = A.statut === "residence", heures = A.milieu && MILIEUX[A.milieu].modes.length > 1;
+      if (residence) c.appendChild(el("p", "as-intro", "Votre pratique à venir, telle que vous la prévoyez."));
       c.appendChild(asGroupe(asNombre("Demi-journées de rendez-vous par semaine", "demiJournees", "d.-j.", 1),
-        asNombre("Demi-journées de sans rendez-vous (SRV)", "srv", "d.-j.", 1),
+        asNombre("Patients par demi-journée de rendez-vous", "patientsParDJ", "pat.", 0.5, "Vos propres patients, en moyenne.", true),
+        asNombre("Demi-journées de sans rendez-vous (SRV)", "srv", "d.-j.", 1, null),
+        A.srv > 0 && asNombre("Patients par demi-journée de SRV", "patientsSRV", "pat.", 0.5, null, true),
+        heures && asNombre("Heures par demi-journée", "heuresParDJ", "h", 0.25, "Pour le taux horaire et le forfait horaire du mixte."),
+        asNombre("Semaines de vacances par année", "vacances", "sem.", 1, "Vos semaines en clinique : 52 moins ces vacances. Si vous faites des semaines à l'hôpital, retirez-les ensuite des semaines en clinique (Revenu, Modifier)."),
         !residence && asCase("C'est ma première année de pratique", "premiere", "La clientèle se bâtit, et aucun acompte d'impôt n'est exigé la première année."),
         asCase("Ma pratique est incorporée", "incorporee", "Les paiements de la RAMQ sont versés à votre société.")));
+    } },
+    { titre: "Votre clientèle", rendre: c => {
+      const nouvelle = A.premiere || A.statut === "residence", clinique = A.milieu === "clinique";
+      if (A.membreGmf === null) A.membreGmf = A.milieu === "gmfu";
+      c.appendChild(asGroupe(asNombre(nouvelle ? "Patients déjà inscrits au départ" : "Patients inscrits auprès de vous", "inscrits", "pat."),
+        nouvelle && asNombre("Nouveaux patients attendus la première année", "nouveaux", "pat.", 1, "Ceux du guichet d'accès : chacun donne un supplément d'inscription et une visite de prise en charge."),
+        asNombre("Patients vulnérables", "vulnerables", "%", 1, "Au moins un code de vulnérabilité : un forfait annuel de plus par patient."),
+        asCase("Membre d'un GMF", "membreGmf", "Forfait de 9,35 $ par patient inscrit vu dans l'année. Un GMF-U est un GMF."),
+        clinique && asNombre("Part de votre facturation remise à la clinique", "fraisPct", "%", 0.5, "Les frais de cabinet : loyer, personnel, équipement. Souvent de 25 à 35 % en clinique privée.")));
+      c.appendChild(el("p", "aide", "Tout le reste (types de visites, tarifs, forfaits, apprenants) part des valeurs de la RAMQ : précisez-le ensuite dans Revenu, Modifier."));
     } },
     { titre: "Vos activités en établissement", rendre: c => {
       c.appendChild(el("p", "as-intro", "En plus de votre pratique principale : cochez celles que vous faites."));
@@ -3802,22 +3822,27 @@ window.Verrou.quandOuvert(function () {
         A.marge && asNombre("Solde de la marge", "margeSolde", "$", 1000), A.marge && asNombre("Taux de la marge", "margeTaux", "%", 0.01),
         asCase("Prêt étudiant (aide financière aux études)", "pret", null, true),
         A.pret && asNombre("Solde du prêt étudiant", "pretSolde", "$", 500),
+        A.pret && asNombre("Taux du prêt étudiant", "pretTaux", "%", 0.01, "Sur votre entente avec l'institution financière.", true),
+        A.pret && asNombre("Paiement par mois", "pretPaiement", "$/mois", 10, "0 : vous ne payez que les intérêts pour l'instant. Le remboursement du capital commence six mois après la fin des études ; une remise de 15 % de la dette est possible selon vos bourses et la durée de vos études (Québec.ca)."),
         asCase("Prêt auto", "auto", null, true),
-        A.auto && asNombre("Solde du prêt auto", "autoSolde", "$", 500), A.auto && asNombre("Paiement par mois", "autoPaiement", "$/mois", 10)));
+        A.auto && asNombre("Solde du prêt auto", "autoSolde", "$", 500), A.auto && asNombre("Taux du prêt auto", "autoTaux", "%", 0.01, null, true),
+        A.auto && asNombre("Paiement par mois", "autoPaiement", "$/mois", 10)));
       c.appendChild(el("p", "aide", "Vous pourrez ajouter, nommer et préciser chaque dette ensuite (page Budget)."));
-    } },
+    }, valide: () => A.pret && A.pretSolde > 0 && A.pretTaux == null ? "Inscrivez le taux de votre prêt étudiant."
+      : A.auto && A.autoSolde > 0 && A.autoTaux == null ? "Inscrivez le taux de votre prêt auto." : "" },
     { titre: "Votre point de départ", bouton: "Créer mon portrait", rendre: c => {
       const couple = enCouple(), n = A.enfants.length;
       const det = [A.marge && `marge de ${$(A.margeSolde)}`, A.pret && `prêt étudiant de ${$(A.pretSolde)}`, A.auto && `prêt auto de ${$(A.autoSolde)}`].filter(Boolean);
       c.appendChild(rangees(el("div"), [
-        { titre: "Famille", sous: !couple ? "Seul(e)" : `En couple, ${A.famille === "fait" ? "conjoints de fait" : "mariés ou union civile"} · partenaire ${A.partenaire === "sans" ? "sans revenu de travail" : `${A.partenaire === "salarie" ? "salarié(e)" : "à son compte"}, ${$(A.revenuPartenaire)} par année`}` },
+        { titre: "Famille", sous: !couple ? "Sans partenaire" : `En couple, ${A.famille === "fait" ? "union de fait" : "mariage ou union civile"} · partenaire ${A.partenaire === "sans" ? "sans revenu de travail" : `${A.partenaire === "salarie" ? "en emploi salarié" : "à son compte"}, ${$(A.revenuPartenaire)} par année`}` },
         { titre: "Enfants", sous: n ? `${n} enfant${n > 1 ? "s" : ""} : ${A.enfants.map(a => `${nb(a, 0)} an${a >= 2 ? "s" : ""}`).join(", ")}` : "Aucun" },
-        { titre: "Pratique", sous: `${MILIEUX[A.milieu].nom}${MILIEUX[A.milieu].modes.length > 1 ? ` · ${NOM_MODE[A.mode].toLowerCase()}` : ""} · ${nb(A.demiJournees)} demi-journées${A.srv ? ` et ${nb(A.srv)} de SRV` : ""} par semaine${A.premiere ? " · première année" : ""}${A.incorporee ? " · incorporée" : ""}` },
+        { titre: "Pratique", sous: `${MILIEUX[A.milieu].nom}${MILIEUX[A.milieu].modes.length > 1 ? ` · ${NOM_MODE[A.mode].toLowerCase()}` : ""} · ${nb(A.demiJournees)} demi-journées de ${nb(A.patientsParDJ || 0)} patients${A.srv ? ` et ${nb(A.srv)} de SRV` : ""} par semaine · ${nb(semainesClinique(A))} semaines en clinique${A.premiere || A.statut === "residence" ? " · première année" : ""}${A.incorporee ? " · incorporée" : ""}` },
+        { titre: "Clientèle", sous: `${nb(A.inscrits || 0)} inscrits${A.premiere || A.statut === "residence" ? `, ${nb(A.nouveaux || 0)} nouveaux attendus` : ""} · ${nb(A.vulnerables || 0)} % vulnérables${A.membreGmf ? " · GMF" : ""}${A.milieu === "clinique" ? ` · ${nb(A.fraisPct || 0)} % remis à la clinique` : ""}` },
         { titre: "Activités en établissement", sous: TYPES_ASSISTANT.filter(k => A["act_" + k] && A["actN_" + k] > 0).map(k => `${ACTIVITES[k].nom} : ${nb(A["actN_" + k])} par mois`).join(" · ") || "Aucune" },
         { titre: "Logement", sous: A.logement === "locataire" ? `Locataire · ${$(A.loyer)} par mois` : `Propriétaire · maison de ${$(A.maison)}${A.hypotheque ? `, hypothèque de ${$(A.hypotheque)}` : ""}` },
         { titre: "Autres dettes", sous: det.length ? det.join(" · ") : "Aucune" },
       ]));
-      c.appendChild(el("p", "aide", "Ensuite : entrez vos dépenses du mois (page Budget), puis vérifiez les valeurs de départ du revenu. Les tarifs de la RAMQ, l'impôt 2026 et les hypothèses de l'avenir sont déjà en place."));
+      c.appendChild(el("p", "aide", "Ensuite : entrez vos dépenses du mois (page Budget) et vos dépenses professionnelles (page Impôt). Les tarifs de la RAMQ, l'impôt et les hypothèses de l'avenir sont déjà en place."));
     } },
   ];
 
@@ -3853,8 +3878,13 @@ window.Verrou.quandOuvert(function () {
   document.getElementById("ap-assistant").addEventListener("click", ouvrirAssistant);
   document.getElementById("reprendre-assistant").addEventListener("click", ouvrirAssistant);
 
-  // Portrait de départ à partir des réponses : rien d'autre ne vient de l'exemple que les
-  // tarifs, les paramètres d'impôt et les hypothèses de l'avenir.
+  // Semaines en clinique : 52 moins les vacances.
+  const semainesClinique = A => Math.max(0, Math.min(52, 52 - Math.max(0, +A.vacances || 0)));
+  /* Portrait de départ à partir des réponses : rien d'autre ne vient de l'exemple que les tarifs,
+     les paramètres d'impôt, les hypothèses de l'avenir et la répartition des types de visites.
+     Prêt d'études : remboursement du capital six mois après la fin des études ; remise de 15 %
+     possible (Québec.ca, « Rembourser son prêt » et « Remise de votre dette d'études », consultés
+     le 31 octobre 2026 : https://www.quebec.ca/en/education/student-financial-assistance/repayment). */
   function portraitDepuis(A) {
     const s = normaliser(clone(EXEMPLE)), auj = new Date(), mm = String(auj.getMonth() + 1).padStart(2, "0");
     const couple = A.famille === "maries" || A.famille === "fait", proprio = A.logement === "proprietaire";
@@ -3867,11 +3897,15 @@ window.Verrou.quandOuvert(function () {
     s.residence = { ...s.residence, active: residence, niveau: String(A.niveau || 1), debutPratique: residence ? A.debutPratique || "" : "", vue: "residence" };
     Object.assign(s.revenu, { milieu: A.milieu, annee: A.premiere || residence ? "premiere" : "type",
       anneePremiere: residence ? +String(A.debutPratique || "").slice(0, 4) || 0 : A.premiere ? auj.getFullYear() : 0, modeBudget: MILIEUX[A.milieu].modes.includes(A.mode) ? A.mode : MILIEUX[A.milieu].modes[0],
-      demiJournees: dj, enseignement: gmfu ? Math.min(2, dj) : 0, residents: gmfu ? 1 : 0, demiJourneesSRV: A.srv || 0, patientsSRV: 12,
-      semaines: 46, semainesArrivee: 46, autresRevenus: 0,
+      demiJournees: dj, enseignement: gmfu ? Math.min(2, dj) : 0, residents: gmfu ? 1 : 0, demiJourneesSRV: A.srv || 0, patientsSRV: A.srv ? A.patientsSRV || 0 : 0,
+      patientsParDJ: A.patientsParDJ || 0, heuresParDJ: A.heuresParDJ || 4, semaines: semainesClinique(A), semainesArrivee: semainesClinique(A), autresRevenus: 0,
+      inscritsDebut: Math.max(0, A.inscrits || 0), nouveauxGuichet: A.premiere || residence ? Math.max(0, A.nouveaux || 0) : 0, nouveauxSansMedecin: 0, nouveauxTransferes: 0,
+      nouveauxAnGuichet: 0, nouveauxAnSansMedecin: 0, partVulnerable: Math.min(100, Math.max(0, A.vulnerables || 0)), partTresVulnerable: 0, partGroupe2: 0, partGroupe34: 0,
+      membreGmf: !!A.membreGmf, primeInscription: 0, fraisCabinetPct: A.milieu === "clinique" ? Math.min(100, Math.max(0, A.fraisPct || 0)) : 0, fraisCabinetMois: 0, lignes: [],
       activites: TYPES_ASSISTANT.filter(k => A["act_" + k] && A["actN_" + k] > 0).map(k => ({ id: nouvelId("a"), type: k, nom: "", nombre: A["actN_" + k], frequence: "mois", cycle: 6,
         calcul: "jour", parJour: ACTIVITES[k].parJour, patients: ACTIVITES[k].patients, parPatient: ACTIVITES[k].parPatient })) });
-    s.impot = { ...s.impot, structure: A.incorporee ? "societe" : "particulier" };
+    s.confirmes["revenu.membreGmf"] = true;   // demandé dans l'assistant
+    s.impot = { ...s.impot, structure: A.incorporee ? "societe" : "particulier", depensesPro: 0, depensesProMode: "total", depensesProDetail: [] };
     s.societe = { ...s.societe, solde: 0 };
     // Famille
     Object.assign(s.conjointe, { active: couple, designation: "partenaire", lien: A.famille === "fait" ? "fait" : "maries",
@@ -3902,9 +3936,11 @@ window.Verrou.quandOuvert(function () {
       s.dettes.push(h);
     }
     if (A.marge && A.margeSolde > 0) s.dettes.push(dette({ nom: "Marge de crédit", type: "marge", solde: A.margeSolde, taux: A.margeTaux, interetsSeulement: true }));
-    if (A.pret && A.pretSolde > 0) s.dettes.push(dette({ nom: "Prêt étudiant (aide financière aux études)", type: "pret", solde: A.pretSolde, taux: 5,
-      paiement: Math.round(C.paiementPour(A.pretSolde, 5 / 1200, 120)), creditImpot: 34 }));
-    if (A.auto && A.autoSolde > 0) s.dettes.push(dette({ nom: "Prêt auto", type: "pret", solde: A.autoSolde, taux: 6.5, paiement: A.autoPaiement || Math.round(C.paiementPour(A.autoSolde, 6.5 / 1200, 60)) }));
+    // Prêt étudiant : le taux et le paiement de l'entente ; sans paiement, les intérêts seulement pour l'instant.
+    if (A.pret && A.pretSolde > 0) s.dettes.push(dette({ nom: "Prêt étudiant (aide financière aux études)", type: "pret", solde: A.pretSolde, taux: +A.pretTaux || 0,
+      paiement: A.pretPaiement || 0, interetsSeulement: !(A.pretPaiement > 0), creditImpot: 34 }));
+    if (A.auto && A.autoSolde > 0) s.dettes.push(dette({ nom: "Prêt auto", type: "pret", solde: A.autoSolde, taux: +A.autoTaux || 0,
+      paiement: A.autoPaiement || Math.round(C.paiementPour(A.autoSolde, (+A.autoTaux || 0) / 1200, 60)) }));
     s.strategie = { ...s.strategie, debut: `${auj.getFullYear()}-${mm}` };
     s.revenu.tarifsModifies = false;
     return synchroniserTarifs(s);
