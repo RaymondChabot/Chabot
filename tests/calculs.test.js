@@ -131,15 +131,19 @@ const parVuln = 45.20 * pctS, respS = 8.25;
 verifier("seuil mixte : le forfait de responsabilité (8,25 $) repousse le seuil",
   proche(gvS.seuilMixte, (thS - fhS) * HS / (parVuln - respS), 1e-6) && gvS.seuilMixte > gvS.seuilPatients, gvS.seuilMixte);
 const gfS = C.revenuGmfu({ ...revSeul, fraisCabinetPct: 30 });
-verifier("seuil acte-mixte : 30 % de frais à l'acte seulement le repousse",
-  proche(gfS.seuilActeMixte, HS * fhS / (tvS * 0.7 - parS), 1e-6) && gfS.seuilActeMixte > gSeul.seuilActeMixte, gfS.seuilActeMixte);
+verifier("seuil acte-mixte : 30 % remis à la clinique ne change pas le seuil de la RAMQ",
+  proche(gfS.seuilActeMixte, gSeul.seuilActeMixte, 1e-9) && gfS.seuilActeMixte < 20, gfS.seuilActeMixte);
+verifier("seuil après frais : 30 % à l'acte laisse un écart d'environ 2 $ par visite, pas un seuil de demi-journée",
+  proche(gfS.seuilActeMixteApresFrais, HS * fhS / (tvS * 0.7 - parS), 1e-6) && gfS.seuilActeMixteApresFrais > 20, gfS.seuilActeMixteApresFrais);
 const fixeS = 500 * 12 / (46 * 9);
 const gmS = C.revenuGmfu({ ...revSeul, fraisCabinetMois: 500 });
-verifier("seuil acte-mixte : 500 $ par mois étalés sur les demi-journées de clinique",
-  proche(gmS.seuilActeMixte, (HS * fhS + fixeS) / (tvS - parS), 1e-6), gmS.seuilActeMixte);
-verifier("seuil : les frais exigés dans les trois modes ne déplacent pas le mixte",
+verifier("seuil après frais : 500 $ par mois s'étalent sur les demi-journées, sans changer le seuil de la RAMQ",
+  proche(gmS.seuilActeMixte, gSeul.seuilActeMixte, 1e-9)
+  && proche(gmS.seuilActeMixteApresFrais, (HS * fhS + fixeS) / (tvS - parS), 1e-6), gmS.seuilActeMixteApresFrais);
+verifier("seuil : les frais exigés dans les trois modes ne déplacent pas le mixte ni l'acte",
   proche(C.revenuGmfu({ ...revSeul, fraisCabinetPct: 30, fraisCabinetMois: 500, fraisCabinetTousModes: true }).seuilMixte, gSeul.seuilMixte, 1e-6)
-  && proche(C.revenuGmfu({ ...revSeul, fraisCabinetPct: 30, fraisCabinetTousModes: true }).seuilActeMixte, gSeul.seuilActeMixte, 1e-6));
+  && proche(C.revenuGmfu({ ...revSeul, fraisCabinetPct: 30, fraisCabinetTousModes: true }).seuilActeMixte, gSeul.seuilActeMixte, 1e-6)
+  && proche(C.revenuGmfu({ ...revSeul, fraisCabinetPct: 30, fraisCabinetTousModes: true }).seuilActeMixteApresFrais, gSeul.seuilActeMixte, 1e-4));
 
 /* 9. SRV et activités en établissement. */
 const gs = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12 });

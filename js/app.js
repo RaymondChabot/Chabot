@@ -1378,9 +1378,14 @@ window.Verrou.quandOuvert(function () {
     const r = S.revenu, g = R.rev, pat = Math.max(0, +r.patientsParDJ || 0), dj = g.demiJourneeClinique;
     const fraisPct = +r.fraisCabinetPct || 0, fraisMois = +r.fraisCabinetMois || 0;
     let aide = "Une demi-journée de clinique, selon vos tarifs. Le forfait de responsabilité du taux horaire est compris. Les forfaits d'inscription, de volume et de GMF sont les mêmes dans les trois modes : ils ne changent pas ces seuils.";
-    if (fraisPct > 0 || fraisMois > 0) aide += r.fraisCabinetTousModes
-      ? " Vos frais de cabinet s'appliquent aux trois modes : ils ne les déplacent pas."
-      : ` Frais de cabinet comptés à l'acte seulement : ${[fraisPct > 0 ? `${nb(fraisPct, 1)} %` : "", fraisMois > 0 ? `${$(fraisMois)} par mois` : ""].filter(Boolean).join(" et ")}.`;
+    if (fraisPct > 0 || fraisMois > 0) {
+      const nFrais = des(g.seuilActeMixteApresFrais);
+      aide += r.fraisCabinetTousModes
+        ? " Vos frais de cabinet s'appliquent aux trois modes : ils ne les déplacent pas."
+        : (nFrais == null || nFrais > 20)
+          ? ` Ces seuils comparent ce que paie la RAMQ. Après ${[fraisPct > 0 ? `${nb(fraisPct, 1)} %` : "", fraisMois > 0 ? `${$(fraisMois)} par mois` : ""].filter(Boolean).join(" et ")} remis à la clinique, seulement à l'acte, le mixte reste devant sur une demi-journée.`
+          : ` Ces seuils comparent ce que paie la RAMQ. ${[fraisPct > 0 ? `${nb(fraisPct, 1)} %` : "", fraisMois > 0 ? `${$(fraisMois)} par mois` : ""].filter(Boolean).join(" et ")} ne s'appliquent qu'à l'acte.`;
+    }
     const cote = (haut, bas, apres, avant) => Math.abs(dj[haut] - dj[bas]) < 0.05 ? "les deux rapportent autant" : dj[haut] > dj[bas] ? apres : avant;
     const ligne = (titre, seuil, sous) => {
       const n = des(seuil);

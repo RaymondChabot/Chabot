@@ -450,17 +450,24 @@
     const djAn = W * C;
     const fixeDJ = djAn > 0 ? Math.max(0, +r.fraisCabinetMois || 0) * 12 / djAn : 0;
     const fixeHoraire = r.fraisCabinetTousModes ? fixeDJ : 0, fixeActe = fixeDJ;
-    const partHoraire = respParPatient * (1 - fAutres), partMixte = parVisite * (1 - fAutres), partActe = parVisiteActe * (1 - fA);
-    const baseHoraire = H * m("tarifHoraire") * maj * (1 - fAutres) - fixeHoraire;
-    const baseMixte = H * m("forfaitHoraireMixte") * maj * (1 - fAutres) - fixeHoraire;
-    // Patients où le mixte égale l'horaire, forfait de responsabilité compris.
+    // Ce que paie la RAMQ pour la demi-journée, avant les frais de cabinet.
+    // Le pourcentage remis à la clinique ne doit pas entrer ici : à 30 % sur l'acte seulement,
+    // il ne reste que quelques dollars par visite au-dessus du mixte, et le forfait horaire
+    // ne se couvre qu'autour de 80 à 90 patients, ce qu'une demi-journée ne permet pas.
+    const partHoraire = respParPatient, partMixte = parVisite, partActe = parVisiteActe;
+    const baseHoraire = H * m("tarifHoraire") * maj, baseMixte = H * m("forfaitHoraireMixte") * maj;
     const gainMixte = partMixte - partHoraire;
     const seuilMixte = gainMixte > 1e-9 ? (baseHoraire - baseMixte) / gainMixte : null;
-    // Patients où l'acte égale le mixte, après les frais de cabinet.
     const gainActe = partActe - partMixte;
-    const seuilActeMixte = gainActe > 1e-9 ? (baseMixte + fixeActe) / gainActe : null;
+    const seuilActeMixte = gainActe > 1e-9 ? baseMixte / gainActe : null;
+    // Même comparaison, une fois les frais qui ne touchent que l'acte retirés. Sert à dire
+    // si l'acte rattrape encore le mixte sur une demi-journée, pas à afficher « dès 89 ».
+    const partActeNet = parVisiteActe * (1 - fA), partMixteNet = parVisite * (1 - fAutres);
+    const baseMixteNet = baseMixte * (1 - fAutres) - fixeHoraire;
+    const gainActeNet = partActeNet - partMixteNet;
+    const seuilActeMixteApresFrais = gainActeNet > 1e-9 ? (baseMixteNet + fixeActe) / gainActeNet : null;
     const nClin = Math.max(0, +r.patientsParDJ || 0);
-    const demiJourneeClinique = { horaire: baseHoraire + nClin * partHoraire, mixte: baseMixte + nClin * partMixte, acte: nClin * partActe - fixeActe };
+    const demiJourneeClinique = { horaire: baseHoraire + nClin * partHoraire, mixte: baseMixte + nClin * partMixte, acte: nClin * partActe };
 
     // Revenu moyen par patient, à 100 % du tarif, au palier de fin d'année : rendez-vous et sans rendez-vous.
     const tarifMoyenRdv = tarifVisite(r.mix, palierFin, TF) * maj, tarifMoyenSrv = tarifSrv(palierFin) * maj;
@@ -469,7 +476,7 @@
     return { heures, garde, heuresHoraire, heuresAuDela, gardeAuDela, autresAuDela, plafondHeures, perteHeures, nbVisites, nbPriseEnCharge, inscritsDepart, inscritsFin, vulnerablesFin, semainesPalierHaut, gainPalier,
       patientsVus, forfaitGmfPossible, detailCompensation, activites, detailActivites, basePolyvalence, polyvalence, pctPolyvalence, anneePratique, detailVolume, examens,
       visitesApprenants: W * T * apprenants, heuresSupervision: heuresSup, tarifMoyenRdv, tarifMoyenSrv,
-      horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe, seuilMixte, seuilActeMixte, demiJourneeClinique };
+      horaire, mixte, acte, ecart: mixte.total - horaire.total, seuilPatients: seuil, seuilActe, seuilMixte, seuilActeMixte, seuilActeMixteApresFrais, demiJourneeClinique };
   }
 
   /* ============================================================

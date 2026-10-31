@@ -1072,7 +1072,8 @@ async function comparerActes(b, base) {
   verifier("seuils : dès tant de patients le mixte, puis l'acte ; dès tant de visites la supervision", resume.seuilsVu && resume.seuilsDabord && !resume.debord
     && resume.seuils.includes("Quand changer de mode") && resume.seuils.includes("patients par demi-journée")
     && resume.seuils.includes("Mixte plutôt que l'horaire") && resume.seuils.includes("L'acte plutôt que le mixte")
-    && resume.seuils.includes("Visites plutôt que la supervision") && resume.seuils.includes("Dès 6") && resume.seuils.includes("Dès 10")
+    && resume.seuils.includes("Visites plutôt que la supervision") && resume.seuils.includes("Dès 6") && resume.seuils.includes("Dès 16") && resume.seuils.includes("Dès 10")
+    && !/Dès [3-9]\d/.test(resume.seuils) && resume.seuils.includes("le mixte reste devant")
     && resume.seuils.includes("3 résidents") && resume.seuils.includes("4,5"), resume.seuils);
   await allerA(p, "revenu/detail");
   verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent
