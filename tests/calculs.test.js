@@ -18,6 +18,10 @@ const proche = (a, b, tol) => Math.abs(a - b) <= tol;
 const catalogues = fs.readFileSync(path.join(__dirname, "../js/catalogues.js"), "utf8");
 const VERIFICATION = JSON.parse(catalogues.match(/const VERIFICATION = (\[.*?\]);\n/s)[1]);
 let maxEcart = 0;
+// Prime : l'outil de mai 2026 plafonnait à 766 $ par adulte. Du 1er juillet 2026 au 30 juin 2027,
+// la RAMQ publie 789 $ (tarifs en vigueur, consultés le 31 octobre 2026). On compare à ce plafond,
+// sans réécrire les montants conservés de l'outil.
+const primeAttendue = off => off === 766 ? 789 : off === 1532 ? 1578 : off;
 for (const v of VERIFICATION) {
   let a = C.impotSalarie({ salaire: v.salaires[0] }), b = v.couple ? C.impotSalarie({ salaire: v.salaires[1] }) : null;
   if (v.couple) [a, b] = C.transfertsConjoints(a, b);
@@ -26,7 +30,8 @@ for (const v of VERIFICATION) {
   const pr = C.primeMedicaments({ revenuNetQc: somme("revenuNetQc"), couple: v.couple, ages: v.ages, adultesCouverts: v.couple ? 2 : 1 });
   const nous = { qc: somme("qc"), fed: somme("fed"), rrq: somme("rrq"), rqap: somme("rqap"), ae: somme("ae"), af: pf.allocationFamille, fournitures: pf.fournitures, ace: pf.ace, prime: pr.total };
   for (const k of Object.keys(v.officiel)) {
-    const e = Math.abs(Math.round(nous[k]) - v.officiel[k]);
+    const attendu = k === "prime" ? primeAttendue(v.officiel[k]) : v.officiel[k];
+    const e = Math.abs(Math.round(nous[k]) - attendu);
     maxEcart = Math.max(maxEcart, e);
     // Écart connu : 40 $ d'impôt fédéral pour un couple 80 000 $ + 40 000 $ ; ailleurs, 1 $ au plus.
     verifier(`officiel ${v.salaires.join("+")} ${k}`, e <= (k === "fed" ? 40 : 1), `écart ${e} $`);
@@ -75,6 +80,13 @@ verifier("auto −15 %/an", proche(p[2].voitureMoi, 20000 * 0.85 * 0.85, 0.01));
 /* 5. REEE : 30 % de subventions, plafonds annuels et à vie. */
 const reee = C.projeterReee({ enfants: [{ age: 0, solde: 0 }], cotisationAnnuelle: 2500 }, 0);
 verifier("REEE : subventions 500 $ + 250 $ par an, plafonnées à vie", proche(reee[0].subventions, 7200 + 3600, 0.01), reee[0].subventions);
+verifier("REEE : 2 500 $ par an restent sous le plafond de 50 000 $", reee[0].cotisations === 42500, reee[0].cotisations);
+// 5 000 $ par an pendant 17 ans dépasseraient 50 000 $. Le plafond coupe à 10 ans : les subventions
+// annuelles (500 $ + 250 $) ne vont donc pas jusqu'aux plafonds à vie de 7 200 $ et 3 600 $.
+const reeePlafond = C.projeterReee({ enfants: [{ age: 0, solde: 0 }], cotisationAnnuelle: 5000 }, 0.05);
+verifier("REEE : cotisations coupées à 50 000 $, pas 85 000 $", reeePlafond[0].cotisations === 50000 && proche(reeePlafond[0].subventions, 7500, 0.01), reeePlafond[0]);
+const reeeDeja = C.projeterReee({ enfants: [{ age: 0, solde: 1000, cotisations: 48000 }], cotisationAnnuelle: 5000 }, 0);
+verifier("REEE : les cotisations déjà versées réduisent le plafond", reeeDeja[0].cotisations === 2000, reeeDeja[0].cotisations);
 
 /* 6. Pratique incorporée : tout l'argent est compté (impôts, dépenses, dividendes, société). */
 for (const retrait of ["tout", "fixe"]) {
@@ -357,16 +369,23 @@ verifier("résidence : droits de scolarité, crédit fédéral (taux de base, ap
   proche(sansScol.total - avecScol.total, 1100 * (0.14 * (1 - 0.165) + 0.08), 0.01), sansScol.total - avecScol.total);
 verifier("résidence : la cotisation syndicale se déduit et sort de la paie", C.impotMixte({ salaire: 70000, syndicat: 600 }).total < sansScol.total
   && proche(sansScol.net - C.impotMixte({ salaire: 70000, syndicat: 600 }).net, 600 - (sansScol.total - C.impotMixte({ salaire: 70000, syndicat: 600 }).total), 1e-6));
+const avecSynd = C.impotSalarie({ salaire: 70000, syndicat: 600 }), sansSynd = C.impotSalarie({ salaire: 70000 });
+verifier("syndicat : crédit de 10 % au Québec, déduction fédérale, revenu net du Québec inchangé",
+  proche(sansSynd.qc - avecSynd.qc, 60, 0.02) && avecSynd.fed < sansSynd.fed && proche(avecSynd.imposableQc, sansSynd.imposableQc, 1e-6)
+  && avecSynd.imposable < sansSynd.imposable, { qc: sansSynd.qc - avecSynd.qc, fed: sansSynd.fed - avecSynd.fed });
+const seul = C.impotSalarie({ salaire: 60000 }), charge = C.impotSalarie({ salaire: 60000, personneACharge: true });
+verifier("personne à charge admissible : 16 452 $ × 14 % × (1 − 16,5 %) = 1 923,24 $", proche(seul.fed - charge.fed, 1923.24, 0.02), seul.fed - charge.fed);
 
 /* 24. Paramètres 2027, provisoires : ceux de 2026 indexés selon la formule officielle (IPC de Statistique Canada,
    octobre à septembre) : fédéral 2,6 % (montants au dollar), Québec 3,15 % (paliers au multiple de 5 $). La même
-   formule redonne les taux officiels de 2026 : 2,0 % et 2,05 %. Assurance-emploi 2027 : 70 800 $ et 1,27 % au Québec. */
+   formule redonne les taux officiels de 2026 : 2,0 % et 2,05 %. Assurance-emploi 2027 : 70 800 $ et 1,29 % au Québec
+   (Commission de l'assurance-emploi, taux de 2027, consulté le 31 octobre 2026). */
 const P7 = C.P2027;
 verifier("2027 : paliers fédéraux indexés de 2,6 %, au dollar", P7.federal.tranches.slice(0, 4).map(t => t[0]).join() === "60045,120088,186157,265203"
   && P7.federal.bpaMax === 16880 && P7.federal.bpaMin === 15215 && P7.montantEmploi === 1540, P7.federal.tranches.map(t => t[0]).join());
 verifier("2027 : paliers du Québec indexés de 3,15 %, au multiple de 5 $", P7.quebec.tranches.slice(0, 3).map(t => t[0]).join() === "56055,112105,136410"
   && P7.quebec.montantBase === 19549, P7.quebec.tranches.map(t => t[0]).join());
-verifier("2027 : assurance-emploi, crédit pour dividendes, taux inchangés ; 2026 intact", P7.ae.max === 70800 && P7.ae.taux === 0.0127 && P7.dividendes.creditQuebec === 0.0269
+verifier("2027 : assurance-emploi, crédit pour dividendes, taux inchangés ; 2026 intact", P7.ae.max === 70800 && P7.ae.taux === 0.0129 && P7.dividendes.creditQuebec === 0.0269
   && P7.federal.tranches[1][1] === 0.205 && C.P2026.federal.tranches[0][0] === 58523 && C.P2026.ae.max === 68900);
 verifier("2027 : marqués provisoires ; 2026 avant, 2027 ensuite", P7.provisoire && !C.P2026.provisoire && C.parametres(2025) === C.P2026 && C.parametres(2026) === C.P2026
   && C.parametres(2027) === P7 && C.parametres(2031) === P7);
@@ -462,6 +481,28 @@ verifier("terme échu au début du plan : renouvelé au premier mois, au taux pr
   echu.dettes[0].termeEchu && echu.dettes[0].premierRenouvellement && echu.dettes[0].premierRenouvellement.date.getMonth() === 0
   && echu.dettes[0].premierRenouvellement.date.getFullYear() === 2026 && proche(echu.dettes[0].premierRenouvellement.paiement, p6, 1e-6)
   && !C.simulerDettes([hyp26], { debut: "2026-01", methode: "minimum" }).dettes[0].termeEchu, echu.dettes[0].premierRenouvellement);
+
+/* 29. Correctifs de l'audit L : intérêts d'études au fil des paiements, dividendes avec le FSS,
+   salaire et dividendes dans une seule déclaration. */
+const pretEtudes = { id: "e", nom: "Prêt d'études", type: "pret", solde: 30000, taux: 5, paiement: 318.20, frequence: "mois", creditImpot: 34 };
+const periodesEtudes = C.interetsEtudesPeriodes([pretEtudes], "2026-06", 25);
+const sommeEtudes = periodesEtudes.reduce((t, x) => t + x, 0);
+const simEtudes = C.simulerDettes([pretEtudes], { debut: "2026-06", methode: "minimum", moisMax: 300 });
+verifier("intérêts d'études : la première année est sous 1 500 $, le total suit les paiements, puis 0",
+  periodesEtudes[0] > 0 && periodesEtudes[0] < 1500 && proche(sommeEtudes, simEtudes.interetsTotaux, 0.05)
+  && proche(sommeEtudes, 8183.46, 0.05) && periodesEtudes[periodesEtudes.length - 1] === 0, { an0: periodesEtudes[0], somme: sommeEtudes });
+const div40 = C.impotDividendes(40000);
+verifier("dividendes : le FSS de la première bande, 150 $, entre dans le total", proche(div40.fss, 150, 0.01) && proche(div40.total, div40.fed + div40.qc + 150, 1e-6) && proche(div40.total, 2363.52, 0.05), div40);
+const persoSep = C.impotMixte({ salaire: 32440, scolarite: 550 });
+const socSep = C.impotSociete({ revenu: 200000, depensesPro: 40000, tauxSociete: 0.205, retrait: "tout" });
+const uneDec = C.impotSalaireEtSociete({ salaire: 32440, scolarite: 550, revenu: 200000, depensesPro: 40000, fraisSociete: 0, tauxSociete: 0.205, retrait: "tout" });
+verifier("transition incorporée : deux déclarations séparées, 11 603,31 $ et 21 146,31 $",
+  proche(socSep.dividendes, 127200, 0.01) && proche(persoSep.fed + socSep.fed, 11603.31, 0.05) && proche(persoSep.qc + socSep.qc, 21146.31, 0.05),
+  { fed: persoSep.fed + socSep.fed, qc: persoSep.qc + socSep.qc, dividende: socSep.dividendes });
+verifier("transition incorporée : une seule déclaration paie davantage, et garde la société",
+  uneDec.fed > persoSep.fed + socSep.fed + 500 && uneDec.qc > persoSep.qc + socSep.qc + 500
+  && proche(uneDec.societe.dividendes, 127200, 0.01) && proche(uneDec.totalGlobal, uneDec.total + uneDec.societe.impotSociete, 1e-6) && uneDec.rrq > 0,
+  { fed: uneDec.fed, qc: uneDec.qc });
 
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

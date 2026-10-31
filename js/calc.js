@@ -37,9 +37,11 @@
       taux1: [0, 0.07, 0.135, 0.19, 0.23], base2: [0, 3123, 6022, 8476, 10260], taux2: [0, 0.032, 0.057, 0.08, 0.095] },
     allocationFamille: { max: 3068, min: 1221, seuilCouple: 60398, seuilMono: 44032, taux: 0.04,
       monoMax: 1077, monoMin: 430, fournitures: 127 },
-    /* Cotisation au régime public d'assurance médicaments (annexe K) : maximum par adulte selon l'outil
-       officiel du ministère des Finances (2026) ; déductions de 2025 indexées de 2,05 %. */
-    medicaments: { max: 766, deductions: { seul: 20298, mono1: 32901, mono2: 37207, couple0: 32901, couple1: 37207, couple2: 41187 },
+    /* Cotisation au régime public d'assurance médicaments : maximum de 789 $ par adulte du 1er juillet 2026
+       au 30 juin 2027 (RAMQ, tarifs en vigueur, consulté le 31 octobre 2026,
+       https://www.ramq.gouv.qc.ca/fr/citoyens/assurance-medicaments/tarifs-vigueur). L'année d'avant, 766 $.
+       Déductions de 2025 indexées de 2,05 %. */
+    medicaments: { max: 789, deductions: { seul: 20298, mono1: 32901, mono2: 37207, couple0: 32901, couple1: 37207, couple2: 41187 },
       seuil: 5000, tauxCouple: [0.0393, 0.0589], tauxSeul: [0.0784, 0.1176] },
     /* Cotisation des particuliers au Fonds des services de santé, sur les revenus autres que d'emploi : 1 % au-delà
        de 18 500 $, jusqu'à 150 $ ; 150 $ jusqu'à 64 355 $ ; puis 1 % de plus, au plus 1 000 $ (Paramètres du régime
@@ -66,8 +68,10 @@
      consulté le 28 octobre 2026). Fédéral : 2,6 % (Canada, ensemble, facteur arrondi au millième, montants au
      dollar). Québec : 3,15 % (Québec, ensemble ; la même formule redonne 2,85 % pour 2025 et 2,05 % pour 2026 ;
      paliers et montants de garde au multiple de 5 $, autres montants au dollar). Assurance-emploi : maximum
-     assurable de 70 800 $ et taux prévu de 1,27 % au Québec (Rapport actuariel 2027 sur le taux de cotisation
-     d'assurance-emploi, BSIF, 14 septembre 2026). Crédit québécois pour dividendes non déterminés : 2,69 %.
+     assurable de 70 800 $ et taux du Québec de 1,29 % (1,29 $ par 100 $, cotisation maximale de l'employé
+     913,32 $ ; Commission de l'assurance-emploi du Canada, taux de 2027, consulté le 31 octobre 2026,
+     https://www.canada.ca/fr/emploi-developpement-social/programmes/assurance-emploi/ae-liste/rapports/cotisation/taux2027.html).
+     Crédit québécois pour dividendes non déterminés : 2,69 %.
      Ce qui ne suit pas cet indice reste à 2026 en attendant : RRQ, RQAP, prime d'assurance médicaments,
      Allocation canadienne pour enfants (indexée en juillet). Tout sera remplacé par les montants officiels. */
   const INDEX_2027 = { federal: 0.026, quebec: 0.0315 };
@@ -85,7 +89,7 @@
     for (const k of Object.keys(p.medicaments.deductions)) p.medicaments.deductions[k] = dollar(p.medicaments.deductions[k], q);
     p.garde.quebec.moins7 = cinq(p.garde.quebec.moins7, q); p.garde.quebec.autres = cinq(p.garde.quebec.autres, q);
     p.garde.quebec.taux = p.garde.quebec.taux.map(([seuil, taux]) => [cinq(seuil, q), taux]);
-    p.ae = { max: 70800, taux: 0.0127 };
+    p.ae = { max: 70800, taux: 0.0129 };
     p.dividendes.creditQuebec = p.dividendes.creditQuebecDes2027;
     return Object.assign(p, { annee: 2027, provisoire: true, index: INDEX_2027 });
   })();
@@ -587,12 +591,19 @@
     return revenu <= f.seuil1 ? 0 : revenu <= f.seuil2 ? Math.min(f.palier, (revenu - f.seuil1) * f.taux) : Math.min(f.max, f.palier + (revenu - f.seuil2) * f.taux);
   }
 
-  function impotsDeBase(imposableFed, imposableQc, creditsFedMontant, creditsQcMontant, creditsFedDirects, creditsQcDirects) {
+  // Au Québec, crédit de 10 % des cotisations syndicales, sans les retirer du revenu imposable.
+  // La page d'aide de la ligne 397 a renvoyé une erreur 404 le 31 octobre 2026 ; le taux est celui retenu par l'audit.
+  const CREDIT_SYNDICAT_QC = 0.10;
+  function impotsDeBase(imposableFed, imposableQc, creditsFedMontant, creditsQcMontant, creditsFedDirects, creditsQcDirects, personneACharge) {
     const f = PAR.federal, q = PAR.quebec;
     const bpa = imposableFed <= f.tranches[2][0] ? f.bpaMax
       : imposableFed >= f.tranches[3][0] ? f.bpaMin
       : f.bpaMax - (f.bpaMax - f.bpaMin) * (imposableFed - f.tranches[2][0]) / (f.tranches[3][0] - f.tranches[2][0]);
-    const fedBase = Math.max(0, parTranches(imposableFed, f.tranches) - (bpa + creditsFedMontant) * f.tauxCredit - creditsFedDirects);
+    // Personne à charge admissible : le même montant que le montant personnel de base, et le même écrêtement
+    // (ARC, indexation 2026, 16 452 $ sous le seuil du taux de 29 %, consulté le 31 octobre 2026,
+    // https://www.canada.ca/fr/agence-revenu/services/impot/particuliers/foire-questions-particuliers/rajustement-montants-fonction-indexation-impot-particuliers-prestations.html).
+    const montantPerso = bpa * (personneACharge ? 2 : 1);
+    const fedBase = Math.max(0, parTranches(imposableFed, f.tranches) - (montantPerso + creditsFedMontant) * f.tauxCredit - creditsFedDirects);
     const fed = fedBase * (1 - f.abattementQc);
     const qc = Math.max(0, parTranches(imposableQc, q.tranches) - (q.montantBase + creditsQcMontant) * q.tauxCredit - creditsQcDirects);
     return { fed, qc };
@@ -614,7 +625,7 @@
     const imposableQc = Math.max(0, netAvantGarde - deductionTravailleur(revenuNetAffaires));
     const ie = o.interetsEtudes || 0;
     const { fed, qc } = impotsDeBase(imposableFed, imposableQc, c.creditFederal, 0,
-      ie * PAR.creditInteretsEtudes.federal, ie * PAR.creditInteretsEtudes.quebec);
+      ie * PAR.creditInteretsEtudes.federal, ie * PAR.creditInteretsEtudes.quebec, o.personneACharge);
     const cotisationFss = fss(revenuNetAffaires + autres);
     const total = fed + qc + c.rrq + c.rqap + cotisationFss;
     return { revenu: o.revenu, autres, imposable: imposableFed, imposableQc, revenuNetFed: imposableFed, revenuNetQc: imposableQc,
@@ -622,23 +633,24 @@
       net: o.revenu + autres - total, tauxMoyen: o.revenu + autres > 0 ? total / (o.revenu + autres) : 0 };
   }
 
-  /* Salarié : RRQ, RQAP et assurance-emploi de l'employé. Déductions : cotisations
+  /* Salarié : RRQ, RQAP et assurance-emploi de l'employé. Déductions fédérales : cotisations
      supplémentaires au RRQ, régime de retraite (RPA), cotisations syndicales, REER ;
-     au Québec, déduction pour travailleurs. Crédits fédéraux : montant de base,
-     montant canadien pour emploi, RRQ de base, AE et RQAP. Aucune cotisation au FSS
-     sur un salaire (l'employeur la paie). */
+     au Québec, déduction pour travailleurs, et un crédit de 10 % des cotisations syndicales
+     (elles ne baissent pas le revenu net du Québec). Crédits fédéraux : montant de base
+     (et le montant pour personne à charge admissible, s'il y a lieu), montant canadien pour
+     emploi, RRQ de base, AE et RQAP. Aucune cotisation au FSS sur un salaire (l'employeur la paie). */
   function impotSalarie(o) {
     const s = Math.max(0, o.salaire || 0), q = PAR.rrq, r = PAR.rrqSalarie;
     const assiette = borne(s - q.exemption, 0, q.mga - q.exemption);
     const rrqBase = assiette * r.base, rrqSupp = assiette * r.supp1 + borne(Math.min(s, q.mgs) - q.mga, 0, q.mgs - q.mga) * r.supp2;
     const rqap = Math.min(s, PAR.rqap.max) * PAR.rqap.salarie;
     const ae = Math.min(s, PAR.ae.max) * PAR.ae.taux;
-    const autres = Math.max(0, o.autresRevenus || 0);
-    const netAvantGarde = Math.max(0, s + autres - rrqSupp - (o.rpa || 0) - (o.syndicat || 0) - (o.reer || 0));
-    const netFed = Math.max(0, netAvantGarde - (o.deductionGarde || 0));
+    const autres = Math.max(0, o.autresRevenus || 0), syndicat = Math.max(0, o.syndicat || 0);
+    const netAvantGarde = Math.max(0, s + autres - rrqSupp - (o.rpa || 0) - (o.reer || 0));
+    const netFed = Math.max(0, netAvantGarde - syndicat - (o.deductionGarde || 0));
     const netQc = Math.max(0, netAvantGarde - deductionTravailleur(s));
     const creditsFed = Math.min(PAR.montantEmploi, s) + rrqBase + ae + rqap;
-    const { fed, qc } = impotsDeBase(netFed, netQc, creditsFed, 0, 0, 0);
+    const { fed, qc } = impotsDeBase(netFed, netQc, creditsFed, 0, 0, syndicat * CREDIT_SYNDICAT_QC, o.personneACharge);
     const total = fed + qc + rrqBase + rrqSupp + rqap + ae;
     const brut = s + autres;
     return { revenu: brut, imposable: netFed, imposableQc: netQc, revenuNetFed: netFed, revenuNetQc: netQc,
@@ -650,10 +662,13 @@
      résident. RRQ : part de l'employé sur le salaire, puis les deux parts sur le revenu d'entreprise, dans ce
      qui reste sous les maximums ; RQAP de même ; assurance-emploi sur le salaire seulement. Déductions : RRQ
      supplémentaire, part « employeur » du travailleur autonome, cotisations syndicales, REER, frais de garde
-     (fédéral) ; au Québec, déduction pour travailleurs. Crédits : montant canadien pour emploi, RRQ de base,
-     assurance-emploi et RQAP ; droits de scolarité (fédéral au taux de base, Québec 8 %) et intérêts d'un prêt
-     étudiant. Fonds des services de santé sur les revenus autres que d'emploi. Sans salaire, le résultat est
-     celui d'impotParticulier ; sans revenu d'entreprise ni autres revenus, celui d'impotSalarie. */
+     (fédéral) ; au Québec, déduction pour travailleurs et crédit de 10 % des cotisations syndicales.
+     Crédits : montant canadien pour emploi, RRQ de base, assurance-emploi et RQAP ; droits de scolarité
+     (fédéral au taux de base, Québec 8 %), intérêts d'un prêt étudiant et, s'il y a lieu, personne à charge
+     admissible. Dividendes non déterminés (o.dividendes) : majoration dans le revenu imposable et le FSS,
+     crédits d'impôt, le net de caisse compte le dividende reçu. Fonds des services de santé sur les revenus
+     autres que d'emploi, majoration comprise. Sans salaire, le résultat est celui d'impotParticulier ;
+     sans revenu d'entreprise, dividendes ni autres revenus, celui d'impotSalarie. */
   function impotMixte(o) {
     const q = PAR.rrq, r = PAR.rrqSalarie, rq = PAR.rqap;
     const s = Math.max(0, o.salaire || 0), affaires = Math.max(0, (o.revenu || 0) - (o.depensesPro || 0)), autres = Math.max(0, o.autresImposables || 0);
@@ -668,19 +683,22 @@
     const ae = Math.min(s, PAR.ae.max) * PAR.ae.taux;
     const deductionAutonome = baseA / 2 + suppA + assurA * (rq.autonome - rq.salarie);
     const syndicat = Math.max(0, o.syndicat || 0), rpa = Math.max(0, o.rpa || 0);
-    const netAvantGarde = Math.max(0, gains + autres - rrqSuppS - deductionAutonome - syndicat - rpa - (o.reer || 0));
-    const imposableFed = Math.max(0, netAvantGarde - (o.deductionGarde || 0));
+    const dividendes = Math.max(0, o.dividendes || 0), dv = PAR.dividendes, majore = dividendes * (1 + dv.majoration);
+    const netAvantGarde = Math.max(0, gains + autres + majore - rrqSuppS - deductionAutonome - rpa - (o.reer || 0));
+    const imposableFed = Math.max(0, netAvantGarde - syndicat - (o.deductionGarde || 0));
     const imposableQc = Math.max(0, netAvantGarde - deductionTravailleur(gains));
     const ie = o.interetsEtudes || 0, scolarite = Math.max(0, o.scolarite || 0);
     const creditsFed = Math.min(PAR.montantEmploi, s) + rrqBaseS + ae + rqapS + baseA / 2 + assurA * rq.salarie + scolarite;
     const { fed, qc } = impotsDeBase(imposableFed, imposableQc, creditsFed, 0,
-      ie * PAR.creditInteretsEtudes.federal, ie * PAR.creditInteretsEtudes.quebec + scolarite * PAR.scolariteQuebec);
-    const cotisationFss = fss(affaires + autres);
+      ie * PAR.creditInteretsEtudes.federal + majore * dv.creditFederal,
+      ie * PAR.creditInteretsEtudes.quebec + scolarite * PAR.scolariteQuebec + syndicat * CREDIT_SYNDICAT_QC + majore * (o.creditDividendesQc ?? dv.creditQuebec),
+      o.personneACharge);
+    const cotisationFss = fss(affaires + autres + majore);
     const rrq = rrqBaseS + rrqSuppS + baseA + suppA, rqap = rqapS + rqapA;
     const total = fed + qc + rrq + rqap + ae + cotisationFss, brut = s + Math.max(0, o.revenu || 0);
-    return { revenu: brut, salaire: s, autres, imposable: imposableFed, imposableQc, revenuNetFed: imposableFed, revenuNetQc: imposableQc,
+    return { revenu: brut, salaire: s, autres, dividendes, imposable: imposableFed, imposableQc, revenuNetFed: imposableFed, revenuNetQc: imposableQc,
       fed, qc, rrq, rqap, ae, fss: cotisationFss, syndicat, total, totalGlobal: total,
-      net: brut + autres - total - syndicat - rpa, tauxMoyen: brut + autres > 0 ? total / (brut + autres) : 0 };
+      net: brut + autres + dividendes - total - syndicat - rpa, tauxMoyen: brut + autres + dividendes > 0 ? total / (brut + autres + dividendes) : 0 };
   }
 
   /* Médecins résidents : entente FMRQ-MSSS 2021-2028, annexe I. Salaire annuel par niveau (1 à 8, soit R1 à R8 ;
@@ -765,11 +783,13 @@
 
   /* ---------- Société : rémunération en dividendes non déterminés ---------- */
   function impotDividendes(dividendes, autresRevenus) {
-    const d = PAR.dividendes;
+    const d = PAR.dividendes, autres = autresRevenus || 0;
     const majore = dividendes * (1 + d.majoration);
-    const imposable = majore + (autresRevenus || 0);
+    const imposable = majore + autres;
     const { fed, qc } = impotsDeBase(imposable, imposable, 0, 0, majore * d.creditFederal, majore * d.creditQuebec);
-    return { fed, qc, total: fed + qc, net: dividendes - fed - qc };
+    const cotisationFss = fss(majore + autres);
+    const total = fed + qc + cotisationFss;
+    return { fed, qc, fss: cotisationFss, total, net: dividendes - total };
   }
   /* Médecin incorporé : la société reçoit les paiements de la RAMQ, paie les dépenses
      et son impôt (taux combiné ; au Québec, la déduction pour petite entreprise exige
@@ -787,13 +807,31 @@
     const imposable = Math.max(0, majore + autres - (o.reer || 0));
     const ie = o.interetsEtudes || 0;
     const { fed, qc } = impotsDeBase(imposable, imposable, 0, 0,
-      majore * d.creditFederal + ie * PAR.creditInteretsEtudes.federal, majore * (o.creditDividendesQc ?? d.creditQuebec) + ie * PAR.creditInteretsEtudes.quebec);
+      majore * d.creditFederal + ie * PAR.creditInteretsEtudes.federal, majore * (o.creditDividendesQc ?? d.creditQuebec) + ie * PAR.creditInteretsEtudes.quebec, o.personneACharge);
     const cotisationFss = fss(majore + autres);
     const total = fed + qc + cotisationFss;
     return { revenu: o.revenu, autres, dividendes, imposable, imposableQc: imposable, revenuNetFed: imposable, revenuNetQc: imposable,
       fed, qc, rrq: 0, rqap: 0, ae: 0, fss: cotisationFss, total, totalGlobal: total + impotSoc,
       net: dividendes + autres - total, tauxMoyen: o.revenu + autres > 0 ? (total + impotSoc) / (o.revenu + autres) : 0,
       societe: { profit, impotSociete: impotSoc, disponible, dividendes, retenu: disponible - dividendes, frais: o.fraisSociete || 0, depenses: o.depensesPro || 0 } };
+  }
+
+  /* Salaire et dividendes de la société la même année (fin de résidence, pratique incorporée) :
+     une seule déclaration. Le bénéfice et le dividende se calculent comme dans impotSociete ;
+     le salaire et le dividende majoré passent ensemble dans impotMixte. */
+  function impotSalaireEtSociete(o) {
+    const profit = Math.max(0, (o.revenu || 0) - (o.depensesPro || 0) - (o.fraisSociete || 0));
+    const impotSoc = profit * (o.tauxSociete || 0);
+    const disponible = profit - impotSoc;
+    const dividendes = o.retrait === "fixe" ? Math.min(disponible, Math.max(0, o.retraitFixe || 0)) : disponible;
+    const perso = impotMixte({
+      salaire: o.salaire, revenu: 0, dividendes, reer: o.reer, interetsEtudes: o.interetsEtudes,
+      autresImposables: o.autresImposables, scolarite: o.scolarite, syndicat: o.syndicat,
+      deductionGarde: o.deductionGarde, personneACharge: o.personneACharge, creditDividendesQc: o.creditDividendesQc,
+    });
+    return { ...perso, dividendes,
+      societe: { profit, impotSociete: impotSoc, disponible, dividendes, retenu: disponible - dividendes, frais: o.fraisSociete || 0, depenses: o.depensesPro || 0 },
+      totalGlobal: perso.total + impotSoc };
   }
 
   /* Compare le particulier et une société qui verse seulement les
@@ -966,18 +1004,39 @@
       libre: iLibre >= 0 ? mois[iLibre].date : null, iLibre, parAn };
   }
 
+  /* Intérêts d'un prêt d'études payés sur chaque tranche de 12 mois à compter de debut,
+     au paiement contractuel (minimums, sans remboursement accéléré). Les années après
+     le remboursement sont à 0. C'est l'intérêt qui donne droit au crédit, pas le solde fois le taux. */
+  function interetsEtudesPeriodes(dettes, debut, periodes) {
+    const n = Math.max(0, Math.floor(+periodes) || 0), zeros = () => Array.from({ length: n }, () => 0);
+    if (!n || !/^\d{4}-\d{2}$/.test(String(debut || ""))) return zeros();
+    const etudes = (dettes || []).filter(d => (+d.creditImpot || 0) > 0 && (+d.solde || 0) > 0);
+    if (!etudes.length) return zeros();
+    const sim = simulerDettes(etudes, { debut, methode: "minimum", extraMensuel: 0, moisMax: n * 12 });
+    const res = [];
+    for (let i = 0; i < n; i++) {
+      let s = 0;
+      for (let m = i * 12; m < (i + 1) * 12 && m < sim.mois.length; m++) s += sim.mois[m].interetsEtudes || 0;
+      res.push(s);
+    }
+    return res;
+  }
+
   /* ============================================================
      ÉPARGNE : REEE, REER, CELI
      ============================================================ */
   /* REEE : subvention fédérale de 20 % (500 $ par an, 7 200 $ à vie) et
      québécoise de 10 % (250 $ par an, 3 600 $ à vie), sur les cotisations
-     jusqu'à 17 ans. */
+     jusqu'à 17 ans. Cotisations plafonnées à 50 000 $ par enfant (déjà versées,
+     champ cotisations, plus celles du plan). */
+  const PLAFOND_REEE = 50000;
   function projeterReee(e, rendement) {
     return e.enfants.map(enf => {
       let solde = +enf.solde || 0, sv = +enf.subventionsRecues || 0, svq = 0, cot = 0;
+      const deja = Math.max(0, +enf.cotisations || 0);
       const ans = Math.max(0, 17 - enf.age);
       for (let a = 0; a < ans; a++) {
-        const c = e.cotisationAnnuelle;
+        const c = Math.max(0, Math.min(+e.cotisationAnnuelle || 0, PLAFOND_REEE - deja - cot));
         const f = Math.min(c * 0.20, 500, Math.max(0, 7200 - sv));
         const q = Math.min(c * 0.10, 250, Math.max(0, 3600 - svq));
         sv += f; svq += q; cot += c;
@@ -1117,7 +1176,7 @@
   }
 
   const Calc = { CELIAPP, celiappParAn, ACTES, CNESST, valeurActes, supervisionOuVisites, demiJourneeActes, P2026, P2027, parametres, utiliserAnnee, avecAnnee, parametresActifs: () => PAR, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, SUPERVISION_MAX_APRES_MIDI, partAssiduite, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
-    remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil, fraisGarde };
+    remboursementReer, impotDividendes, impotSociete, impotSalaireEtSociete, comparerSociete, simulerDettes, interetsEtudesPeriodes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil, fraisGarde };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;
 })(typeof window !== "undefined" ? window : globalThis);

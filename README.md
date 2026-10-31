@@ -334,8 +334,8 @@ dossier racine.
   montants au dollar). Québec : 3,15 % (Québec, ensemble ; la même formule
   redonne 2,85 % pour 2025 et 2,05 % pour 2026 ; paliers et montants de
   garde au multiple de 5 $). Assurance-emploi 2027 : maximum assurable de
-  70 800 $ et taux prévu de 1,27 % au Québec (Rapport actuariel 2027 sur le
-  taux de cotisation d'assurance-emploi, BSIF, 14 septembre 2026). RRQ,
+  70 800 $ et taux du Québec de 1,29 % (Commission de l'assurance-emploi
+  du Canada, taux de 2027, consulté le 31 octobre 2026). RRQ,
   RQAP, prime d'assurance médicaments et Allocation canadienne pour enfants :
   ceux de 2026, en attendant. La page Impôt et le rapport l'indiquent
   (« Montants 2027 provisoires ») ; la vérification officielle reste faite

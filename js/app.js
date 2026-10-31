@@ -417,9 +417,10 @@ window.Verrou.quandOuvert(function () {
       const e = S.epargne.reee.enfants[i];
       const nom = el("input", "nom-element"); nom.type = "text"; nom.value = e.nom; nom.setAttribute("aria-label", "Nom ou surnom"); lierListe("enfants", i, "nom")(nom);
       const g = el("div", "groupe"); g.appendChild(nom); c.appendChild(g);
-      [{ k: "age", l: "Âge", u: "ans", s: 1 }, { k: "solde", l: "Solde du REEE", u: "$", s: 100 }].forEach(ch => {
+      [{ k: "age", l: "Âge", u: "ans", s: 1 }, { k: "solde", l: "Solde du REEE", u: "$", s: 100 },
+        { k: "cotisations", l: "Cotisations déjà versées", u: "$", s: 100, h: "Le solde comprend les subventions et les gains. Seules les cotisations comptent dans le plafond de 50 000 $." }].forEach(ch => {
         const ligne = creerChamp(ch, `e-${e.id}-${ch.k}`, lierListe("enfants", i, ch.k), false);
-        ligne.querySelector("input").value = e[ch.k];
+        ligne.querySelector("input").value = e[ch.k] ?? 0;
         c.appendChild(ligne);
       });
       c.appendChild(el("p", "aide", "L'âge sert aussi au calcul des allocations familiales et de la prime d'assurance médicaments."));
@@ -490,7 +491,10 @@ window.Verrou.quandOuvert(function () {
     // imposé seul (pas de transfert de crédits, allocations selon son seul revenu), même s'ils
     // partagent le logement et les dépenses.
     R.coupleFiscal = R.couple && (S.conjointe.lien !== "fait" || !!S.conjointe.depuis12mois || !!S.conjointe.enfantCommun);
-    R.interetsEtudes = S.dettes.filter(d => d.creditImpot > 0).reduce((a, d) => a + d.solde * d.taux / 100, 0);
+    // Intérêts du prêt d'études au paiement contractuel, par tranche de 12 mois. Un remboursement
+    // accéléré en baisserait encore : on ne reboucle pas l'impôt et le surplus dans la simulation.
+    R.interetsPeriodes = C.interetsEtudesPeriodes(S.dettes, S.strategie.debut, 41);
+    R.interetsEtudes = R.interetsPeriodes[0] || 0;
     // Résidence : salaire de l'échelle de la FMRQ jusqu'au début de la pratique. Vue « résidence » : l'aperçu, le
     // revenu, l'impôt et le budget montrent la résidence ; vue « pratique » : la pratique à venir. Les projections et
     // le plan des dettes suivent le parcours (résidence, puis pratique) dans les deux vues. Sans date : le 1er juillet qui vient.
@@ -525,7 +529,10 @@ window.Verrou.quandOuvert(function () {
     const celiappAns = C.celiappParAn(S.epargne.celiapp, 60);
     R.celiappAnnee = a => celiappAns[Math.max(0, a)] || 0;
     R.celiappVoulu = Math.max(0, +(S.epargne.celiapp || {}).cotisationAnnuelle || 0);
-    const base = { depensesPro: R.depensesPro, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(0), interetsEtudes: R.interetsEtudes, autresImposables: R.autresNonPro };
+    // Personne à charge admissible : vous seul, sans conjoint au sens de l'impôt, avec un enfant de moins de 18 ans.
+    const enfantACharge = a => S.epargne.reee.enfants.some(x => +x.age + a < 18);
+    const base = { depensesPro: R.depensesPro, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(0), interetsEtudes: R.interetsEtudes, autresImposables: R.autresNonPro,
+      personneACharge: !R.coupleFiscal && enfantACharge(0) };
     // Partenaire : salarié, ou à son compte (même calcul que le médecin travailleur autonome).
     // reel : facteur de revenu en dollars d'aujourd'hui (années futures).
     R.autonomeP = R.couple && S.conjointe.statut === "autonome";
@@ -556,7 +563,9 @@ window.Verrou.quandOuvert(function () {
     // Une place subventionnée : sa contribution réduite ne compte pas pour le crédit du Québec.
     // Déduction fédérale : le conjoint au revenu net le moins élevé, au plus les 2/3 de son revenu gagné
     // (salaire, revenu d'entreprise ; pas les dividendes). Années futures : selon l'âge des enfants.
-    const lignesGarde = k => depensesEffectives().filter(b => b.k === k);
+    // Le détail, pas l'estimation : en estimation, l'argent est déjà dans « le reste », mais les lignes
+    // gardées (garderie, camps, gardiennage) donnent encore droit au crédit.
+    const lignesGarde = k => depensesDuDetail().filter(b => b.k === k);
     const annuelGarde = (k, part = () => 1) => lignesGarde(k).reduce((t, b) => t + mensuel(b) * 12 * part(b), 0);
     const kFed = ["garderie", "campsJour", "gardiennage"], kQc = S.famille.gardeSubventionnee ? ["campsJour", "gardiennage"] : kFed;
     const fraisFed = kFed.reduce((t, k) => t + annuelGarde(k), 0), fraisQc = kQc.reduce((t, k) => t + annuelGarde(k), 0);
@@ -564,7 +573,7 @@ window.Verrou.quandOuvert(function () {
     const agesGarde = a => S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x <= 16);
     // Vue résidence : mon impôt de salarié sur le salaire de résident (base.deductionGarde, s'il y a lieu).
     const impotResidence = (x = {}) => C.impotMixte({ salaire: R.res.brut, reer: base.reer, interetsEtudes: R.interetsEtudes, autresImposables: R.autresNonPro,
-      scolarite: R.res.scolarite, syndicat: R.res.syndicat, deductionGarde: base.deductionGarde || 0, ...x });
+      scolarite: R.res.scolarite, syndicat: R.res.syndicat, deductionGarde: base.deductionGarde || 0, personneACharge: base.personneACharge, ...x });
     const gagneMoi = R.vueResidence ? R.res.brut : R.societeActive ? 0 : Math.max(0, R.rev[mode].total - depensesMode(mode));
     const gagneP = !R.couple ? 0 : R.autonomeP ? Math.max(0, (S.conjointe.revenuAutonome || 0) - (S.conjointe.depensesAutonome || 0)) : S.conjointe.statut === "sans" ? 0 : S.conjointe.salaire || 0;
     const sansGarde = () => R.vueResidence ? impotResidence() : impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.rev[mode].total });
@@ -689,13 +698,12 @@ window.Verrou.quandOuvert(function () {
        résidence (salaire de l'échelle au niveau et à la date de chaque mois ; après la fin de l'entente, la hausse des
        revenus du scénario), puis ceux de la pratique : la période où elle commence suit l'année de la page Revenu
        (première année, s'il y a lieu), les suivantes l'année type. Impôt sur le salaire et le revenu de pratique
-       réunis (impotMixte) ; en société, le salaire est imposé à part la période de transition (approximation). */
+       réunis (impotMixte) ; en société, le salaire et les dividendes de la transition sont une seule déclaration. */
     const finEntente = C.FMRQ.finEntente.slice(0, 7);
     const salaireMois = (m, h) => {
       const d = isoMois(m), apres = d.slice(0, 7) > finEntente ? Math.pow(1 + h.hausseRevenus / 100, moisEntre(finEntente, d.slice(0, 7)) / 12) : 1;
       return (echelleAu(m).total * apres + (+rs.autres || 0) * Math.pow(1 + h.hausseRevenus / 100, m / 12)) / 12;
     };
-    const sommeImpots = (x, y) => { const o = { ...y }; for (const k of Object.keys(x)) if (typeof x[k] === "number") o[k] = (x[k] || 0) + (y[k] || 0); return o; };
     const anneeParcours = (h, a) => {
       const I = Math.pow(1 + h.inflation / 100, a), reel = Math.pow(1 + h.hausseRevenus / 100, a) / I;
       const moisRes = Math.max(0, Math.min(12, R.moisAvantPratique - 12 * a)), fP = (12 - moisRes) / 12;
@@ -709,15 +717,21 @@ window.Verrou.quandOuvert(function () {
       const reer = S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImp = R.autresNonPro * reel;
       const anneeProj = (an0 || new Date().getFullYear()) + a;
       const creditDividendesQc = anneeProj >= 2027 ? C.P2026.dividendes.creditQuebecDes2027 : undefined;
+      const fisc = R.couple && (R.coupleFiscal || a >= 1);
+      const pac = !fisc && enfantACharge(a), interetsAn = R.interetsPeriodes[a] || 0;
       const impotMoi = dg => {
-        const perso = () => C.impotMixte({ salaire: brutRes, revenu: R.societeActive ? 0 : totalP, depensesPro: proPerso, reer, interetsEtudes: R.interetsEtudes,
-          autresImposables: autresImp, scolarite: scol, syndicat: synd, deductionGarde: dg });
+        if (R.societeActive && totalP && brutRes) return C.impotSalaireEtSociete({
+          salaire: brutRes, revenu: totalP, depensesPro: R.depensesPro * fP + fraisP, fraisSociete: S.societe.fraisSociete,
+          tauxSociete: S.societe.tauxSociete / 100, retrait: S.societe.retrait, retraitFixe: S.societe.retraitFixe / I,
+          reer, interetsEtudes: interetsAn, autresImposables: autresImp, scolarite: scol, syndicat: synd,
+          deductionGarde: dg, personneACharge: pac, creditDividendesQc,
+        });
+        const perso = () => C.impotMixte({ salaire: brutRes, revenu: R.societeActive ? 0 : totalP, depensesPro: proPerso, reer, interetsEtudes: interetsAn,
+          autresImposables: autresImp, scolarite: scol, syndicat: synd, deductionGarde: dg, personneACharge: pac });
         if (!R.societeActive || !totalP) return perso();
-        const soc = impotDe({ ...base, reer: brutRes ? 0 : reer, autresImposables: brutRes ? 0 : autresImp, depensesPro: R.depensesPro * fP + fraisP, revenu: totalP, creditDividendesQc, deductionGarde: brutRes ? 0 : dg }, 1 / I);
-        return brutRes ? sommeImpots(perso(), soc) : soc;
+        return impotDe({ ...base, personneACharge: pac, interetsEtudes: interetsAn, reer, autresImposables: autresImp, depensesPro: R.depensesPro * fP + fraisP, revenu: totalP, creditDividendesQc, deductionGarde: dg }, 1 / I);
       };
       // Frais de garde : la déduction fédérale va au conjoint au revenu net le moins élevé.
-      const fisc = R.couple && (R.coupleFiscal || a >= 1);
       const conj0 = impotPartenaire(reel, 0), moi0 = impotMoi(0);
       const parPart = !!R.garde.fraisFed && fisc && conj0.revenuNetFed < moi0.revenuNetFed;
       const gagne = parPart ? gagneP * reel : brutRes + (R.societeActive ? 0 : Math.max(0, totalP - proPerso));
@@ -752,9 +766,9 @@ window.Verrou.quandOuvert(function () {
         // Dès 2027, le crédit québécois pour dividendes non déterminés passe à 2,69 % (pratique incorporée).
         const anneeProj = (+String(S.strategie.debut).slice(0, 4) || new Date().getFullYear()) + a;
         const creditDividendesQc = anneeProj >= 2027 ? C.P2026.dividendes.creditQuebecDes2027 : undefined;
-        let moi = impotDe({ ...base, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImposables: R.autresNonPro * reel, depensesPro: R.depensesPro + fraisA, revenu: R.revType[mode].total * reel, creditDividendesQc, deductionGarde: R.garde.parPartenaire ? 0 : R.garde.deductionAn(a, reel) }, 1 / I);
         // L'an prochain, des conjoints de fait auront 12 mois de vie commune : couple pour l'impôt.
         const fisc = R.couple && (R.coupleFiscal || a >= 1);
+        let moi = impotDe({ ...base, personneACharge: !fisc && enfantACharge(a), interetsEtudes: R.interetsPeriodes[a] || 0, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImposables: R.autresNonPro * reel, depensesPro: R.depensesPro + fraisA, revenu: R.revType[mode].total * reel, creditDividendesQc, deductionGarde: R.garde.parPartenaire ? 0 : R.garde.deductionAn(a, reel) }, 1 / I);
         if (fisc) moi = C.transfertsConjoints(moi, conj)[0];
         const ages = S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x < 18);
         const nf = moi.revenuNetFed + (fisc ? conj.revenuNetFed : 0), nq = moi.revenuNetQc + (fisc ? conj.revenuNetQc : 0);
@@ -1044,9 +1058,9 @@ window.Verrou.quandOuvert(function () {
       action("info", `Votre première année de pratique (${S.revenu.anneePremiere}) est terminée : quand votre clientèle sera bâtie, choisissez « Année type » (Revenu, Modifier).`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     // En résidence, le régime d'assurance collective de l'entente de la FMRQ couvre les médicaments (art. 28.10).
-    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si cette assurance collective vous couvre, décochez le régime public (Budget, bouton Ménage) ; la prime de 766 $ ne s'applique pas.");
+    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si cette assurance collective vous couvre, décochez le régime public (Budget, bouton Ménage) ; la prime, jusqu'à 789 $, ne s'applique pas.");
     else if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
-      action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 766 $ par adulte en 2026, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
+      action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 789 $ par adulte du 1er juillet 2026 au 30 juin 2027, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
     const auj = new Date(S.strategie.debut + "-01T00:00:00");
     S.dettes.filter(d => d.type === "hypotheque" && d.finTerme).forEach(d => {
       const f = new Date(d.finTerme + "T00:00:00"); const mois = (f - auj) / 2.63e9;
@@ -1816,7 +1830,7 @@ window.Verrou.quandOuvert(function () {
       x.scolarite > 0 && { cls: "sous", cellules: ["Moins votre part des droits de scolarité", moins(x.scolarite)] },
       { cls: "sous", cellules: ["Taux moyen", pct(I.tauxMoyen)] },
     ].filter(Boolean));
-    document.getElementById("im-tableau-note").textContent = "Salarié : impôt fédéral (après l'abattement du Québec) et du Québec, RRQ, RQAP et assurance-emploi de l'employé. Crédits : montant canadien pour emploi, cotisations, droits de scolarité (fédéral, et Québec à 8 %) et intérêts d'un prêt étudiant ; déductions : cotisation syndicale, REER et, au Québec, déduction pour travailleurs.";
+    document.getElementById("im-tableau-note").textContent = "Salarié : impôt fédéral (après l'abattement du Québec) et du Québec, RRQ, RQAP et assurance-emploi de l'employé. Crédits : montant canadien pour emploi, cotisations, droits de scolarité (fédéral, et Québec à 8 %), intérêts d'un prêt étudiant et, au Québec, 10 % de la cotisation syndicale ; déductions : cotisation syndicale au fédéral, REER et, au Québec, déduction pour travailleurs.";
   }
   function rendreImpot(R) {
     document.getElementById("h-impot").textContent = `Impôt ${R.parametres.annee}`;
@@ -1963,6 +1977,9 @@ window.Verrou.quandOuvert(function () {
   // Refait les cas de l'outil officiel avec le calcul de WealthMorand et montre les écarts.
   const CHAMPS_VERIF = [["qc", "Impôt du Québec"], ["fed", "Impôt fédéral"], ["rrq", "RRQ"], ["rqap", "RQAP"], ["ae", "Assurance-emploi"],
     ["af", "Allocation famille"], ["fournitures", "Fournitures scolaires"], ["ace", "Allocation canadienne pour enfants"], ["prime", "Prime d'assurance médicaments"]];
+  // L'outil de mai 2026 plafonnait la prime à 766 $. Du 1er juillet 2026 au 30 juin 2027, la RAMQ publie 789 $.
+  const primeAttendue = off => off === 766 ? 789 : off === 1532 ? 1578 : off;
+  const ecartVerif = (k, nous, off) => Math.round(nous) - (k === "prime" ? primeAttendue(off) : off);
   function casCalcul(v) { return C.avecAnnee(2026, () => casCalcul2026(v)); }   // l'outil officiel porte sur 2026
   function casCalcul2026(v) {
     let a = C.impotSalarie({ salaire: v.salaires[0] }), b = v.couple ? C.impotSalarie({ salaire: v.salaires[1] }) : null;
@@ -1981,7 +1998,12 @@ window.Verrou.quandOuvert(function () {
     let total = 0, egaux = 0, pire = { e: 0 };
     const cas = VERIFICATION.map(v => {
       const b = casCalcul(v);
-      const ecarts = CHAMPS_VERIF.map(([k, n]) => { const e = Math.round(b[k]) - v.officiel[k]; total++; if (Math.abs(e) <= 1) egaux++; if (Math.abs(e) > Math.abs(pire.e)) pire = { e, n, cas: nomCas(v) }; return { n, e, off: v.officiel[k], nous: Math.round(b[k]) }; });
+      const ecarts = CHAMPS_VERIF.map(([k, n]) => {
+        const nous = Math.round(b[k]), plafond = k === "prime" && primeAttendue(v.officiel[k]) !== v.officiel[k] && nous === primeAttendue(v.officiel[k]);
+        const e = plafond ? 0 : ecartVerif(k, b[k], v.officiel[k]);
+        total++; if (Math.abs(e) <= 1) egaux++; if (Math.abs(e) > Math.abs(pire.e)) pire = { e, n, cas: nomCas(v) };
+        return { n, e, off: v.officiel[k], nous, plafond };
+      });
       return { v, ecarts };
     });
     document.getElementById("im-verif-resume").textContent = `${nb(egaux, 0)} montants sur ${nb(total, 0)} identiques à l'outil du ministère des Finances`;
@@ -1996,10 +2018,10 @@ window.Verrou.quandOuvert(function () {
     const d = el("details", "plier"); d.appendChild(el("summary", null, "Voir chaque montant"));
     cas.forEach(({ v, ecarts }) => {
       d.appendChild(el("h4", null, nomCas(v)));
-      tableauSimple(d, ["", "Officiel", "WealthMorand", "Écart"], ecarts.map(x => ({ cellules: [x.n, $(x.off), $(x.nous), x.e ? signe(x.e) : "—"] })));
+      tableauSimple(d, ["", "Officiel", "WealthMorand", "Écart"], ecarts.map(x => ({ cellules: [x.n, $(x.off), $(x.nous), x.plafond ? "plafond" : x.e ? signe(x.e) : "—"] })));
     });
     z.appendChild(d);
-    z.appendChild(el("p", "aide", "Outil de calcul du revenu disponible des familles (version de mai 2026, année 2026), consulté le 25 octobre 2026. L'outil ne traite que des revenus d'emploi : il valide les barèmes, les crédits, les transferts entre conjoints, les allocations et la prime d'assurance médicaments. Votre revenu de travailleur autonome (RRQ des deux parts, Fonds des services de santé) suit les mêmes barèmes, mais ne peut pas y être vérifié."));
+    z.appendChild(el("p", "aide", "Outil de calcul du revenu disponible des familles (version de mai 2026, année 2026), consulté le 25 octobre 2026. L'outil ne traite que des revenus d'emploi : il valide les barèmes, les crédits, les transferts entre conjoints, les allocations et la prime d'assurance médicaments. Votre revenu de travailleur autonome (RRQ des deux parts, Fonds des services de santé) suit les mêmes barèmes, mais ne peut pas y être vérifié. La prime de ces cas est plafonnée à 766 $ dans l'outil de mai ; du 1er juillet 2026 au 30 juin 2027, le plafond publié par la RAMQ est 789 $ par adulte : ces lignes indiquent « plafond »."));
   }
 
   function rendreBudget(R) {
@@ -2302,7 +2324,7 @@ window.Verrou.quandOuvert(function () {
         const e = S.epargne.reee.enfants[i];
         return { titre: e.nom, sous: `${nb(e.age, 0)} ans · encore ${x.ans} an${x.ans > 1 ? "s" : ""} de cotisations`, valeur: $(x.solde), valeurSous: `dont ${$(x.subventions)} de subventions`, action: () => feuilleEnfant(i) };
       }),
-      { titre: "Ajouter un enfant", ico: "plus", cls: "ajout", action: () => { S.epargne.reee.enfants.push({ id: nouvelId("e"), nom: "Enfant", age: 0, solde: 0 }); sauver(); tout(); feuilleEnfant(S.epargne.reee.enfants.length - 1); } },
+      { titre: "Ajouter un enfant", ico: "plus", cls: "ajout", action: () => { S.epargne.reee.enfants.push({ id: nouvelId("e"), nom: "Enfant", age: 0, solde: 0, cotisations: 0 }); sauver(); tout(); feuilleEnfant(S.epargne.reee.enfants.length - 1); } },
     ]);
     const z = document.getElementById("ep-reer"); z.textContent = "";
     const c = S.epargne.reer.cotisationAnnuelle;
@@ -3970,7 +3992,7 @@ window.Verrou.quandOuvert(function () {
     etat: () => S, resultats: () => R, plan: () => planActif === null ? null : principal.plans[planActif].nom,
     verification: () => {
       let total = 0, egaux = 0, pire = 0;
-      VERIFICATION.forEach(v => { const b = casCalcul(v); CHAMPS_VERIF.forEach(([k]) => { const e = Math.abs(Math.round(b[k]) - v.officiel[k]); total++; if (e <= 1) egaux++; pire = Math.max(pire, e); }); });
+      VERIFICATION.forEach(v => { const b = casCalcul(v); CHAMPS_VERIF.forEach(([k]) => { const e = Math.abs(ecartVerif(k, b[k], v.officiel[k])); total++; if (e <= 1) egaux++; pire = Math.max(pire, e); }); });
       return { total, egaux, pire, cas: VERIFICATION.length };
     },
     outils: { depensesEffectives, annuelLigne, nomLigne, estPro, ITEMS_PRO, analyseDossier, independance, tresorerie, $, $2, nb, pct, signe, signePct, moisAn, moisLong, moisAvant, dateLongue, MODES, NOM_MODE, COULEUR_MODE, MILIEUX, ACTIVITES, nomActivite, frequenceTexte, libelleRevenu, SCENARIOS, NOMS_METHODES, CATALOGUE, categorie, mensuel, minimumDette, seriesDettes, jalons, votreP },
@@ -4284,7 +4306,7 @@ window.Verrou.quandOuvert(function () {
     s.famille = { calculAuto: true, versementA: "moi", medicamentsPublicMoi: !residence };
     s.epargne = { rendement: 5, encaisse: 0, reer: { solde: 0, droits: 0, cotisationAnnuelle: 0 }, celi: { solde: 0, cotisationAnnuelle: 0 },
       celiapp: { solde: 0, cotisationAnnuelle: 0 }, tauxRetrait: 35,
-      reee: { cotisationAnnuelle: 0, enfants: A.enfants.map((age, i) => ({ id: "e" + (i + 1), nom: `Enfant ${i + 1}`, age, solde: 0 })) } };
+      reee: { cotisationAnnuelle: 0, enfants: A.enfants.map((age, i) => ({ id: "e" + (i + 1), nom: `Enfant ${i + 1}`, age, solde: 0, cotisations: 0 })) } };
     // Logement
     const part = proprio ? (couple ? A.partMaison : 100) : 0;
     s.actifs = { logement: proprio ? "proprietaire" : "locataire", maison: { valeur: proprio ? A.maison : 0, part, croissance: 3 },
