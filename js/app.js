@@ -3408,14 +3408,29 @@ window.Verrou.quandOuvert(function () {
     ouvrir(location.hash.slice(1));
   });
   // Le logo mène à l'accueil, même si on y est déjà (retour en haut).
-  // La même séquence qu'à l'ouverture : les motifs défilent, le sceau reste, on termine sur le lion.
+  // Un seul dessin au centre : on le remplace. Les superposer les laissait tous visibles
+  // (l'opacité d'un groupe SVG n'est pas respectée partout).
   const ecranSceau = document.querySelector(".ouverture");
-  let finSceau = null;
+  const centreOuverture = ecranSceau.querySelector(".ouverture-centre");
+  const SUITE_OUVERTURE = ["#wm-g-cedre", "#wm-g-balance", "#wm-g-boussole", "#wm-g-cerf", "#wm-g-racines", "#wm-g-lion"];
+  const ouvertureAuDepart = document.documentElement.classList.contains("avec-ouverture");
+  let finSceau = null, pasOuverture = null;
   function jouerOuverture() {
+    const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     document.documentElement.classList.remove("avec-ouverture");
     ecranSceau.classList.remove("joue"); void ecranSceau.offsetWidth; ecranSceau.classList.add("joue");
-    clearTimeout(finSceau); finSceau = setTimeout(() => ecranSceau.classList.remove("joue"), 1400);
+    clearTimeout(pasOuverture); clearTimeout(finSceau);
+    let i = 0;
+    const montrer = () => {
+      centreOuverture.setAttribute("href", reduit ? SUITE_OUVERTURE[SUITE_OUVERTURE.length - 1] : SUITE_OUVERTURE[i]);
+      if (reduit || i >= SUITE_OUVERTURE.length - 1) return;
+      i += 1;
+      pasOuverture = setTimeout(montrer, 130);
+    };
+    montrer();
+    finSceau = setTimeout(() => ecranSceau.classList.remove("joue"), reduit ? 500 : 1400);
   }
+  if (ouvertureAuDepart) jouerOuverture();
   document.querySelectorAll("a.marque").forEach(a => a.addEventListener("click", e => {
     e.preventDefault();
     jouerOuverture();
@@ -4137,7 +4152,7 @@ window.Verrou.quandOuvert(function () {
   // Un lien de transfert passe avant l'assistant : les données arrivent d'un autre appareil.
   let dejaVu = true;
   try { dejaVu = !!localStorage.getItem(CLE) || !!localStorage.getItem(ASSISTANT_VU); } catch (e) { /* stockage indisponible */ }
-  const apresOuverture = document.documentElement.classList.contains("avec-ouverture") ? 1400 : 0;
+  const apresOuverture = ouvertureAuDepart ? 1400 : 0;
   if (transfertRecu) setTimeout(() => recevoirTransfert(transfertRecu), apresOuverture);
   else if (!dejaVu) setTimeout(ouvrirAssistant, apresOuverture);
   if (typeof ResizeObserver !== "undefined") {

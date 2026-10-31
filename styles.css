@@ -142,40 +142,23 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 .barre-haut { gap: 10px; }
 .barre-haut .marque { display: flex; flex: 1 1 auto; max-width: 440px; gap: clamp(9px, 2.8vw, 13px); }
 
-/* Écran d'ouverture : le sceau reste fixe, seul le motif du centre change
-   (cèdre, balance, rose des vents, cerf, arbre, lion), puis l'app paraît.
+/* Écran d'ouverture : un seul dessin au centre. Le script le remplace
+   (cèdre, balance, rose des vents, cerf, arbre, lion). Le sceau ne bouge pas.
    Même séquence au clic sur le logo. Ne bloque pas les clics. */
 .ouverture { display: none; }
 .avec-ouverture .ouverture,
 .ouverture.joue {
   position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
   background: var(--fond); color: var(--marque); pointer-events: none;
-  animation: ouverture-fin 0.4s ease 0.86s forwards;
 }
-.ouverture-sceau { width: min(56vw, 230px); height: min(56vw, 230px); animation: ouverture-sceau 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.ouverture .motif { opacity: 0; }
-.avec-ouverture .motif-cedre, .ouverture.joue .motif-cedre { animation: motif-passe 130ms steps(1, end) 0ms forwards; }
-.avec-ouverture .motif-balance, .ouverture.joue .motif-balance { animation: motif-passe 130ms steps(1, end) 130ms forwards; }
-.avec-ouverture .motif-boussole, .ouverture.joue .motif-boussole { animation: motif-passe 130ms steps(1, end) 260ms forwards; }
-.avec-ouverture .motif-cerf, .ouverture.joue .motif-cerf { animation: motif-passe 130ms steps(1, end) 390ms forwards; }
-.avec-ouverture .motif-racines, .ouverture.joue .motif-racines { animation: motif-passe 130ms steps(1, end) 520ms forwards; }
-.avec-ouverture .motif-lion, .ouverture.joue .motif-lion { animation: motif-reste 1ms linear 650ms forwards; }
-@keyframes motif-passe { 0% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes motif-reste { to { opacity: 1; } }
+.ouverture.joue { animation: ouverture-fin 0.4s ease 0.86s forwards; }
+.ouverture-sceau { width: min(56vw, 230px); height: min(56vw, 230px); }
+.ouverture.joue .ouverture-sceau { animation: ouverture-sceau 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 @keyframes ouverture-fin { to { opacity: 0; visibility: hidden; } }
 @keyframes ouverture-sceau { from { opacity: 0; transform: scale(0.94); } }
 @media (prefers-reduced-motion: reduce) {
-  .ouverture-sceau,
-  .avec-ouverture .motif-cedre, .ouverture.joue .motif-cedre,
-  .avec-ouverture .motif-balance, .ouverture.joue .motif-balance,
-  .avec-ouverture .motif-boussole, .ouverture.joue .motif-boussole,
-  .avec-ouverture .motif-cerf, .ouverture.joue .motif-cerf,
-  .avec-ouverture .motif-racines, .ouverture.joue .motif-racines,
-  .avec-ouverture .motif-lion, .ouverture.joue .motif-lion { animation: none; }
-  .ouverture .motif { opacity: 0; }
-  .ouverture .motif-lion { opacity: 1; }
-  .avec-ouverture .ouverture,
   .ouverture.joue { animation: ouverture-fin 0.2s ease 0.2s forwards; }
+  .ouverture.joue .ouverture-sceau { animation: none; }
 }
 /* Verrou : tant que les données chiffrées ne sont pas ouvertes, l'app reste cachée. */
 .verrou { display: none; }
