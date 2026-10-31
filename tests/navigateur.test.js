@@ -720,14 +720,16 @@ async function enteteEtChamps(b, base) {
   const { ctx, p, erreurs } = await ouvrir(b, base, { details: true });
   const m = await p.evaluate(() => {
     const r = s => document.querySelector(s).getBoundingClientRect();
-    const marque = r(".barre-haut .marque"), barre = document.querySelector(".barre-outils"), h1 = r("#h-apercu"), hero = r("#ap-hero");
+    const marque = r(".barre-haut .marque"), barre = document.querySelector(".barre-outils"), h1 = r("#h-apercu");
+    const et = r("#ap-hero .hero-etiquette"), val = r("#ap-hero .hero-valeur"), sous = r("#ap-hero .hero-sous");
     const boutons = [...barre.children].filter(x => getComputedStyle(x).display !== "none").map(x => x.getBoundingClientRect()).sort((a, c) => a.top - c.top);
     return { largeur: Math.round(marque.width), place: innerWidth - 32, vue: barre.parentElement.id, n: boutons.length,
-      memeX: boutons.every(x => Math.abs(x.left - boutons[0].left) < 1), empiles: boutons.every((x, i) => !i || x.top >= boutons[i - 1].bottom),
-      aDroite: boutons[0].left > h1.right && boutons[0].left > hero.right, heroACote: hero.top < boutons[boutons.length - 1].bottom };
+      memeX: boutons.every(x => Math.abs(x.left - boutons[0].left) < 1), empiles: boutons.every((x, i) => !i || x.top >= boutons[i - 1].bottom - 1),
+      aDroite: boutons[0].left > h1.right, etUneLigne: et.height < 28 && et.right < boutons[0].left,
+      sousPleine: sous.left <= h1.left + 1 && sous.right > boutons[0].right - 1, nombre: val.width > 40 };
   });
   verifier("en-tête : le logo et le nom sur toute la largeur", m.largeur >= m.place - 1, m);
-  verifier("en-tête : Rapport PDF, thème et Données empilés à droite du titre et du chiffre", m.vue === "v-apercu" && m.n >= 3 && m.memeX && m.empiles && m.aDroite && m.heroACote, m);
+  verifier("en-tête : boutons à droite, libellé sur une ligne, détail en pleine largeur", m.vue === "v-apercu" && m.n >= 3 && m.memeX && m.empiles && m.aDroite && m.etUneLigne && m.sousPleine && m.nombre, m);
   await allerA(p, "revenu");
   verifier("en-tête : les boutons suivent la page ouverte, sans Rapport PDF", await p.evaluate(() => document.querySelector(".barre-outils").parentElement.id === "v-revenu" && document.getElementById("barre-pdf").hidden));
   await allerA(p, "apercu");
@@ -848,6 +850,12 @@ async function residence(b, base) {
     tuile: document.querySelector("#ap-tuiles .tuile .tuile-valeur").textContent.replace(/\s/g, " "), faire: document.getElementById("ap-actions").textContent,
     echeances: document.getElementById("ap-echeances").textContent }));
   verifier("résidence : l'aperçu montre la résidence, avec la bascule", ap.hero.includes("en résidence") && ap.choix.join() === "Résidence,Pratique" && ap.tuile === "74 305 $", ap);
+  const align = await p.evaluate(() => {
+    const b = s => document.querySelector(s).getBoundingClientRect();
+    const titre = b("#v-apercu > .tete-page"), parcours = b("#ap-parcours"), pdf = b("#barre-pdf");
+    return { titre: Math.round(titre.width), parcours: Math.round(parcours.width), ecartHaut: Math.round(pdf.top - parcours.top), pdfX: Math.round(pdf.left), parcoursD: Math.round(parcours.right) };
+  });
+  verifier("résidence : le titre a la largeur de la bascule, et les boutons partent à sa hauteur", Math.abs(align.titre - align.parcours) <= 2 && align.ecartHaut >= -2 && align.ecartHaut <= 8 && align.pdfX >= align.parcoursD - 2, align);
   verifier("résidence : impôt retenu sur la paie, ni acompte ni alerte de la RAMQ", ap.faire.includes("retenus sur chaque paie") && !ap.faire.includes("paiement de la RAMQ") && !ap.echeances.includes("Acompte provisionnel")
     && ap.echeances.includes("Début de la pratique"), ap.echeances);
   await allerA(p, "revenu");

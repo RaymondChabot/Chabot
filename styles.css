@@ -217,18 +217,19 @@ main {
 }
 .vue { display: flex; flex-direction: column; gap: 14px; }
 .vue[hidden] { display: none; }
-.tete-page { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 2px 2px; }
-.tete-page h1 { font: 450 2.15rem/1.1 var(--police-titre); letter-spacing: -0.015em; margin-right: auto; }
+.tete-page { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0 2px; }
+.tete-page h1 { font: 450 2.15rem/1.1 var(--police-titre); letter-spacing: -0.015em; margin-right: auto; text-wrap: balance; }
 /* Bouton lune / soleil : dans la barre du haut (téléphone), dans l'en-tête de chaque page (ordinateur). */
 .tete-page .tete-theme { display: none; }
 @media (min-width: 960px) { .tete-page .tete-theme { display: grid; } }
 @media print { [data-bascule-theme] { display: none !important; } }
 
 /* ---------- Héros : le chiffre principal de la page ---------- */
-.hero { padding: 6px 2px 4px; display: flex; flex-direction: column; gap: 6px; }
-.hero-etiquette { font-size: 0.95rem; color: var(--discret); }
-.hero-valeur { font-size: clamp(2.6rem, 11vw, 3.4rem); font-weight: 600; letter-spacing: -0.035em; line-height: 1.02; }
-.hero-sous { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 0.92rem; color: var(--encre-2); }
+.hero { padding: 6px 0 4px; display: flex; flex-direction: column; gap: 6px; }
+.hero-etiquette { font-size: 0.95rem; color: var(--discret); text-wrap: balance; }
+.hero-valeur { font-size: clamp(2.6rem, 11vw, 3.4rem); font-weight: 600; letter-spacing: -0.035em; line-height: 1.02; white-space: nowrap; }
+.hero-sous { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 0.92rem; color: var(--encre-2); }
+.hero-sous > span { text-wrap: balance; }
 
 /* Pastilles d'écart : flèche + texte, couleur selon que c'est bon ou non */
 .puce {
@@ -325,9 +326,9 @@ button.rangee:hover .rangee-titre { text-decoration: underline; text-underline-o
   padding: 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; text-decoration: none; color: inherit;
 }
 a.tuile:hover { border-color: var(--trait); }
-.tuile-titre { font-size: 0.84rem; color: var(--discret); }
+.tuile-titre { font-size: 0.84rem; color: var(--discret); line-height: 1.3; min-height: 2.6em; text-wrap: balance; }
 .tuile-valeur { font-size: 1.32rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tuile-sous { font-size: 0.8rem; color: var(--discret); }
+.tuile-sous { font-size: 0.8rem; color: var(--discret); line-height: 1.3; min-height: 2.6em; text-wrap: balance; }
 
 /* ---------- Contrôle segmenté ---------- */
 .segment { display: flex; gap: 2px; padding: 3px; background: var(--surface-3); border-radius: 999px; }
@@ -338,8 +339,8 @@ a.tuile:hover { border-color: var(--trait); }
 }
 .segment button[aria-checked="true"] { background: var(--surface); color: var(--encre); font-weight: 600; box-shadow: 0 1px 3px rgba(18, 18, 17, 0.12); }
 .segment.petit button { padding: 7px 8px; font-size: 0.84rem; }
-/* Bascule Résidence / Pratique : deux choix, pas plus large qu'il ne faut. */
-.segment.parcours { max-width: 340px; }
+/* Bascule Résidence / Pratique : même largeur que le titre au-dessus, deux moitiés égales. */
+.segment.parcours { width: 100%; max-width: 28rem; }
 @media print { .segment.parcours { display: none; } }
 /* Sous-onglets du Budget et du Patrimoine : soulignés, pour ne pas les confondre avec les choix (segments). */
 .onglets { display: flex; gap: 2px; margin: 2px 0 4px; border-bottom: 1px solid var(--ligne); overflow-x: auto; scrollbar-width: none; }
@@ -861,9 +862,9 @@ a.tuile:hover { border-color: var(--trait); }
 .rp-sources { font-size: 8.4pt; padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 3px; }
 .rp-avis { font-size: 8pt; margin: 8px 0 0; font-weight: 600; }
 
-/* Téléphone : Rapport PDF (aperçu), thème et Données empilés à droite du titre de la page, de même largeur ;
-   le titre et le chiffre principal de l'aperçu restent à gauche. La barre suit la page ouverte (app.js). */
-.barre-outils { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding-top: 6px; }
+/* Téléphone : Rapport PDF (aperçu), thème et Données empilés, de même largeur.
+   La barre suit la page ouverte (app.js). */
+.barre-outils { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding-top: 0; }
 .barre-outils [hidden] { display: none; }
 .barre-outils > * { min-height: 40px; justify-content: center; }
 .barre-outils .bouton-icone { width: auto; border-radius: 999px; }
@@ -874,17 +875,33 @@ a.tuile:hover { border-color: var(--trait); }
   #rapport-pdf { display: none; }
   .vue { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: start; }
   .vue > * { grid-column: 1 / -1; }
-  .vue > .tete-page { grid-column: 1; grid-row: 1; justify-content: flex-start; flex-wrap: wrap; row-gap: 8px; }
-  .vue > .tete-page h1 { margin-right: 0; }
-  .vue > .barre-outils { grid-column: 2; grid-row: 1; }
-  #v-apercu > .barre-outils { grid-row: 1 / span 2; }
-  #v-apercu > .hero { grid-column: 1; grid-row: 2; container-type: inline-size; }
-  /* Bascule Résidence / Pratique : sous le titre, à gauche des boutons, au-dessus du chiffre. */
-  #v-apercu.avec-parcours > .barre-outils { grid-row: 1 / span 3; }
-  #v-apercu.avec-parcours > #ap-parcours { grid-column: 1; grid-row: 2; }
-  #v-apercu.avec-parcours > .hero { grid-row: 3; }
-  /* À côté des boutons, le chiffre rapetisse au besoin pour tenir dans sa colonne (« −12 345 $ » compris). */
-  #v-apercu > .hero .hero-valeur { font-size: min(clamp(2.6rem, 11vw, 3.4rem), 19cqi); }
+  .vue > .tete-page { grid-column: 1; grid-row: 1; justify-content: flex-start; flex-wrap: nowrap; row-gap: 8px; align-self: start; }
+  .vue.mode-detail > .tete-page { flex-wrap: wrap; }
+  .vue > .tete-page h1 { margin-right: 0; min-width: 0; white-space: nowrap; }
+  .vue > .barre-outils { grid-column: 2; grid-row: 1; align-self: start; }
+  /* Aperçu sans bascule : le libellé et le chiffre occupent la colonne de gauche, le détail en pleine largeur. */
+  #v-apercu:not(.avec-parcours) > .barre-outils { grid-row: 1 / span 3; }
+  #v-apercu:not(.avec-parcours) > .hero { display: contents; }
+  #v-apercu:not(.avec-parcours) > .hero .hero-etiquette { grid-column: 1; grid-row: 2; align-self: end; }
+  #v-apercu:not(.avec-parcours) > .hero .hero-valeur { grid-column: 1; grid-row: 3; align-self: start; font-size: clamp(1.9rem, 8.2vw, 3.2rem); }
+  #v-apercu:not(.avec-parcours) > .hero .hero-sous { grid-column: 1 / -1; grid-row: 4; }
+  /* Résidence / Pratique : le titre a exactement la largeur de la bascule.
+     Les boutons commencent à la hauteur de la bascule, pas plus haut.
+     Le libellé est sur deux lignes égales ; la phrase du dessous prend toute la largeur. */
+  .vue.avec-parcours:not(.mode-detail) > .tete-page { align-self: end; padding-bottom: 0; }
+  .vue.avec-parcours:not(.mode-detail) > .segment.parcours {
+    grid-column: 1; grid-row: 2; width: 100%; max-width: none; align-self: start;
+  }
+  .vue.avec-parcours:not(.mode-detail) > .barre-outils { grid-column: 2; grid-row: 2 / span 3; align-self: start; }
+  .vue.avec-parcours:not(.mode-detail) > .hero { display: contents; }
+  .vue.avec-parcours:not(.mode-detail) > .hero .hero-etiquette { grid-column: 1; grid-row: 3; align-self: start; padding-top: 2px; white-space: pre-line; }
+  .vue.avec-parcours:not(.mode-detail) > .hero .hero-valeur { grid-column: 1; grid-row: 4; align-self: start; font-size: clamp(1.9rem, 8.2vw, 3.2rem); }
+  .vue.avec-parcours:not(.mode-detail) > .hero .hero-sous { grid-column: 1 / -1; grid-row: 5; }
+  /* « Impôt 2026 » et Modifier sur une seule ligne, le bord droit aligné sur les boutons. */
+  #v-impot > .tete-page { grid-column: 1 / -1; }
+  #v-impot > .barre-outils { grid-row: 2; }
+  #v-impot.avec-parcours:not(.mode-detail) > .barre-outils { grid-column: 2; grid-row: 2 / span 3; }
+  .vue.mode-detail > .segment.parcours { max-width: none; }
 }
 /* Téléphone étroit : les boutons passent en icônes (le titre et le chiffre principal gardent leur place). */
 @media screen and (max-width: 359px) { .barre-outils .bouton-pdf { font-size: 0; gap: 0; padding: 0 12px; } }
@@ -979,10 +996,10 @@ a.tuile:hover { border-color: var(--trait); }
 /* Barre empilée et sa légende en deux colonnes égales. */
 .barre-legende { display: flex; flex-direction: column; gap: 14px; }
 .legende-cases { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
-.legende-cases li { display: grid; grid-template-columns: 10px minmax(0, 1fr); column-gap: 8px; align-items: center; min-width: 0; }
-.legende-cases i { width: 10px; height: 10px; border-radius: 3px; }
-.legende-cases span { font-size: 0.84rem; line-height: 1.3; color: var(--discret); }
-.legende-cases strong { grid-column: 2; font-size: 1rem; font-weight: 600; }
+.legende-cases li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; column-gap: 8px; align-items: baseline; min-width: 0; }
+.legende-cases i { width: 10px; height: 10px; border-radius: 3px; align-self: center; }
+.legende-cases span { grid-column: 2; grid-row: 1; font-size: 0.84rem; line-height: 1.3; color: var(--discret); text-wrap: balance; }
+.legende-cases strong { grid-column: 3; grid-row: 1; font-size: 1rem; font-weight: 600; text-align: right; }
 
 /* Barres horizontales : nom, barre, montant, sur une même ligne ; les montants alignés à droite. */
 .mini-barres { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
@@ -994,7 +1011,7 @@ a.tuile:hover { border-color: var(--trait); }
 
 /* Portrait en une carte courte : la jauge et le bouton pour continuer. */
 .portrait-court .jauge span { background: var(--marque); }
-.portrait-court .bouton { align-self: flex-start; }
+.portrait-court .bouton { align-self: stretch; justify-content: center; }
 
 /* Résumé : les tuiles sur toute la largeur passent à quatre de front quand la place le permet. */
 @media (min-width: 720px) { .tuiles.quatre { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

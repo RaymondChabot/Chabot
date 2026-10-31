@@ -955,7 +955,8 @@ window.Verrou.quandOuvert(function () {
     rendrePortrait();
     // Sans aucune dépense entrée, le « surplus » serait le revenu net en entier : on montre le revenu, et la suite.
     // Avec la résidence : ce que montre la vue, et jusqu'à quand.
-    const enVue = !R.residenceActive ? "" : R.vueResidence ? " en résidence" : " en pratique";
+    // Deux lignes courtes et alignées : la vue est déjà dite par la bascule, elle reste lisible sous le titre.
+    const enVue = !R.residenceActive ? "" : R.vueResidence ? "\nen résidence" : "\nen pratique";
     const quand = !R.residenceActive ? null : puce(R.vueResidence ? `R${R.res.niveau}, jusqu'en ${moisLong(moisAvant(R.debutPratique))}` : `Dès ${moisLong(R.debutPratique)}`);
     if (!S.meta.exemple && !categoriesBudget().some(categorieRemplie)) {
       const lien = el("a", "lien-carte", "Entrez vos dépenses du mois"); lien.href = "#budget/mois";
@@ -2209,7 +2210,7 @@ window.Verrou.quandOuvert(function () {
       if (R.residenceActive) segment(id, choix, R.vueResidence ? "residence" : "pratique", v => changer("residence.vue", v), "Afficher la résidence ou la pratique");
       else { const z = document.getElementById(id); z.textContent = ""; delete z.dataset.cle; }
     }
-    document.getElementById("v-apercu").classList.toggle("avec-parcours", R.residenceActive);
+    for (const id of ["v-apercu", "v-revenu", "v-impot", "v-budget"]) document.getElementById(id).classList.toggle("avec-parcours", R.residenceActive);
   }
   function tout() {
     R = calculer();
