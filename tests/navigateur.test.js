@@ -972,6 +972,41 @@ async function tempsQuiPasse(b, base) {
   verifier("temps : aucune erreur", [janvier, aout, refus].every(x => x.erreurs.length === 0), [...janvier.erreurs, ...aout.erreurs, ...refus.erreurs]);
 }
 
+/* 31. Comparer les actes (Revenu, sous-onglet) : supervision ou visites des apprenants, choix appliqué au plan ;
+   durée d'un acte ; ma demi-journée, puis celle du plan ; carte du résumé ; aucun débordement. */
+async function comparerActes(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu/actes" });
+  await remplacer(p, { "revenu.milieu": "gmfu", "revenu.lieuTarifs": "auto", "revenu.modeBudget": "mixte", "revenu.residents": 1, "revenu.externes": 1, "revenu.patientsParResident": 4.5,
+    "revenu.patientsParExterne": 2.5, "revenu.heuresParDJ": 3.5, "revenu.enseignement": 2, "revenu.enseignementApresMidi": 0, "revenu.demiJournees": 8, "revenu.semaines": 40,
+    "revenu.annee": "type", "revenu.inscritsDebut": 600, "revenu.patientsPendantSupervision": 0, "revenu.supervisionFacturation": "visites",
+    "revenu.mix": { suivi: 100, suiviV: 0, perioV: 0, pedia: 0, gross: 0 } });
+  const vue = await p.evaluate(() => ({ hash: location.hash, onglets: [...document.querySelectorAll("#rv-onglets button")].map(x => x.textContent),
+    visibles: [...document.querySelectorAll("#v-revenu .carte")].filter(c => c.offsetParent).map(c => c.id), conclusion: document.getElementById("rv-sup-conclusion").textContent,
+    bouton: (document.querySelector("#rv-sup-actions button") || {}).textContent || "", debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
+  verifier("actes : le sous-onglet de Revenu et ses quatre cartes, sans le reste du détail", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Comparer les actes"
+    && vue.visibles.join() === "rv-carte-supervision,rv-carte-actes,rv-carte-demijournee,rv-carte-cnesst" && !vue.debord, vue);
+  verifier("actes : la supervision rapporte 51,94 $ de plus, environ 4 156 $ sur 80 demi-journées ; les visites dès 10", vue.conclusion.includes("51,94") && vue.conclusion.replace(/\s/g, " ").includes("4 156")
+    && vue.conclusion.includes("80 demi-journées") && vue.conclusion.includes("dès 10 visites"), vue.conclusion);
+  await p.click("#rv-sup-actions button"); await p.waitForTimeout(300);
+  verifier("actes : le bouton applique l'intervention de supervision au plan", vue.bouton === "Facturer l'intervention de supervision"
+    && await p.evaluate(() => window.Wealthnord.etat().revenu.supervisionFacturation === "acte"), vue.bouton);
+  await p.fill("#duree-suivi", "20"); await p.waitForTimeout(400);
+  const duree = await p.evaluate(() => ({ s: window.Wealthnord.etat().revenu.dureesActes.suivi, acte: document.querySelector('#rv-actes-heure tr[data-acte="suivi"] td[data-m="acte"]').textContent }));
+  verifier("actes : la durée d'un suivi change ce qu'il rapporte à l'heure", duree.s === 20 && duree.acte.replace(/\s/g, "") === "111$", duree);
+  await p.fill("#rapide-suivi", "6"); await p.waitForTimeout(400);
+  const dj = await p.evaluate(() => ({ t: window.Wealthnord.etat().revenu.demiJourneeType, plan: !document.getElementById("rv-dj-plan").hidden, c: document.getElementById("rv-dj-conclusion").textContent }));
+  verifier("actes : ma demi-journée se garde, avec les autres actes ; « Selon mon plan » apparaît", dj.t && dj.t.suivi === 6 && "perioV" in dj.t && dj.plan && dj.c.includes("rapporte le plus"), dj);
+  await p.click("#rv-dj-plan"); await p.waitForTimeout(300);
+  verifier("actes : « Selon mon plan » revient à la demi-journée du plan", await p.evaluate(() => window.Wealthnord.etat().revenu.demiJourneeType === null));
+  await allerA(p, "revenu"); await p.waitForTimeout(200);
+  const resume = await p.evaluate(() => { const c = document.getElementById("rv-r-actes"); return { lien: c.querySelector("a.lien-carte").getAttribute("href"), texte: c.textContent }; });
+  verifier("actes : la carte du résumé mène au sous-onglet", resume.lien === "#revenu/actes" && resume.texte.includes("La supervision") && resume.texte.includes("Ma demi-journée"), resume);
+  await allerA(p, "revenu/detail");
+  verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent));
+  verifier("actes : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 30. Le plan suit le calendrier : au premier lancement d'un nouveau mois, il repart du mois courant ; les soldes ne
    bougent pas (la personne les met à jour avec ses relevés). L'avis permet d'annuler pour ce mois-ci, sans perdre une
    modification faite pendant l'avis. Niveau de résidence au 1er juillet ; enfants et privilège au 1er janvier ;
@@ -1028,7 +1063,7 @@ async function planCalendrier(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

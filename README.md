@@ -127,6 +127,16 @@ avec un enfant commun : avant, chacun est imposé seul.
 L'essentiel suffit pour commencer ; le bouton **Optimiser** du panneau
 Revenu affiche tous les détails.
 
+**Comparer les actes** (sous-onglet du détail de Revenu, et une carte du
+résumé) : au mixte, en GMF-U, l'intervention de supervision ou les visites
+des apprenants, par demi-journée et par année, avec le nombre de visites à
+partir duquel les visites rapportent plus, et un bouton qui applique le
+meilleur choix au plan ; ce que rapporte chaque acte à l'acte et au mixte,
+et à l'heure selon la durée que vous choisissez (cabinet ou établissement,
+moins de 500 ou 500 inscrits et plus) ; votre demi-journée type (au départ,
+celle du plan) au taux horaire, au mixte et à l'acte ; les formulaires de
+la CNESST et de l'IVAC (annexe XIII), payés à 100 % dans tous les modes.
+
 - **Revenu** : pratique principale en GMF ou clinique privée (à l'acte,
   frais de cabinet), en GMF-U ou en CLSC (taux horaire, mode mixte ou à
   l'acte), avec les tarifs de la RAMQ : demi-journées de rendez-vous et de

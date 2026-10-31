@@ -1223,7 +1223,175 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("rv-residence-note").textContent = "Échelle de l'entente FMRQ-MSSS 2021-2028 (annexe I), avec l'ajustement de 0,11 % du 31 mars 2026 (avis de la RAMQ du 16 juillet 2026) ; "
       + "hausse de 3,5 % le 1er avril 2027, puis, après l'entente, la hausse des revenus du scénario. Basculez sur « Pratique » pour voir et préparer la pratique.";
   }
+  /* ============================================================
+     COMPARER LES ACTES (sous-onglet de Revenu) : supervision ou visites des apprenants, ce que rapporte
+     chaque acte selon le mode, une demi-journée de votre choix, et les formulaires de la CNESST.
+     Les champs rapides sont ceux du plan ; le lieu, le palier et le moment ne valent que pour cet écran.
+     ============================================================ */
+  // Champs rapides : bâtis une fois (le focus reste pendant la saisie) ; leurs valeurs suivent ensuite le plan.
+  function champsRapides(id, defs, valeurDe = d => lire(d.p)) {
+    const c = document.getElementById(id), cle = defs.map(d => d.p || d.k).join("|");
+    if (c.dataset.cle !== cle) {
+      c.textContent = ""; c.dataset.cle = cle;
+      defs.forEach(d => c.appendChild(creerChamp(d, "rapide-" + (d.p || d.k).replace(/\./g, "-"), inp => { if (d.p) inp.dataset.p = d.p; else inp.dataset.dj = d.k; }, false)));
+    }
+    defs.forEach(d => {
+      const inp = document.getElementById("rapide-" + (d.p || d.k).replace(/\./g, "-"));
+      if (inp && inp !== document.activeElement) { const v = valeurDe(d); inp.value = v === null || v === undefined ? "" : String(Math.round(v * 100) / 100); }
+    });
+  }
+  // Montants de la RAMQ du plan : ceux de tous les lieux, et ceux de la colonne du plan si on la regarde.
+  const MONTANTS_TOUS_LIEUX = ["tarifHoraire", "forfaitHoraireMixte", "pctMixte", "acteSupervision", "pctSupervision", "supervisionMaxH"];
+  const MONTANTS_DU_LIEU = ["forfaitResponsabilite", "suppExamenEnfant", "suppSuiviGrossesse", "perDiemResident", "perDiemExterne"];
+  function optionsActes(R) {
+    const r = S.revenu, lieuPlan = C.lieuTarifs(r), lieu = U.actesLieu || lieuPlan, memeLieu = lieu === lieuPlan;
+    const palier = U.actesPalier != null ? U.actesPalier : R.rev.inscritsFin >= 499.999 ? 1 : 0;
+    const cles = [...MONTANTS_TOUS_LIEUX, ...(memeLieu ? MONTANTS_DU_LIEU : [])].filter(k => r[k] !== undefined && r[k] !== null && r[k] !== "");
+    const tarifs = memeLieu ? r.tarifs : undefined;
+    return { lieu, palier, memeLieu, tarifs, montants: Object.fromEntries(cles.map(k => [k, +r[k]])), liste: r.listeEnseignement,
+      majorationPct: r.majorationPct, pctActe: r.pctActe, durees: r.dureesActes || {},
+      tarifMoyen: C.tarifVisite(r.mix, palier, { ...C.TARIFS_LIEU[lieu], ...(tarifs || {}) }) };
+  }
+  // Ma demi-journée selon le plan : les patients d'une demi-journée de rendez-vous, répartis selon les types de visites.
+  function demiJourneeDuPlan() {
+    const r = S.revenu, p = Math.round(Math.max(0, +r.patientsParDJ || 0)), mix = r.mix || {}, cles = ["suivi", "suiviV", "perioV", "pedia", "gross"];
+    const total = cles.reduce((t, k) => t + Math.max(0, +mix[k] || 0), 0) || 1;
+    const parts = cles.map(k => ({ k, x: p * Math.max(0, +mix[k] || 0) / total }));
+    const n = Object.fromEntries(parts.map(({ k, x }) => [k, Math.floor(x)]));
+    let reste = p - Object.values(n).reduce((t, v) => t + v, 0);
+    for (const { k } of [...parts].sort((a, b) => (b.x - Math.floor(b.x)) - (a.x - Math.floor(a.x)))) { if (reste <= 0) break; n[k]++; reste--; }
+    return n;
+  }
+  const NOMS_MODE_ACTES = { horaire: "Le taux horaire", mixte: "Le mixte", acte: "L'acte" };
+  function rendreActes(R) {
+    const r = S.revenu, o = optionsActes(R), D = { ...C.RAMQ, ...o.montants }, maj = 1 + (+r.majorationPct || 0) / 100;
+    // Lieu et palier : pour cet écran seulement (au départ, ceux du plan).
+    segment("rv-actes-lieu", [["cabinet", "Cabinet"], ["etablissement", "Établissement"]], o.lieu, v => { U.actesLieu = v; tout(); }, "Colonne de tarifs");
+    segment("rv-actes-palier", [["0", "Moins de 500 inscrits"], ["1", "500 et plus"]], String(o.palier), v => { U.actesPalier = +v; tout(); }, "Palier d'inscrits");
+
+    // 1. Supervision ou visites des apprenants (mixte, GMF-U).
+    const gmfu = R.milieu === "gmfu", T = Math.min(+r.enseignement || 0, +r.demiJournees || 0), anDJ = T * Math.max(0, +r.semaines || 0);
+    const pm = U.supMoment ? U.supMoment === "pm" : T > 0 && (+r.enseignementApresMidi || 0) >= T;
+    segment("rv-sup-moment", [["am", "Avant-midi ou soir"], ["pm", "Après-midi"]], pm ? "pm" : "am", v => { U.supMoment = v; tout(); }, "Moment de la demi-journée");
+    document.getElementById("rv-sup-intro").textContent = (gmfu ? "" : "En GMF-U seulement : votre pratique principale est ailleurs, la comparaison sert à préparer une demi-journée d'enseignement. ")
+      + "Au mixte, pour chaque demi-journée d'enseignement, vous facturez soit l'intervention de supervision (24,87 $ par 15 minutes, payée à 62,15 %, un seul acte quel que soit le nombre d'apprenants), soit les visites de vos apprenants (à 63,58 % du tarif).";
+    champsRapides("rv-sup-champs", [
+      { p: "revenu.residents", l: "Résidents", u: "rés." }, { p: "revenu.externes", l: "Externes", u: "ext." },
+      { p: "revenu.patientsParResident", l: "Patients par résident", u: "pat.", s: 0.5 }, { p: "revenu.patientsParExterne", l: "Patients par externe", u: "pat.", s: 0.5 },
+      { p: "revenu.heuresParDJ", l: "Heures par demi-journée", u: "h", s: 0.25 },
+    ]);
+    const so = C.supervisionOuVisites({ ...o, heuresParDJ: r.heuresParDJ, apresMidi: pm, residents: r.residents, externes: r.externes,
+      patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision });
+    rangees("rv-sup-resultat", [
+      { titre: "Intervention de supervision", sous: `${nb(so.heures, 2)} h × ${$2(D.acteSupervision * maj)} × ${nb(D.pctSupervision, 2)} %${pm ? " (jusqu'à 5 h l'après-midi)" : " (au plus 3,5 h)"}`, valeur: $2(so.supervision), cls: so.meilleur === "acte" ? "choisi" : null },
+      { titre: "Visites des apprenants", sous: `${nb(so.nbVisites, 1)} visites × ${$2(so.parVisite)} (${nb(D.pctMixte, 2)} % d'une visite moyenne de ${$2(o.tarifMoyen * maj)})`, valeur: $2(so.visites), cls: so.meilleur === "visites" ? "choisi" : null },
+      { titre: "En plus, dans les deux cas", sous: `Forfait horaire ${$2(so.forfait)}${so.perDiem > 0 ? ` ; demi-per diem ${$2(so.perDiem)}` : ""}`, valeur: $2(so.forfait + so.perDiem) },
+    ]);
+    const meilleurNom = so.meilleur === "visites" ? "Les visites des apprenants rapportent" : "L'intervention de supervision rapporte";
+    document.getElementById("rv-sup-conclusion").textContent = so.nbVisites <= 0
+      ? `Inscrivez vos apprenants pour comparer : l'intervention de supervision rapporte ${$2(so.supervision)} par demi-journée${so.seuil != null ? `, et les visites l'emportent dès ${nb(Math.floor(so.seuil + 1e-9) + 1, 0)} visites` : ""}.`
+      : Math.abs(so.ecart) < 0.005 ? "Les deux options rapportent autant."
+      : `${meilleurNom} ${$2(Math.abs(so.ecart))} de plus par demi-journée${anDJ > 0 ? `, environ ${$(Math.abs(so.ecart) * anDJ)} sur vos ${nb(anDJ, 0)} demi-journées d'enseignement de l'année` : ""}.`
+        + (so.seuil != null ? ` Les visites l'emportent dès ${nb(Math.floor(so.seuil + 1e-9) + 1, 0)} visites par demi-journée.` : "");
+    const actions = document.getElementById("rv-sup-actions"); actions.textContent = "";
+    if (gmfu && R.modes.includes("mixte")) {
+      const choix = r.supervisionFacturation === "visites" ? "visites" : "acte";
+      if (choix !== so.meilleur) {
+        const b = el("button", "bouton secondaire", so.meilleur === "visites" ? "Facturer les visites des apprenants" : "Facturer l'intervention de supervision"); b.type = "button";
+        b.addEventListener("click", () => { S.revenu.supervisionFacturation = so.meilleur; S.meta.exemple = false; sauver(); tout(); toast(so.meilleur === "visites" ? "Au mixte : les visites des apprenants." : "Au mixte : l'intervention de supervision."); });
+        actions.appendChild(b);
+      } else actions.appendChild(el("p", "aide", `Votre plan facture déjà ${choix === "visites" ? "les visites des apprenants" : "l'intervention de supervision"}.`));
+    }
+    const nCour = Math.round(so.nbVisites * 10) / 10, liste = [...new Set([2, 4, 6, 8, 10, 12, 14, 16, nCour])].filter(n => n > 0).sort((a, b) => a - b);
+    lignes(document.getElementById("rv-sup-table"), ["Visites", "Rapportent", "Écart"],
+      liste.map(n => ({ cls: n === nCour ? "choisi" : null, cellules: [nb(n, 1), $2(n * so.parVisite), signe$2(n * so.parVisite - so.supervision)] })));
+
+    // 2. Ce que rapporte chaque acte.
+    const actes = C.valeurActes(o), sup15 = D.acteSupervision / 4 * maj * D.pctSupervision / 100;
+    lignes(document.getElementById("rv-actes-table"), ["Acte", "À l'acte", `Au mixte (${nb(D.pctMixte, 2)} %)`], [
+      ...actes.map(a => ({ cellules: [`${a.nom} · ${a.code}`, $2(a.acte), $2(a.mixte)] })),
+      { cls: "sous", cellules: ["Intervention de supervision, 15 min · 42096 à 42098", "—", $2(sup15)] },
+    ]);
+    tableauHeure(actes, D, maj);
+    document.getElementById("rv-actes-note").textContent = `À l'acte : avant les frais de cabinet${o.lieu === "cabinet" && r.fraisCabinetPct > 0 ? ` (${nb(r.fraisCabinetPct, 1)} % dans votre plan)` : ""}. `
+      + `Au mixte : ${$2(D.forfaitHoraireMixte * maj)} l'heure, plus ${nb(D.pctMixte, 2)} % du tarif de chaque acte. Au taux horaire : ${$2(D.tarifHoraire * maj)} l'heure, plus le forfait de responsabilité ou le supplément de l'examen. `
+      + "Les durées sont les vôtres : changez-les dans le tableau. Taux horaire et mixte : en CLSC et en GMF-U.";
+
+    // 3. Ma demi-journée.
+    const plan = !r.demiJourneeType, nDJ = plan ? demiJourneeDuPlan() : r.demiJourneeType;
+    document.getElementById("rv-dj-plan").hidden = plan;
+    document.getElementById("rv-dj-intro").textContent = `Les actes d'une demi-journée de ${nb(+r.heuresParDJ || 0, 2)} h${plan ? ", répartis selon votre plan" : ""} : changez-les pour comparer les trois modes.`;
+    champsRapides("rv-dj-champs", [...actes.map(a => ({ k: a.cle, l: a.nom, u: "actes", s: 1 })), ...C.CNESST.slice(0, 5).map(f => ({ k: f.code, l: `CNESST : ${f.nom.toLowerCase()}`, u: "form.", s: 1 }))],
+      d => +(nDJ || {})[d.k] || 0);
+    const fraisAppliques = o.lieu === "cabinet" ? +r.fraisCabinetPct || 0 : 0;
+    const dj = C.demiJourneeActes({ ...o, heuresParDJ: r.heuresParDJ, nombres: nDJ, fraisCabinetPct: fraisAppliques, fraisTousModes: !!r.fraisCabinetTousModes });
+    const modes = ["horaire", "mixte", "acte"], meilleur = modes.reduce((a, m) => dj[m].net > dj[a].net ? m : a, "horaire");
+    const ligneMode = (m, titre, sous) => ({ titre, sous: sous + (dj[m].net < dj[m].brut - 0.005 ? ` ; ${$2(dj[m].brut)} avant ${nb(fraisAppliques, 1)} % de frais de cabinet` : ""), valeur: $2(dj[m].net), cls: m === meilleur ? "choisi" : null });
+    rangees("rv-dj-resultat", [
+      ligneMode("horaire", "Taux horaire", `${nb(dj.heures, 2)} h × ${$2(D.tarifHoraire * maj)}, plus les forfaits des examens`),
+      ligneMode("mixte", "Mixte", `Forfait horaire ${$2(dj.heures * D.forfaitHoraireMixte * maj)}, plus ${nb(D.pctMixte, 2)} % des tarifs`),
+      ligneMode("acte", "À l'acte", `${nb(dj.patients, 1)} actes au tarif`),
+    ]);
+    const autres = modes.filter(m => m !== meilleur).map(m => `${$2(dj[meilleur].net - dj[m].net)} de plus que ${m === "acte" ? "l'acte" : m === "mixte" ? "le mixte" : "le taux horaire"}`);
+    document.getElementById("rv-dj-conclusion").textContent = dj.patients + dj.formulaires === 0 && !(dj.heures > 0) ? "Inscrivez les actes de votre demi-journée."
+      : `${NOMS_MODE_ACTES[meilleur]} rapporte le plus pour cette demi-journée : ${autres.join(", ")}.${dj.formulaires > 0 ? ` Les formulaires de la CNESST (${$2(dj.formulaires)}) sont payés à 100 % dans les trois modes.` : ""}`;
+
+    // 4. Formulaires de la CNESST.
+    lignes(document.getElementById("rv-cnesst"), ["Formulaire", "Tarif"], C.CNESST.map(f => ({ cellules: [`${f.nom} · ${f.code}`, $2(f.tarif)] })));
+    document.getElementById("rv-cnesst-note").textContent = "Annexe XIII de l'Entente, en vigueur depuis le 1er avril 2025 (manuel de la RAMQ consulté le 25 octobre 2026). "
+      + "Payés à 100 % du tarif dans tous les modes : à l'acte, au mixte (annexe XXIII, par. 2.11) et au taux horaire, à l'acte pour ces services sans facturer d'heures pour ce temps. "
+      + "L'examen se facture à part, sauf le rapport d'évaluation médicale (09944). Sans majoration selon le territoire.";
+
+    // Résumé de Revenu : la carte qui mène ici.
+    const suivi = actes.find(a => a.cle === "suivi");
+    carteResume("rv-r-actes", "Comparer les actes", ["Ouvrir", "#revenu/actes"], rangees(el("div"), [
+      gmfu ? { titre: "Au mixte : supervision ou visites", sous: "Par demi-journée d'enseignement", valeur: so.meilleur === "visites" ? "Les visites" : "La supervision", valeurSous: `${signe$2(Math.abs(so.ecart))} par demi-journée` }
+        : { titre: "Un suivi", sous: o.lieu === "cabinet" ? "En cabinet" : "En établissement", valeur: $2(suivi.acte), valeurSous: `${$2(suivi.mixte)} au mixte` },
+      { titre: "Ma demi-journée", sous: plan ? "Selon votre plan" : "Celle que vous avez inscrite", valeur: NOMS_MODE_ACTES[meilleur], valeurSous: `${$2(dj[meilleur].net)}` },
+    ]));
+  }
+  const signe$2 = v => (v >= 0 ? "+" : "−") + $2(Math.abs(v));
+  // À l'heure, selon la durée de chaque acte : la durée se change dans le tableau (le focus reste pendant la saisie).
+  function tableauHeure(actes, D, maj) {
+    const t = document.getElementById("rv-actes-heure"), cle = actes.map(a => a.cle).join("|");
+    if (t.dataset.cle !== cle) {
+      t.dataset.cle = cle; t.textContent = "";
+      const th = el("thead"), tr = el("tr"); ["Acte", "Minutes", "À l'acte", "Mixte", "Horaire"].forEach(h => tr.appendChild(el("th", null, h))); th.appendChild(tr); t.appendChild(th);
+      const tb = el("tbody");
+      for (const a of actes) {
+        const ligne = el("tr"); ligne.dataset.acte = a.cle; ligne.appendChild(el("td", null, a.nom));
+        const td = el("td"), boite = el("div", "saisie mini"), inp = el("input");
+        inp.type = "number"; inp.min = "1"; inp.step = "5"; inp.inputMode = "numeric"; inp.id = "duree-" + a.cle; inp.dataset.p = `revenu.dureesActes.${a.cle}`;
+        inp.setAttribute("aria-label", `Durée : ${a.nom}, en minutes`);
+        boite.appendChild(inp); td.appendChild(boite); ligne.appendChild(td);
+        ["acte", "mixte", "horaire"].forEach(m => { const c = el("td"); c.dataset.m = m; ligne.appendChild(c); });
+        tb.appendChild(ligne);
+      }
+      const sup = el("tr", "sous"); sup.dataset.acte = "supervision";
+      [["Supervision, au mixte"], ["60"], ["—"], [null, "mixte"], [null, "horaire"]].forEach(([texte, m]) => { const c = el("td", null, texte || ""); if (m) c.dataset.m = m; sup.appendChild(c); });
+      tb.appendChild(sup); t.appendChild(tb);
+    }
+    for (const a of actes) {
+      const ligne = t.querySelector(`tr[data-acte="${a.cle}"]`), inp = ligne.querySelector("input");
+      if (inp !== document.activeElement) inp.value = String(a.duree);
+      const best = ["acte", "mixte", "horaire"].reduce((x, m) => a.heure[m] > a.heure[x] ? m : x, "acte");
+      ["acte", "mixte", "horaire"].forEach(m => { const c = ligne.querySelector(`td[data-m="${m}"]`); c.textContent = $(a.heure[m]); c.classList.toggle("meilleur", m === best); });
+    }
+    const sup = t.querySelector('tr[data-acte="supervision"]');
+    sup.querySelector('td[data-m="mixte"]').textContent = $(D.forfaitHoraireMixte * maj + D.acteSupervision * maj * D.pctSupervision / 100);
+    sup.querySelector('td[data-m="horaire"]').textContent = $(D.tarifHoraire * maj);
+  }
+  // Ma demi-journée : chaque nombre change la demi-journée inscrite (au premier, elle part de celle du plan).
+  document.getElementById("rv-dj-champs").addEventListener("input", e => {
+    const inp = e.target; if (!inp.dataset.dj) return;
+    const v = valeur(inp); if (v === null) return;
+    if (!S.revenu.demiJourneeType) S.revenu.demiJourneeType = demiJourneeDuPlan();
+    S.revenu.demiJourneeType[inp.dataset.dj] = v; S.meta.exemple = false; plusTard();
+  });
+  document.getElementById("rv-dj-plan").addEventListener("click", () => { S.revenu.demiJourneeType = null; sauver(); tout(); document.getElementById("rv-dj-intro").focus?.(); });
+
   function rendreRevenu(R) {
+    rendreActes(R);
     rendreResidence(R);
     resumeRevenu(R);
     if (R.vueResidence) { rendreAutresRevenus(); return; }
@@ -2047,7 +2215,7 @@ window.Verrou.quandOuvert(function () {
     R = calculer();
     document.getElementById("pied-parametres").textContent = `paramètres fiscaux ${R.parametres.annee}${R.parametres.provisoire ? " (provisoires)" : ""}`;
     appliquerVue(R);
-    appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
+    appliquerSous("revenu"); appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
     rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
     if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
     // Sigles de la RAMQ : définition au toucher, dans les pages et le panneau ouvert.
@@ -3101,7 +3269,7 @@ window.Verrou.quandOuvert(function () {
       if (inp.dataset.p === "revenu.milieu") { choisirMilieu(v); return; }
       if (inp.dataset.p.startsWith("revenu.tarifs.")) S.revenu.tarifsModifies = true;
       if (inp.dataset.p === "revenu.membreGmf") S.confirmes["revenu.membreGmf"] = true;   // l'alerte de l'Aperçu disparaît
-      if (inp.dataset.p.startsWith("revenu.")) vus().revenu = true;   // le portrait : vos revenus, précisés
+      if (inp.dataset.p.startsWith("revenu.") && !inp.dataset.p.startsWith("revenu.dureesActes.")) vus().revenu = true;   // le portrait : vos revenus, précisés
       ecrire(inp.dataset.p, v); S.meta.exemple = false;
       // Résidence cochée : la vue Résidence, et le 1er juillet qui vient comme début de pratique, à préciser.
       if (inp.dataset.p === "residence.active" && v) { S.residence.vue = "residence"; if (!S.residence.debutPratique) { S.residence.debutPratique = R.debutPratique; remplirChamps(); } }
@@ -3191,6 +3359,7 @@ window.Verrou.quandOuvert(function () {
   /* Sous-onglets du Budget et du Patrimoine : des pages plus courtes sur téléphone. Le choix est
      gardé sur cet appareil ; une adresse comme #budget/dettes ouvre directement un sous-onglet. */
   const SOUS_ONGLETS = {
+    revenu: [["detail", "Votre revenu"], ["actes", "Comparer les actes"]],
     budget: [["mois", "Ce mois-ci"], ["annee", "L'année"], ["dettes", "Dettes"]],
     avenir: [["aujourdhui", "Aujourd'hui"], ["projection", "Projection"], ["placements", "Placements"], ["proches", "Proches"]],
   };
@@ -3200,12 +3369,13 @@ window.Verrou.quandOuvert(function () {
     return SOUS_ONGLETS[page].some(([k]) => k === v) ? v : SOUS_ONGLETS[page][0][0];
   }
   function garderSous(page, cle) { try { localStorage.setItem("wm.sous." + page, cle); } catch (e) { /* préférence non gardée */ } }
+  const BARRE_SOUS = { revenu: ["rv-onglets", "Sections du revenu"], budget: ["bu-onglets", "Sections du budget"], avenir: ["pa-onglets", "Sections du patrimoine"] };
   function appliquerSous(page) {
     const cle = sousChoisi(page);
-    segment(page === "budget" ? "bu-onglets" : "pa-onglets", SOUS_ONGLETS[page], cle, v => {
+    segment(BARRE_SOUS[page][0], SOUS_ONGLETS[page], cle, v => {
       garderSous(page, v); history.replaceState(null, "", `#${page}/${v}`); tout();
-    }, page === "budget" ? "Sections du budget" : "Sections du patrimoine");
-    document.querySelectorAll(`#v-${page} .carte[data-sous]`).forEach(c => c.classList.toggle("hors-onglet", c.dataset.sous !== cle));
+    }, BARRE_SOUS[page][1]);
+    document.querySelectorAll(`#v-${page} [data-sous]`).forEach(c => c.classList.toggle("hors-onglet", c.dataset.sous !== cle));
   }
   /* Chaque page : son résumé (#budget), ou tout son détail (#budget/detail, ou un sous-onglet : #budget/dettes).
      Le bouton Retour du téléphone ramène du détail au résumé. */

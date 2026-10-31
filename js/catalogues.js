@@ -29,6 +29,8 @@
       nouveauxAnGuichet: 0, nouveauxAnSansMedecin: 0,   // année type : nouveaux patients par année, à la place des départs
       semainesArrivee: 38, partVulnerable: 20, partGroupe2: 0, partGroupe34: 0, assiduite: "80", inscriptionsEnDouble: 0, anneePratique: "5", membreGmf: true, pctPatientsVus: 80,
       typeTransfert: "changement", srvMemeJour: false, dmeInternet: false, enseignementApresMidi: 0,
+      // Comparer les actes : durées choisies (minutes) et demi-journée inscrite (vide : celle du plan).
+      dureesActes: {}, demiJourneeType: null,
       mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 },
       grossessesAn: null,   // grossesses prises en charge au premier trimestre ; vide : estimées d'après les suivis
       heuresGardeSurPlace: 0,   // au taux horaire, en plus des heures en clinique

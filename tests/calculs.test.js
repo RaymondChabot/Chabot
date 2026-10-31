@@ -367,6 +367,31 @@ const dme = o => C.compensationCabinet({ patientsParDJ: 0, membreGmf: false, ann
 verifier("DMÉ : hors GMF, licences et équipements ; le lien Internet et le commutateur (19977) seulement si réclamé", proche(dme({}), 4 * (459.90 + 287.45), 1e-6)
   && proche(dme({ dmeInternet: true }), 4 * (459.90 + 287.45 + 700.35), 1e-6) && proche(dme({ dmeInternet: true, membreGmf: true }), 4 * 459.90, 1e-6));
 
+/* 28. Comparer les actes : chaque acte à l'acte, au mixte (63,58 %) et à l'heure selon sa durée ; supervision ou
+   visites des apprenants (annexe XXIII) ; une demi-journée au taux horaire, au mixte et à l'acte ; CNESST à 100 %. */
+const actes28 = C.valeurActes({ lieu: "etablissement", palier: 1 }), suivi28 = actes28.find(a => a.cle === "suivi"), suiviV28 = actes28.find(a => a.cle === "suiviV");
+verifier("actes : un suivi, 36,95 $ à l'acte, 23,49 $ au mixte ; à l'heure (15 min) 147,80 $, 153,65 $ et 99,48 $",
+  suivi28.tarif === 36.95 && suivi28.code === "15804" && proche(suivi28.mixte, 36.95 * 0.6358, 1e-9) && proche(suivi28.heure.acte, 147.8, 1e-9)
+  && proche(suivi28.heure.mixte, 59.68 + 4 * 36.95 * 0.6358, 1e-9) && proche(suivi28.heure.horaire, 99.48, 1e-9) && proche(suiviV28.heure.horaire, 99.48 + 3 * 8.25, 1e-9), suivi28.heure);
+verifier("actes : la durée choisie, le cabinet et le palier de moins de 500", proche(C.valeurActes({ lieu: "etablissement", palier: 1, durees: { suivi: 20 } })[0].heure.acte, 36.95 * 3, 1e-9)
+  && C.valeurActes({ lieu: "cabinet", palier: 0 })[0].tarif === 42.85 && C.valeurActes({ lieu: "cabinet", palier: 0 })[0].code === "15803");
+const sup28 = C.supervisionOuVisites({ heuresParDJ: 3.5, residents: 1, externes: 1, tarifMoyen: 36.95 });
+verifier("supervision ou visites : 216,39 $ contre 164,45 $ (7 suivis) ; les visites l'emportent au-delà de 9,2 visites",
+  proche(sup28.supervision, 3.5 * 99.48 * 0.6215, 1e-9) && proche(sup28.visites, 7 * 36.95 * 0.6358, 1e-9) && sup28.meilleur === "acte"
+  && proche(sup28.seuil, 3.5 * 99.48 * 0.6215 / (36.95 * 0.6358), 1e-9) && proche(sup28.forfait, 3.5 * 59.68, 1e-9) && proche(sup28.perDiem, 41.45 + 49.85, 1e-9), sup28);
+verifier("supervision ou visites : jusqu'à 5 h l'après-midi ; 12 visites l'emportent", C.supervisionOuVisites({ heuresParDJ: 4, apresMidi: true, tarifMoyen: 36.95 }).heures === 4
+  && C.supervisionOuVisites({ heuresParDJ: 4, tarifMoyen: 36.95 }).heures === 3.5 && C.supervisionOuVisites({ heuresParDJ: 3.5, residents: 2, patientsParResident: 6, tarifMoyen: 36.95 }).meilleur === "visites");
+const dj28 = C.demiJourneeActes({ lieu: "etablissement", palier: 1, heuresParDJ: 3.5, nombres: { suivi: 4, perioV: 2, pecVuln: 1, "09926": 1 } });
+const tarifs28 = 4 * 36.95 + 2 * 84.80 + 82.90;
+verifier("ma demi-journée : taux horaire, mixte et acte, avec une attestation de la CNESST à 100 % partout",
+  proche(dj28.horaire.brut, 3.5 * 99.48 + 3 * 8.25 + 27.57, 1e-9) && proche(dj28.mixte.brut, 3.5 * 59.68 + tarifs28 * 0.6358 + 27.57, 1e-9)
+  && proche(dj28.acte.brut, tarifs28 + 27.57, 1e-9) && dj28.patients === 7 && dj28.formulaires === 27.57, dj28);
+const dj28f = C.demiJourneeActes({ lieu: "cabinet", palier: 1, heuresParDJ: 4, nombres: { suivi: 8 }, fraisCabinetPct: 30 });
+verifier("ma demi-journée : les frais de cabinet à l'acte seulement, sauf si la clinique les exige partout", proche(dj28f.acte.net, 8 * 49.15 * 0.7, 1e-9)
+  && dj28f.mixte.net === dj28f.mixte.brut && proche(C.demiJourneeActes({ lieu: "cabinet", heuresParDJ: 4, nombres: { suivi: 8 }, fraisCabinetPct: 30, fraisTousModes: true }).mixte.net,
+    C.demiJourneeActes({ lieu: "cabinet", heuresParDJ: 4, nombres: { suivi: 8 } }).mixte.brut * 0.7, 1e-9));
+verifier("CNESST : 15 formulaires, dont l'attestation (27,57 $) et le REM (520,81 $)", C.CNESST.length === 15 && C.CNESST[0].tarif === 27.57 && C.CNESST.find(f => f.code === "09944").tarif === 520.81);
+
 /* 25. CELIAPP (ARC, « Cotiser à un CELIAPP », 31 octobre 2026) : droits de 8 000 $ par année, plus le report des droits
    inutilisés de l'année d'avant (au plus 8 000 $), et 40 000 $ à vie. Versements par mois dans la projection. */
 verifier("CELIAPP : 20 000 $ voulus, 8 000 $ retenus chaque année jusqu'au plafond à vie",

@@ -349,7 +349,7 @@ a.tuile:hover { border-color: var(--trait); }
 .onglets button { flex: 1 0 auto; padding: 11px 8px 9px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--discret);
   font: inherit; font-size: 0.93rem; white-space: nowrap; cursor: pointer; }
 .onglets button[aria-checked="true"] { color: var(--encre); font-weight: 650; border-bottom-color: var(--marque); }
-.carte.hors-onglet { display: none !important; }
+.hors-onglet { display: none !important; }
 .segment.compact { flex: none; }
 .segment.compact button { flex: 1 0 auto; padding: 5px 12px; font-size: 0.8rem; }
 .hyp-ligne { margin-top: -4px; padding: 0 4px; }
@@ -502,6 +502,18 @@ a.tuile:hover { border-color: var(--trait); }
 @keyframes monter { from { transform: translateY(40px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 @keyframes glisser { from { transform: translateX(40px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 @keyframes fondu { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- Comparer les actes (Revenu) ---------- */
+.champs-rapides { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); column-gap: 20px; margin: 2px 0 10px; }
+.champs-rapides .champ { grid-template-columns: minmax(0, 1fr) minmax(96px, 128px); }
+.champs-rapides .champ > span:last-child:empty { display: none; }
+.choix-actes { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 2px 0 12px; }
+.conclusion { font-weight: 600; line-height: 1.45; margin: 12px 0 4px; }
+.tableau td.meilleur { font-weight: 700; color: var(--bon); }
+.saisie.mini { display: inline-flex; width: 58px; padding-right: 0; }
+.saisie.mini input { padding: 7px 8px; text-align: center; }
+#rv-actes-heure th, #rv-actes-heure td { padding-left: 4px; padding-right: 4px; }
+#rv-carte-actes h3 { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--discret); margin: 14px 0 2px; }
 
 /* ---------- Champs ---------- */
 .groupe { display: flex; flex-direction: column; padding-top: 14px; }

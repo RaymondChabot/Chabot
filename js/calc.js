@@ -456,15 +456,15 @@
      par. 6.02 B, 8.01, 7.02 B). Durée : celle que la personne prévoit, pour comparer à l'heure (valeur de
      départ seulement, à ajuster). */
   const ACTES = [
-    { cle: "suivi", nom: "Suivi", codes: "15803, 15804", duree: 15 },
-    { cle: "suiviV", nom: "Suivi, patient vulnérable", codes: "15823, 15824", duree: 20, horaire: "forfaitResponsabilite" },
-    { cle: "perioV", nom: "Périodique, patient vulnérable", codes: "15819, 15820", duree: 30, horaire: "forfaitResponsabilite" },
-    { cle: "pedia", nom: "Périodique pédiatrique", codes: "15813, 15814", duree: 20, horaire: "suppExamenEnfant" },
-    { cle: "gross", nom: "Suivi de grossesse", codes: "15811, 15812", duree: 15, horaire: "suppSuiviGrossesse" },
-    { cle: "pecNonVuln", nom: "Prise en charge", codes: "15801, 15802", duree: 30 },
-    { cle: "pecVuln", nom: "Prise en charge, patient vulnérable", codes: "15821, 15822", duree: 45, horaire: "forfaitResponsabilite" },
-    { cle: "srvMineure", nom: "Sans rendez-vous, mineure", codes: "15765, 15766", duree: 10 },
-    { cle: "srvComplexe", nom: "Sans rendez-vous, complexe", codes: "15773, 15774", duree: 15 },
+    { cle: "suivi", nom: "Suivi", codes: ["15803", "15804"], duree: 15 },
+    { cle: "suiviV", nom: "Suivi, patient vulnérable", codes: ["15823", "15824"], duree: 20, horaire: "forfaitResponsabilite" },
+    { cle: "perioV", nom: "Périodique, patient vulnérable", codes: ["15819", "15820"], duree: 30, horaire: "forfaitResponsabilite" },
+    { cle: "pedia", nom: "Périodique pédiatrique", codes: ["15813", "15814"], duree: 20, horaire: "suppExamenEnfant" },
+    { cle: "gross", nom: "Suivi de grossesse", codes: ["15811", "15812"], duree: 15, horaire: "suppSuiviGrossesse" },
+    { cle: "pecNonVuln", nom: "Prise en charge", codes: ["15801", "15802"], duree: 30 },
+    { cle: "pecVuln", nom: "Prise en charge, patient vulnérable", codes: ["15821", "15822"], duree: 45, horaire: "forfaitResponsabilite" },
+    { cle: "srvMineure", nom: "Sans rendez-vous, mineure", codes: ["15765", "15766"], duree: 10 },
+    { cle: "srvComplexe", nom: "Sans rendez-vous, complexe", codes: ["15773", "15774"], duree: 15 },
   ];
   /* Formulaires de la CNESST et de l'IVAC (annexe XIII de l'Entente, en vigueur depuis le 1er avril 2025 ; manuel
      de la RAMQ consulté le 25 octobre 2026). Payés à 100 % du tarif dans tous les modes : à l'acte ; au mixte
@@ -499,7 +499,7 @@
     return ACTES.map(a => {
       const tarif = (+T[a.cle][palier] || 0) * maj, duree = Math.max(1, +(o.durees || {})[a.cle] || a.duree), parHeure = 60 / duree;
       const enPlus = a.horaire ? (+D[a.horaire] || 0) * maj : 0, acte = tarif * pctActe, mixte = tarif * D.pctMixte / 100;
-      return { ...a, tarif, duree, acte, mixte, horaireEnPlus: enPlus,
+      return { ...a, code: a.codes[palier], tarif, duree, acte, mixte, horaireEnPlus: enPlus,
         heure: { acte: acte * parHeure, mixte: D.forfaitHoraireMixte * maj + mixte * parHeure, horaire: D.tarifHoraire * maj + enPlus * parHeure } };
     });
   }
