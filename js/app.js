@@ -620,6 +620,19 @@ window.Verrou.quandOuvert(function () {
     const parHeure = (g, md) => { const h = g.heures + (md === "horaire" ? g.garde : 0);
       return h > 0 ? (g[md].total - g.activites - g.polyvalence - g[md].autres - g[md].fraisCabinet) / h : null; };
     R.parHeure = Object.fromEntries(R.modes.map(md => [md, parHeure(R.rev, md)]));
+    // Une autre offre de pratique : son milieu (colonne de tarifs et montants de son lieu), son mode et sa semaine ;
+    // la clientèle, les tarifs modifiés du même lieu, le ménage et les déductions restent ceux du plan.
+    R.offre = o => {
+      const milieu = MILIEUX[o.milieu] ? o.milieu : "clinique", lieuPlan = C.lieuTarifs(S.revenu), lieu = milieu === "clinique" ? "cabinet" : "etablissement";
+      const x = { ...S.revenu, autresRevenus: autresRev, milieu, lieuTarifs: "auto", demiJournees: +o.demiJournees || 0, patientsParDJ: +o.patientsParDJ || 0,
+        semaines: +o.semaines || 0, heuresParDJ: +o.heuresParDJ || S.revenu.heuresParDJ, fraisCabinetPct: milieu === "clinique" ? +o.fraisCabinetPct || 0 : 0,
+        activites: o.activites === false ? [] : S.revenu.activites };
+      if (lieu !== lieuPlan) Object.assign(x, { tarifs: clone(C.TARIFS_LIEU[lieu]) }, C.montantsLieu(lieu, S.revenu.listeEnseignement));
+      if (milieu !== "gmfu") Object.assign(x, { enseignement: 0, residents: 0, externes: 0, patientsPendantSupervision: 0 });
+      else x.enseignement = Math.min(+S.revenu.enseignement || 0, x.demiJournees);
+      const g = C.revenuGmfu(x), mode = MILIEUX[milieu].modes.includes(o.mode) ? o.mode : MILIEUX[milieu].modes[0];
+      return { milieu, mode, g, brut: g[mode].total, net: R.netPour(g[mode].total, g[mode].fraisCabinet), heure: parHeure(g, mode), heures: g.heures };
+    };
     R.essaiModes = x => { const g = revenuDe(x); return Object.fromEntries(R.modes.map(md => [md, { brut: g[md].total, net: R.netPour(g[md].total, g[md].fraisCabinet), heure: parHeure(g, md) }])); };
     // REER : impôt sans cotisation, et avec une cotisation donnée (au revenu de l'année).
     const baseMode = { ...base, depensesPro: depensesMode(mode), revenu: R.brut };
@@ -1273,7 +1286,11 @@ window.Verrou.quandOuvert(function () {
     }
     defs.forEach(d => {
       const inp = document.getElementById("rapide-" + (d.p || d.k).replace(/\./g, "-"));
-      if (inp && inp !== document.activeElement) { const v = valeurDe(d); inp.value = v === null || v === undefined ? "" : String(Math.round(v * 100) / 100); }
+      if (inp && inp !== document.activeElement) {
+        const v = valeurDe(d);
+        if (inp.type === "checkbox") inp.checked = !!v;
+        else inp.value = v === null || v === undefined ? "" : typeof v === "number" ? String(Math.round(v * 100) / 100) : String(v);
+      }
     });
   }
   // Montants de la RAMQ du plan : ceux de tous les lieux, et ceux de la colonne du plan si on la regarde.
@@ -1528,7 +1545,66 @@ window.Verrou.quandOuvert(function () {
   });
   document.getElementById("rv-dj-plan").addEventListener("click", () => { S.revenu.demiJourneeType = null; sauver(); tout(); document.getElementById("rv-dj-intro").focus?.(); });
 
+  /* Comparer deux offres : votre plan et une autre pratique (milieu, mode, semaine), côte à côte. L'offre est gardée
+     avec les données ; ses réglages se déplient. Le ménage, les déductions et la clientèle sont ceux du plan. */
+  function offreDepart() {
+    const r = S.revenu, autre = r.milieu === "clinique" ? "gmfu" : "clinique";
+    return { milieu: autre, mode: MILIEUX[autre].modes.includes("mixte") ? "mixte" : MILIEUX[autre].modes[0], demiJournees: +r.demiJournees || 8,
+      patientsParDJ: +r.patientsParDJ || 0, semaines: +r.semaines || 0, heuresParDJ: +r.heuresParDJ || 4, fraisCabinetPct: autre === "clinique" ? 0 : +r.fraisCabinetPct || 0, activites: true };
+  }
+  function rendreOffres(R) {
+    const carte = document.getElementById("rv-carte-offres"), o = S.revenu.offreB;
+    // Squelette bâti une fois : les champs gardent le focus pendant la saisie.
+    if (!carte.dataset.monte) {
+      carte.dataset.monte = "1";
+      const tete = el("div", "carte-tete"); tete.appendChild(el("h2", null, "Comparer deux offres"));
+      const vide = el("div"); vide.id = "rv-offre-vide";
+      vide.appendChild(el("p", "aide", "Votre plan à côté d'une autre pratique : un autre milieu, un autre mode, une autre semaine. Le net par année et à l'heure, côte à côte."));
+      const a = el("div", "actions"), b = el("button", "bouton secondaire", "Comparer avec une autre offre"); b.type = "button"; b.id = "rv-offre-ajouter";
+      b.addEventListener("click", () => { S.revenu.offreB = offreDepart(); U.offreOuverte = true; S.meta.exemple = false; sauver(); tout(); });
+      a.appendChild(b); vide.appendChild(a);
+      const plein = el("div"); plein.id = "rv-offre-plein";
+      const w = el("div", "tableau-defile"), t = el("table", "tableau"); t.id = "rv-offre-table"; w.appendChild(t);
+      const c = el("p", "conclusion"); c.id = "rv-offre-conclusion";
+      const d = el("details", "plus-loin"); d.id = "rv-offre-plus";
+      d.addEventListener("toggle", () => { U.offreOuverte = d.open; });
+      const champs = el("div", "champs-rapides"); champs.id = "rv-offre-champs";
+      const ar = el("div", "actions"), retirer = el("button", "bouton secondaire", "Retirer l'autre offre"); retirer.type = "button";
+      retirer.addEventListener("click", () => { S.revenu.offreB = null; sauver(); tout(); });
+      ar.appendChild(retirer);
+      d.append(el("summary", null, "Régler l'autre offre"), champs, ar);
+      plein.append(w, c, d, el("p", "aide", "Même ménage, mêmes déductions et même clientèle que votre plan ; la colonne de tarifs suit le milieu de l'offre."));
+      carte.append(tete, vide, plein);
+    }
+    document.getElementById("rv-offre-vide").hidden = !!o;
+    document.getElementById("rv-offre-plein").hidden = !o;
+    if (!o) return;
+    const plan = { milieu: R.milieu, mode: R.mode, brut: R.rev[R.mode].total, net: R.nets[R.mode], heure: R.parHeure[R.mode], heures: R.rev.heures };
+    const b = R.offre(o), nom = x => `${MILIEUX[x.milieu].nom}${MILIEUX[x.milieu].modes.length > 1 ? ", " + NOM_MODE[x.mode].toLowerCase() : ""}`;
+    const plus = (a, c) => c > a + 0.5 ? "meilleur" : null;
+    lignes(document.getElementById("rv-offre-table"), ["", "Votre plan", "L'autre offre"], [
+      { cellules: ["Pratique", nom(plan), nom(b)] },
+      { cellules: ["Heures en clinique", `${nb(plan.heures, 0)} h`, `${nb(b.heures, 0)} h`] },
+      { cellules: ["Brut par année", $(plan.brut), $(b.brut)] },
+      { cellules: ["Net par année", $(plan.net), $(b.net)], classes: [null, plus(b.net, plan.net), plus(plan.net, b.net)] },
+      { cellules: ["Par heure en clinique", plan.heure != null ? $(plan.heure) : "—", b.heure != null ? $(b.heure) : "—"], classes: [null, plus(b.heure || 0, plan.heure || 0), plus(plan.heure || 0, b.heure || 0)] },
+    ]);
+    const ecart = b.net - plan.net;
+    document.getElementById("rv-offre-conclusion").textContent = Math.abs(ecart) < 1 ? "Les deux offres laissent le même net par année."
+      : `${ecart > 0 ? "L'autre offre" : "Votre plan"} laisse ${$(Math.abs(ecart))} net de plus par année${b.heure != null && plan.heure != null ? ` ; à l'heure, ${b.heure > plan.heure ? "l'autre offre" : "votre plan"} paie ${$(Math.abs(b.heure - plan.heure))} de plus` : ""}.`;
+    const d = document.getElementById("rv-offre-plus"); if (U.offreOuverte !== undefined) d.open = !!U.offreOuverte;
+    champsRapides("rv-offre-champs", [
+      { p: "revenu.offreB.milieu", l: "Milieu", t: "select", o: Object.entries(MILIEUX).map(([k, m]) => [k, m.long]) },
+      ...(MILIEUX[b.milieu].modes.length > 1 ? [{ p: "revenu.offreB.mode", l: "Mode", t: "select", o: MILIEUX[b.milieu].modes.map(m => [m, NOM_MODE[m]]) }] : []),
+      { p: "revenu.offreB.demiJournees", l: "Demi-journées par semaine", u: "d.-j." }, { p: "revenu.offreB.patientsParDJ", l: "Patients par demi-journée", u: "pat.", s: 0.5 },
+      { p: "revenu.offreB.semaines", l: "Semaines en clinique", u: "sem." }, { p: "revenu.offreB.heuresParDJ", l: "Heures par demi-journée", u: "h", s: 0.25 },
+      ...(b.milieu === "clinique" ? [{ p: "revenu.offreB.fraisCabinetPct", l: "Part remise à la clinique", u: "%", s: 0.5 }] : []),
+      { p: "revenu.offreB.activites", l: "Avec vos activités en établissement", t: "check" },
+    ], x => x.p.endsWith(".mode") ? b.mode : lire(x.p));
+  }
+
   function rendreRevenu(R) {
+    rendreOffres(R);
     rendreActes(R);
     rendreSeuils(R);
     resumeModes(R);

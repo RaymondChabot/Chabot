@@ -143,6 +143,13 @@ font bouger les trois modes en direct, sans toucher au plan, jusqu'à
 clinique (après les frais de cabinet, avant l'impôt, sans les activités en
 établissement), et le mode qui paie le mieux à l'heure.
 
+**Comparer deux offres** (détail de Revenu) : votre plan à côté d'une autre
+pratique (milieu, mode, demi-journées, patients, semaines, heures, frais de
+cabinet, avec ou sans vos activités en établissement) : heures, brut, net
+par année et par heure en clinique, et laquelle laisse le plus. Même
+ménage, mêmes déductions et même clientèle ; la colonne de tarifs suit le
+milieu de l'offre. Les réglages se gardent avec vos données.
+
 **Comparer les actes** (sous-onglet du détail de Revenu, dès qu'il y a
 plusieurs modes) : les résultats d'abord, les réglages se déplient pour
 aller plus loin. Quand changer de mode : dès combien de patients par

@@ -1166,6 +1166,30 @@ async function etSi(b, base) {
   await ctx.close();
 }
 
+/* 34. Comparer deux offres : votre plan et une autre pratique côte à côte ; la même offre que le plan donne le même net ;
+   les réglages se gardent ; on peut la retirer. */
+async function deuxOffres(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu/detail" });
+  await remplacer(p, {});
+  const pareil = await p.evaluate(() => { const R = window.Wealthnord.resultats(), S = window.Wealthnord.etat(), r = S.revenu;
+    const o = R.offre({ milieu: r.milieu, mode: R.mode, demiJournees: r.demiJournees, patientsParDJ: r.patientsParDJ, semaines: r.semaines, heuresParDJ: r.heuresParDJ, fraisCabinetPct: r.fraisCabinetPct, activites: true });
+    return { offre: o.net, plan: R.nets[R.mode], brut: o.brut, brutPlan: R.rev[R.mode].total }; });
+  verifier("offres : la même pratique que le plan donne le même brut et le même net", Math.abs(pareil.offre - pareil.plan) < 1 && Math.abs(pareil.brut - pareil.brutPlan) < 1, pareil);
+  await p.click("#rv-offre-ajouter"); await p.waitForTimeout(250);
+  const vue = await p.evaluate(() => ({ lignes: document.querySelectorAll("#rv-offre-table tbody tr").length, conclusion: document.getElementById("rv-offre-conclusion").textContent,
+    offre: window.Wealthnord.etat().revenu.offreB, ouvert: document.getElementById("rv-offre-plus").open, debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
+  verifier("offres : l'autre offre (GMF-U, au mixte) à côté du plan, avec sa conclusion", vue.lignes === 5 && vue.offre && vue.offre.milieu === "gmfu" && vue.offre.mode === "mixte"
+    && /net de plus par année/.test(vue.conclusion) && vue.ouvert && !vue.debord, vue);
+  await p.selectOption("#rapide-revenu-offreB-milieu", "clsc"); await p.waitForTimeout(250);
+  await p.fill("#rapide-revenu-offreB-patientsParDJ", "9"); await p.waitForTimeout(300);
+  const regle = await p.evaluate(() => ({ o: window.Wealthnord.etat().revenu.offreB, focus: document.activeElement && document.activeElement.id, nom: document.querySelector("#rv-offre-table tbody tr td:nth-child(3)").textContent }));
+  verifier("offres : les réglages se gardent, le focus reste dans le champ", regle.o.milieu === "clsc" && regle.o.patientsParDJ === 9 && regle.focus === "rapide-revenu-offreB-patientsParDJ" && regle.nom.startsWith("CLSC"), regle);
+  await p.click("#rv-offre-plus .actions .bouton"); await p.waitForTimeout(200);
+  verifier("offres : on peut la retirer", await p.evaluate(() => window.Wealthnord.etat().revenu.offreB === null && !document.getElementById("rv-offre-vide").hidden));
+  verifier("offres : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 30. Le plan suit le calendrier : au premier lancement d'un nouveau mois, il repart du mois courant ; les soldes ne
    bougent pas (la personne les met à jour avec ses relevés). L'avis permet d'annuler pour ce mois-ci, sans perdre une
    modification faite pendant l'avis. Niveau de résidence au 1er juillet ; enfants et privilège au 1er janvier ;
@@ -1222,7 +1246,7 @@ async function planCalendrier(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

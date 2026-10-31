@@ -31,6 +31,8 @@
       typeTransfert: "changement", srvMemeJour: false, dmeInternet: false, enseignementApresMidi: 0,
       // Comparer les actes : durées choisies (minutes) et demi-journée inscrite (vide : celle du plan).
       dureesActes: {}, demiJourneeType: null,
+      // Comparer deux offres : l'autre pratique (vide : aucune).
+      offreB: null,
       mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 },
       grossessesAn: null,   // grossesses prises en charge au premier trimestre ; vide : estimées d'après les suivis
       heuresGardeSurPlace: 0,   // au taux horaire, en plus des heures en clinique
