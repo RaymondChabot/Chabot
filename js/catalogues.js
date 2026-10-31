@@ -89,7 +89,7 @@
       reer: { solde: 25000, droits: 0, cotisationAnnuelle: 0 },
       celi: { solde: 0, cotisationAnnuelle: 0 },
       // CELIAPP : 8 000 $ par année, 40 000 $ à vie ; déductible ; retrait sans impôt pour une première propriété.
-      celiapp: { solde: 0, cotisationAnnuelle: 0, cotisationsVersees: null },
+      celiapp: { solde: 0, cotisationAnnuelle: 0, cotisationsVersees: null, droitsReportes: 0 },
       // Taux d'imposition prévu au retrait du REER, pour le comparer au CELI.
       tauxRetrait: 35,
       // Frais de gestion des placements (RFG), en % ; 0 : non précisé.
@@ -315,7 +315,8 @@
     revenu: [
       { g: "Votre pratique" },
       { p: "revenu.milieu", l: "Pratique principale", t: "select", o: Object.entries(MILIEUX).map(([k, m]) => [k, m.long]), h: "Urgence, hospitalisation, obstétrique et autres activités en établissement : ajoutez-les dans la page Revenu." },
-      { p: "revenu.annee", l: "Année calculée", t: "select", o: [["premiere", "Première année de pratique"], ["type", "Année type, plein régime"]], h: "Première année : arrivée des nouveaux patients au fil de l'année." },
+      { p: "revenu.annee", l: "Année calculée", t: "select", o: [["premiere", "Première année de pratique"], ["type", "Année type, plein régime"]], h: "Première année : arrivée des nouveaux patients au fil de l'année. Une fois son année civile passée, l'app compte une année type." },
+      { p: "revenu.anneePremiere", l: "Année civile de la première année", u: "", s: 1, si: "revenu.annee=premiere", h: "Celle du début de votre pratique : son impôt se paie d'un coup le 30 avril suivant, sans acomptes avant. 0 : l'année du début de la simulation." },
       { p: "revenu.anneePratique", l: "Année de pratique, depuis le permis", t: "select", o: [["2", "2e année"], ["3", "3e année"], ["4", "4e année"], ["5", "5e année ou plus"]], si: "revenu.annee=type&details",
         h: "Les quatre premières années, la majoration de la pratique polyvalente s'obtient avec moins de patients inscrits (EP 40, par. 16.04)." },
       { p: "revenu.semaines", l: "Semaines en clinique par année", u: "sem.", h: "Sans les vacances ni les semaines passées à l'hôpital." },
@@ -479,7 +480,8 @@
       { p: "epargne.celi.cotisationAnnuelle", l: "Cotisation CELI par année", u: "$/an", s: 100 },
       { p: "epargne.celiapp.solde", l: "Solde CELIAPP", u: "$", s: 100, h: "Compte d'épargne libre d'impôt pour l'achat d'une première propriété." },
       { p: "epargne.celiapp.cotisationsVersees", l: "Cotisations CELIAPP versées à ce jour", u: "$", s: 100, h: "Pour le plafond à vie de 40 000 $. Vide : le solde sert d'estimation, mais il comprend les gains." },
-      { p: "epargne.celiapp.cotisationAnnuelle", l: "Cotisation CELIAPP par année", u: "$/an", s: 100, h: "8 000 $ par année au plus, 40 000 $ à vie ; déductible comme un REER ; retrait sans impôt pour acheter une première propriété." },
+      { p: "epargne.celiapp.cotisationAnnuelle", l: "Cotisation CELIAPP par année", u: "$/an", s: 100, h: "Droits de 8 000 $ par année, plus le report ci-dessous, et 40 000 $ à vie : l'app ne compte pas plus. Déductible comme un REER ; retrait sans impôt pour acheter une première propriété." },
+      { p: "epargne.celiapp.droitsReportes", l: "Droits CELIAPP inutilisés de l'an passé", u: "$", s: 100, si: "epargne.celiapp.cotisationAnnuelle", h: "Au plus 8 000 $ (ARC, « Cotiser à un CELIAPP ») : ils s'ajoutent aux 8 000 $ de cette année. Sur votre avis de cotisation." },
       { p: "epargne.encaisse", l: "Comptes et encaisse", u: "$", s: 100 },
       { p: "epargne.frais", l: "Frais de gestion de vos placements (RFG)", u: "%", s: 0.05, h: "Sur vos relevés ou le document « Aperçu du fonds ». Soustraits du rendement des scénarios ; 0 : non précisé, le rendement est alors avant frais." },
       { p: "epargne.tauxRetrait", l: "Taux d'imposition prévu au retrait du REER", u: "%", s: 1, h: "Pour comparer le REER au CELI : s'il est plus bas que votre taux marginal d'aujourd'hui, le REER rapporte plus." },

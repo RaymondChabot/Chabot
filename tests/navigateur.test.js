@@ -927,40 +927,54 @@ async function tempsQuiPasse(b, base) {
   verifier("temps : aucune erreur", [janvier, aout, refus].every(x => x.erreurs.length === 0), [...janvier.erreurs, ...aout.erreurs, ...refus.erreurs]);
 }
 
-/* 30. Le plan suit le calendrier : au premier lancement d'un nouveau mois, il repart du mois courant avec les soldes
-   prévus ; l'avis permet d'annuler pour ce mois-ci. Niveau de résidence au 1er juillet ; enfants au 1er janvier ;
-   en 2027, l'impôt 2027 avec des montants provisoires. */
+/* 30. Le plan suit le calendrier : au premier lancement d'un nouveau mois, il repart du mois courant ; les soldes ne
+   bougent pas (la personne les met à jour avec ses relevés). L'avis permet d'annuler pour ce mois-ci, sans perdre une
+   modification faite pendant l'avis. Niveau de résidence au 1er juillet ; enfants et privilège au 1er janvier ;
+   première année passée : année type ; en 2027, l'impôt 2027 avec des montants provisoires. */
 async function planCalendrier(b, base) {
   const { ctx, p, erreurs } = await ouvrir(b, base, { horloge: "2026-10-15T10:00:00" });
   await remplacer(p, { "strategie.debut": "2026-10" });
-  // Ce que le plan prévoit pour le début de décembre : deux mois de paiements, de cotisations et de rendement.
-  const prevu = await p.evaluate(() => { const R = window.Wealthnord.resultats(), S = window.Wealthnord.etat(), x = R.releveApres(2);
-    return { dettes: R.sim.mois[1].soldes.map(v => Math.round(v * 100) / 100), reer: Math.round(x.reer), celi: Math.round(x.celi), avant: S.dettes.map(d => d.solde) }; });
+  const etat = () => p.evaluate(() => { const S = window.Wealthnord.etat();
+    return { debut: S.strategie.debut, dettes: S.dettes.map(d => d.solde), reer: S.epargne.reer.solde, celi: S.epargne.celi.solde, encaisse: S.epargne.encaisse, avance: S.meta.planAvance,
+      refus: S.meta.planRefuse, toast: document.getElementById("toast-texte").textContent, visible: !document.getElementById("toast").hidden, faire: document.getElementById("ap-actions").textContent }; });
+  const avant = await etat();
   await p.clock.setFixedTime(new Date("2026-12-02T10:00:00"));
   await p.reload(); await pret(p);
-  const dec = await p.evaluate(() => { const S = window.Wealthnord.etat();
-    return { debut: S.strategie.debut, dettes: S.dettes.map(d => d.solde), reer: S.epargne.reer.solde, celi: S.epargne.celi.solde, avance: S.meta.planAvance,
-      toast: document.getElementById("toast-texte").textContent, visible: !document.getElementById("toast").hidden, faire: document.getElementById("ap-actions").textContent }; });
-  verifier("plan : en décembre, il part de décembre, avec les soldes prévus", dec.debut === "2026-12" && dec.avance === "2026-12" && dec.dettes.join() === prevu.dettes.join()
-    && dec.reer === prevu.reer && dec.celi === prevu.celi && dec.dettes[0] < prevu.avant[0], { dec, prevu });
-  verifier("plan : un avis avec Annuler ; « À faire » invite à comparer aux relevés", dec.visible && dec.toast.startsWith("Plan avancé à décembre 2026")
-    && dec.faire.includes("Le plan part maintenant de décembre 2026"), dec.toast);
+  const dec = await etat();
+  verifier("plan : en décembre, il part de décembre ; dettes et placements gardent leurs soldes", dec.debut === "2026-12" && dec.avance === "2026-12"
+    && dec.dettes.join() === avant.dettes.join() && dec.reer === avant.reer && dec.celi === avant.celi, { dec, avant });
+  verifier("plan : un avis avec Annuler ; « À faire » demande de mettre les soldes à jour", dec.visible && dec.toast.startsWith("Le plan part maintenant de décembre 2026")
+    && dec.toast.includes("Vos soldes n'ont pas bougé") && dec.faire.includes("avec les soldes que vous avez inscrits"), dec.toast);
+  // Une modification pendant l'avis : « Annuler » ne la défait pas.
+  await p.evaluate(() => { window.Wealthnord.etat().epargne.encaisse = 12345; });
   await p.click("#toast-annuler"); await p.waitForTimeout(200);
-  const annule = await p.evaluate(() => { const S = window.Wealthnord.etat(); return { debut: S.strategie.debut, dettes: S.dettes.map(d => d.solde), refus: S.meta.planRefuse }; });
-  verifier("plan : Annuler rend le plan d'octobre et ses soldes", annule.debut === "2026-10" && annule.dettes.join() === prevu.avant.join() && annule.refus === "2026-12", annule);
+  const annule = await etat();
+  verifier("plan : Annuler rend le plan d'octobre et garde la modification faite pendant l'avis", annule.debut === "2026-10" && annule.refus === "2026-12" && annule.encaisse === 12345, annule);
   await p.reload(); await pret(p);
   verifier("plan : refusé pour décembre, il attend janvier", await p.evaluate(() => window.Wealthnord.etat().strategie.debut === "2026-10"));
-  // Résidence : R2 en juin, R3 après le 1er juillet ; un enfant de 3 ans en a 4 après le 1er janvier.
+  // Résidence : R2 en juin, R3 après le 1er juillet ; un enfant de 3 ans en a 4 après le 1er janvier ; le privilège repart.
   await p.clock.setFixedTime(new Date("2026-06-10T10:00:00"));
   await remplacer(p, { "strategie.debut": "2026-06", "meta.planRefuse": "", "residence.active": true, "residence.niveau": "2", "residence.debutPratique": "2028-07",
-    "epargne.reee.enfants": [{ id: "e1", nom: "", age: 3, solde: 0 }] });
+    "epargne.reee.enfants": [{ id: "e1", nom: "", age: 3, solde: 0 }],
+    "dettes": [{ id: "h1", nom: "Hypothèque", type: "hypotheque", solde: 300000, limite: 0, taux: 4, paiement: 1600, frequence: "mois", interetsSeulement: false, finTerme: "2029-06-01",
+      tauxRenouvellement: 4, dureeTerme: 5, privilege: 10, privilegeUtilise: 5000, creditImpot: 0, partMoi: 100, paiementMoi: 100 }] });
   await p.clock.setFixedTime(new Date("2027-01-04T10:00:00"));
   await p.reload(); await pret(p);
   const jan = await p.evaluate(() => { const S = window.Wealthnord.etat(); return { debut: S.strategie.debut, niveau: S.residence.niveau, actif: S.residence.active, age: S.epargne.reee.enfants[0].age,
+    solde: S.dettes[0].solde, utilise: S.dettes[0].privilegeUtilise,
     titre: document.getElementById("h-impot").textContent, pied: document.getElementById("pied-parametres").textContent, toast: document.getElementById("toast-texte").textContent }; });
-  verifier("plan : R3 au 1er juillet, un an de plus à l'enfant au 1er janvier", jan.debut === "2027-01" && jan.niveau === "3" && jan.actif && jan.age === 4
-    && jan.toast.includes("résidence au niveau R3"), jan);
+  verifier("plan : R3 au 1er juillet, un an de plus à l'enfant et le privilège qui repart au 1er janvier ; solde gardé", jan.debut === "2027-01" && jan.niveau === "3" && jan.actif && jan.age === 4
+    && jan.utilise === 0 && jan.solde === 300000 && jan.toast.includes("résidence au niveau R3"), jan);
   verifier("plan : en 2027, l'impôt 2027, montants provisoires", jan.titre === "Impôt 2027" && jan.pied === "paramètres fiscaux 2027 (provisoires)", jan);
+  // Première année de pratique en 2027 : en janvier 2028, l'app compte une année type.
+  await remplacer(p, { "strategie.debut": "2027-09", "meta.planRefuse": "", "residence.active": false, "revenu.annee": "premiere", "revenu.anneePremiere": 2027 });
+  await p.clock.setFixedTime(new Date("2028-01-10T10:00:00"));
+  await p.reload(); await pret(p);
+  const an2 = await p.evaluate(() => { const S = window.Wealthnord.etat(); return { annee: S.revenu.annee, debut: S.strategie.debut, toast: document.getElementById("toast-texte").textContent }; });
+  verifier("plan : la première année (2027) passée, l'année type en 2028, avec l'avis", an2.debut === "2028-01" && an2.annee === "type"
+    && an2.toast.includes("votre première année de pratique (2027) est passée : année type"), an2);
+  await p.click("#toast-annuler"); await p.waitForTimeout(200);
+  verifier("plan : Annuler remet la première année", await p.evaluate(() => { const S = window.Wealthnord.etat(); return S.revenu.annee === "premiere" && S.strategie.debut === "2027-09"; }));
   verifier("plan : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }

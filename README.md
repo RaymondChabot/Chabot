@@ -72,14 +72,18 @@ apparence et rapport, recommencer) se déplient au toucher.
 
 ## Le plan suit le calendrier
 
-Au premier lancement d'un nouveau mois, le plan repart du mois courant : les
-soldes des dettes et des placements prennent les valeurs prévues par le plan
-(paiements, cotisations, rendement du scénario), le niveau de résidence monte
-au 1er juillet, la résidence prend fin à la date de début de la pratique, et
-les enfants ont un an de plus chaque 1er janvier. Un avis permet d'annuler
-pour ce mois-ci ; « À faire » invite à comparer les soldes aux relevés. La
-première année de pratique garde son année : son solde d'impôt reste dû le
-30 avril suivant ; une fois l'année passée, « À faire » propose l'année type.
+Au premier lancement d'un nouveau mois, le plan repart du mois courant : le
+niveau de résidence monte au 1er juillet, la résidence prend fin à la date de
+début de la pratique, les enfants ont un an de plus chaque 1er janvier, et le
+privilège de remboursement anticipé de l'hypothèque repart en entier. Les
+soldes (dettes, placements, REEE, objectifs) ne bougent pas : vous les mettez
+à jour avec vos relevés, quand vous voulez, et « À faire » vous le rappelle.
+Un avis permet d'annuler pour ce mois-ci ; « Annuler » ne remet que ce que
+l'avance a changé. La première année de pratique garde son année : son solde
+d'impôt reste dû le 30 avril suivant ; une fois son année civile passée,
+l'app compte une année type (l'avis le dit, « Annuler » la remet). Un terme
+d'hypothèque déjà échu se renouvelle au premier mois du plan, au taux prévu,
+et « À faire » demande le vrai taux.
 
 ## Ce qu'elle calcule
 
@@ -277,8 +281,9 @@ HORLOGE=2027-03-15 node tests/navigateur.test.js   # toute la suite, comme à un
   sommaire pour le comptable sur une seule page, résumé et détail de chaque
   page (navigation, mêmes chiffres, cartes de même hauteur sur ordinateur),
   passage du temps (horloge fixée : délais, première année de pratique),
-  plan qui suit le calendrier (soldes prévus, Annuler, niveau de résidence,
-  enfants, impôt 2027 provisoire).
+  plan qui suit le calendrier (soldes gardés, Annuler sans perdre une
+  modification, niveau de résidence, enfants, privilège, année type,
+  impôt 2027 provisoire).
 - GitHub Actions lance les trois à chaque publication sur `main`
   (`.github/workflows/tests.yml`). Cas fictifs seulement.
 
@@ -369,8 +374,11 @@ dossier racine.
   le tableau-synthèse des visites (P.G. 2.2.6 A, 25 juillet 2025).
 - Dépenses professionnelles : grille tarifaire 2026-2027 du Collège des
   médecins ; cotisations 2027 de l'ACPM au Québec.
-- CELIAPP : 8 000 $ par année, 40 000 $ à vie (Agence du revenu du Canada),
-  sur les cotisations versées (à défaut, le solde sert d'estimation).
+- CELIAPP : droits de 8 000 $ par année, plus les droits inutilisés reportés
+  de l'année d'avant (au plus 8 000 $), et 40 000 $ à vie, sur les
+  cotisations versées (à défaut, le solde sert d'estimation) ; dans l'impôt
+  comme dans la projection, versés par mois (ARC, « Cotiser à un CELIAPP »,
+  consulté le 31 octobre 2026).
 - Impôt : tables fédérales et québécoises 2026, RRQ et RQAP 2026 (RQAP du
   travailleur autonome : 0,764 % jusqu'à 103 000 $) ; vérifié contre l'outil
   de calcul du revenu disponible du ministère des Finances du Québec (mai

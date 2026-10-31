@@ -329,16 +329,41 @@ C.utiliserAnnee(2026);
 verifier("2027 : à revenu égal, un peu moins d'impôt (paliers indexés) ; un calcul ponctuel en 2026 revient ensuite à 2027",
   impot27 < impot26 && impot26 - impot27 < 2000 && verif27 === 2026, { impot26, impot27 });
 
-/* 25. Le plan qui avance : la projection relève les soldes des placements après k mois ; après 12 mois, ce sont
-   ceux de la fin de la première année. */
-const optProj = { annees: 3, anneeDepart: 2026, rendement: 5, reer: { solde: 20000, cotisationAnnuelle: 6000 }, celi: { solde: 10000, cotisationAnnuelle: 3000 },
-  celiapp: { solde: 0, cotisationAnnuelle: 8000 }, encaisse: 0, maison: { valeur: 0, part: 0, croissance: 0 }, dettes: [], objectifs: [{ solde: 0, mensuel: 100, mois: 24 }] };
-const simVide = C.simulerDettes([], { debut: "2026-10", methode: "avalanche" });
-const proj12 = C.projeterValeurNette({ ...optProj, releveMois: 12 }, simVide), proj3 = C.projeterValeurNette({ ...optProj, releveMois: 3 }, simVide);
-verifier("plan qui avance : relevé à 12 mois = fin de la première année", proche(proj12.releve.reer, proj12[1].reer, 1e-6) && proche(proj12.releve.celi, proj12[1].celi, 1e-6)
-  && proche(proj12.releve.celiapp, proj12[1].celiapp, 1e-6) && proche(proj12.releve.objectifs[0], 1200, 1e-6), proj12.releve);
-verifier("plan qui avance : relevé à 3 mois, entre le départ et la fin de l'année", proj3.releve.reer > 20000 + 3 * 500 && proj3.releve.reer < proj12.releve.reer
-  && proche(proj3.releve.objectifs[0], 300, 1e-6) && C.projeterValeurNette(optProj, simVide).releve === null, proj3.releve);
+/* 25. CELIAPP (ARC, « Cotiser à un CELIAPP », 31 octobre 2026) : droits de 8 000 $ par année, plus le report des droits
+   inutilisés de l'année d'avant (au plus 8 000 $), et 40 000 $ à vie. Versements par mois dans la projection. */
+verifier("CELIAPP : 20 000 $ voulus, 8 000 $ retenus chaque année jusqu'au plafond à vie",
+  C.celiappParAn({ cotisationAnnuelle: 20000, cotisationsVersees: 0 }, 6).join() === "8000,8000,8000,8000,8000,0,0", C.celiappParAn({ cotisationAnnuelle: 20000 }, 6));
+verifier("CELIAPP : report de 5 000 $ l'an 0 ; ensuite, ce qui reste des droits de l'année d'avant",
+  C.celiappParAn({ cotisationAnnuelle: 20000, cotisationsVersees: 0, droitsReportes: 5000 }, 3).join() === "13000,8000,8000,8000"
+  && C.celiappParAn({ cotisationAnnuelle: 20000, cotisationsVersees: 0, droitsReportes: 12000 }, 0).join() === "16000"
+  && C.celiappParAn({ cotisationAnnuelle: 4000, cotisationsVersees: 0 }, 2).join() === "4000,4000,4000");
+verifier("CELIAPP : plafond à vie sur les cotisations versées, à défaut sur le solde",
+  C.celiappParAn({ cotisationAnnuelle: 8000, cotisationsVersees: 36000, solde: 50000 }, 2).join() === "4000,0,0"
+  && C.celiappParAn({ cotisationAnnuelle: 8000, cotisationsVersees: null, solde: 35000 }, 1).join() === "5000,0");
+const optProj = { annees: 2, anneeDepart: 2026, rendement: 0, reer: { solde: 0, cotisationAnnuelle: 0 }, celi: { solde: 0, cotisationAnnuelle: 0 },
+  celiapp: { solde: 0, cotisationAnnuelle: 20000, cotisationsVersees: 0 }, encaisse: 0, maison: { valeur: 0, part: 0, croissance: 0 }, dettes: [] };
+const projCa = C.projeterValeurNette(optProj, C.simulerDettes([], { debut: "2026-10", methode: "avalanche" }));
+verifier("CELIAPP : la projection verse 8 000 $ par année, au douzième chaque mois", proche(projCa[1].celiapp, 8000, 1e-6) && proche(projCa[2].celiapp, 16000, 1e-6), projCa.map(x => x.celiapp));
+const projCa5 = C.projeterValeurNette({ ...optProj, rendement: 5, celiapp: { solde: 0, cotisationAnnuelle: 8000, cotisationsVersees: 0 } }, C.simulerDettes([], { debut: "2026-10", methode: "avalanche" }));
+const rm5 = Math.pow(1.05, 1 / 12) - 1, annuite = 8000 / 12 * (Math.pow(1 + rm5, 12) - 1) / rm5;
+verifier("CELIAPP à 5 % : versements mensuels, la formule de l'annuité", proche(projCa5[1].celiapp, annuite, 1e-6), { app: projCa5[1].celiapp, annuite });
+
+/* 26. Hypothèque : le privilège de l'année civile, moins ce qui est déjà remboursé ; un terme échu se renouvelle au
+   premier mois. Hypothèque 200 000 $, 4 %, 1 200 $ par mois, privilège 10 %, 3 000 $ de plus par mois. */
+const hyp26 = { id: "h", nom: "H", type: "hypotheque", solde: 200000, taux: 4, paiement: 1200, frequence: "mois", interetsSeulement: false, finTerme: "2031-01-01", tauxRenouvellement: 4, dureeTerme: 5, privilege: 10, creditImpot: 0 };
+const premierMois = (d, debut) => C.simulerDettes([d], { debut, methode: "avalanche", extraMensuel: 30000 }).mois[0];
+const iMois = Math.pow(1.02, 1 / 6) - 1, capital = 1200 - 200000 * iMois;
+verifier("privilège : au départ, 10 % du solde, moins ce qui est déjà remboursé depuis janvier",
+  proche(200000 - capital - premierMois(hyp26, "2026-10").soldes[0], 20000, 1e-6)
+  && proche(200000 - capital - premierMois({ ...hyp26, privilegeUtilise: 15000 }, "2026-10").soldes[0], (200000 + 15000) * 0.1 - 15000, 1e-6)
+  && proche(200000 - capital - premierMois({ ...hyp26, privilegeUtilise: 15000 }, "2027-01").soldes[0], 20000, 1e-6),
+  { oct: 200000 - capital - premierMois({ ...hyp26, privilegeUtilise: 15000 }, "2026-10").soldes[0] });
+const echu = C.simulerDettes([{ ...hyp26, finTerme: "2025-11-01", tauxRenouvellement: 6, privilege: 0 }], { debut: "2026-01", methode: "minimum" });
+const n0 = C.moisRestants(200000, iMois, 1200), i6 = Math.pow(1.03, 1 / 6) - 1, p6 = 200000 * i6 / (1 - Math.pow(1 + i6, -n0));
+verifier("terme échu au début du plan : renouvelé au premier mois, au taux prévu, paiement recalculé ; signalé",
+  echu.dettes[0].termeEchu && echu.dettes[0].premierRenouvellement && echu.dettes[0].premierRenouvellement.date.getMonth() === 0
+  && echu.dettes[0].premierRenouvellement.date.getFullYear() === 2026 && proche(echu.dettes[0].premierRenouvellement.paiement, p6, 1e-6)
+  && !C.simulerDettes([hyp26], { debut: "2026-01", methode: "minimum" }).dettes[0].termeEchu, echu.dettes[0].premierRenouvellement);
 
 console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
 process.exit(echecs ? 1 : 0);

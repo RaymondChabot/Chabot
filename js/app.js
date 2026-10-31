@@ -353,6 +353,7 @@ window.Verrou.quandOuvert(function () {
     { k: "tauxRenouvellement", l: "Taux au renouvellement", u: "%", s: 0.01, seul: "hypotheque" },
     { k: "dureeTerme", l: "Durée des termes suivants", u: "ans", s: 1, seul: "hypotheque" },
     { k: "privilege", l: "Remboursement anticipé permis", u: "%/an", s: 1, seul: "hypotheque" },
+    { k: "privilegeUtilise", l: "Déjà remboursé par anticipation cette année", u: "$", s: 100, seul: "hypotheque", h: "Ce que vous avez versé en plus depuis le 1er janvier : l'app le retire du privilège de cette année. Remis à 0 en janvier." },
     { k: "creditImpot", l: "Crédit d'impôt sur les intérêts", u: "%", s: 1, h: "34 % pour un prêt de l'aide financière aux études : 14 % fédéral et 20 % Québec." },
     { k: "partMoi", l: "Part de la dette qui vous revient", u: "%", s: 1 },
     { k: "paiementMoi", l: "Part des paiements que vous faites", u: "%", s: 1 },
@@ -507,10 +508,11 @@ window.Verrou.quandOuvert(function () {
     }
     // Dépenses professionnelles : le total, ou la somme du détail.
     R.depensesPro = S.impot.depensesProMode === "detail" ? S.impot.depensesProDetail.reduce((t, l) => t + annuelLigne(l), 0) : S.impot.depensesPro;
-    // CELIAPP : cotisations jusqu'au plafond à vie de 40 000 $ ; déductibles comme le REER.
-    const ca = S.epargne.celiapp || { solde: 0, cotisationAnnuelle: 0 };
-    const dejaCeliapp = ca.cotisationsVersees != null && ca.cotisationsVersees !== "" ? +ca.cotisationsVersees || 0 : ca.solde || 0;
-    R.celiappAnnee = a => Math.min(ca.cotisationAnnuelle || 0, Math.max(0, 40000 - dejaCeliapp - a * (ca.cotisationAnnuelle || 0)));
+    // CELIAPP : la cotisation de chaque année, dans les droits de l'année (8 000 $ plus le report) et le
+    // plafond à vie de 40 000 $ ; déductible comme le REER.
+    const celiappAns = C.celiappParAn(S.epargne.celiapp, 60);
+    R.celiappAnnee = a => celiappAns[Math.max(0, a)] || 0;
+    R.celiappVoulu = Math.max(0, +(S.epargne.celiapp || {}).cotisationAnnuelle || 0);
     const base = { depensesPro: R.depensesPro, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(0), interetsEtudes: R.interetsEtudes, autresImposables: R.autresNonPro };
     // Partenaire : salarié, ou à son compte (même calcul que le médecin travailleur autonome).
     // reel : facteur de revenu en dollars d'aujourd'hui (années futures).
@@ -781,7 +783,7 @@ window.Verrou.quandOuvert(function () {
     R.detteTotale = S.dettes.reduce((a, d) => a + d.solde, 0);
 
     // Valeur nette : maison (sa valeur croît, l'hypothèque payée devient de l'équité), autos, placements.
-    const projeter = (h, sim, m = methode, rendements = null, releveMois = 0) => C.projeterValeurNette({ releveMois,
+    const projeter = (h, sim, m = methode, rendements = null) => C.projeterValeurNette({
       annees: ANNEES, anneeDepart: +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear(),
       rendement: h.rendement, rendements, reer: S.epargne.reer, celi: S.epargne.celi, celiapp: S.epargne.celiapp, encaisse: S.epargne.encaisse,
       maison: R.locataire ? { valeur: 0, part: 0, croissance: 0, partMenage: 0 }
@@ -798,8 +800,6 @@ window.Verrou.quandOuvert(function () {
     }, sim);
     // Méthodes comparées sur la valeur nette à l'horizon : elle tient compte des intérêts, de l'argent
     // en attente d'un renouvellement et des placements faits après la dernière dette.
-    // Soldes des placements après k mois, selon le plan : le plan qui repart du mois courant.
-    R.releveApres = k => projeter(R.hyp, R.sim, methode, null, k).releve;
     R.vnMethodes = {};
     for (const m of METHODES) { const pr = projeter(R.hyp, R.sims[m], m); R.vnMethodes[m] = pr[pr.length - 1]; }
     R.recommandee = METHODES.filter(m => m !== "minimum").reduce((a, m) => R.vnMethodes[m].moi > R.vnMethodes[a].moi ? m : a, "avalanche");
@@ -1019,7 +1019,10 @@ window.Verrou.quandOuvert(function () {
     if (S.residence && S.residence.active && !R.residenceActive) action("info", "Votre date de début de pratique est passée : l'app compte maintenant votre pratique. Si c'est fait, retirez la résidence (Revenu, Modifier).");
     if (S.revenu.annee === "premiere" && !R.residenceActive) action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total + R.primeMoi)} seront à payer d'un coup le 30 avril ${R.anImpotPremiere}.`);
     if (S.meta.planAvance && S.meta.planAvance === S.strategie.debut && S.meta.planAvance === moisCle(new Date()))
-      action("info", `Le plan part maintenant de ${moisLong(S.strategie.debut)}, avec les soldes prévus : comparez-les à vos relevés et corrigez au besoin (Budget, Dettes ; Patrimoine, Aujourd'hui).`);
+      action("info", `Le plan part maintenant de ${moisLong(S.strategie.debut)}, avec les soldes que vous avez inscrits : mettez-les à jour avec vos relevés (Budget, Dettes ; Patrimoine, Aujourd'hui).`);
+    // Terme échu au début du plan : le moteur le renouvelle au taux supposé ; la personne inscrit le vrai terme.
+    S.dettes.forEach((d, i) => { const x = R.sim.dettes[i]; if (x && x.termeEchu) action("important", `Le terme de « ${d.nom || "votre hypothèque"} » est échu : inscrivez le nouveau taux, le paiement et la fin du nouveau terme (Budget, Dettes). D'ici là, l'app suppose un renouvellement à ${nb(d.tauxRenouvellement || d.taux, 2)} %.`); });
+    if (R.celiappVoulu > R.celiappAnnee(0) + 0.5) action("info", `Votre cotisation CELIAPP prévue (${$(R.celiappVoulu)} par année) dépasse vos droits : l'app compte ${$(R.celiappAnnee(0))} cette année (8 000 $ par année, plus les droits reportés, et 40 000 $ à vie).`);
     if (S.revenu.annee === "premiere" && !R.residenceActive && +S.revenu.anneePremiere && +String(S.strategie.debut).slice(0, 4) > +S.revenu.anneePremiere)
       action("info", `Votre première année de pratique (${S.revenu.anneePremiere}) est terminée : quand votre clientèle sera bâtie, choisissez « Année type » (Revenu, Modifier).`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
@@ -3245,66 +3248,63 @@ window.Verrou.quandOuvert(function () {
 
   /* ============================================================
      LE PLAN SUIT LE CALENDRIER : au premier lancement d'un nouveau mois, le plan repart du mois
-     courant. Soldes des dettes et des placements selon le plan (paiements, cotisations, rendement du
-     scénario) ; un niveau de résidence de plus chaque 1er juillet ; fin de la résidence à la date de
-     début de la pratique ; un an de plus aux enfants chaque 1er janvier. L'avis permet d'annuler pour
-     ce mois-ci ; « À faire » invite à comparer les soldes aux relevés.
+     courant : un niveau de résidence de plus chaque 1er juillet ; fin de la résidence à la date de
+     début de la pratique ; année type une fois l'année de la première année de pratique passée ;
+     un an de plus aux enfants chaque 1er janvier. Les soldes (dettes, placements, REEE, objectifs)
+     ne bougent pas : la personne les met à jour avec ses relevés, quand elle veut. L'avis permet
+     d'annuler pour ce mois-ci ; « Annuler » ne remet que ce que l'avance a changé.
      ============================================================ */
+  const lireChemin = (o, ch) => ch.reduce((x, c) => x == null ? undefined : x[c], o);
+  const ecrireChemin = (o, ch, v) => { const parent = lireChemin(o, ch.slice(0, -1)); if (parent != null) parent[ch[ch.length - 1]] = v; };
   function avancerPlan(s0, r0, versMois) {
     const k = moisEntre(s0.strategie.debut, versMois);
     if (!(k > 0)) return null;
-    const s = clone(s0), [an0, mo0] = String(s0.strategie.debut).split("-").map(Number);
+    const s = clone(s0), [an0, mo0] = String(s0.strategie.debut).split("-").map(Number), anVers = +String(versMois).slice(0, 4);
     const passages = mois => { let n = 0; for (let m = 1; m <= k; m++) if (new Date(an0, mo0 - 1 + m, 1).getMonth() + 1 === mois) n++; return n; };
-    // Dettes : le solde au début du mois courant, après les paiements prévus.
-    const soldes = (r0.sim.mois[k - 1] || {}).soldes || s.dettes.map(() => 0);
-    s.dettes.forEach((d, i) => { d.solde = Math.round((soldes[i] || 0) * 100) / 100; });
-    // Placements : la projection, mois par mois.
-    const p = r0.releveApres(k);
-    if (p) {
-      s.epargne.reer.solde = Math.round(p.reer); s.epargne.celi.solde = Math.round(p.celi);
-      if (s.epargne.celiapp) {
-        s.epargne.celiapp.solde = Math.round(p.celiapp);
-        if (s.epargne.celiapp.cotisationsVersees !== "" && s.epargne.celiapp.cotisationsVersees != null) s.epargne.celiapp.cotisationsVersees = Math.round(p.cumulCeliapp);
-      }
-      if (r0.couple) s.conjointe.epargne = Math.round(p.conj);
-      if (r0.societeActive) s.societe.solde = Math.round(p.soc);
-      // Objectifs dans un compte dédié, pas encore échus : ce qui est mis de côté.
-      let j = 0;
-      r0.objectifs.forEach((o, i) => { if (!o.dedie) return; if (o.mois > k && s.objectifs[i]) s.objectifs[i].deja = Math.round(p.objectifs[j]); j++; });
-    }
+    // Chaque champ changé est noté, avec sa valeur d'avant, pour « Annuler ».
+    const changes = [];
+    const poser = (ch, v) => { const avant = lireChemin(s, ch); if (avant !== v) { ecrireChemin(s, ch, v); changes.push({ ch, avant, apres: v }); } };
     // Résidence : un niveau de plus chaque 1er juillet ; à la date de début de la pratique, elle prend fin.
     const rs = s.residence, niveauAvant = rs && rs.active ? +rs.niveau || 1 : null;
-    let pratique = false;
+    let pratique = false, typeApres = false;
     if (rs && rs.active) {
-      if (!/^\d{4}-\d{2}$/.test(rs.debutPratique || "")) rs.debutPratique = r0.debutPratique;   // la date supposée devient fixe
-      rs.niveau = String(Math.min(8, niveauAvant + passages(7)));
+      if (!/^\d{4}-\d{2}$/.test(rs.debutPratique || "")) poser(["residence", "debutPratique"], r0.debutPratique);   // la date supposée devient fixe
+      poser(["residence", "niveau"], String(Math.min(8, niveauAvant + passages(7))));
       if (moisEntre(versMois, rs.debutPratique) <= 0) {
-        pratique = true; rs.active = false;
-        Object.assign(s.revenu, { annee: "premiere", anneePremiere: +rs.debutPratique.slice(0, 4) });
+        pratique = true; poser(["residence", "active"], false);
+        poser(["revenu", "annee"], "premiere"); poser(["revenu", "anneePremiere"], +rs.debutPratique.slice(0, 4));
       }
     }
-    if (s.revenu.annee === "premiere" && !+s.revenu.anneePremiere) s.revenu.anneePremiere = r0.anImpotPremiere - 1;
+    if (s.revenu.annee === "premiere" && !+s.revenu.anneePremiere) poser(["revenu", "anneePremiere"], r0.anImpotPremiere - 1);
+    // La première année de pratique est celle de son année civile : passée, l'app compte une année type.
+    if (s.revenu.annee === "premiere" && +s.revenu.anneePremiere && anVers > +s.revenu.anneePremiere) { poser(["revenu", "annee"], "type"); typeApres = true; }
     const janviers = passages(1);
-    if (janviers) s.epargne.reee.enfants.forEach(e => { e.age = (+e.age || 0) + janviers; });
-    s.strategie.debut = versMois;
-    s.meta.planAvance = versMois;
-    return { s, niveauAvant, niveauApres: rs && rs.active ? +rs.niveau : null, pratique };
+    if (janviers) {
+      s.epargne.reee.enfants.forEach((e, i) => poser(["epargne", "reee", "enfants", i, "age"], (+e.age || 0) + janviers));
+      // Nouvelle année civile : le privilège de remboursement anticipé repart en entier.
+      s.dettes.forEach((d, i) => { if (+d.privilegeUtilise) poser(["dettes", i, "privilegeUtilise"], 0); });
+    }
+    poser(["strategie", "debut"], versMois);
+    poser(["meta", "planAvance"], versMois);
+    // Annuler : remet chaque champ changé, sauf s'il a été modifié depuis.
+    const defaire = cible => changes.forEach(x => { if (lireChemin(cible, x.ch) === x.apres) ecrireChemin(cible, x.ch, x.avant); });
+    return { s, niveauAvant, niveauApres: rs && rs.active ? +rs.niveau : null, pratique, typeApres, anneePremiere: +s0.revenu.anneePremiere || +s.revenu.anneePremiere, defaire };
   }
   // Nouveau mois : pas pour l'exemple, ni pour un plan B, ni si on a annulé pour ce mois-ci.
   function avancerSiNouveauMois() {
     const ici = moisCle(new Date());
     if (S.meta.exemple || S.meta.planRefuse === ici || planActif) return null;
     R = calculer();
-    const x = avancerPlan(S, R, ici);
+    const debutAvant = S.strategie.debut, x = avancerPlan(S, R, ici);
     if (!x) return null;
-    const avant = clone(S);
     S = x.s; sauver();
-    const quoi = [`Plan avancé à ${moisLong(ici)} : soldes des dettes et des placements selon le plan`];
+    const quoi = [`Le plan part maintenant de ${moisLong(ici)}`];
     if (x.pratique) quoi.push("votre pratique a commencé, la résidence est terminée");
     else if (x.niveauApres && x.niveauApres !== x.niveauAvant) quoi.push(`résidence au niveau R${x.niveauApres}`);
-    return { texte: quoi.join(" ; ") + ".", annuler: () => {
-      S = avant; S.meta.planRefuse = ici; sauver(); tout();
-      toast(`Plan gardé à ${moisLong(avant.strategie.debut)} pour ce mois-ci.`);
+    if (x.typeApres) quoi.push(`votre première année de pratique (${x.anneePremiere}) est passée : année type`);
+    return { texte: quoi.join(" ; ") + ". Vos soldes n'ont pas bougé : mettez-les à jour avec vos relevés.", annuler: () => {
+      x.defaire(S); S.meta.planRefuse = ici; sauver(); tout();
+      toast(`Plan gardé à ${moisLong(debutAvant)} pour ce mois-ci.`);
     } };
   }
   const annoncerAvance = (av, avant = "") => toast(avant + av.texte, av.annuler, "Annuler", 12000);

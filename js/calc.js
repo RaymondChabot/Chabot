@@ -684,7 +684,10 @@
      hypothèques acceptent au plus `privilege` % de leur solde au
      1er janvier en paiements anticipés par année civile, sauf au mois de
      chaque renouvellement (fin du terme, puis tous les `dureeTerme` ans).
-     Au renouvellement, le paiement ne change pas : seul le taux change. */
+     Au renouvellement, le taux change et le paiement est recalculé sur
+     l'amortissement d'origine qui reste (il diminue d'un mois chaque mois et
+     n'est pas raccourci par les remboursements anticipés). Un terme déjà
+     échu au début du plan se renouvelle tout de suite. */
   // Taux réel : taux en vigueur (après un renouvellement), moins le crédit d'impôt sur les intérêts.
   function tauxReel(d) { return (d.tauxCourant ?? d.taux) * (1 - (d.creditImpot || 0) / 100); }
   /* Taux mensuel effectif. Hypothèque à taux fixe au Canada : intérêt composé
@@ -719,6 +722,8 @@
         finTerme: d.finTerme ? new Date(d.finTerme + "T00:00:00") : null,
         privilegeRestant: Infinity,
       };
+      // Terme déjà échu au début du plan : renouvelé au premier mois (le prochain terme part de là).
+      if (x.finTerme && x.finTerme < debut) { x.finTerme = new Date(debut); x.termeEchu = true; }
       // Taux variable (marge) : l'écart du scénario s'applique tout de suite.
       x.tauxCourant = d.type === "marge" ? Math.max(0, d.taux + ecart) : d.taux;
       // Amortissement restant au départ, gardé au renouvellement (on ne le rallonge pas).
@@ -736,8 +741,13 @@
     for (let m = 0; m < max; m++) {
       const date = new Date(debut.getFullYear(), debut.getMonth() + m, 1);
       const budget = o.methode === "minimum" ? null : minimumsDepart + extraAnnee(Math.floor(m / 12));
+      // Privilège de l'année civile : au 1er janvier ; au départ du plan, moins ce qui est déjà remboursé
+      // par anticipation depuis janvier (le solde de janvier est estimé en le rajoutant au solde d'aujourd'hui).
       if (date.getMonth() === 0 || m === 0) {
-        ds.forEach(d => { d.privilegeRestant = d.type === "hypotheque" ? d.s * (d.privilege || 0) / 100 : Infinity; });
+        ds.forEach(d => {
+          const deja = m === 0 && date.getMonth() !== 0 ? Math.max(0, +d.privilegeUtilise || 0) : 0;
+          d.privilegeRestant = d.type === "hypotheque" ? Math.max(0, (d.s + deja) * (d.privilege || 0) / 100 - deja) : Infinity;
+        });
       }
       let interetsMois = 0, interetsEtudes = 0, minimumsPayes = 0;
       for (const d of ds) {
@@ -801,7 +811,7 @@
       e.interetsEtudes += x.interetsEtudes;
     }
     const iLibre = mois.findIndex(x => x.total <= 0.005);
-    return { mois, dettes: ds.map(d => ({ id: d.id, nom: d.nom, fin: d.fin, interets: d.interets, interetsNets: d.interetsNets, tauxFinal: d.tauxCourant, premierRenouvellement: d.premierRenouvellement || null })),
+    return { mois, dettes: ds.map(d => ({ id: d.id, nom: d.nom, fin: d.fin, interets: d.interets, interetsNets: d.interetsNets, tauxFinal: d.tauxCourant, premierRenouvellement: d.premierRenouvellement || null, termeEchu: !!d.termeEchu })),
       interetsTotaux, interetsNetsTotaux, gainsAttente, coutNet: interetsNetsTotaux - gainsAttente,
       libre: iLibre >= 0 ? mois[iLibre].date : null, iLibre, parAn };
   }
@@ -833,6 +843,26 @@
      libéré par la dernière dette est investi (CELI). Chaque paiement
      d'hypothèque réduit la dette : le capital remboursé devient de l'équité
      dans la maison, dont la valeur croît chaque année. */
+  /* CELIAPP (ARC, « Cotiser à un CELIAPP », consulté le 31 octobre 2026 :
+     https://www.canada.ca/fr/agence-revenu/services/impot/particuliers/sujets/compte-epargne-libre-impot-achat-premiere-propriete/cotiser-un-celiapp.html) :
+     droits de 8 000 $ par année, plus les droits inutilisés reportés de l'année d'avant (au plus 8 000 $),
+     sans dépasser 40 000 $ moins les cotisations déjà versées. Cotisation retenue de chaque année du plan
+     (a = 0 : l'année en cours) ; le plafond à vie se compte sur les cotisations versées à ce jour, à défaut
+     sur le solde (qui comprend les gains). */
+  const CELIAPP = { annuel: 8000, report: 8000, vie: 40000 };
+  function celiappParAn(ca, ans) {
+    const voulu = Math.max(0, +(ca || {}).cotisationAnnuelle || 0);
+    let cumul = ca && ca.cotisationsVersees != null && ca.cotisationsVersees !== "" ? +ca.cotisationsVersees || 0 : +(ca || {}).solde || 0;
+    let report = Math.min(CELIAPP.report, Math.max(0, +(ca || {}).droitsReportes || 0));
+    const res = [];
+    for (let a = 0; a <= ans; a++) {
+      const droits = CELIAPP.annuel + report, c = Math.min(voulu, droits, Math.max(0, CELIAPP.vie - cumul));
+      res.push(c); cumul += c;
+      report = Math.min(CELIAPP.report, droits - c);
+    }
+    return res;
+  }
+
   function projeterValeurNette(o, simulation) {
     const ans = o.annees || 20;
     // Rendement mensuel de l'année a : constant, ou tiré d'une suite de rendements annuels (simulations).
@@ -840,10 +870,9 @@
     const rmSocDe = a => Math.pow(1 + (o.rendements ? o.rendements[a - 1] : o.rendement) / 100 * (1 - (o.societe && o.societe.impotPlacement != null ? o.societe.impotPlacement : 0.5)), 1 / 12) - 1;
     const voitures = o.voitures || [];
     let reer = o.reer.solde, celi = o.celi.solde, conj = o.actifsConjoint || 0, soc = o.societe ? o.societe.solde || 0 : 0;
-    // CELIAPP : cotisations jusqu'au plafond à vie (40 000 $), croissance à l'abri de l'impôt.
-    const ca = o.celiapp || { solde: 0, cotisationAnnuelle: 0 };
-    // Plafond à vie : sur les cotisations versées à ce jour ; à défaut, le solde (qui comprend les gains).
-    let celiapp = ca.solde || 0, cumulCeliapp = ca.cotisationsVersees != null && ca.cotisationsVersees !== "" ? +ca.cotisationsVersees || 0 : ca.solde || 0;
+    // CELIAPP : la cotisation de chaque année (plafonds annuel et à vie), versée par mois ; croissance à l'abri de l'impôt.
+    const ca = o.celiapp || { solde: 0, cotisationAnnuelle: 0 }, celiappAns = celiappParAn(ca, ans);
+    let celiapp = ca.solde || 0;
     // Placements de la société : rendement après l'impôt de la société sur le revenu de placement (rmSocDe).
     // Autos : chacune perd de la valeur chaque année ; si un remplacement est prévu, une auto
     // neuve est achetée tous les N ans (prix indexé à l'inflation), payée avec l'épargne.
@@ -856,8 +885,6 @@
     // objectif à dépenser (auto, voyage, congé) sort ce mois-là, celui d'un fonds d'urgence reste.
     const objectifs = (o.objectifs || []).map(x => ({ ...x, s: x.solde || 0 }));
     const res = [];
-    // Relevé des soldes après o.releveMois mois : le plan qui repart du mois courant.
-    let releve = null;
     const soldesAu = a => {
       if (a === 0) return o.dettes.map(d => Math.max(0, +d.solde || 0));
       const m = simulation.mois[a * 12 - 1];
@@ -872,12 +899,9 @@
           // Sans remboursement accéléré (minimums seulement), le surplus du mois est épargné.
           celi = celi * (1 + rm) + o.celi.cotisationAnnuelle / 12 + (libre || 0) + (o.ajoutMensuel ? Math.max(0, o.ajoutMensuel(a - 1)) : 0);
           conj = conj * (1 + rm) + (o.epargneConjointe || 0) * Math.pow(1 + (o.hausseEpargneConjointe || 0) / 100, a - 1);
-          const cCeliapp = k % 12 === 0 ? Math.min(ca.cotisationAnnuelle || 0, Math.max(0, 40000 - cumulCeliapp)) : 0;
-          if (k % 12 === 0) cumulCeliapp += cCeliapp;
-          celiapp = celiapp * (1 + rm) + cCeliapp;
+          celiapp = celiapp * (1 + rm) + celiappAns[a - 1] / 12;
           for (const ob of objectifs) { if (k < ob.mois) ob.s += ob.mensuel; if (ob.depenser && k + 1 === ob.mois) ob.s = 0; }
           if (o.societe) soc = soc * (1 + rmSoc) + Math.max(0, o.societe.retenuAnnee(a - 1)) / 12;
-          if (k + 1 === o.releveMois) releve = { reer, celi, celiapp, cumulCeliapp, conj, soc, objectifs: objectifs.map(ob => ob.s) };
         }
         for (const v of autos) {
           v.valeurCourante *= 1 - v.depreciation / 100; v.age++;
@@ -917,7 +941,6 @@
         autresActifsMoi: actifsMoi, autresActifsMenage: actifsMenage,
         hypotheque: hypMenage, dettes: hypMenage + autresMenage });
     }
-    res.releve = releve;
     return res;
   }
 
@@ -943,7 +966,7 @@
     return { plafondQc, admissibleQc, taux, creditQc: admissibleQc * taux, plafondFed, deduction };
   }
 
-  const Calc = { P2026, P2027, parametres, utiliserAnnee, avecAnnee, parametresActifs: () => PAR, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { CELIAPP, celiappParAn, P2026, P2027, parametres, utiliserAnnee, avecAnnee, parametresActifs: () => PAR, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, comparerSociete, simulerDettes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil, fraisGarde };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;
