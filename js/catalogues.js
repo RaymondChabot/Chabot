@@ -531,7 +531,7 @@
       { p: "residence.primeGarde", l: `Prime de responsabilité de garde : ${C.FMRQ.echelles[1].garde} $ par 28 jours`, t: "check", si: "residence.active", h: "Pour le résident appelé à faire de la garde dans l'année (art. 12.26), 13 fois par année." },
       { p: "residence.primeEnseignement", l: `Prime de responsabilité d'enseignement : ${C.FMRQ.echelles[1].enseignement} $ par 28 jours`, t: "check", si: "residence.active", h: "Pour le résident appelé à enseigner (art. 13.10)." },
       { p: "residence.autres", l: "Autres revenus d'emploi : gardes volontaires, autres primes", u: "$/an", s: 100, si: "residence.active" },
-      { p: "residence.syndicat", l: "Cotisation syndicale (association et FMRQ)", u: "$/an", s: 10, si: "residence.active", h: "Retenue sur la paie ; elle figure sur le T4 et le relevé 1, et se déduit du revenu." },
+      { p: "residence.syndicat", l: "Cotisation syndicale (association et FMRQ)", u: "$/an", s: 10, si: "residence.active", h: "Retenue sur la paie. Elle se déduit du revenu fédéral et donne un crédit de 10 % au Québec." },
       { p: "residence.scolarite", l: "Droits de scolarité : votre part", u: "$/an", s: 50, si: "residence.active", h: "Selon l'entente (art. 13.09) : 900 $ en 2025-2026, 1 100 $ en 2026-2027, 1 300 $ en 2027-2028. Crédit d'impôt fédéral et du Québec (8 %)." },
     ],
     hypotheses: [

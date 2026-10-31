@@ -479,7 +479,7 @@ window.Verrou.quandOuvert(function () {
       ...(x.garde + x.enseignement > 0 ? [{ c: ["Primes de responsabilité", $(x.garde + x.enseignement)] }] : []),
       ...(x.autres > 0 ? [{ c: ["Autres revenus d'emploi", $(x.autres)] }] : []),
       ...(I.autres > 0.5 ? [{ c: ["Autres revenus imposables", $(I.autres)] }] : []),
-      ...(x.syndicat > 0 ? [{ c: ["Cotisation syndicale (déduction)", moins(x.syndicat)] }] : []),
+      ...(x.syndicat > 0 ? [{ c: ["Cotisation syndicale (déduction fédérale, crédit de 10 % au Québec)", moins(x.syndicat)] }] : []),
       ...(reer > 0.5 ? [{ c: ["Déduction REER", moins(reer)] }] : []),
       ...(celiapp > 0.5 ? [{ c: ["Déduction CELIAPP", moins(celiapp)] }] : []),
       { cls: "total", c: ["Revenu imposable fédéral", $(I.imposable)] },

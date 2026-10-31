@@ -257,6 +257,24 @@ async function budget(b, base) {
   await p.click("#bu-revenir-detail"); await p.waitForTimeout(300);
   const retour = await p.evaluate(() => ({ actif: window.Wealthnord.etat().budgetSimple.actif, dep: Math.round(window.Wealthnord.resultats().depMoi), bouton: !!document.getElementById("bu-passer-estimation") }));
   verifier("budget : le détail de chaque poste revient, avec le même total", !retour.actif && retour.dep === avant && retour.bouton, { retour, avant });
+  await p.evaluate(() => {
+    const S = JSON.parse(localStorage.getItem("boussole.v1"));
+    S.budgetSimple.actif = true;
+    const l = S.budget.find(x => x.k === "garderie");
+    if (l) Object.assign(l, { montant: 1000, periode: "mois", qui: "moi" });
+    S.epargne.reee.enfants = [{ id: "e1", nom: "Enfant", age: 4, solde: 0, cotisations: 0 }];
+    localStorage.setItem("boussole.v1", JSON.stringify(S));
+  });
+  await p.reload(); await pret(p);
+  const gardeEstimee = await p.evaluate(() => {
+    const R = window.Wealthnord.resultats(), S = window.Wealthnord.etat();
+    const loyer = S.budget.filter(b => b.k === "loyer").reduce((t, b) => t + (b.periode === "an" ? b.montant / 12 : b.montant), 0);
+    return { actif: !!(S.budgetSimple && S.budgetSimple.actif), credit: R.garde.creditQc, frais: R.garde.fraisQc,
+      dep: R.depMoi, loyer, reste: +(S.budgetSimple && S.budgetSimple.reste) || 0, ligne: !!S.budget.find(x => x.k === "garderie" && x.montant === 1000) };
+  });
+  verifier("budget : en estimation, la garderie du détail donne encore le crédit, sans gonfler les dépenses",
+    gardeEstimee.actif && gardeEstimee.ligne && gardeEstimee.frais === 12000 && gardeEstimee.credit > 500
+    && Math.abs(gardeEstimee.dep - (gardeEstimee.loyer + gardeEstimee.reste)) < 0.01, gardeEstimee);
   verifier("budget : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
