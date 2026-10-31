@@ -142,7 +142,7 @@ td, .chiffre, .hero-valeur, .tuile-valeur, .rangee-valeur { font-variant-numeric
 .barre-haut { gap: 10px; }
 .barre-haut .marque { display: flex; flex: 1 1 auto; max-width: 440px; gap: clamp(9px, 2.8vw, 13px); }
 
-/* Écran d'ouverture : un seul dessin au centre. Le script le remplace
+/* Écran d'ouverture : un seul dessin au centre, copié dans le sceau
    (cèdre, balance, rose des vents, cerf, arbre, lion). Le sceau ne bouge pas.
    Même séquence au clic sur le logo. Ne bloque pas les clics. */
 .ouverture { display: none; }

@@ -3408,27 +3408,40 @@ window.Verrou.quandOuvert(function () {
     ouvrir(location.hash.slice(1));
   });
   // Le logo mène à l'accueil, même si on y est déjà (retour en haut).
-  // Un seul dessin au centre : on le remplace. Les superposer les laissait tous visibles
-  // (l'opacité d'un groupe SVG n'est pas respectée partout).
+  // Un seul dessin au centre, copié dans le sceau affiché. Changer le lien d'un
+  // <use>, ou superposer les dessins en jouant sur l'opacité, les laissait tous
+  // visibles sur certains téléphones : l'ancien dessin restait peint.
   const ecranSceau = document.querySelector(".ouverture");
-  const centreOuverture = ecranSceau.querySelector(".ouverture-centre");
   const SUITE_OUVERTURE = ["#wm-g-cedre", "#wm-g-balance", "#wm-g-boussole", "#wm-g-cerf", "#wm-g-racines", "#wm-g-lion"];
   const ouvertureAuDepart = document.documentElement.classList.contains("avec-ouverture");
-  let finSceau = null, pasOuverture = null;
+  let finSceau = null, pasOuverture = null, serieOuverture = 0;
+  function poserMotif(id) {
+    const source = document.querySelector(id);
+    const svg = ecranSceau.querySelector(".ouverture-sceau");
+    const ancien = svg.querySelector(".ouverture-centre");
+    const g = source.cloneNode(true);
+    g.removeAttribute("id");
+    g.setAttribute("class", "ouverture-centre");
+    g.setAttribute("data-motif", id);
+    if (ancien) ancien.replaceWith(g); else svg.appendChild(g);
+    void g.getBoundingClientRect();
+  }
   function jouerOuverture() {
     const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const serie = ++serieOuverture;
     document.documentElement.classList.remove("avec-ouverture");
     ecranSceau.classList.remove("joue"); void ecranSceau.offsetWidth; ecranSceau.classList.add("joue");
     clearTimeout(pasOuverture); clearTimeout(finSceau);
     let i = 0;
     const montrer = () => {
-      centreOuverture.setAttribute("href", reduit ? SUITE_OUVERTURE[SUITE_OUVERTURE.length - 1] : SUITE_OUVERTURE[i]);
+      if (serie !== serieOuverture) return;
+      poserMotif(reduit ? SUITE_OUVERTURE[SUITE_OUVERTURE.length - 1] : SUITE_OUVERTURE[i]);
       if (reduit || i >= SUITE_OUVERTURE.length - 1) return;
       i += 1;
       pasOuverture = setTimeout(montrer, 130);
     };
     montrer();
-    finSceau = setTimeout(() => ecranSceau.classList.remove("joue"), reduit ? 500 : 1400);
+    finSceau = setTimeout(() => { if (serie === serieOuverture) ecranSceau.classList.remove("joue"); }, reduit ? 500 : 1400);
   }
   if (ouvertureAuDepart) jouerOuverture();
   document.querySelectorAll("a.marque").forEach(a => a.addEventListener("click", e => {

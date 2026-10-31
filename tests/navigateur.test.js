@@ -7,6 +7,7 @@ const http = require("http");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
 const { chromium } = require("playwright");
 
 const RACINE = path.join(__dirname, "..");
@@ -242,23 +243,39 @@ async function budget(b, base) {
 
 /* 10. Logo : le lion à côté du nom (étoile) ; au clic, la séquence du sceau, puis l'accueil. */
 async function logo(b, base) {
+  const icone = fs.readFileSync(path.join(RACINE, "icone.svg"), "utf8");
+  const vb = icone.match(/viewBox="([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+)"/);
+  const cote = vb ? +vb[3] : 0;
+  verifier("icône : le sceau remplit le carré", !!vb && cote > 440 && cote < 490 && +vb[1] > 10 && !/rx=/.test(icone) && !/translate\(28/.test(icone), vb && vb[0]);
+  const masque = fs.readFileSync(path.join(RACINE, "icones/icone-masquable.svg"), "utf8");
+  verifier("icône masquable : le sceau va jusqu'au bord utile", !/translate\(70/.test(masque) && !/scale\(0\.72/.test(masque) && /viewBox="-/.test(masque));
   const { ctx, p, erreurs } = await ouvrir(b, base, { page: "budget" });
   verifier("en-tête : le lion seul", await p.evaluate(() => document.querySelector(".barre-haut .marque-ico use").getAttribute("href") === "#wm-lion"));
   verifier("nom : une étoile entre Wealth et Morand", await p.evaluate(() => !!document.querySelector("#wm-nom .etoile")));
-  verifier("ouverture : un seul dessin au centre", await p.evaluate(() => document.querySelectorAll(".ouverture use").length === 2
-    && document.querySelector(".ouverture-centre").getAttribute("href") === "#wm-g-cedre"));
+  verifier("ouverture : un seul dessin au centre", await p.evaluate(() => document.querySelectorAll(".ouverture .ouverture-centre").length === 1
+    && document.querySelector(".ouverture-centre").getAttribute("data-motif") === "#wm-g-cedre"));
   await p.click(".barre-haut a.marque");
-  const pendant = await p.evaluate(() => new Promise(resolve => {
+  const empreinte = buf => crypto.createHash("sha256").update(buf).digest("hex");
+  const pendantPromesse = p.evaluate(() => new Promise(resolve => {
     const vus = [];
-    const id = setInterval(() => vus.push(document.querySelector(".ouverture-centre").getAttribute("href")), 70);
+    const id = setInterval(() => {
+      const c = document.querySelector(".ouverture-centre");
+      vus.push({ motif: c && c.getAttribute("data-motif"), tag: c && c.tagName, centres: document.querySelectorAll(".ouverture-centre").length, chemins: c ? c.querySelectorAll("path").length : 0 });
+    }, 70);
     setTimeout(() => { clearInterval(id); resolve({ joue: document.querySelector(".ouverture").classList.contains("joue"), vus }); }, 800);
   }));
+  const dessin1 = empreinte(await p.locator(".ouverture-sceau").screenshot());
+  await p.waitForTimeout(280);
+  const dessin2 = empreinte(await p.locator(".ouverture-sceau").screenshot());
+  verifier("logo : le dessin affiché change", dessin1 !== dessin2);
+  const pendant = await pendantPromesse;
   const suite = ["#wm-g-cedre", "#wm-g-balance", "#wm-g-boussole", "#wm-g-cerf", "#wm-g-racines", "#wm-g-lion"];
-  const ordre = pendant.vus.filter((h, i) => h !== pendant.vus[i - 1]);
-  verifier("logo : les dessins se suivent, un à la fois", pendant.joue && ordre.join() === suite.join(), ordre);
+  const ordre = pendant.vus.map(v => v.motif).filter((h, i, a) => h !== a[i - 1]);
+  const unSeul = pendant.vus.every(v => v.centres === 1 && v.tag === "g" && v.chemins === 1);
+  verifier("logo : les dessins se suivent, un à la fois", pendant.joue && unSeul && ordre.join() === suite.join(), { ordre, unSeul });
   await p.waitForTimeout(900);
-  const apres = await p.evaluate(() => ({ joue: document.querySelector(".ouverture").classList.contains("joue"), page: location.hash, href: document.querySelector(".ouverture-centre").getAttribute("href") }));
-  verifier("logo : on termine sur le lion, puis l'accueil", !apres.joue && apres.page === "#apercu" && apres.href === "#wm-g-lion", apres);
+  const apres = await p.evaluate(() => ({ joue: document.querySelector(".ouverture").classList.contains("joue"), page: location.hash, motif: document.querySelector(".ouverture-centre").getAttribute("data-motif") }));
+  verifier("logo : on termine sur le lion, puis l'accueil", !apres.joue && apres.page === "#apercu" && apres.motif === "#wm-g-lion", apres);
   verifier("logo : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
