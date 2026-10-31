@@ -514,6 +514,13 @@ a.tuile:hover { border-color: var(--trait); }
 .champs-rapides .champ { grid-template-columns: minmax(0, 1fr) minmax(96px, 128px); }
 .champs-rapides .champ > span:last-child:empty { display: none; }
 .choix-actes { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 2px 0 12px; }
+/* Aller plus loin : les champs et les tableaux d'une carte, repliés sous ses résultats. */
+.plus-loin { margin-top: 8px; border-top: 1px solid var(--grille); }
+.plus-loin > summary { list-style: none; cursor: pointer; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--discret); font-size: 0.92rem; }
+.plus-loin > summary::-webkit-details-marker { display: none; }
+.plus-loin > summary::after { content: ""; flex: none; width: 7px; height: 7px; margin-right: 4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); }
+.plus-loin[open] > summary::after { transform: rotate(-135deg) translateY(-1px); }
+.plus-loin[open] > summary { margin-bottom: 4px; }
 .conclusion { font-weight: 600; line-height: 1.45; margin: 12px 0 4px; }
 .tableau td.meilleur { font-weight: 700; color: var(--bon); }
 .saisie.mini { display: inline-flex; width: 58px; padding-right: 0; }

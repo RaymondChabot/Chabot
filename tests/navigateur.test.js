@@ -292,24 +292,29 @@ async function logo(b, base) {
   verifier("nom : une étoile entre Wealth et Morand", await p.evaluate(() => !!document.querySelector("#wm-nom .etoile")));
   verifier("ouverture : un seul dessin au centre", await p.evaluate(() => document.querySelectorAll(".ouverture .ouverture-centre").length === 1
     && document.querySelector(".ouverture-centre").getAttribute("data-motif") === "#wm-g-cedre"));
-  await p.click(".barre-haut a.marque");
   const empreinte = buf => crypto.createHash("sha256").update(buf).digest("hex");
+  // L'observation commence avant le clic : le premier dessin (le cèdre) peut ne durer qu'un instant.
   const pendantPromesse = p.evaluate(() => new Promise(resolve => {
     const vus = [];
-    const id = setInterval(() => {
+    const echantillon = () => {
       const c = document.querySelector(".ouverture-centre");
-      vus.push({ motif: c && c.getAttribute("data-motif"), tag: c && c.tagName, centres: document.querySelectorAll(".ouverture-centre").length, chemins: c ? c.querySelectorAll("path").length : 0 });
-    }, 70);
+      vus.push({ motif: c && c.getAttribute("data-motif"), tag: c && c.tagName, centres: document.querySelectorAll(".ouverture-centre").length, chemins: c ? c.querySelectorAll("path").length : 0,
+        joue: document.querySelector(".ouverture").classList.contains("joue") });
+    };
+    echantillon();
+    const id = setInterval(echantillon, 70);
     setTimeout(() => { clearInterval(id); resolve({ joue: document.querySelector(".ouverture").classList.contains("joue"), vus }); }, 800);
   }));
+  await p.click(".barre-haut a.marque");
   const dessin1 = empreinte(await p.locator(".ouverture-sceau").screenshot());
   await p.waitForTimeout(280);
   const dessin2 = empreinte(await p.locator(".ouverture-sceau").screenshot());
   verifier("logo : le dessin affiché change", dessin1 !== dessin2);
   const pendant = await pendantPromesse;
   const suite = ["#wm-g-cedre", "#wm-g-balance", "#wm-g-boussole", "#wm-g-cerf", "#wm-g-racines", "#wm-g-lion"];
-  const ordre = pendant.vus.map(v => v.motif).filter((h, i, a) => h !== a[i - 1]);
-  const unSeul = pendant.vus.every(v => v.centres === 1 && v.tag === "g" && v.chemins === 1);
+  const enJeu = pendant.vus.filter(v => v.joue);
+  const ordre = enJeu.map(v => v.motif).filter((h, i, a) => h !== a[i - 1]);
+  const unSeul = enJeu.length > 0 && enJeu.every(v => v.centres === 1 && v.tag === "g" && v.chemins === 1);
   verifier("logo : les dessins se suivent, un à la fois", pendant.joue && unSeul && ordre.join() === suite.join(), { ordre, unSeul });
   await p.waitForTimeout(900);
   const apres = await p.evaluate(() => ({ joue: document.querySelector(".ouverture").classList.contains("joue"), page: location.hash, motif: document.querySelector(".ouverture-centre").getAttribute("data-motif") }));
@@ -1060,58 +1065,55 @@ async function comparerActes(b, base) {
   const vue = await p.evaluate(() => ({ hash: location.hash, onglets: [...document.querySelectorAll("#rv-onglets button")].map(x => x.textContent),
     visibles: [...document.querySelectorAll("#v-revenu .carte")].filter(c => c.offsetParent).map(c => c.id), conclusion: document.getElementById("rv-sup-conclusion").textContent,
     bouton: (document.querySelector("#rv-sup-actions button") || {}).textContent || "", debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
-  verifier("actes : le sous-onglet de Revenu et ses quatre cartes, sans le reste du détail", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Comparer les actes"
-    && vue.visibles.join() === "rv-carte-supervision,rv-carte-actes,rv-carte-demijournee,rv-carte-cnesst" && !vue.debord, vue);
+  verifier("actes : le sous-onglet de Revenu : les seuils, la supervision, la demi-journée ; les actes et la CNESST repliés", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Comparer les actes"
+    && vue.visibles.join() === "rv-carte-seuils,rv-carte-supervision,rv-carte-demijournee,rv-carte-actes,rv-carte-cnesst" && !vue.debord
+    && await p.evaluate(() => !document.getElementById("rv-carte-actes").open && !document.getElementById("rv-carte-cnesst").open && !document.getElementById("rv-sup-plus").open), vue);
   verifier("actes : la supervision rapporte 51,94 $ de plus, environ 4 156 $ sur 80 demi-journées ; les visites dès 10", vue.conclusion.includes("51,94") && vue.conclusion.replace(/\s/g, " ").includes("4 156")
     && vue.conclusion.includes("80 demi-journées") && vue.conclusion.includes("dès 10 visites"), vue.conclusion);
   await p.click("#rv-sup-actions button"); await p.waitForTimeout(300);
   verifier("actes : le bouton applique l'intervention de supervision au plan", vue.bouton === "Facturer l'intervention de supervision"
     && await p.evaluate(() => window.Wealthnord.etat().revenu.supervisionFacturation === "acte"), vue.bouton);
-  await p.fill("#duree-suivi", "20"); await p.waitForTimeout(400);
+  await p.click("#rv-carte-actes > summary"); await p.fill("#duree-suivi", "20"); await p.waitForTimeout(400);
   const duree = await p.evaluate(() => ({ s: window.Wealthnord.etat().revenu.dureesActes.suivi, acte: document.querySelector('#rv-actes-heure tr[data-acte="suivi"] td[data-m="acte"]').textContent }));
   verifier("actes : la durée d'un suivi change ce qu'il rapporte à l'heure", duree.s === 20 && duree.acte.replace(/\s/g, "") === "111$", duree);
-  await p.fill("#rapide-suivi", "6"); await p.waitForTimeout(400);
+  await p.click("#rv-dj-plus > summary"); await p.fill("#rapide-suivi", "6"); await p.waitForTimeout(400);
   const dj = await p.evaluate(() => ({ t: window.Wealthnord.etat().revenu.demiJourneeType, plan: !document.getElementById("rv-dj-plan").hidden, c: document.getElementById("rv-dj-conclusion").textContent }));
   verifier("actes : ma demi-journée se garde, avec les autres actes ; « Selon mon plan » apparaît", dj.t && dj.t.suivi === 6 && "perioV" in dj.t && dj.plan && dj.c.includes("rapporte le plus"), dj);
   await p.click("#rv-dj-plan"); await p.waitForTimeout(300);
   verifier("actes : « Selon mon plan » revient à la demi-journée du plan", await p.evaluate(() => window.Wealthnord.etat().revenu.demiJourneeType === null));
+  const seuils = await p.evaluate(() => document.getElementById("rv-carte-seuils").textContent);
+  verifier("seuils : en tête du sous-onglet, dès tant de patients le mixte, puis l'acte ; dès tant de visites la supervision ; l'année aussi",
+    seuils.includes("Quand changer de mode") && seuils.includes("patients par demi-journée") && seuils.includes("Mixte plutôt que l'horaire") && seuils.includes("L'acte plutôt que le mixte")
+    && seuils.includes("Visites plutôt que la supervision") && seuils.includes("Dès 6") && seuils.includes("Dès 16") && seuils.includes("Dès 10") && !/Dès [3-9]\d/.test(seuils)
+    && seuils.includes("3 résidents") && seuils.includes("4,5") && seuils.includes("Sur l'année") && seuils.includes("Comment ces seuils sont calculés"), seuils);
   await allerA(p, "revenu"); await p.waitForTimeout(200);
   const resume = await p.evaluate(() => {
-    const c = document.getElementById("rv-r-actes"), s = document.getElementById("rv-r-seuils"), hero = document.getElementById("rv-hero"), sources = document.getElementById("rv-r-sources");
-    return { lien: c.querySelector("a.lien-carte").getAttribute("href"), bouton: c.querySelector("a.bouton").getAttribute("href"),
-      texte: c.textContent, seuils: s.textContent, vu: !!c.offsetParent, seuilsVu: !!s.offsetParent,
-      sousLeChiffre: c.getBoundingClientRect().top > hero.getBoundingClientRect().top,
-      seuilsDabord: s.getBoundingClientRect().top < c.getBoundingClientRect().top,
-      avantLeReste: !sources.offsetParent || c.getBoundingClientRect().top < sources.getBoundingClientRect().top,
+    const c = document.getElementById("rv-r-modes"), hero = document.getElementById("rv-hero"), sources = document.getElementById("rv-r-sources");
+    return { lien: c.querySelector("a.lien-carte").getAttribute("href"), texte: c.textContent, vu: !!c.offsetParent, choisis: c.querySelectorAll(".rangee.choisi").length,
+      lignes: c.querySelectorAll(".rangee").length, sousLeChiffre: c.getBoundingClientRect().top > hero.getBoundingClientRect().top,
+      avantLeReste: !sources.offsetParent || c.getBoundingClientRect().top < sources.getBoundingClientRect().top, puce: hero.textContent,
+      anciennes: !!document.getElementById("rv-r-seuils") || !!document.getElementById("rv-r-actes"),
       debord: document.documentElement.scrollWidth > document.documentElement.clientWidth };
   });
-  verifier("actes : la carte du résumé, sous le chiffre, mène au sous-onglet", resume.lien === "#revenu/actes" && resume.bouton === "#revenu/actes"
-    && resume.vu && resume.sousLeChiffre && resume.avantLeReste && resume.texte.includes("La supervision") && resume.texte.includes("Ma demi-journée"), resume);
-  verifier("seuils : dès tant de patients le mixte, puis l'acte ; dès tant de visites la supervision", resume.seuilsVu && resume.seuilsDabord && !resume.debord
-    && resume.seuils.includes("Quand changer de mode") && resume.seuils.includes("patients par demi-journée")
-    && resume.seuils.includes("Mixte plutôt que l'horaire") && resume.seuils.includes("L'acte plutôt que le mixte")
-    && resume.seuils.includes("Visites plutôt que la supervision") && resume.seuils.includes("Dès 6") && resume.seuils.includes("Dès 16") && resume.seuils.includes("Dès 10")
-    && !/Dès [3-9]\d/.test(resume.seuils) && resume.seuils.includes("le mixte reste devant")
-    && resume.seuils.includes("3 résidents") && resume.seuils.includes("4,5"), resume.seuils);
+  verifier("résumé : une seule carte « Vos trois modes », sous le chiffre, le meilleur net en évidence ; elle mène aux seuils et aux actes",
+    resume.vu && resume.lien === "#revenu/actes" && resume.texte.includes("Vos trois modes") && resume.texte.includes("net par année") && resume.texte.includes("rapporte le plus")
+    && resume.lignes === 3 && resume.choisis === 1 && resume.sousLeChiffre && resume.avantLeReste && !resume.anciennes && !resume.debord, resume);
+  verifier("résumé : le chiffre du haut compare le net, comme la carte", resume.puce.includes("net par rapport"), resume.puce);
   await allerA(p, "revenu/detail");
   verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent
     && document.getElementById("rv-seuil").textContent.includes("dès") && document.getElementById("rv-seuil").textContent.includes("forfait de responsabilité")));
   await remplacer(p, { "revenu.milieu": "clsc" });
-  await allerA(p, "revenu");
-  const clsc = await p.evaluate(() => {
-    const s = document.getElementById("rv-r-seuils");
-    return { hash: location.hash, seuils: !!s.offsetParent, actes: document.getElementById("rv-r-actes").hidden, texte: s.textContent,
-      onglet: document.getElementById("rv-onglets").hidden, debord: document.documentElement.scrollWidth > document.documentElement.clientWidth };
-  });
-  verifier("seuils : en CLSC, les patients par demi-journée, sans Comparer les actes", clsc.seuils && clsc.actes && clsc.onglet && !clsc.debord
-    && clsc.texte.includes("patients par demi-journée") && clsc.texte.includes("Dès") && !clsc.texte.includes("supervision"), clsc);
   await allerA(p, "revenu/actes");
-  verifier("actes : en CLSC, l'adresse revient au détail du revenu", await p.evaluate(() => location.hash === "#revenu/detail" && !document.getElementById("rv-carte-supervision").offsetParent));
+  const clsc = await p.evaluate(() => ({ hash: location.hash, onglet: !document.getElementById("rv-onglets").hidden, seuils: !!document.getElementById("rv-carte-seuils").offsetParent,
+    sup: !!document.getElementById("rv-carte-supervision").offsetParent, texte: document.getElementById("rv-carte-seuils").textContent,
+    debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
+  verifier("seuils : en CLSC, le sous-onglet et les seuils, sans la supervision", clsc.hash === "#revenu/actes" && clsc.onglet && clsc.seuils && !clsc.sup && !clsc.debord
+    && clsc.texte.includes("patients par demi-journée") && clsc.texte.includes("Dès") && !clsc.texte.includes("Visites plutôt que la supervision"), clsc);
   await remplacer(p, { "revenu.milieu": "clinique" });
   await allerA(p, "revenu/actes");
-  const clinique = await p.evaluate(() => ({ hash: location.hash, actes: document.getElementById("rv-r-actes").hidden, seuils: document.getElementById("rv-r-seuils").hidden,
+  const clinique = await p.evaluate(() => ({ hash: location.hash, modes: document.getElementById("rv-r-modes").hidden,
     onglet: document.getElementById("rv-onglets").hidden, sup: !!document.getElementById("rv-carte-supervision").offsetParent }));
-  verifier("actes : en clinique, ni la section ni les seuils", clinique.hash === "#revenu/detail" && clinique.actes && clinique.seuils && clinique.onglet && !clinique.sup, clinique);
+  verifier("actes : en clinique, à l'acte seulement, ni le sous-onglet ni la carte des modes", clinique.hash === "#revenu/detail" && clinique.modes && clinique.onglet && !clinique.sup, clinique);
   verifier("actes : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }

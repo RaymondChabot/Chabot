@@ -127,15 +127,23 @@ avec un enfant commun : avant, chacun est imposé seul.
 L'essentiel suffit pour commencer ; le bouton **Optimiser** du panneau
 Revenu affiche tous les détails.
 
-**Comparer les actes** (sous-onglet du détail de Revenu, et une carte du
-résumé) : au mixte, en GMF-U, l'intervention de supervision ou les visites
-des apprenants, par demi-journée et par année, avec le nombre de visites à
-partir duquel les visites rapportent plus, et un bouton qui applique le
-meilleur choix au plan ; ce que rapporte chaque acte à l'acte et au mixte,
-et à l'heure selon la durée que vous choisissez (cabinet ou établissement,
-moins de 500 ou 500 inscrits et plus) ; votre demi-journée type (au départ,
-celle du plan) au taux horaire, au mixte et à l'acte ; les formulaires de
-la CNESST et de l'IVAC (annexe XIII), payés à 100 % dans tous les modes.
+**Vos trois modes** (résumé de Revenu, en GMF-U et en CLSC) : le net de
+chaque mode après impôt et frais, le meilleur en évidence, et l'écart sur
+l'année ; le chiffre du haut compare le même net.
+
+**Comparer les actes** (sous-onglet du détail de Revenu, dès qu'il y a
+plusieurs modes) : les résultats d'abord, les réglages se déplient pour
+aller plus loin. Quand changer de mode : dès combien de patients par
+demi-journée le mixte dépasse le taux horaire, puis l'acte le mixte, et ce
+que dit l'année entière. Au mixte, en GMF-U : l'intervention de
+supervision ou les visites des apprenants, par demi-journée et par année,
+avec le nombre de visites à partir duquel les visites rapportent plus, et
+un bouton qui applique le meilleur choix au plan. Votre demi-journée type
+(au départ, la moyenne du plan) au taux horaire, au mixte et à l'acte.
+Repliés : ce que rapporte chaque acte à l'acte et au mixte, et à l'heure
+selon la durée que vous choisissez (cabinet ou établissement, moins de 500
+ou 500 inscrits et plus) ; les formulaires de la CNESST et de l'IVAC
+(annexe XIII), payés à 100 % dans tous les modes.
 
 - **Revenu** : pratique principale en GMF ou clinique privée (à l'acte,
   frais de cabinet), en GMF-U ou en CLSC (taux horaire, mode mixte ou à

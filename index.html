@@ -144,8 +144,7 @@
       </div>
       <div class="segment pratique-seule detail-seul" id="rv-mode" data-sous="detail"></div>
       <div class="hero" id="rv-hero"></div>
-      <div class="carte resume-seul pratique-seule" id="rv-r-seuils" hidden></div>
-      <div class="carte resume-seul carte-accent pratique-seule" id="rv-r-actes" hidden></div>
+      <div class="carte resume-seul pratique-seule" id="rv-r-modes" hidden></div>
       <div class="tuiles quatre resume-seul" id="rv-r-tuiles"></div>
       <div class="carte residence-seule detail-seul" id="rv-residence" data-sous="detail" hidden>
         <div class="carte-tete"><h2>Votre résidence</h2><button type="button" class="lien-carte" data-feuille="residence">Modifier</button></div>
@@ -190,39 +189,47 @@
         <div class="legende" id="rv-legende"></div>
         <div class="tableau-defile"><table class="tableau" id="rv-detail"></table></div>
       </div>
-      <!-- Comparer les actes : un sous-onglet du détail. -->
+      <!-- Comparer les actes : un sous-onglet du détail, dès qu'il y a plusieurs modes. Les résultats d'abord ;
+           les champs et les tableaux se déplient pour aller plus loin. -->
+      <div class="carte detail-seul" id="rv-carte-seuils" data-sous="actes"></div>
       <div class="carte detail-seul" id="rv-carte-supervision" data-sous="actes">
         <div class="carte-tete"><h2>Supervision ou visites des apprenants</h2></div>
-        <p class="aide" id="rv-sup-intro"></p>
-        <div class="choix-actes"><div class="segment petit" id="rv-sup-moment"></div></div>
-        <div class="champs-rapides" id="rv-sup-champs"></div>
         <div class="rangees" id="rv-sup-resultat"></div>
         <p class="conclusion" id="rv-sup-conclusion"></p>
         <div class="actions" id="rv-sup-actions"></div>
-        <p class="aide">Selon le nombre de visites d'apprenants par demi-journée : ce qu'elles rapportent au mixte, et l'écart avec l'intervention de supervision.</p>
-        <div class="tableau-defile"><table class="tableau" id="rv-sup-table"></table></div>
+        <details class="plus-loin" id="rv-sup-plus">
+          <summary>Ajuster les apprenants et le moment</summary>
+          <p class="aide" id="rv-sup-intro"></p>
+          <div class="choix-actes"><div class="segment petit" id="rv-sup-moment"></div></div>
+          <div class="champs-rapides" id="rv-sup-champs"></div>
+          <p class="aide">Selon le nombre de visites d'apprenants par demi-journée : ce qu'elles rapportent au mixte, et l'écart avec l'intervention de supervision.</p>
+          <div class="tableau-defile"><table class="tableau" id="rv-sup-table"></table></div>
+        </details>
       </div>
-      <div class="carte detail-seul" id="rv-carte-actes" data-sous="actes">
-        <div class="carte-tete"><h2>Ce que rapporte chaque acte</h2></div>
+      <div class="carte detail-seul" id="rv-carte-demijournee" data-sous="actes">
+        <div class="carte-tete"><h2>Ma demi-journée</h2><button type="button" class="lien-carte" id="rv-dj-plan">Selon mon plan</button></div>
+        <p class="aide" id="rv-dj-intro"></p>
+        <div class="rangees" id="rv-dj-resultat"></div>
+        <p class="conclusion" id="rv-dj-conclusion"></p>
+        <details class="plus-loin" id="rv-dj-plus">
+          <summary>Changer les actes de la demi-journée</summary>
+          <div class="champs-rapides" id="rv-dj-champs"></div>
+        </details>
+      </div>
+      <details class="carte carte-repliable detail-seul" id="rv-carte-actes" data-sous="actes">
+        <summary><h2>Ce que rapporte chaque acte</h2><span class="repli-resume" id="rv-actes-resume"></span></summary>
         <div class="choix-actes"><div class="segment petit" id="rv-actes-lieu"></div><div class="segment petit" id="rv-actes-palier"></div></div>
         <h3>Par acte</h3>
         <div class="tableau-defile"><table class="tableau" id="rv-actes-table"></table></div>
         <h3>À l'heure, selon la durée</h3>
         <div class="tableau-defile"><table class="tableau" id="rv-actes-heure"></table></div>
         <p class="aide" id="rv-actes-note"></p>
-      </div>
-      <div class="carte detail-seul" id="rv-carte-demijournee" data-sous="actes">
-        <div class="carte-tete"><h2>Ma demi-journée</h2><button type="button" class="lien-carte" id="rv-dj-plan">Selon mon plan</button></div>
-        <p class="aide" id="rv-dj-intro"></p>
-        <div class="champs-rapides" id="rv-dj-champs"></div>
-        <div class="rangees" id="rv-dj-resultat"></div>
-        <p class="conclusion" id="rv-dj-conclusion"></p>
-      </div>
-      <div class="carte detail-seul" id="rv-carte-cnesst" data-sous="actes">
-        <div class="carte-tete"><h2>Formulaires de la CNESST</h2></div>
+      </details>
+      <details class="carte carte-repliable detail-seul" id="rv-carte-cnesst" data-sous="actes">
+        <summary><h2>Formulaires de la CNESST</h2><span class="repli-resume" id="rv-cnesst-resume"></span></summary>
         <div class="tableau-defile"><table class="tableau" id="rv-cnesst"></table></div>
         <p class="aide" id="rv-cnesst-note"></p>
-      </div>
+      </details>
       <div class="carte detail-seul" id="rv-residence-ajout" data-sous="detail" hidden>
         <div class="carte-tete"><h2 id="rv-residence-ajout-titre">En résidence ?</h2></div>
         <p class="aide" id="rv-residence-ajout-texte">Ajoutez votre salaire de résident (échelle de la FMRQ) et la date de début de votre pratique : l'app montre l'une ou l'autre, et vos projections passent de la résidence à la pratique à cette date.</p>
