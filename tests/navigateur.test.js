@@ -50,7 +50,8 @@ async function ouvrir(b, base, { largeur = 390, details = false, sw = false, pag
   await pret(p);
   return { ctx, p, erreurs };
 }
-const pret = p => p.waitForFunction(() => window.Wealthnord && window.Wealthnord.resultats());
+// Prête : les résultats calculés ; puis toutes les pages rendues (l'app ne redessine que la page affichée).
+const pret = p => p.waitForFunction(() => window.Wealthnord && window.Wealthnord.resultats()).then(() => p.evaluate(() => window.Wealthnord.rendreTout()));
 const resultat = p => p.evaluate(() => { const R = window.Wealthnord.resultats(), S = window.Wealthnord.etat();
   return { brut: Math.round(R.brut), mode: R.mode, milieu: R.milieu, r: S.revenu }; });
 // Textes de « À faire », espaces insécables ramenées à des espaces simples.
@@ -932,7 +933,7 @@ async function residence(b, base) {
   const q = await p.evaluate(() => { const R = window.Wealthnord.resultats(); return { vue: R.vueResidence, surplus: R.surplusMoi, vn: R.projection[10].moi, hero: document.querySelector("#ap-hero .hero-etiquette").textContent }; });
   verifier("bascule : la vue Pratique, comme sans résidence", !q.vue && Math.abs(q.surplus - avant.surplus) < 0.01 && q.hero.includes("en pratique"), { q, avant });
   verifier("bascule : mêmes projections dans les deux vues ; la résidence les change", Math.abs(q.vn - r.vn) < 0.01 && r.vn < avant.vn, { pratique: q.vn, residence: r.vn, sans: avant.vn });
-  const prem = await p.evaluate(() => ({ ech: [...document.querySelectorAll("#ap-echeances .rangee")].map(x => x.textContent.replace(/\s+/g, " ")),
+  const prem = await p.evaluate(() => (window.Wealthnord.rendreTout(), { ech: [...document.querySelectorAll("#ap-echeances .rangee")].map(x => x.textContent.replace(/\s+/g, " ")),
     impot: document.getElementById("im-acomptes").textContent.replace(/\s+/g, " "),
     treso: window.Wealthnord.outils.tresorerie(window.Wealthnord.resultats()).mois.flatMap(m => m.ev.map(([n]) => `${m.date.getFullYear()} ${n}`)).filter(x => /Acompte|Solde/.test(x)) }));
   verifier("bascule : première année de pratique en 2027, solde le 30 avril 2028, aucun acompte en 2027", prem.ech.some(x => /^30avrSolde de l'impôt.*2028$/.test(x))

@@ -2550,7 +2550,10 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("pied-parametres").textContent = `paramètres fiscaux ${R.parametres.annee}${R.parametres.provisoire ? " (provisoires)" : ""}`;
     appliquerVue(R);
     appliquerSous("revenu"); appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
-    rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite();
+    // Seule la page affichée se redessine (lot 10 de l'audit) : ouvrir une page appelle tout() de nouveau.
+    const visible = (document.querySelector(".vue:not([hidden])") || {}).id || "v-apercu";
+    ({ "v-apercu": () => rendreApercu(R), "v-revenu": () => rendreRevenu(R), "v-impot": () => rendreImpot(R), "v-budget": () => rendreBudget(R),
+      "v-avenir": () => rendreAvenir(R), "v-donnees": () => rendreFiabilite() })[visible]?.();
     if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
     // Sigles de la RAMQ : définition au toucher, dans les pages et le panneau ouvert.
     lexique(document.querySelector("main"), LEXIQUE);
@@ -2781,7 +2784,9 @@ window.Verrou.quandOuvert(function () {
      ============================================================ */
   function rendreChances(R, couple) {
     const z = document.getElementById("pa-chances"); z.textContent = "";
-    if (document.getElementById("v-avenir").hidden) return;   // calcul fait quand la page est ouverte
+    // Les 300 avenirs ne se calculent que si la carte est à l'écran (sous-onglet Projection, outils avancés affichés).
+    const carte = z.closest(".carte");
+    if (document.getElementById("v-avenir").hidden || !carte || !carte.offsetParent) return;
     const vol = S.scenarios.volatilite ?? 10, M = R.monteCarlo(300, vol), p = R.projection, fin = p.length - 1, cle = couple ? "menage" : "moi";
     const def = i => R.deflateur(i), q = (k, i) => M.quantile(cle, i, k) / def(i);
     const res = el("p", "resume");
@@ -3011,7 +3016,9 @@ window.Verrou.quandOuvert(function () {
       z.appendChild(el("p", "aide", "Copiez votre plan, changez quelques choix (vous incorporer, acheter une maison en 2028, passer à 4 jours, une autre méthode de remboursement), puis comparez les deux valeurs nettes."));
       const a = el("div", "actions"); a.appendChild(bouton("Créer un plan B", "", creerPlan)); z.appendChild(a); return;
     }
-    if (document.getElementById("v-avenir").hidden) return;   // calcul fait quand la page est ouverte
+    // Les 300 avenirs ne se calculent que si la carte est à l'écran (sous-onglet Projection, outils avancés affichés).
+    const carte = z.closest(".carte");
+    if (document.getElementById("v-avenir").hidden || !carte || !carte.offsetParent) return;
     const i = planActif ?? 0, plan = plans[i];
     const Rp = planActif === null ? R : calculerAvec(principal), Rb = planActif === null ? calculerAvec(plan.donnees) : R;
     const n = Math.min(Rp.projection.length, Rb.projection.length);
@@ -4188,7 +4195,10 @@ window.Verrou.quandOuvert(function () {
 
   /* Outils pour le rapport PDF (js/rapport.js). */
   window.Wealthnord = {
-    etat: () => S, resultats: () => R, plan: () => planActif === null ? null : principal.plans[planActif].nom,
+    etat: () => S, resultats: () => R,
+    // Toutes les pages, même cachées (les tests lisent parfois une autre page que celle affichée).
+    rendreTout: () => { rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite(); lexique(document.querySelector("main"), LEXIQUE); },
+    plan: () => planActif === null ? null : principal.plans[planActif].nom,
     verification: () => {
       let total = 0, egaux = 0, pire = 0;
       VERIFICATION.forEach(v => { const b = casCalcul(v); CHAMPS_VERIF.forEach(([k]) => { const e = Math.abs(ecartVerif(k, b[k], v.officiel[k])); total++; if (e <= 1) egaux++; pire = Math.max(pire, e); }); });
