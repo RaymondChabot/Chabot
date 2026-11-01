@@ -470,7 +470,8 @@ window.Verrou.quandOuvert(function () {
   function calculer() {
     const R = {};
     // Paramètres d'impôt de l'année du plan : 2026, puis 2027 (provisoires jusqu'aux montants officiels).
-    R.parametres = C.utiliserAnnee(+String(S.strategie.debut).slice(0, 4) || new Date().getFullYear());
+    R.anneePlan = +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear();   // l'année du plan ; les paramètres fiscaux s'arrêtent à la dernière année connue
+    R.parametres = C.utiliserAnnee(R.anneePlan);
     // Pratique principale : GMF ou clinique (à l'acte), GMF-U ou CLSC (trois modes), plus les activités.
     R.milieu = MILIEUX[S.revenu.milieu] ? S.revenu.milieu : "clinique";
     R.modes = MILIEUX[R.milieu].modes;
@@ -1122,7 +1123,7 @@ window.Verrou.quandOuvert(function () {
   }
 
   // Prochaines échéances : impôt, acomptes, REER, déclarations, renouvellements, REEE.
-  function echeances(R) {
+  function echeances(R, n = 5) {
     const auj = new Date(); auj.setHours(0, 0, 0, 0);
     const an = auj.getFullYear(), anImpot = R.anImpotPremiere;
     const l = [], premiere = R.premiereAnnee, t = R.impot.total + R.primeMoi;   // prime d'assurance médicaments : avec l'impôt du Québec
@@ -1149,7 +1150,7 @@ window.Verrou.quandOuvert(function () {
       l.push({ date: prochaine(11, 31), titre: "Cotisation REEE de l'année", sous: "Pour recevoir les subventions de l'année (30 %)", valeur: $(S.epargne.reee.cotisationAnnuelle * S.epargne.reee.enfants.filter(e => e.age < 17).length) });
     lignesAnnuelles().filter(x => x.mois && x.montant >= 200).forEach(x => l.push({ date: prochaine(x.mois - 1, 1), titre: x.nom, sous: "Dépense annuelle", valeur: $(x.montant) }));
     const jours = d => Math.round((d - auj) / 864e5);
-    return l.filter(x => x.date >= auj).sort((a, b) => a.date - b.date).slice(0, 5).map(x => {
+    return l.filter(x => x.date >= auj).sort((a, b) => a.date - b.date).slice(0, n).map(x => {
       const j = jours(x.date);
       const quand = j === 0 ? "aujourd'hui" : j < 31 ? `dans ${j} jour${j > 1 ? "s" : ""}` : `dans ${Math.round(j / 30.4)} mois`;
       return { date: x.date, titre: x.titre, sous: `${x.sous} · ${quand}`, valeur: x.valeur, valeurSous: x.date.getFullYear() !== an ? String(x.date.getFullYear()) : undefined };
@@ -1910,7 +1911,7 @@ window.Verrou.quandOuvert(function () {
       : [net, { titre: "À mettre de côté", valeur: $((t + R.primeMoi) / 12), sous: "Par mois, prime comprise" }, fed, qc]);
     const m = morceauxImpot(R);
     carteResume("im-r-cent", "Sur chaque 100 $ gagnés", ["Détail", "#impot/detail"], barreLegende(m.morceaux, v => $2(v / m.brut * 100)));
-    const prochain = echeances(R).find(x => /^Acompte|^Solde de l'impôt/.test(x.titre));
+    const prochain = echeances(R, Infinity).find(x => /^Acompte|^Solde de l'impôt/.test(x.titre));
     carteResume("im-r-payer", R.vueResidence ? "Retenu sur la paie" : "Prochain paiement", ["Détail", "#impot/detail"], rangees(el("div"), R.vueResidence ? [
       { titre: "Paie brute", sous: "26 paies par année, en moyenne", valeur: $(I.revenu / 26) },
       { titre: "Impôt et cotisations retenus", valeur: moins(I.total / 26) },
@@ -1922,7 +1923,8 @@ window.Verrou.quandOuvert(function () {
     ]));
   }
   // Paramètres de l'année pas encore officiels : montants indexés selon la formule officielle.
-  const pucePrevue = R => R.parametres.provisoire ? puce(`Montants ${R.parametres.annee} provisoires`) : null;
+  const pucePrevue = R => R.parametres.provisoire || R.anneePlan !== R.parametres.annee
+    ? puce(R.anneePlan !== R.parametres.annee ? `Paramètres ${R.parametres.annee}, provisoires` : `Montants ${R.parametres.annee} provisoires`) : null;
   // Vue résidence : un salarié ; l'impôt et les cotisations sont retenus sur chaque paie.
   function rendreImpotResidence(R) {
     const I = R.impot, x = R.res, t = I.total;
@@ -1960,7 +1962,7 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("im-tableau-note").textContent = "Salarié : impôt fédéral (après l'abattement du Québec) et du Québec, RRQ, RQAP et assurance-emploi de l'employé. Crédits : montant canadien pour emploi, cotisations, droits de scolarité (fédéral, et Québec à 8 %), intérêts d'un prêt étudiant et, au Québec, 10 % de la cotisation syndicale ; déductions : cotisation syndicale au fédéral, REER et, au Québec, déduction pour travailleurs.";
   }
   function rendreImpot(R) {
-    document.getElementById("h-impot").textContent = `Impôt ${R.parametres.annee}`;
+    document.getElementById("h-impot").textContent = `Impôt ${R.anneePlan}`;
     resumeImpot(R);
     if (R.vueResidence) {
       rendreImpotResidence(R); rendreFamille(R); rendreVerification();

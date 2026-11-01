@@ -1313,9 +1313,25 @@ async function planCalendrier(b, base) {
   const an2 = await p.evaluate(() => { const S = window.Wealthnord.etat(); return { annee: S.revenu.annee, debut: S.strategie.debut, toast: document.getElementById("toast-texte").textContent }; });
   verifier("plan : la première année (2027) passée, l'année type en 2028, avec l'avis", an2.debut === "2028-01" && an2.annee === "type"
     && an2.toast.includes("votre première année de pratique (2027) est passée : année type"), an2);
+  const titre28 = await p.evaluate(() => ({ titre: document.getElementById("h-impot").textContent, puces: document.getElementById("im-hero").textContent }));
+  verifier("plan : en 2028, la page s'intitule « Impôt 2028 » et dit que les paramètres 2027 sont provisoires", titre28.titre === "Impôt 2028" && titre28.puces.includes("Paramètres 2027, provisoires"), titre28);
   await p.click("#toast-annuler"); await p.waitForTimeout(200);
   verifier("plan : Annuler remet la première année", await p.evaluate(() => { const S = window.Wealthnord.etat(); return S.revenu.annee === "premiere" && S.strategie.debut === "2027-09"; }));
   verifier("plan : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
+/* 39. Le prochain acompte se trouve même quand cinq autres échéances le précèdent (REEE, dépenses annuelles). */
+async function prochainPaiement(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { horloge: "2026-12-16T10:00:00", page: "impot" });
+  const budget = await p.evaluate(() => window.Wealthnord.etat().budget);
+  [[1, 1200], [1, 300], [2, 900], [2, 250]].forEach(([mois, montant], i) => budget.push({ id: `annuel${i}`, k: "autre", nom: `Annuelle ${i}`, montant, periode: "an", mois, qui: "moi" }));
+  await remplacer(p, { "strategie.debut": "2026-12", "meta.planRefuse": "", "residence.active": false, "revenu.annee": "type", budget,
+    "epargne.reee.enfants": [{ id: "e1", nom: "", age: 3, solde: 0 }], "epargne.reee.cotisationAnnuelle": 2500 });
+  await p.reload(); await pret(p); await allerA(p, "impot");
+  const x = await p.evaluate(() => document.getElementById("im-r-payer").textContent);
+  verifier("impôt : le prochain paiement est l'acompte du 15 mars, même derrière cinq autres échéances", x.includes("Acompte provisionnel") && !x.includes("Aucun acompte"), x);
+  verifier("impôt : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
 
@@ -1323,7 +1339,7 @@ async function planCalendrier(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
