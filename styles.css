@@ -1053,3 +1053,22 @@ a.tuile:hover { border-color: var(--trait); }
 @media (min-width: 1100px) { .vue:not(.mode-detail) { align-items: stretch; } .vue:not(.mode-detail) > .hero { align-self: start; } }
 /* À l'impression, tout le détail, sans le résumé. */
 @media print { .retour-resume, .bouton-detail, .resume-seul { display: none !important; } }
+
+/* ============================================================
+   FINITION : les grands chiffres et les titres des cartes en Newsreader, l'or du lion pour marquer le
+   meilleur, un peu plus d'air. À l'écran seulement : le rapport PDF garde sa mise en page.
+   ============================================================ */
+:root { --or-texte: #85601f; }   /* or du lion, foncé : 4,5:1 au moins sur les surfaces claires */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --or-texte: #d6b57a; } }
+:root[data-theme="dark"] { --or-texte: #d6b57a; }
+@media screen {
+  .hero-valeur { font-family: var(--police-titre); font-weight: 500; letter-spacing: -0.015em; font-variant-numeric: lining-nums tabular-nums; }
+  .carte-tete h2, .carte-repliable > summary h2 { font-family: var(--police-titre); font-weight: 600; font-size: 1.16rem; letter-spacing: -0.005em; }
+  .tableau td.meilleur { color: var(--or-texte); }
+  :is(#rv-r-modes, #rv-sup-resultat, #rv-dj-resultat) .rangee.choisi .rangee-valeur { color: var(--or-texte); }
+  :is(#rv-r-modes, #rv-sup-resultat, #rv-dj-resultat) .rangee.choisi .rangee-titre::after {
+    content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--marque); vertical-align: 0.1em; }
+  .conclusion { font-family: var(--police-titre); font-weight: 500; font-size: 1.06rem; line-height: 1.4; }
+  .vue { gap: 18px; }
+}
+@media screen and (min-width: 960px) { .vue { gap: 24px; } }
