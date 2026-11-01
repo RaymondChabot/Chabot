@@ -3529,7 +3529,7 @@ window.Verrou.quandOuvert(function () {
     const cats = categoriesBudget(), nCat = cats.filter(categorieRemplie).length, viseCat = Math.min(6, cats.length);
     const ep = S.epargne, epargne = vus().patrimoine || ancienParcours("autres") || ep.encaisse > 0 || ep.reer.solde > 0 || ep.reer.droits > 0 || ep.celi.solde > 0;
     const items = [
-      { titre: "Votre situation", sous: "Famille, pratique, logement, dettes", f: S.meta.exemple ? 0 : 1, poids: 15, action: ouvrirAssistant },
+      { titre: "Votre situation", sous: "Famille, pratique, logement, dettes", f: S.meta.exemple || S.meta.portraitRapide ? 0 : 1, poids: 15, action: ouvrirAssistant },
       { titre: "Vos revenus", sous: "Pratique, clientèle, activités, autres revenus", f: vus().revenu || ancienParcours("revenus") ? 1 : 0, poids: 35, action: () => { ouvrir("revenu"); ouvrirSection("revenu"); } },
       { titre: "Votre budget", sous: `${nCat} catégorie${nCat > 1 ? "s" : ""} remplie${nCat > 1 ? "s" : ""}`, f: Math.min(1, nCat / viseCat), poids: 35, action: () => ouvrir("budget/mois") },
       { titre: "Votre patrimoine", sous: "Épargne, biens et objectifs", f: epargne ? 1 : 0, poids: 10, action: () => { voir("patrimoine"); ouvrir("avenir/aujourdhui"); } },
@@ -4267,8 +4267,11 @@ window.Verrou.quandOuvert(function () {
   }, false);
 
   const ETAPES = [
-    { titre: "Bienvenue dans WealthMorand", bouton: "Commencer", rendre: c => {
-      c.appendChild(el("p", "as-intro", "Quelques questions pour partir de votre situation : votre famille, votre pratique, votre logement et vos dettes. Environ deux minutes. Tout reste sur cet appareil, et tout se modifie ensuite."));
+    { titre: "Bienvenue dans WealthMorand", bouton: "Portrait complet", rendre: c => {
+      c.appendChild(el("p", "as-intro", "Comparez vos modes de rémunération en trois questions : votre milieu, vos demi-journées, vos patients. Ou faites votre portrait complet (famille, pratique, logement, dettes), en deux minutes. Tout reste sur cet appareil, et tout se modifie ensuite."));
+      const r = el("div", "actions"), vite = el("button", "bouton", "Comparer mes modes en 30 secondes"); vite.type = "button"; vite.id = "as-rapide";
+      vite.addEventListener("click", () => { A.rapide = true; etape = 0; points(); rendreEtape(); document.getElementById("as-titre").focus(); });
+      r.appendChild(vite); c.appendChild(r);
       if (S.meta.exemple) {
         const a = el("div", "actions"), ex = el("button", "bouton secondaire", "Voir un exemple"); ex.type = "button";
         ex.addEventListener("click", () => fermerAssistant()); a.appendChild(ex); c.appendChild(a);
@@ -4386,19 +4389,26 @@ window.Verrou.quandOuvert(function () {
     } },
   ];
 
+  // Chemin rapide : la pratique et la semaine, puis les trois modes ; le portrait complet se fait ensuite.
+  const parcours = () => A && A.rapide ? [ETAPES.find(x => x.titre === "Votre pratique"), ETAPES.find(x => x.titre === "Votre semaine")] : ETAPES;
+  function points() {
+    const pts = document.getElementById("as-points"); pts.textContent = "";
+    for (let i = A && A.rapide ? 0 : 1; i < parcours().length; i++) pts.appendChild(el("li"));
+  }
   function rendreEtape() {
-    const e = ETAPES[etape]; asCorps.textContent = "";
-    if (etape > 0) asCorps.appendChild(el("p", "as-etape", `Étape ${etape} sur ${ETAPES.length - 1}`));
+    const liste = parcours(), e = liste[etape], rapide = A && A.rapide; asCorps.textContent = "";
+    if (rapide) asCorps.appendChild(el("p", "as-etape", `Question ${etape + 1} sur ${liste.length}`));
+    else if (etape > 0) asCorps.appendChild(el("p", "as-etape", `Étape ${etape} sur ${ETAPES.length - 1}`));
     const h = el("h2", null, e.titre); h.id = "as-titre"; h.tabIndex = -1; asCorps.appendChild(h);
     e.rendre(asCorps);
     const msg = el("p", "as-message avertissement"); msg.id = "as-message"; msg.setAttribute("role", "alert"); asCorps.appendChild(msg);
-    asRetour.hidden = etape === 0; asSuivant.hidden = false; asSuivant.textContent = e.bouton || "Continuer";
-    document.querySelectorAll("#as-points li").forEach((li, i) => li.classList.toggle("fait", i < etape));
+    asRetour.hidden = etape === 0 && !rapide; asSuivant.hidden = false;
+    asSuivant.textContent = rapide && etape === liste.length - 1 ? "Voir mes modes" : e.bouton || "Continuer";
+    document.querySelectorAll("#as-points li").forEach((li, i) => li.classList.toggle("fait", i < (rapide ? etape + 1 : etape)));
   }
   function ouvrirAssistant() {
     A = reponsesVides(); etape = 0;
-    const pts = document.getElementById("as-points"); pts.textContent = "";
-    for (let i = 1; i < ETAPES.length; i++) pts.appendChild(el("li"));
+    points();
     rendreEtape();
     if (!boiteAssistant.open) boiteAssistant.showModal();
     document.getElementById("as-titre").focus();
@@ -4406,12 +4416,15 @@ window.Verrou.quandOuvert(function () {
   const assistantVu = () => { try { localStorage.setItem(ASSISTANT_VU, "1"); } catch (e) { /* rien à garder */ } };
   function fermerAssistant() { assistantVu(); if (boiteAssistant.open) boiteAssistant.close(); }
   asSuivant.addEventListener("click", () => {
-    const e = ETAPES[etape], erreur = e.valide ? e.valide() : "";
+    const liste = parcours(), e = liste[etape], erreur = e.valide ? e.valide() : "";
     if (erreur) { document.getElementById("as-message").textContent = erreur; return; }
-    if (etape === ETAPES.length - 1) return terminerAssistant();
+    if (etape === liste.length - 1) return terminerAssistant();
     etape++; rendreEtape(); asCorps.scrollTop = 0; document.getElementById("as-titre").focus();
   });
-  asRetour.addEventListener("click", () => { if (etape > 0) { etape--; rendreEtape(); document.getElementById("as-titre").focus(); } });
+  asRetour.addEventListener("click", () => {
+    if (etape > 0) etape--; else if (A && A.rapide) { A.rapide = false; points(); } else return;
+    rendreEtape(); document.getElementById("as-titre").focus();
+  });
   document.getElementById("as-fermer").addEventListener("click", fermerAssistant);
   boiteAssistant.addEventListener("close", () => { if (boiteToast.parentNode === boiteAssistant) document.body.appendChild(boiteToast); });
   boiteAssistant.addEventListener("cancel", assistantVu);
@@ -4428,7 +4441,7 @@ window.Verrou.quandOuvert(function () {
   function portraitDepuis(A) {
     const s = normaliser(clone(EXEMPLE)), auj = new Date(), mm = String(auj.getMonth() + 1).padStart(2, "0");
     const couple = A.famille === "maries" || A.famille === "fait", proprio = A.logement === "proprietaire";
-    s.meta = { exemple: false, misAJour: null, assistant: auj.toISOString() };
+    s.meta = { exemple: false, misAJour: null, assistant: auj.toISOString(), ...(A.rapide ? { portraitRapide: true } : {}) };
     s.confirmes = {};
     // Pratique
     const dj = Math.min(12, Math.max(0, A.demiJournees || 0)), gmfu = A.milieu === "gmfu";
@@ -4486,9 +4499,11 @@ window.Verrou.quandOuvert(function () {
     return synchroniserTarifs(s);
   }
   function terminerAssistant() {
+    const rapide = !!A.rapide;
     sortirPlan(true); S = portraitDepuis(A); sauver(); fermerAssistant();
-    ouvrir("apercu"); tout();
-    toast("Votre portrait est prêt. Précisez maintenant vos revenus et vos dépenses du mois.");
+    ouvrir(rapide ? "revenu" : "apercu"); tout();
+    toast(rapide ? "Vos modes, côte à côte. Complétez votre portrait quand vous voulez : famille, logement, dettes (Aperçu)."
+      : "Votre portrait est prêt. Précisez maintenant vos revenus et vos dépenses du mois.");
   }
 
   const transfertRecu = lireTransfert();   // avant d'ouvrir la page : la charge est dans l'adresse

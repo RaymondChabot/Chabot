@@ -113,7 +113,10 @@ mettre les soldes à jour et de faire partir le plan du mois courant. Le
 sommaire pour le comptable décrit l'année en résidence, même en vue
 Pratique.
 
-Au premier lancement, un **assistant de départ** pose quelques questions
+Au premier lancement, **Comparer mes modes en 30 secondes** demande le
+milieu, les demi-journées et les patients, puis ouvre vos trois modes côte
+à côte ; le portrait complet se fait ensuite, quand vous voulez. Sinon, un
+**assistant de départ** pose quelques questions
 (famille, enfants, pratique, semaine, clientèle, activités, logement,
 dettes) et bâtit le point de départ à partir des réponses : patients par
 demi-journée, semaines de vacances, patients inscrits et nouveaux, part de

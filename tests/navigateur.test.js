@@ -847,11 +847,11 @@ async function transfert(b, base) {
   await autre.p.goto(lien); await pret(autre.p); await autre.p.waitForSelector("#transfert-code");
   verifier("transfert : la charge quitte l'adresse ; l'autre appareil demande le code", await autre.p.evaluate(() => location.hash === "#apercu" && document.getElementById("feuille-titre").textContent === "Recevoir des données"));
   // Le déchiffrement (600 000 itérations) peut prendre quelques secondes quand la suite charge la machine.
-  const messageDe = (q, texte) => q.waitForFunction(t => ((document.querySelector(".transfert-form .message") || {}).textContent || "").includes(t), texte, { timeout: 20000 }).catch(() => {});
+  const messageDe = (q, texte) => q.waitForFunction(t => ((document.querySelector(".transfert-form .message") || {}).textContent || "").includes(t), texte, { timeout: 45000 }).catch(() => {});
   await autre.p.fill("#transfert-code", "AAAA-BBBB-CCCC-DDDD"); await autre.p.click(".transfert-form [type=submit]"); await messageDe(autre.p, "Code incorrect");
   verifier("transfert : mauvais code refusé", (await autre.p.textContent(".transfert-form .message")).includes("Code incorrect"));
   await autre.p.fill("#transfert-code", code.replace(/-/g, "").toLowerCase()); await autre.p.click(".transfert-form [type=submit]");
-  await autre.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 20000 });
+  await autre.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 45000 });
   const resume = await autre.p.textContent("#feuille-corps .feuille-intro");
   verifier("transfert : ce qui arrive est décrit avant de remplacer", /^Données du .+ : \d+ dettes?, \d+ dépenses? inscrites?\. Elles remplaceront/.test(resume), resume);
   await autre.p.click("#feuille-corps .bouton.danger"); await autre.p.waitForTimeout(300);
@@ -864,7 +864,7 @@ async function transfert(b, base) {
   await troisieme.p.fill("#transfert-lien", lien.slice(0, -12)); await troisieme.p.fill("#transfert-code", code); await troisieme.p.click(".transfert-form [type=submit]"); await messageDe(troisieme.p, "incomplet ou abîmé");
   verifier("transfert : lien abîmé refusé", (await troisieme.p.textContent(".transfert-form .message")).includes("incomplet ou abîmé"));
   await troisieme.p.fill("#transfert-lien", `Voici le lien : ${lien}`); await troisieme.p.click(".transfert-form [type=submit]");
-  await troisieme.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 20000 });
+  await troisieme.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 45000 });
   await troisieme.p.click("#feuille-corps .bouton.danger"); await troisieme.p.waitForTimeout(300);
   verifier("transfert : lien collé dans l'app, puis reçu", await troisieme.p.evaluate(() => window.Wealthnord.etat().revenu.semaines === 41));
   verifier("transfert : aucune erreur", erreurs.length + autre.erreurs.length + troisieme.erreurs.length === 0, [...erreurs, ...autre.erreurs, ...troisieme.erreurs]);
@@ -1190,6 +1190,35 @@ async function deuxOffres(b, base) {
   await ctx.close();
 }
 
+/* 35. Démarrage en trois questions : le milieu, les demi-journées, les patients ; puis vos trois modes. Le portrait
+   complet reste à faire (carte de l'aperçu), et le retour ramène à l'accueil. */
+async function demarrageRapide(b, base) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+  const p = await ctx.newPage(), erreurs = [];
+  p.on("pageerror", e => erreurs.push(String(e)));
+  await ctx.addInitScript(() => { try { sessionStorage.setItem("wm.ouverture", "1"); } catch (e) { /* stockage indisponible */ } });
+  await p.goto(`${base}/index.html`); await pret(p);
+  await p.waitForSelector("#assistant[open]", { timeout: 5000 });
+  await p.click("#as-rapide");
+  const q1 = await p.evaluate(() => ({ etape: document.querySelector("#as-corps .as-etape").textContent, titre: document.getElementById("as-titre").textContent, retour: !document.getElementById("as-retour").hidden }));
+  await p.click("#as-retour");
+  const accueil = await p.evaluate(() => document.getElementById("as-titre").textContent);
+  await p.click("#as-rapide");
+  await p.check('input[name="as-milieu"][value="gmfu"]'); await p.click("#as-suivant");
+  const q2 = await p.evaluate(() => ({ etape: document.querySelector("#as-corps .as-etape").textContent, bouton: document.getElementById("as-suivant").textContent }));
+  await p.fill("#as-patientsParDJ", "8"); await p.click("#as-suivant"); await p.waitForTimeout(400);
+  const fin = await p.evaluate(() => ({ hash: location.hash, modes: !!document.getElementById("rv-r-modes").offsetParent, S: window.Wealthnord.etat(),
+    toast: document.getElementById("toast-texte").textContent }));
+  verifier("rapide : trois questions, puis vos trois modes", q1.etape === "Question 1 sur 2" && q1.titre === "Votre pratique" && q1.retour && accueil === "Bienvenue dans WealthMorand"
+    && q2.etape === "Question 2 sur 2" && q2.bouton === "Voir mes modes" && fin.hash === "#revenu" && fin.modes && fin.S.revenu.milieu === "gmfu" && fin.S.revenu.patientsParDJ === 8
+    && fin.toast.includes("Complétez votre portrait"), { q1, accueil, q2, hash: fin.hash, toast: fin.toast });
+  await allerA(p, "apercu/detail");
+  verifier("rapide : le portrait complet reste à faire", fin.S.meta.portraitRapide === true && await p.evaluate(() => !document.getElementById("ap-portrait").hidden
+    && document.getElementById("ap-portrait-titre").textContent !== "Votre portrait : 100 % complété"));
+  verifier("rapide : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 30. Le plan suit le calendrier : au premier lancement d'un nouveau mois, il repart du mois courant ; les soldes ne
    bougent pas (la personne les met à jour avec ses relevés). L'avis permet d'annuler pour ce mois-ci, sans perdre une
    modification faite pendant l'avis. Niveau de résidence au 1er juillet ; enfants et privilège au 1er janvier ;
@@ -1246,7 +1275,7 @@ async function planCalendrier(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
