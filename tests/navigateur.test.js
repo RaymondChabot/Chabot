@@ -382,9 +382,9 @@ async function verrou(b, base) {
   };
   const etat = () => p.evaluate(() => document.getElementById("verrou-etat").textContent);
   // Activer : phrase trop courte, puis deux phrases différentes, puis la bonne.
-  await p.fill("#vr-nouvelle", "court"); await p.fill("#vr-confirmer", "court"); await p.click("#carte-verrou button[type=submit]");
+  await p.evaluate(() => { document.getElementById("carte-verrou").open = true; }); await p.fill("#vr-nouvelle", "court"); await p.fill("#vr-confirmer", "court"); await p.click("#carte-verrou button[type=submit]");
   verifier("verrou : phrase trop courte refusée", (await etat()) === "Désactivé");
-  await p.fill("#vr-nouvelle", PHRASE); await p.fill("#vr-confirmer", PHRASE + "!"); await p.click("#carte-verrou button[type=submit]");
+  await p.evaluate(() => { document.getElementById("carte-verrou").open = true; }); await p.fill("#vr-nouvelle", PHRASE); await p.fill("#vr-confirmer", PHRASE + "!"); await p.click("#carte-verrou button[type=submit]");
   verifier("verrou : phrases différentes refusées", (await etat()) === "Désactivé");
   await p.fill("#vr-confirmer", PHRASE); await p.click("#carte-verrou button[type=submit]");
   await p.waitForFunction(() => document.getElementById("verrou-etat").textContent === "Activé");
@@ -419,10 +419,10 @@ async function verrou(b, base) {
   verifier("verrou : sauvegarde chiffrée restaurée", (await resultat(p)).brut === brut && await p.evaluate(() => document.getElementById("fichier-chiffre").hidden));
   // Changer la phrase : l'ancienne n'ouvre plus les données.
   await p.evaluate(() => { document.querySelector("#carte-verrou details").open = true; });
-  await p.fill("#vr-actuelle", "mauvaise phrase"); await p.fill("#vr-nouvelle", NOUVELLE); await p.fill("#vr-confirmer", NOUVELLE);
+  await p.evaluate(() => { document.getElementById("carte-verrou").open = true; }); await p.fill("#vr-actuelle", "mauvaise phrase"); await p.fill("#vr-nouvelle", NOUVELLE); await p.fill("#vr-confirmer", NOUVELLE);
   await p.click("#carte-verrou button[type=submit]");
   await p.waitForFunction(() => document.querySelector("#carte-verrou .message").textContent.includes("incorrecte"));
-  await p.fill("#vr-actuelle", PHRASE); await p.click("#carte-verrou button[type=submit]");
+  await p.evaluate(() => { document.getElementById("carte-verrou").open = true; }); await p.fill("#vr-actuelle", PHRASE); await p.click("#carte-verrou button[type=submit]");
   await p.waitForFunction(() => document.querySelector("#carte-verrou .message").textContent.includes("Phrase changée"));
   await p.reload(); await p.waitForSelector("#verrou-phrase");
   verifier("verrou : l'ancienne phrase n'ouvre plus", !(await deverrouiller(PHRASE)));
@@ -430,7 +430,7 @@ async function verrou(b, base) {
   // Retirer le verrou : les données redeviennent lisibles.
   await allerA(p, "donnees");
   await p.evaluate(() => { document.querySelector("#carte-verrou details").open = true; });
-  await p.fill("#vr-actuelle", NOUVELLE); await p.click("#carte-verrou button.danger");
+  await p.evaluate(() => { document.getElementById("carte-verrou").open = true; }); await p.fill("#vr-actuelle", NOUVELLE); await p.click("#carte-verrou button.danger");
   await p.waitForFunction(() => document.getElementById("verrou-etat").textContent === "Désactivé");
   verifier("verrou : retiré, données non chiffrées", (await stocke()).includes('"revenu"'));
   verifier("verrou : aucune erreur", erreurs.length === 0 && (await p.evaluate(() => window.__csp.length)) === 0, erreurs);
@@ -445,7 +445,7 @@ async function verrouDelai(b, base) {
   await ctx.addInitScript(() => { try { localStorage.setItem("wm.assistant", "1"); sessionStorage.setItem("wm.ouverture", "1"); } catch (e) { /* stockage indisponible */ } });
   await p.clock.install();
   await p.goto(`${base}/index.html#donnees`); await pret(p);
-  await p.fill("#vr-nouvelle", "trois chats dansent"); await p.fill("#vr-confirmer", "trois chats dansent"); await p.click("#carte-verrou button[type=submit]");
+  await p.evaluate(() => { document.getElementById("carte-verrou").open = true; }); await p.fill("#vr-nouvelle", "trois chats dansent"); await p.fill("#vr-confirmer", "trois chats dansent"); await p.click("#carte-verrou button[type=submit]");
   await p.waitForFunction(() => document.getElementById("verrou-etat").textContent === "Activé");
   await p.selectOption("#vr-delai", "1");
   await p.clock.runFor(30000);
@@ -465,7 +465,7 @@ async function verrouOnglets(b, base) {
   const { ctx, p, erreurs } = await ouvrir(b, base, { page: "donnees" });
   const p2 = await ctx.newPage(); p2.on("pageerror", e => erreurs.push(String(e)));
   await p2.goto(`${base}/index.html#apercu`); await pret(p2);
-  await p.fill("#vr-nouvelle", "trois chats dansent"); await p.fill("#vr-confirmer", "trois chats dansent"); await p.click("#carte-verrou button[type=submit]");
+  await p.evaluate(() => { document.getElementById("carte-verrou").open = true; }); await p.fill("#vr-nouvelle", "trois chats dansent"); await p.fill("#vr-confirmer", "trois chats dansent"); await p.click("#carte-verrou button[type=submit]");
   await p.waitForFunction(() => document.getElementById("verrou-etat").textContent === "Activé");
   await p2.waitForSelector("#verrou-phrase", { state: "visible", timeout: 5000 });
   await p2.waitForTimeout(300);
@@ -1015,9 +1015,9 @@ async function resumeDetail(b, base) {
   await allerA(p, "donnees");
   const don = await p.evaluate(() => ({ adresse: location.hash, retour: document.querySelectorAll("#v-donnees .retour-resume").length,
     cartes: [...document.querySelectorAll("#v-donnees details.carte-repliable")].map(d => ({ ouvert: d.open, resume: d.querySelector(".repli-resume").textContent })) }));
-  verifier("données : quatre cartes repliées, leur conclusion en vue", don.adresse === "#donnees" && don.retour === 0 && don.cartes.length === 4
-    && don.cartes.every(c => !c.ouvert && c.resume.length > 3) && /^\d+ sur \d+$/.test(don.cartes[1].resume), don);
-  await p.click("#v-donnees details.carte-repliable:nth-of-type(3) > summary"); await p.waitForTimeout(150);
+  verifier("données : cinq cartes repliées (verrou compris), leur conclusion en vue", don.adresse === "#donnees" && don.retour === 0 && don.cartes.length === 5
+    && don.cartes.every(c => !c.ouvert && c.resume.length > 3) && /^\d+ sur \d+$/.test(don.cartes[2].resume), don);
+  await p.click("#v-donnees details.carte-repliable:nth-of-type(4) > summary"); await p.waitForTimeout(150);
   verifier("données : une carte s'ouvre au toucher", await p.evaluate(() => document.getElementById("theme-choix").getClientRects().length > 0));
   // Ordinateur : les cartes côte à côte, de même hauteur ; la même largeur sur chaque page.
   await p.setViewportSize({ width: 1280, height: 900 });
