@@ -103,7 +103,21 @@
   const codeNu = c => String(c).toUpperCase().replace(/[^A-Z0-9]/g, "");
   const versB64url = u8 => versB64(u8).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const deB64url = t => deB64(t.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((t.length + 3) % 4));
-  const parFlux = async (u8, flux) => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(flux)).arrayBuffer());
+  // Passe des octets dans un flux (compression) ; au plus « plafond » octets en sortie.
+  async function parFlux(u8, flux, plafond = Infinity) {
+    const lecteur = new Blob([u8]).stream().pipeThrough(flux).getReader(), morceaux = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await lecteur.read();
+      if (done) break;
+      total += value.length;
+      if (total > plafond) { await lecteur.cancel(); throw new Error("format"); }
+      morceaux.push(value);
+    }
+    const sortie = new Uint8Array(total); let i = 0;
+    for (const m of morceaux) { sortie.set(m, i); i += m.length; }
+    return sortie;
+  }
   async function creerTransfert(texte) {
     const code = codeAuHasard(), sel = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
     const brut = enc.encode(texte);
@@ -130,7 +144,7 @@
     } catch (e) { throw new Error("code", { cause: e }); }
     if (u8[1] & 1) {
       if (typeof DecompressionStream === "undefined") throw new Error("ancien");
-      corps = await parFlux(corps, new DecompressionStream("deflate"));
+      corps = await parFlux(corps, new DecompressionStream("deflate"), 5000000);
     }
     return dec.decode(corps);
   }

@@ -1034,7 +1034,7 @@
     return e.enfants.map(enf => {
       let solde = +enf.solde || 0, sv = +enf.subventionsRecues || 0, svq = 0, cot = 0;
       const deja = Math.max(0, +enf.cotisations || 0);
-      const ans = Math.max(0, 17 - enf.age);
+      const ans = Math.max(0, Math.min(17, 17 - (Number.isFinite(+enf.age) ? +enf.age : 17)));   // âge hors borne : rien à projeter
       for (let a = 0; a < ans; a++) {
         const c = Math.max(0, Math.min(+e.cotisationAnnuelle || 0, PLAFOND_REEE - deja - cot));
         const f = Math.min(c * 0.20, 500, Math.max(0, 7200 - sv));

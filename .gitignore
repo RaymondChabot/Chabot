@@ -1,6 +1,9 @@
 # Fichiers de données personnelles : ne jamais les verser.
-*donnees*.json
-*.backup.json
+*[Dd]onn[eé]es*.json
+*[Dd][Oo][Nn][Nn][Ee][Ee][Ss]*.json
+*[Bb]ackup*.json
+*[Ss]auvegarde*.json
+wealthmorand-*.json
 .DS_Store
 
 # Outils de développement (npm ci).

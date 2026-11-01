@@ -10,6 +10,8 @@
   const fmt$2 = new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const $ = v => fmt$.format(isFinite(v) ? v : 0);
   const $2 = v => fmt$2.format(isFinite(v) ? v : 0);
+  // Texte libre dans une chaîne HTML ou SVG : échappé.
+  const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const nb = (v, d = 1) => new Intl.NumberFormat("fr-CA", { maximumFractionDigits: d }).format(isFinite(v) ? v : 0);
   const pct = (v, d = 1) => nb(v * 100, d) + " %";
   const signe = v => (v >= 0 ? "+" : "−") + $(Math.abs(v));
@@ -169,7 +171,7 @@
     const axe = v => Math.abs(v) < 1e-6 ? "0 $" : Math.abs(v) >= 1e6 ? nb(v / 1e6, 1) + " M$" : pas < 10000 ? nb(v / 1000, 1) + " k$" : k$(v);
     const x = i => m.l + (n <= 1 ? iw / 2 : (i / (n - 1)) * iw);
     const y = v => m.t + ih - ((v - min) / (max - min)) * ih;
-    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="group" aria-label="${options.titre}">`;
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="group" aria-label="${esc(options.titre)}">`;
     for (let v = Math.ceil(min / pas - 1e-9) * pas; v <= max + 1e-6; v += pas) {
       const yy = Math.round(y(v)) + 0.5;
       s += `<line class="${Math.abs(v) < 1e-6 ? "base" : "grille"}" x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}"/>`;
@@ -304,6 +306,6 @@
 
   window.WM.interface = {
     SERIES, $, $2, nb, pct, signe, k$, texteDe, moisAn, el, icone, hero, puce, rangee, rangees, segment, tableauSimple,
-    lignes, moins, signePct, graphiqueLignes, lexique,
+    lignes, moins, signePct, graphiqueLignes, lexique, esc,
   };
 })();

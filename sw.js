@@ -1,7 +1,7 @@
 /* WealthMorand : fonctionne hors ligne. Réseau d'abord, pour recevoir les mises
    à jour ; copie en cache en secours. Les données personnelles ne passent
    jamais ici : elles restent dans le stockage local du navigateur. */
-const CACHE = "wealthmorand-v64";
+const CACHE = "wealthmorand-v65";
 const FICHIERS = [
   "./", "index.html", "styles.css", "js/demarrage.js", "js/calc.js", "js/verrou.js", "js/catalogues.js", "js/interface.js", "js/app.js", "js/rapport.js", "manifest.webmanifest",
   "polices/inter.woff2", "polices/newsreader.woff2",
@@ -22,7 +22,9 @@ self.addEventListener("fetch", e => {
   // peut réafficher l'ancienne mise en page juste après une publication.
   e.respondWith(
     fetch(r, { cache: "no-cache" }).then(rep => {
-      if (rep.ok) { const copie = rep.clone(); caches.open(CACHE).then(c => c.put(r, copie)); }
+      // En cache : seulement les pages, scripts, styles, polices, images et le manifeste.
+      const type = rep.headers.get("content-type") || "";
+      if (rep.ok && /^(text\/html|text\/css|(text|application)\/javascript|font\/|image\/|application\/(manifest\+)?json)/.test(type)) { const copie = rep.clone(); caches.open(CACHE).then(c => c.put(r, copie)); }
       return rep;
     }).catch(() => caches.match(r, { ignoreSearch: true }).then(x => x || (r.mode === "navigate" ? caches.match("index.html") : undefined)))
   );

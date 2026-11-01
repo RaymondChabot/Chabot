@@ -10,7 +10,7 @@ window.Verrou.quandOuvert(function () {
   const { EXEMPLE, nouvelId, CATALOGUE, ITEMS_REVENUS, normaliserLignes, annuelLigne, estPro, nomLigne, ITEMS_PRO, normaliserPro, AIDE_CATEGORIE,
     normaliserBudget, nomDepense, categorie, VERIFICATION, MILIEUX, ACTIVITES, nomActivite, LEXIQUE } = window.WM.catalogues;
   const { SERIES, $, $2, nb, pct, signe, texteDe, moisAn, el, icone, hero, puce, rangees, segment, tableauSimple, lignes, moins, signePct,
-    graphiqueLignes, lexique } = window.WM.interface;
+    graphiqueLignes, lexique, esc } = window.WM.interface;
 
   // Dépenses prises en compte : les lignes, sauf dans les catégories où l'on a choisi un total.
   const totalActif = g => S.budgetTotaux && S.budgetTotaux[g] && S.budgetTotaux[g].actif;
@@ -35,7 +35,10 @@ window.Verrou.quandOuvert(function () {
     if (Array.isArray(base)) return Array.isArray(x) ? x : base;
     if (base && typeof base === "object") {
       const o = { ...base };
-      if (x && typeof x === "object" && !Array.isArray(x)) for (const k of Object.keys(x)) o[k] = k in base ? fusion(base[k], x[k]) : x[k];
+      if (x && typeof x === "object" && !Array.isArray(x)) for (const k of Object.keys(x)) {
+        if (k === "__proto__" || k === "constructor" || k === "prototype") continue;   // données importées : jamais ces clés
+        o[k] = Object.prototype.hasOwnProperty.call(base, k) ? fusion(base[k], x[k]) : x[k];
+      }
       return o;
     }
     return x === undefined || x === null ? base : x;
@@ -2730,7 +2733,7 @@ window.Verrou.quandOuvert(function () {
   function exporterTableur() {
     const Rr = R, part = S.menage.partCommunMoi / 100, qui = b => b.qui === "moi" ? 1 : b.qui === "commun" ? part : 0;
     const n = v => (Math.round((+v || 0) * 100) / 100).toFixed(2).replace(".", ",");
-    const t = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const t = v => { const x = String(v ?? ""); return `"${(/^[=+\-@\t\r]/.test(x) && !/^-?\d/.test(x) ? "'" + x : x).replace(/"/g, '""')}"`; };   // pas de formule dans un tableur
     const L = [];
     const ligne = (...c) => L.push(c.join(";"));
     ligne(t("WealthMorand"), t(`Exporté le ${new Date().toLocaleDateString("fr-CA")}`)); L.push("");
@@ -2890,10 +2893,10 @@ window.Verrou.quandOuvert(function () {
     const k$c = v => Math.abs(v) >= 1e6 ? nb(v / 1e6, 2) + " M$" : Math.abs(v) >= 1e4 ? nb(v / 1000, 0) + " k$" : $(v);
     const etiquette = (xe, o, ancre) => {
       const cy = o.y + o.h / 2, deux = o.h >= 26;
-      return `<text class="flux-etiquette" x="${xe}" y="${cy}" text-anchor="${ancre}" dy="${deux ? "-0.25em" : "0.35em"}">${o.n}${deux ? "" : ` · ${k$c(o.v)}`}</text>` +
+      return `<text class="flux-etiquette" x="${xe}" y="${cy}" text-anchor="${ancre}" dy="${deux ? "-0.25em" : "0.35em"}">${esc(o.n)}${deux ? "" : ` · ${k$c(o.v)}`}</text>` +
         (deux ? `<text class="flux-montant" x="${xe}" y="${cy}" text-anchor="${ancre}" dy="1.05em">${k$c(o.v)}</text>` : "");
     };
-    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Flux de l'année : ${[...F.milieu, ...F.fin].map(([n, v]) => `${n} ${$(v)}`).join(", ")}">`;
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Flux de l'année : ${esc([...F.milieu, ...F.fin].map(([n, v]) => `${n} ${$(v)}`).join(", "))}">`;
     let yo = yTot;
     for (const o of M) { s += bande(x1 + nw, yo, x2, o.y, o.h, o.c); yo += o.h; }
     yo = dispo.y;
@@ -3863,9 +3866,23 @@ window.Verrou.quandOuvert(function () {
     message(chiffree ? "Sauvegarde chiffrée exportée : il faudra votre phrase de passe pour la restaurer."
       : "Sauvegarde exportée. Gardez-la dans un endroit sûr : elle contient toutes vos données.");
   });
+  /* Données reçues (fichier ou lien) : la forme attendue, des nombres finis et bornés là où une valeur folle
+     bloquerait le calcul, puis un calcul à blanc. Rien n'est écrit si l'une de ces étapes échoue. */
+  function preparerImport(d) {
+    if (!d || typeof d !== "object" || d.version !== 1 || !d.revenu || typeof d.revenu !== "object" || !Array.isArray(d.dettes)) throw new Error("format");
+    for (const l of [d.budget, d.objectifs, (d.revenu || {}).activites, ((d.epargne || {}).reee || {}).enfants]) if (l !== undefined && !Array.isArray(l)) throw new Error("format");
+    if (JSON.stringify(d).length > 5000000) throw new Error("format");
+    const s = normaliser(fusion(clone(EXEMPLE), migrer(clone(d))));
+    s.epargne.reee.enfants.forEach(e => { e.age = Math.min(30, Math.max(0, Number.isFinite(+e.age) ? Math.round(+e.age) : 0)); });
+    for (const k of ["demiJournees", "demiJourneesSRV", "enseignement"]) s.revenu[k] = Math.min(14, Math.max(0, Number.isFinite(+s.revenu[k]) ? +s.revenu[k] : 0));
+    s.revenu.semaines = Math.min(52, Math.max(0, Number.isFinite(+s.revenu.semaines) ? +s.revenu.semaines : 0));
+    s.meta.exemple = false;
+    calculerAvec(s);   // lève une erreur si les données ne se calculent pas
+    return s;
+  }
   function restaurer(d, chiffree) {
-    if (!d || d.version !== 1 || !d.revenu || !Array.isArray(d.dettes)) throw new Error("format");
-    sortirPlan(true); S = normaliser(fusion(clone(EXEMPLE), migrer(d))); S.meta.exemple = false; sauver();
+    const pret = preparerImport(d);
+    sortirPlan(true); S = pret; sauver();
     const avance = avancerSiNouveauMois();
     tout(); message(`Sauvegarde restaurée : ${S.dettes.length} dettes, ${S.budget.filter(b => b.montant > 0).length} dépenses inscrites.`
       + (chiffree && !window.Verrou.actif() ? " Le verrou n'est pas activé sur cet appareil : activez-le ci-dessous pour garder vos données chiffrées." : ""));
@@ -3882,7 +3899,7 @@ window.Verrou.quandOuvert(function () {
       try {
         const d = JSON.parse(lecteur.result);
         if (window.Verrou.estChiffre(d)) { fichierChiffre = d; formFichier.hidden = false; phraseFichier.focus(); message(""); return; }
-        fermerFichier(); const av = restaurer(d); if (av) annoncerAvance(av);
+        fermerFichier(); preparerImport(d); confirmerFichier(d, false);
       } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
     };
     lecteur.readAsText(f); e.target.value = "";
@@ -3893,8 +3910,17 @@ window.Verrou.quandOuvert(function () {
     let d;
     try { d = JSON.parse(await window.Verrou.ouvrirFichier(fichierChiffre, phraseFichier.value)); } catch (err) { message("Phrase de passe incorrecte pour cette sauvegarde."); phraseFichier.select(); return; }
     fermerFichier();
-    try { const av = restaurer(d, true); if (av) annoncerAvance(av); } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
+    try { preparerImport(d); confirmerFichier(d, true); } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
   });
+  // Restaurer une sauvegarde : ce qui arrive est décrit, et rien n'est remplacé sans le bouton.
+  function confirmerFichier(d, chiffree) {
+    ouvrirFeuille("Restaurer une sauvegarde", c => confirmerTransfert(c, { donnees: d, cree: (d.meta || {}).misAJour }, () => {
+      let av;
+      try { av = restaurer(d, chiffree); } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); return; }
+      feuille.close();
+      if (av) annoncerAvance(av);
+    }));
+  }
   document.getElementById("fichier-annuler").addEventListener("click", () => { fermerFichier(); message("Rien n'a été changé."); });
 
   /* Passer à un autre appareil, sans compte : un lien qui contient les données chiffrées (verrou.js) et un
@@ -3973,19 +3999,19 @@ window.Verrou.quandOuvert(function () {
   }
   const pluriel = (n, un, plusieurs = un + "s") => `${n} ${n > 1 ? plusieurs : un}`;
   // Données ouvertes : ce qu'elles contiennent, puis le remplacement, seulement si on le confirme.
-  function confirmerTransfert(c, x) {
+  function confirmerTransfert(c, x, remplacer) {
     const d = x.donnees, date = new Date(x.cree);
     c.textContent = "";
-    c.appendChild(el("p", "resume feuille-intro", `Données du ${isFinite(date) ? date.toLocaleString("fr-CA", { dateStyle: "long", timeStyle: "short" }) : "jour du lien"} : `
+    c.appendChild(el("p", "resume feuille-intro", `Données du ${isFinite(date) && x.cree ? date.toLocaleString("fr-CA", { dateStyle: "long", timeStyle: "short" }) : "jour du lien"} : `
       + `${pluriel((d.dettes || []).length, "dette")}, ${pluriel((d.budget || []).filter(b => b.montant > 0).length, "dépense inscrite", "dépenses inscrites")}. Elles remplaceront celles de cet appareil.`));
     if (!S.meta.exemple) c.appendChild(el("p", "aide", "Les données actuelles de cet appareil seront effacées. Pour les garder, exportez-en d'abord une sauvegarde."));
     const a = el("div", "feuille-actions");
-    a.appendChild(boutonSimple("Remplacer mes données", "danger plein large", () => {
+    a.appendChild(boutonSimple("Remplacer mes données", "danger plein large", remplacer || (() => {
       let av;
       try { av = restaurer(d); } catch (err) { toast("Ces données ne sont pas une sauvegarde WealthMorand. Rien n'a été changé."); return; }
       feuille.close(); ouvrir("apercu");
       if (av) annoncerAvance(av, "Données reçues de l'autre appareil. "); else toast("Données reçues de l'autre appareil.");
-    }));
+    })));
     if (!S.meta.exemple) a.appendChild(boutonSimple("Exporter d'abord une sauvegarde de cet appareil", "secondaire large", () => document.getElementById("exporter").click()));
     a.appendChild(boutonSimple("Annuler", "secondaire large", () => feuille.close()));
     c.appendChild(a);
@@ -4124,7 +4150,7 @@ window.Verrou.quandOuvert(function () {
   document.getElementById("exporter-plan").addEventListener("click", () => {
     const sim = R.sim, fin = sim.iLibre >= 0 ? sim.iLibre + 1 : sim.mois.length;
     const montant = v => v.toFixed(2).replace(".", ",");
-    const texte = c => `"${String(c).replace(/"/g, '""')}"`;
+    const texte = c => { const t = String(c); return `"${(/^[=+\-@\t\r]/.test(t) && !/^-?\d/.test(t) ? "'" + t : t).replace(/"/g, '""')}"`; };   // pas de formule dans un tableur
     const lignesCsv = [["Mois", ...S.dettes.map(d => d.nom), "Total des dettes", "Mis de côté pour un renouvellement"].map(texte).join(";")];
     sim.mois.slice(0, fin).forEach(m => lignesCsv.push([m.date.toISOString().slice(0, 7), ...m.soldes.map(montant), montant(m.total), montant(m.reserve || 0)].join(";")));
     const blob = new Blob(["\ufeff" + lignesCsv.join("\r\n")], { type: "text/csv;charset=utf-8" });

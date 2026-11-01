@@ -143,7 +143,9 @@ async function sauvegarde(b, base) {
   await dl.saveAs(fichier);
   await a.ctx.close();
   const n = await ouvrir(b, base, { page: "donnees" });
-  await n.p.setInputFiles("#importer", fichier); await n.p.waitForTimeout(500);
+  await n.p.setInputFiles("#importer", fichier); await n.p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 10000 });
+  verifier("restauration : rien ne change avant le bouton", await n.p.evaluate(() => window.Wealthnord.etat().meta.exemple === true && document.getElementById("feuille-titre").textContent === "Restaurer une sauvegarde"));
+  await n.p.click("#feuille-corps .bouton.danger"); await n.p.waitForTimeout(400);
   verifier("restauration : message", (await n.p.textContent("#donnees-message")).startsWith("Sauvegarde restaurée"));
   verifier("restauration : mêmes chiffres", (await resultat(n.p)).brut === attendu, [(await resultat(n.p)).brut, attendu]);
   fs.unlinkSync(fichier);
@@ -394,6 +396,7 @@ async function verrou(b, base) {
   // Une sauvegarde ordinaire restaurée pendant que le verrou est actif est gardée chiffrée.
   const simple = await p.evaluate(() => JSON.stringify({ ...window.Wealthnord.etat(), dettes: [] }));
   await p.setInputFiles("#importer", { name: "simple.json", mimeType: "application/json", buffer: Buffer.from(simple) });
+  await p.waitForSelector("#feuille-corps .bouton.danger"); await p.click("#feuille-corps .bouton.danger");
   await p.waitForFunction(() => window.Wealthnord.etat().dettes.length === 0);
   await p.waitForTimeout(200);
   verifier("verrou : restauration gardée chiffrée", (await stocke()).startsWith('{"wealthmorand":"chiffre"'));
@@ -410,6 +413,7 @@ async function verrou(b, base) {
   await p.fill("#fichier-phrase", "mauvaise phrase"); await p.click("#fichier-chiffre button[type=submit]");
   await p.waitForFunction(() => document.getElementById("donnees-message").textContent.includes("incorrecte"));
   await p.fill("#fichier-phrase", PHRASE); await p.click("#fichier-chiffre button[type=submit]");
+  await p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 20000 }); await p.click("#feuille-corps .bouton.danger");
   await p.waitForFunction(n => window.Wealthnord.etat().dettes.length === n, nDettes);
   verifier("verrou : sauvegarde chiffrée restaurée", (await resultat(p)).brut === brut && await p.evaluate(() => document.getElementById("fichier-chiffre").hidden));
   // Changer la phrase : l'ancienne n'ouvre plus les données.
@@ -1219,6 +1223,29 @@ async function demarrageRapide(b, base) {
   await ctx.close();
 }
 
+/* 36. Import sûr : un âge d'enfant hors borne ne bloque plus l'app ; une clé « __proto__ » est ignorée ; un fichier
+   qui n'est pas une sauvegarde ne change rien ; un nom de dette en forme de formule est neutralisé dans le CSV. */
+async function importSur(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "donnees" });
+  const etat = await p.evaluate(() => JSON.parse(JSON.stringify(window.Wealthnord.etat())));
+  etat.epargne.reee.enfants = [{ id: "e1", nom: "", age: -1e12, solde: 0 }];
+  etat.dettes = [{ ...etat.dettes[0], nom: "=SOMME(A1)" }];
+  const texte = JSON.stringify(etat).replace(/^\{/, '{"__proto__":{"pollue":1},');
+  await p.setInputFiles("#importer", { name: "bizarre.json", mimeType: "application/json", buffer: Buffer.from(texte) });
+  await p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 10000 }); await p.click("#feuille-corps .bouton.danger"); await p.waitForTimeout(400);
+  const apres = await p.evaluate(() => ({ age: window.Wealthnord.etat().epargne.reee.enfants[0].age, pollue: ({}).pollue, visible: !!document.querySelector("#v-donnees").offsetParent }));
+  verifier("import : âge ramené dans ses bornes, aucune pollution, l'app reste là", apres.age === 0 && apres.pollue === undefined && apres.visible, apres);
+  await p.setInputFiles("#importer", { name: "autre.json", mimeType: "application/json", buffer: Buffer.from('{"rien":1}') });
+  await p.waitForTimeout(300);
+  verifier("import : un autre fichier ne change rien", (await p.textContent("#donnees-message")).includes("Rien n'a été changé") && await p.evaluate(() => !document.getElementById("feuille").open));
+  await allerA(p, "budget/dettes");
+  const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#exporter-plan")]);
+  const csv = fs.readFileSync(await dl.path(), "utf8");
+  verifier("CSV : un nom en forme de formule est neutralisé", csv.includes(`"'=SOMME(A1)"`), csv.slice(0, 120));
+  verifier("import : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 30. Le plan suit le calendrier : au premier lancement d'un nouveau mois, il repart du mois courant ; les soldes ne
    bougent pas (la personne les met à jour avec ses relevés). L'avis permet d'annuler pour ce mois-ci, sans perdre une
    modification faite pendant l'avis. Niveau de résidence au 1er juillet ; enfants et privilège au 1er janvier ;
@@ -1275,7 +1302,7 @@ async function planCalendrier(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
