@@ -62,7 +62,7 @@ window.Verrou.quandOuvert(function () {
       for (const [k, ancien] of [["pctMixte", 60], ["acteSupervision", 114.2], ["pctSupervision", 60]]) if (+d.revenu[k] === ancien) d.revenu[k] = C.RAMQ[k];
       // Forfait GMF (EP 33) : décoché dans les données d'avant, jusqu'à ce qu'on le confirme.
       d.revenu.membreGmf ??= false;
-      // Assiduité : l'ancienne case (80 % ou plus) devient un taux (80, 75, 70 ou 0).
+      // Assiduité : l'ancienne case (80 % ou plus) devient un taux (80, 75, 70 ou 0).
       if (d.revenu.assiduite === undefined && d.revenu.assiduite80 !== undefined) d.revenu.assiduite = d.revenu.assiduite80 === false ? "0" : "80";
       delete d.revenu.assiduite80;
       // Compensation des frais de cabinet : un montant déjà inscrit reste ; sinon, elle est calculée.
@@ -279,13 +279,13 @@ window.Verrou.quandOuvert(function () {
         b.addEventListener("click", () => { synchroniserTarifs(S, true); sauver(); remplirChamps(); tout(); toast("Tarifs, forfaits et suppléments de la RAMQ rétablis."); });
         a.appendChild(b); gTarifs.appendChild(a);
       }
-      // Total des types de visites, qui doit faire 100 %.
+      // Total des types de visites, qui doit faire 100 %.
       const groupe = [...c.querySelectorAll(".groupe")].find(g => g.firstChild.textContent.startsWith("Vos visites"));
       if (!groupe) return;
       const total = el("p", "aide"); groupe.appendChild(total);
       feuilleCourante.maj = () => {
         const s = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
-        total.textContent = `Total : ${nb(s)} %` + (Math.abs(s - 100) > 0.5 ? " : le calcul le ramène à 100 %." : "");
+        total.textContent = `Total : ${nb(s)} %` + (Math.abs(s - 100) > 0.5 ? " : le calcul le ramène à 100 %." : "");
         total.classList.toggle("avertissement", Math.abs(s - 100) > 0.5);
       };
       feuilleCourante.maj();
@@ -369,7 +369,7 @@ window.Verrou.quandOuvert(function () {
     { k: "dureeTerme", l: "Durée des termes suivants", u: "ans", s: 1, seul: "hypotheque" },
     { k: "privilege", l: "Remboursement anticipé permis", u: "%/an", s: 1, seul: "hypotheque" },
     { k: "privilegeUtilise", l: "Déjà remboursé par anticipation cette année", u: "$", s: 100, seul: "hypotheque", h: "Ce que vous avez versé en plus depuis le 1er janvier : l'app le retire du privilège de cette année. Remis à 0 en janvier." },
-    { k: "creditImpot", l: "Crédit d'impôt sur les intérêts", u: "%", s: 1, h: "34 % pour un prêt de l'aide financière aux études : 14 % fédéral et 20 % Québec." },
+    { k: "creditImpot", l: "Crédit d'impôt sur les intérêts", u: "%", s: 1, h: "34 % pour un prêt de l'aide financière aux études : 14 % fédéral et 20 % Québec." },
     { k: "partMoi", l: "Part de la dette qui vous revient", u: "%", s: 1 },
     { k: "paiementMoi", l: "Part des paiements que vous faites", u: "%", s: 1 },
   ];
@@ -421,7 +421,7 @@ window.Verrou.quandOuvert(function () {
       const nom = el("input", "nom-element"); nom.type = "text"; nom.value = e.nom; nom.setAttribute("aria-label", "Nom ou surnom"); lierListe("enfants", i, "nom")(nom);
       const g = el("div", "groupe"); g.appendChild(nom); c.appendChild(g);
       [{ k: "age", l: "Âge", u: "ans", s: 1 }, { k: "solde", l: "Solde du REEE", u: "$", s: 100 },
-        { k: "cotisations", l: "Cotisations déjà versées", u: "$", s: 100, h: "Le solde comprend les subventions et les gains. Seules les cotisations comptent dans le plafond de 50 000 $." }].forEach(ch => {
+        { k: "cotisations", l: "Cotisations déjà versées", u: "$", s: 100, h: "Le solde comprend les subventions et les gains. Seules les cotisations comptent dans le plafond de 50 000 $." }].forEach(ch => {
         const ligne = creerChamp(ch, `e-${e.id}-${ch.k}`, lierListe("enfants", i, ch.k), false);
         ligne.querySelector("input").value = e[ch.k] ?? 0;
         c.appendChild(ligne);
@@ -528,8 +528,8 @@ window.Verrou.quandOuvert(function () {
     }
     // Dépenses professionnelles : le total, ou la somme du détail.
     R.depensesPro = S.impot.depensesProMode === "detail" ? S.impot.depensesProDetail.reduce((t, l) => t + annuelLigne(l), 0) : S.impot.depensesPro;
-    // CELIAPP : la cotisation de chaque année, dans les droits de l'année (8 000 $ plus le report) et le
-    // plafond à vie de 40 000 $ ; déductible comme le REER.
+    // CELIAPP : la cotisation de chaque année, dans les droits de l'année (8 000 $ plus le report) et le
+    // plafond à vie de 40 000 $ ; déductible comme le REER.
     const celiappAns = C.celiappParAn(S.epargne.celiapp, 60);
     R.celiappAnnee = a => celiappAns[Math.max(0, a)] || 0;
     R.celiappVoulu = Math.max(0, +(S.epargne.celiapp || {}).cotisationAnnuelle || 0);
@@ -603,7 +603,7 @@ window.Verrou.quandOuvert(function () {
     R.brutVue = R.vueResidence ? R.res.brut : R.brut;
     R.netVue = R.vueResidence ? R.impot.net - R.dproPerso : R.nets[mode];
     const totalDe = x => x.totalGlobal ?? x.total;
-    // Taux marginal : impôt (société comprise) sur 1 000 $ de plus.
+    // Taux marginal : impôt (société comprise) sur 1 000 $ de plus.
     R.tauxMarginal = R.vueResidence ? (impotResidence({ salaire: R.res.brut + 1000 }).total - impotResidence().total) / 1000
       : (totalDe(impotDe({ ...base, depensesPro: R.depensesPro + fraisCabinet(R.brut + 1000, mode), revenu: R.brut + 1000 }))
       - totalDe(impotDe({ ...base, depensesPro: depensesMode(mode), revenu: R.brut }))) / 1000;
@@ -644,7 +644,7 @@ window.Verrou.quandOuvert(function () {
     R.impotSansReer = impotVue({ reer: 0 }).total;
     R.impotAvecReer = m => impotVue({ reer: m }).total;
     R.remboursementReer = S.epargne.reer.cotisationAnnuelle > 0 ? impotVue({ reer: 0 }).total - impotVue({}).total : 0;
-    // Taux de déduction : ce que rapporte 1 000 $ cotisés au REER (sur le revenu imposable). Il dépasse
+    // Taux de déduction : ce que rapporte 1 000 $ cotisés au REER (sur le revenu imposable). Il dépasse
     // le taux marginal par dollar facturé quand une part de chaque dollar va aux frais de cabinet.
     R.tauxDeduction = (R.impotSansReer - R.impotAvecReer(1000)) / 1000;
 
@@ -787,7 +787,7 @@ window.Verrou.quandOuvert(function () {
       else {
         const conj = impotPartenaire(reel, R.garde.parPartenaire ? R.garde.deductionAn(a, reel) : 0);
         const fraisA = fraisCabinet(R.revType[mode].total * reel, mode, reel);
-        // Dès 2027, le crédit québécois pour dividendes non déterminés passe à 2,69 % (pratique incorporée).
+        // Dès 2027, le crédit québécois pour dividendes non déterminés passe à 2,69 % (pratique incorporée).
         const anneeProj = (+String(S.strategie.debut).slice(0, 4) || new Date().getFullYear()) + a;
         const creditDividendesQc = anneeProj >= 2027 ? C.P2026.dividendes.creditQuebecDes2027 : undefined;
         // L'an prochain, des conjoints de fait auront 12 mois de vie commune : couple pour l'impôt.
@@ -1077,22 +1077,22 @@ window.Verrou.quandOuvert(function () {
       action("info", `Le plan part maintenant de ${moisLong(S.strategie.debut)}, avec les soldes que vous avez inscrits : mettez-les à jour avec vos relevés (Budget, Dettes ; Patrimoine, Aujourd'hui).`);
     // Terme échu au début du plan : le moteur le renouvelle au taux supposé ; la personne inscrit le vrai terme.
     S.dettes.forEach((d, i) => { const x = R.sim.dettes[i]; if (x && x.termeEchu) action("important", `Le terme de « ${d.nom || "votre hypothèque"} » est échu : inscrivez le nouveau taux, le paiement et la fin du nouveau terme (Budget, Dettes). D'ici là, l'app suppose un renouvellement à ${nb(d.tauxRenouvellement || d.taux, 2)} %.`); });
-    if (R.celiappVoulu > R.celiappAnnee(0) + 0.5) action("info", `Votre cotisation CELIAPP prévue (${$(R.celiappVoulu)} par année) dépasse vos droits : l'app compte ${$(R.celiappAnnee(0))} cette année (8 000 $ par année, plus les droits reportés, et 40 000 $ à vie).`);
+    if (R.celiappVoulu > R.celiappAnnee(0) + 0.5) action("info", `Votre cotisation CELIAPP prévue (${$(R.celiappVoulu)} par année) dépasse vos droits : l'app compte ${$(R.celiappAnnee(0))} cette année (8 000 $ par année, plus les droits reportés, et 40 000 $ à vie).`);
     if (S.revenu.annee === "premiere" && !R.residenceActive && +S.revenu.anneePremiere && +String(S.strategie.debut).slice(0, 4) > +S.revenu.anneePremiere)
       action("info", `Votre première année de pratique (${S.revenu.anneePremiere}) est terminée : quand votre clientèle sera bâtie, choisissez « Année type » (Revenu, Modifier).`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     // En résidence, le régime d'assurance collective de l'entente de la FMRQ couvre les médicaments (art. 28.10).
-    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si cette assurance collective vous couvre, décochez le régime public (Budget, bouton Ménage) ; la prime, jusqu'à 789 $, ne s'applique pas.");
+    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si cette assurance collective vous couvre, décochez le régime public (Budget, bouton Ménage) ; la prime, jusqu'à 789 $, ne s'applique pas.");
     else if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
-      action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 789 $ par adulte du 1er juillet 2026 au 30 juin 2027, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
+      action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 789 $ par adulte du 1er juillet 2026 au 30 juin 2027, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
     const auj = new Date(S.strategie.debut + "-01T00:00:00");
     S.dettes.filter(d => d.type === "hypotheque" && d.finTerme).forEach(d => {
       const f = new Date(d.finTerme + "T00:00:00"); const mois = (f - auj) / 2.63e9;
       if (mois >= 0 && mois <= 18) action("info", `Renouvellement de « ${d.nom} » le ${f.toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" })} : versez un montant forfaitaire sans pénalité si possible, et ne rallongez pas l'amortissement.`);
     });
     S.dettes.filter(d => d.type === "marge" && d.limite > 0).forEach(d => action("info", `Disponible sur « ${d.nom} » : ${$(d.limite - d.solde)}. Gardez cet espace comme fonds d'urgence plutôt que de l'argent qui dort.`));
-    if (S.epargne.reee.enfants.filter(e => e.age < 17).length > 0 && S.epargne.reee.cotisationAnnuelle < 2500) action("info", "Cotisez 2 500 $ par enfant par année au REEE pour obtenir toutes les subventions (30 %).");
-    if (S.epargne.reer.droits > 0 && S.epargne.reer.cotisationAnnuelle === 0) action("info", `Vous avez ${$(S.epargne.reer.droits)} de droits REER. Chaque 1 000 $ cotisés vous remet environ ${$(R.tauxDeduction * 1000)} d'impôt (${pct(R.tauxDeduction, 0)}).`);
+    if (S.epargne.reee.enfants.filter(e => e.age < 17).length > 0 && S.epargne.reee.cotisationAnnuelle < 2500) action("info", "Cotisez 2 500 $ par enfant par année au REEE pour obtenir toutes les subventions (30 %).");
+    if (S.epargne.reer.droits > 0 && S.epargne.reer.cotisationAnnuelle === 0) action("info", `Vous avez ${$(S.epargne.reer.droits)} de droits REER. Chaque 1 000 $ cotisés vous remet environ ${$(R.tauxDeduction * 1000)} d'impôt (${pct(R.tauxDeduction, 0)}).`);
     if (!S.meta.exemple) {
       const jours = S.meta.dernierExport ? Math.floor((Date.now() - new Date(S.meta.dernierExport)) / 864e5) : Infinity;
       if (jours > 30) action("info", jours === Infinity
@@ -1106,7 +1106,7 @@ window.Verrou.quandOuvert(function () {
     });
     if (!R.vueResidence) alertesRamq(R, action);
     const mix = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
-    if (!R.vueResidence && Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
+    if (!R.vueResidence && Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
     if (R.surplusMoi < 0) action("important", `Votre budget est négatif de ${$(-R.surplusMoi)} par mois : revoyez les dépenses ou leur partage.`);
     else action("bon", `Votre surplus de ${$(R.surplusMoi)} par mois va sur les dettes, dans l'ordre de la méthode choisie.`);
 
@@ -1147,7 +1147,7 @@ window.Verrou.quandOuvert(function () {
       l.push({ date: f, titre: `Renouvellement : ${d.nom}`, sous: r ? `Paiement estimé ${$(r.paiement)} par mois à ${nb(r.taux, 2)} %` : "Comparez les offres ; ne rallongez pas l'amortissement" });
     });
     if (S.epargne.reee.enfants.some(e => e.age < 17) && S.epargne.reee.cotisationAnnuelle > 0)
-      l.push({ date: prochaine(11, 31), titre: "Cotisation REEE de l'année", sous: "Pour recevoir les subventions de l'année (30 %)", valeur: $(S.epargne.reee.cotisationAnnuelle * S.epargne.reee.enfants.filter(e => e.age < 17).length) });
+      l.push({ date: prochaine(11, 31), titre: "Cotisation REEE de l'année", sous: "Pour recevoir les subventions de l'année (30 %)", valeur: $(S.epargne.reee.cotisationAnnuelle * S.epargne.reee.enfants.filter(e => e.age < 17).length) });
     lignesAnnuelles().filter(x => x.mois && x.montant >= 200).forEach(x => l.push({ date: prochaine(x.mois - 1, 1), titre: x.nom, sous: "Dépense annuelle", valeur: $(x.montant) }));
     const jours = d => Math.round((d - auj) / 864e5);
     return l.filter(x => x.date >= auj).sort((a, b) => a.date - b.date).slice(0, n).map(x => {
@@ -1189,12 +1189,12 @@ window.Verrou.quandOuvert(function () {
   function alertesRamq(R, action) {
     const g = R.rev, rv = S.revenu, inscrits = Math.round(g.inscritsFin);
     if (R.mode === "horaire" && g.heuresAuDela > 0) action("important", `Taux horaire : ${nb(g.heuresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h par année sont payées `
-      + (g.gardeAuDela > 0.5 ? `à 71,8 % (${nb(g.autresAuDela, 0)} h) et à 94 % pour la garde sur place (${nb(g.gardeAuDela, 0)} h)` : "à 71,8 %") + `, environ ${$(g.perteHeures)} de moins. `
+      + (g.gardeAuDela > 0.5 ? `à 71,8 % (${nb(g.autresAuDela, 0)} h) et à 94 % pour la garde sur place (${nb(g.gardeAuDela, 0)} h)` : "à 71,8 %") + `, environ ${$(g.perteHeures)} de moins. `
       + (g.plafondHeures < 2420 ? "Si votre chef de département autorise le dépassement (jusqu'à 880 h, annexe XIV), inscrivez-le dans Revenu, Modifier." : "C'est au-delà du dépassement maximal de 880 heures."));
     if (R.mode !== "horaire" && inscrits >= 350 && inscrits < 500 && g.gainPalier > 0)
       action("info", `Encore ${nb(500 - inscrits, 0)} patients inscrits pour atteindre 500 : chaque visite est alors payée environ ${pct(g.gainPalier, 0)} de plus.`);
     const seuil = [[750, 7500], [1000, 15000]].find(([s]) => inscrits < s && inscrits >= s - 100);
-    if (seuil) action("info", `Encore ${nb(seuil[0] - inscrits, 0)} patients inscrits actifs au 31 décembre pour recevoir ${$(seuil[1])}${seuil[0] === 1000 ? " au lieu de 7 500 $" : ""} en juin (EP 40, par. 4.15).`);
+    if (seuil) action("info", `Encore ${nb(seuil[0] - inscrits, 0)} patients inscrits actifs au 31 décembre pour recevoir ${$(seuil[1])}${seuil[0] === 1000 ? " au lieu de 7 500 $" : ""} en juin (EP 40, par. 4.15).`);
     if (g.basePolyvalence > 0) {
       const n = Math.round(g.inscritsFin + Math.max(0, g.vulnerablesFin - 245) * 1.5), prochain = C.SEUILS_POLYVALENCE[g.anneePratique].find(s => s > n);
       if (prochain && prochain - n <= 100) {
@@ -1204,10 +1204,10 @@ window.Verrou.quandOuvert(function () {
     }
     if (C.partAssiduite(rv.assiduite) < 1) {
       const perdu = C.montantsVolume(g.inscritsFin, g.vulnerablesFin, "80").supplements - g.detailVolume.supplements;
-      if (perdu > 0) action("info", `Avec un taux d'assiduité de 80 %, vous recevriez ${$(perdu)} de plus en suppléments au volume (EP 40, par. 15.03 et 15.05).`);
+      if (perdu > 0) action("info", `Avec un taux d'assiduité de 80 %, vous recevriez ${$(perdu)} de plus en suppléments au volume (EP 40, par. 15.03 et 15.05).`);
     }
     if (!rv.membreGmf && !S.confirmes["revenu.membreGmf"] && g.forfaitGmfPossible > 0)
-      action("info", `${R.milieu === "gmfu" ? "Un GMF-U est un GMF : le" : R.milieu === "clsc" ? "Si votre CLSC fait partie d'un GMF, le" : "Si votre clinique est un GMF, le"} forfait de 9,35 $ par patient vu dans l'année (code 08875) ajouterait environ ${$(g.forfaitGmfPossible)}. Vérifiez-le, puis cochez ou non « Membre d'un GMF » (Revenu, Modifier).`);
+      action("info", `${R.milieu === "gmfu" ? "Un GMF-U est un GMF : le" : R.milieu === "clsc" ? "Si votre CLSC fait partie d'un GMF, le" : "Si votre clinique est un GMF, le"} forfait de 9,35 $ par patient vu dans l'année (code 08875) ajouterait environ ${$(g.forfaitGmfPossible)}. Vérifiez-le, puis cochez ou non « Membre d'un GMF » (Revenu, Modifier).`);
   }
 
   const COURT_MODE = { horaire: "Horaire", mixte: "Mixte", acte: "À l'acte" };
@@ -1275,8 +1275,8 @@ window.Verrou.quandOuvert(function () {
       x.prochain && { titre: `Au ${dateLongue(x.prochain.date)} : R${x.prochain.niveau}`, sous: "Une année de formation de plus", valeur: $(x.prochain.total + x.autres) },
       { titre: "Début de la pratique", sous: delaiMois(R.moisAvantPratiqueAuj), valeur: moisLong(R.debutPratique) },
     ]);
-    document.getElementById("rv-residence-note").textContent = "Échelle de l'entente FMRQ-MSSS 2021-2028 (annexe I), avec l'ajustement de 0,11 % du 31 mars 2026 (avis de la RAMQ du 16 juillet 2026) ; "
-      + "hausse de 3,5 % le 1er avril 2027, puis, après l'entente, la hausse des revenus du scénario. Basculez sur « Pratique » pour voir et préparer la pratique.";
+    document.getElementById("rv-residence-note").textContent = "Échelle de l'entente FMRQ-MSSS 2021-2028 (annexe I), avec l'ajustement de 0,11 % du 31 mars 2026 (avis de la RAMQ du 16 juillet 2026) ; "
+      + "hausse de 3,5 % le 1er avril 2027, puis, après l'entente, la hausse des revenus du scénario. Basculez sur « Pratique » pour voir et préparer la pratique.";
   }
   /* ============================================================
      COMPARER LES ACTES (sous-onglet de Revenu) : supervision ou visites des apprenants, ce que rapporte
@@ -1330,7 +1330,7 @@ window.Verrou.quandOuvert(function () {
     const pm = U.supMoment ? U.supMoment === "pm" : T > 0 && (+r.enseignementApresMidi || 0) >= T;
     segment("rv-sup-moment", [["am", "Avant-midi ou soir"], ["pm", "Après-midi"]], pm ? "pm" : "am", v => { U.supMoment = v; tout(); }, "Moment de la demi-journée");
     document.getElementById("rv-sup-intro").textContent = (gmfu ? "" : "En GMF-U seulement : votre pratique principale est ailleurs, la comparaison sert à préparer une demi-journée d'enseignement. ")
-      + "Au mixte, pour chaque demi-journée d'enseignement, vous facturez soit l'intervention de supervision (24,87 $ par 15 minutes, payée à 62,15 %, un seul acte quel que soit le nombre d'apprenants), soit les visites de vos apprenants (à 63,58 % du tarif).";
+      + "Au mixte, pour chaque demi-journée d'enseignement, vous facturez soit l'intervention de supervision (24,87 $ par 15 minutes, payée à 62,15 %, un seul acte quel que soit le nombre d'apprenants), soit les visites de vos apprenants (à 63,58 % du tarif).";
     champsRapides("rv-sup-champs", [
       { p: "revenu.residents", l: "Résidents", u: "rés." }, { p: "revenu.externes", l: "Externes", u: "ext." },
       { p: "revenu.patientsParResident", l: "Patients par résident", u: "pat.", s: 0.5 }, { p: "revenu.patientsParExterne", l: "Patients par externe", u: "pat.", s: 0.5 },
@@ -1390,18 +1390,18 @@ window.Verrou.quandOuvert(function () {
     ]);
     const autres = modes.filter(m => m !== meilleur).map(m => `${$2(dj[meilleur].net - dj[m].net)} de plus que ${m === "acte" ? "l'acte" : m === "mixte" ? "le mixte" : "le taux horaire"}`);
     document.getElementById("rv-dj-conclusion").textContent = dj.patients + dj.formulaires === 0 && !(dj.heures > 0) ? "Inscrivez les actes de votre demi-journée."
-      : `${NOMS_MODE_ACTES[meilleur]} rapporte le plus pour cette demi-journée : ${autres.join(", ")}.${dj.formulaires > 0 ? ` Les formulaires de la CNESST (${$2(dj.formulaires)}) sont payés à 100 % dans les trois modes.` : ""}`;
+      : `${NOMS_MODE_ACTES[meilleur]} rapporte le plus pour cette demi-journée : ${autres.join(", ")}.${dj.formulaires > 0 ? ` Les formulaires de la CNESST (${$2(dj.formulaires)}) sont payés à 100 % dans les trois modes.` : ""}`;
 
     // 4. Formulaires de la CNESST.
     lignes(document.getElementById("rv-cnesst"), ["Formulaire", "Tarif"], C.CNESST.map(f => ({ cellules: [`${f.nom} · ${f.code}`, $2(f.tarif)] })));
     document.getElementById("rv-cnesst-note").textContent = "Annexe XIII de l'Entente, en vigueur depuis le 1er avril 2025 (manuel de la RAMQ consulté le 25 octobre 2026). "
-      + "Payés à 100 % du tarif dans tous les modes : à l'acte, au mixte (annexe XXIII, par. 2.11) et au taux horaire, à l'acte pour ces services sans facturer d'heures pour ce temps. "
+      + "Payés à 100 % du tarif dans tous les modes : à l'acte, au mixte (annexe XXIII, par. 2.11) et au taux horaire, à l'acte pour ces services sans facturer d'heures pour ce temps. "
       + "L'examen se facture à part, sauf le rapport d'évaluation médicale (09944). Sans majoration selon le territoire.";
 
     // Cartes repliées : leur conclusion en une ligne.
     const suivi = actes.find(a => a.cle === "suivi");
     document.getElementById("rv-actes-resume").textContent = `Un suivi : ${$2(suivi.acte)} à l'acte, ${$2(suivi.mixte)} au mixte`;
-    document.getElementById("rv-cnesst-resume").textContent = `${nb(C.CNESST.length, 0)} formulaires, payés à 100 % dans tous les modes`;
+    document.getElementById("rv-cnesst-resume").textContent = `${nb(C.CNESST.length, 0)} formulaires, payés à 100 % dans tous les modes`;
     // L'intervention de supervision n'existe qu'en GMF-U.
     document.getElementById("rv-carte-supervision").hidden = !gmfu;
   }
@@ -1692,10 +1692,10 @@ window.Verrou.quandOuvert(function () {
     const auDela = R.modes.includes("horaire") && g.heuresAuDela > 0;
     const sousVisites = [srv ? `${nb(srv, 0)} en sans rendez-vous` : "", g.visitesApprenants ? `${nb(g.visitesApprenants, 0)} vues par les apprenants` : ""].filter(Boolean).join(", ");
     rangees("rv-faits", [
-      { titre: "Heures en clinique", sous: auDela ? `Au taux horaire, ${nb(g.autresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h sont payées à 71,8 % (annexe XIV)` : null, valeur: nb(g.heures, 0) + " h" },
-      R.modes.includes("horaire") && g.garde > 0 ? { titre: "Garde sur place, au taux horaire", sous: g.gardeAuDela > 0.5 ? `${nb(g.gardeAuDela, 0)} h au-delà du plafond, payées à 94 % (annexe XIV, par. 5.03)` : "Sous le plafond annuel : à 100 %", valeur: nb(g.garde, 0) + " h" } : null,
+      { titre: "Heures en clinique", sous: auDela ? `Au taux horaire, ${nb(g.autresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h sont payées à 71,8 % (annexe XIV)` : null, valeur: nb(g.heures, 0) + " h" },
+      R.modes.includes("horaire") && g.garde > 0 ? { titre: "Garde sur place, au taux horaire", sous: g.gardeAuDela > 0.5 ? `${nb(g.gardeAuDela, 0)} h au-delà du plafond, payées à 94 % (annexe XIV, par. 5.03)` : "Sous le plafond annuel : à 100 %", valeur: nb(g.garde, 0) + " h" } : null,
       { titre: "Visites en clinique", sous: sousVisites ? `Dont ${sousVisites}` : null, valeur: nb(g.nbVisites, 0) },
-      { titre: "Tarif moyen d'une visite de rendez-vous", sous: "À l'acte, à 100 % du tarif", valeur: $2(g.tarifMoyenRdv) },
+      { titre: "Tarif moyen d'une visite de rendez-vous", sous: "À l'acte, à 100 % du tarif", valeur: $2(g.tarifMoyenRdv) },
       srv ? { titre: "Tarif moyen d'un patient au sans rendez-vous", sous: `Visite ponctuelle : ${nb(S.revenu.pctSrvComplexe || 0)} % complexes`, valeur: $2(g.tarifMoyenSrv) } : null,
       { titre: "Visites de prise en charge", valeur: nb(g.nbPriseEnCharge, 0) },
       R.modes.includes("horaire") && g.horaire.responsabilite > 0 ? { titre: "Forfaits de responsabilité, au taux horaire",
@@ -1878,7 +1878,7 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("rv-sens-note").textContent = `${notePrefixe} Demi-journées de rendez-vous${ens ? `, dont ${nb(ens)} d'enseignement` : ""}, à ${nb(pat)} patients chacune ; le sans rendez-vous et les activités restent les mêmes.${R.modes.includes("horaire") ? " Au taux horaire, le nombre de patients ne change pas le revenu." : ""}`;
   }
 
-  // Sur chaque 100 $ gagnés : où va le revenu brut (morceaux : nom, montant de l'année, couleur).
+  // Sur chaque 100 $ gagnés : où va le revenu brut (morceaux : nom, montant de l'année, couleur).
   function centDollars(morceaux, brut) {
     const cent = document.getElementById("im-cent"); cent.textContent = "";
     const barre = el("div", "flux-barre"); barre.setAttribute("role", "img");
@@ -1887,7 +1887,7 @@ window.Verrou.quandOuvert(function () {
     cent.appendChild(barre);
     cent.appendChild(rangees(el("div"), morceaux.map(([n, v, c]) => ({ titre: n, couleur: c, valeur: $2(v / brut * 100), valeurSous: $(v) + " par année" }))));
   }
-  // Où va chaque 100 $ gagné, selon la vue : [nom, montant de l'année, couleur], et le revenu de base.
+  // Où va chaque 100 $ gagné, selon la vue : [nom, montant de l'année, couleur], et le revenu de base.
   function morceauxImpot(R) {
     const I = R.impot, x = I.societe;
     if (R.vueResidence) return { brut: Math.max(1, I.revenu + (I.autres || 0)), morceaux: [["Impôt fédéral", I.fed, SERIES[0]], ["Impôt du Québec", I.qc, SERIES[1]],
@@ -1900,7 +1900,7 @@ window.Verrou.quandOuvert(function () {
       : [["Impôt fédéral", I.fed, SERIES[0]], ["Impôt du Québec", I.qc, SERIES[1]], ["RRQ, RQAP et Fonds des services de santé", I.rrq + I.rqap + I.fss, SERIES[2]],
          [R.rev[R.mode].fraisCabinet ? "Dépenses et frais de cabinet" : "Dépenses professionnelles", dpro, SERIES[3]], ["Reste pour vous", I.net - dpro, SERIES[4]]] };
   }
-  // Impôt : les taux et le net en tuiles ; chaque 100 $ ; le prochain paiement (ou la retenue sur la paie).
+  // Impôt : les taux et le net en tuiles ; chaque 100 $ ; le prochain paiement (ou la retenue sur la paie).
   function resumeImpot(R) {
     const I = R.impot, t = I.totalGlobal ?? I.total, soc = R.societeActive && !R.vueResidence;
     const net = { titre: soc ? "Net pour vous" : "Net de l'année", valeur: $(R.netVue), sous: R.vueResidence ? "Après impôt et retenues" : "Après impôt et frais" };
@@ -1910,7 +1910,7 @@ window.Verrou.quandOuvert(function () {
         { titre: "Impôt de la société", valeur: $(I.societe.impotSociete), sous: "Par année" }, { titre: "Laissé dans la société", valeur: $(I.societe.retenu), sous: "Par année" }]
       : [net, { titre: "À mettre de côté", valeur: $((t + R.primeMoi) / 12), sous: "Par mois, prime comprise" }, fed, qc]);
     const m = morceauxImpot(R);
-    carteResume("im-r-cent", "Sur chaque 100 $ gagnés", ["Détail", "#impot/detail"], barreLegende(m.morceaux, v => $2(v / m.brut * 100)));
+    carteResume("im-r-cent", "Sur chaque 100 $ gagnés", ["Détail", "#impot/detail"], barreLegende(m.morceaux, v => $2(v / m.brut * 100)));
     const prochain = echeances(R, Infinity).find(x => /^Acompte|^Solde de l'impôt/.test(x.titre));
     carteResume("im-r-payer", R.vueResidence ? "Retenu sur la paie" : "Prochain paiement", ["Détail", "#impot/detail"], rangees(el("div"), R.vueResidence ? [
       { titre: "Paie brute", sous: "26 paies par année, en moyenne", valeur: $(I.revenu / 26) },
@@ -1959,7 +1959,7 @@ window.Verrou.quandOuvert(function () {
       x.scolarite > 0 && { cls: "sous", cellules: ["Moins votre part des droits de scolarité", moins(x.scolarite)] },
       { cls: "sous", cellules: ["Taux moyen", pct(I.tauxMoyen)] },
     ].filter(Boolean));
-    document.getElementById("im-tableau-note").textContent = "Salarié : impôt fédéral (après l'abattement du Québec) et du Québec, RRQ, RQAP et assurance-emploi de l'employé. Crédits : montant canadien pour emploi, cotisations, droits de scolarité (fédéral, et Québec à 8 %), intérêts d'un prêt étudiant et, au Québec, 10 % de la cotisation syndicale ; déductions : cotisation syndicale au fédéral, REER et, au Québec, déduction pour travailleurs.";
+    document.getElementById("im-tableau-note").textContent = "Salarié : impôt fédéral (après l'abattement du Québec) et du Québec, RRQ, RQAP et assurance-emploi de l'employé. Crédits : montant canadien pour emploi, cotisations, droits de scolarité (fédéral, et Québec à 8 %), intérêts d'un prêt étudiant et, au Québec, 10 % de la cotisation syndicale ; déductions : cotisation syndicale au fédéral, REER et, au Québec, déduction pour travailleurs.";
   }
   function rendreImpot(R) {
     document.getElementById("h-impot").textContent = `Impôt ${R.anneePlan}`;
@@ -1976,7 +1976,7 @@ window.Verrou.quandOuvert(function () {
       puce(`Taux moyen ${pct(R.impot.tauxMoyen, 0)}`), puce(`Taux marginal ${pct(R.tauxMarginal, 0)}`), pucePrevue(R),
     ], t);
 
-    // Sur chaque 100 $ gagnés : où va le revenu brut.
+    // Sur chaque 100 $ gagnés : où va le revenu brut.
     const m = morceauxImpot(R), x = R.impot.societe;
     centDollars(m.morceaux, m.brut);
 
@@ -2019,7 +2019,7 @@ window.Verrou.quandOuvert(function () {
       ligne(soc ? "Taux moyen, société comprise" : "Taux moyen", x => pct(x.tauxMoyen), "sous"),
     ]);
     document.getElementById("im-tableau-note").textContent = soc
-      ? "Pratique incorporée : la société paie les dépenses, les frais et son impôt, puis vous verse des dividendes non déterminés (majorés de 15 %, avec crédit d'impôt pour dividendes). Pas de RRQ ni de RQAP sur les dividendes, donc pas de rente RRQ ni de droits REER pour ces revenus. Crédit pour les intérêts d'un prêt étudiant et déduction REER inclus."
+      ? "Pratique incorporée : la société paie les dépenses, les frais et son impôt, puis vous verse des dividendes non déterminés (majorés de 15 %, avec crédit d'impôt pour dividendes). Pas de RRQ ni de RQAP sur les dividendes, donc pas de rente RRQ ni de droits REER pour ces revenus. Crédit pour les intérêts d'un prêt étudiant et déduction REER inclus."
       : "Travail autonome, sans société : impôt fédéral (après l'abattement du Québec), impôt du Québec, RRQ des deux parts, RQAP et Fonds des services de santé. Crédits de base, crédit pour les intérêts d'un prêt de l'aide financière aux études, déduction REER et dépenses professionnelles.";
     document.getElementById("im-societe").closest(".carte").hidden = soc;
 
@@ -2106,7 +2106,7 @@ window.Verrou.quandOuvert(function () {
   // Refait les cas de l'outil officiel avec le calcul de WealthMorand et montre les écarts.
   const CHAMPS_VERIF = [["qc", "Impôt du Québec"], ["fed", "Impôt fédéral"], ["rrq", "RRQ"], ["rqap", "RQAP"], ["ae", "Assurance-emploi"],
     ["af", "Allocation famille"], ["fournitures", "Fournitures scolaires"], ["ace", "Allocation canadienne pour enfants"], ["prime", "Prime d'assurance médicaments"]];
-  // L'outil de mai 2026 plafonnait la prime à 766 $. Du 1er juillet 2026 au 30 juin 2027, la RAMQ publie 789 $.
+  // L'outil de mai 2026 plafonnait la prime à 766 $. Du 1er juillet 2026 au 30 juin 2027, la RAMQ publie 789 $.
   const primeAttendue = off => off === 766 ? 789 : off === 1532 ? 1578 : off;
   const ecartVerif = (k, nous, off) => Math.round(nous) - (k === "prime" ? primeAttendue(off) : off);
   function casCalcul(v) { return C.avecAnnee(2026, () => casCalcul2026(v)); }   // l'outil officiel porte sur 2026
@@ -2138,7 +2138,7 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("im-verif-resume").textContent = `${nb(egaux, 0)} montants sur ${nb(total, 0)} identiques à l'outil du ministère des Finances`;
     const tete = el("div", "hero-sous");
     tete.append(puce(`${nb(egaux, 0)} sur ${nb(total, 0)} identiques`, "haut", true));
-    z.append(tete, el("p", "resume", `WealthMorand refait ${VERIFICATION.length} cas de l'outil officiel du ministère des Finances du Québec : ${nb(egaux, 0)} montants sur ${nb(total, 0)} sont identiques, à 1 $ près.` +
+    z.append(tete, el("p", "resume", `WealthMorand refait ${VERIFICATION.length} cas de l'outil officiel du ministère des Finances du Québec : ${nb(egaux, 0)} montants sur ${nb(total, 0)} sont identiques, à 1 $ près.` +
       (pire.e ? ` Le plus grand écart est de ${$(Math.abs(pire.e))} (${pire.n.toLowerCase()}, ${pire.cas.charAt(0).toLowerCase() + pire.cas.slice(1)}).` : "")));
     z.appendChild(rangees(el("div"), cas.map(({ v, ecarts }) => {
       const max = ecarts.reduce((m, x) => Math.abs(x.e) > Math.abs(m) ? x.e : m, 0);
@@ -2150,7 +2150,7 @@ window.Verrou.quandOuvert(function () {
       tableauSimple(d, ["", "Officiel", "WealthMorand", "Écart"], ecarts.map(x => ({ cellules: [x.n, $(x.off), $(x.nous), x.plafond ? "plafond" : x.e ? signe(x.e) : "—"] })));
     });
     z.appendChild(d);
-    z.appendChild(el("p", "aide", "Outil de calcul du revenu disponible des familles (version de mai 2026, année 2026), consulté le 25 octobre 2026. L'outil ne traite que des revenus d'emploi : il valide les barèmes, les crédits, les transferts entre conjoints, les allocations et la prime d'assurance médicaments. Votre revenu de travailleur autonome (RRQ des deux parts, Fonds des services de santé) suit les mêmes barèmes, mais ne peut pas y être vérifié. La prime de ces cas est plafonnée à 766 $ dans l'outil de mai ; du 1er juillet 2026 au 30 juin 2027, le plafond publié par la RAMQ est 789 $ par adulte : ces lignes indiquent « plafond »."));
+    z.appendChild(el("p", "aide", "Outil de calcul du revenu disponible des familles (version de mai 2026, année 2026), consulté le 25 octobre 2026. L'outil ne traite que des revenus d'emploi : il valide les barèmes, les crédits, les transferts entre conjoints, les allocations et la prime d'assurance médicaments. Votre revenu de travailleur autonome (RRQ des deux parts, Fonds des services de santé) suit les mêmes barèmes, mais ne peut pas y être vérifié. La prime de ces cas est plafonnée à 766 $ dans l'outil de mai ; du 1er juillet 2026 au 30 juin 2027, le plafond publié par la RAMQ est 789 $ par adulte : ces lignes indiquent « plafond »."));
   }
 
   function rendreBudget(R) {
@@ -2272,7 +2272,7 @@ window.Verrou.quandOuvert(function () {
           ? ` ${AVEC_ARTICLE[moinsChere].replace(/^./, c => c.toUpperCase())} coûte ${$(rec.coutNet - mc.coutNet)} de moins en intérêts, mais ${AVEC_ARTICLE[R.recommandee]} finit plus tôt (${moisAn(rec.libre)}) : l'argent libéré est placé plus vite.`
           : "";
       })() +
-      " La date « sans dettes » suit les renouvellements : l'argent qui attend est placé à court terme (2,4 %) et compte dans la valeur nette." +
+      " La date « sans dettes » suit les renouvellements : l'argent qui attend est placé à court terme (2,4 %) et compte dans la valeur nette." +
       (placer ? ` Placer le surplus au lieu de rembourser donnerait plus dans ce scénario (rendement de ${nb(R.hyp.rendement, 1)} %), mais ce rendement n'est pas garanti, contrairement à l'intérêt économisé.` : "");
   }
 
@@ -2357,7 +2357,7 @@ window.Verrou.quandOuvert(function () {
       { titre: "Dépenses annuelles", sous: annuelles ? `${$(annuelles / 12)} à mettre de côté par mois` : "Aucune inscrite", valeur: $(annuelles) },
     ]));
   }
-  // Patrimoine : la valeur nette projetée ; ce que vous possédez en tuiles ; où mettre le prochain 1 000 $.
+  // Patrimoine : la valeur nette projetée ; ce que vous possédez en tuiles ; où mettre le prochain 1 000 $.
   function resumePatrimoine(R) {
     const p = R.projection, x = p[0], F = independance(R, false);
     const c = carteResume("pa-r-graph", "Valeur nette projetée", ["Projection", "#avenir/projection"]), g = el("div", "graphique");
@@ -2369,7 +2369,7 @@ window.Verrou.quandOuvert(function () {
       { titre: "Solde des dettes", valeur: $(R.detteTotale), sous: R.sim.libre ? `Remboursées en ${moisAn(R.sim.libre)}` : "Jamais remboursées" },
       { titre: "Indépendance", valeur: F.annee ? String(F.annee) : "—", sous: F.annee ? `${nb(F.mult)} fois vos dépenses` : "Pas sur l'horizon" }]);
     const o = optionsProchain(R)[0];
-    carteResume("pa-r-prochain", "Le prochain 1 000 $", ["Détail", "#avenir/aujourdhui"], rangees(el("div"), [
+    carteResume("pa-r-prochain", "Le prochain 1 000 $", ["Détail", "#avenir/aujourdhui"], rangees(el("div"), [
       { titre: o.titre, sous: o.sous, ico: "ok", cls: "choisi", valeur: $(o.v), valeurSous: "dans 10 ans" }]));
   }
   function rendreAvenir(R) {
@@ -2459,7 +2459,7 @@ window.Verrou.quandOuvert(function () {
     const c = S.epargne.reer.cotisationAnnuelle;
     z.appendChild(el("p", "resume", c > 0
       ? `Cotiser ${$(c)} au REER vous rembourse environ ${$(R.remboursementReer)} d'impôt (${pct(R.remboursementReer / c, 0)}).${S.strategie.reerSurDettes ? " Ce remboursement est versé sur vos dettes chaque avril." : ""}`
-      : `Aucune cotisation REER prévue. 10 000 $ cotisés rapporteraient environ ${$(R.impotSansReer - R.impotAvecReer(10000))} de remboursement.`));
+      : `Aucune cotisation REER prévue. 10 000 $ cotisés rapporteraient environ ${$(R.impotSansReer - R.impotAvecReer(10000))} de remboursement.`));
     // Remboursement selon la cotisation : votre taux marginal baisse à mesure que le revenu imposable diminue.
     const droits = S.epargne.reer.droits, montants = [5000, 10000, 20000, 30000].filter(m => !droits || m < droits);
     if (droits > 0) montants.push(droits);
@@ -3064,7 +3064,7 @@ window.Verrou.quandOuvert(function () {
      INDÉPENDANCE FINANCIÈRE ET JALONS PERSONNELS
      ============================================================ */
   // Indépendance : placements (REER, CELI, CELIAPP, comptes, société) égaux à N fois les dépenses
-  // de l'année (25 fois : la règle du 4 %), en dollars de chaque année.
+  // de l'année (25 fois : la règle du 4 %), en dollars de chaque année.
   function independance(R, couple, p = R.projection) {
     const I = S.independance || {}, mult = +I.multiple || 25, h = R.hyp;
     const depenses = (+I.depenses || 0) > 0 ? +I.depenses : (couple ? R.depMenage : R.depMoi) * 12;
@@ -3076,7 +3076,7 @@ window.Verrou.quandOuvert(function () {
       annee: i >= 0 ? p[i].annee : null, age: i >= 0 && naissance ? p[i].annee - naissance : null, fin: p[p.length - 1].annee, naissance };
   }
   const CHAMPS_INDEPENDANCE = [
-    { p: "independance.multiple", l: "Placements visés, en années de dépenses", u: "fois", s: 1, h: "25 fois les dépenses de l'année : on peut en retirer environ 4 % par année (règle du 4 %). 30 fois pour plus de prudence." },
+    { p: "independance.multiple", l: "Placements visés, en années de dépenses", u: "fois", s: 1, h: "25 fois les dépenses de l'année : on peut en retirer environ 4 % par année (règle du 4 %). 30 fois pour plus de prudence." },
     { p: "independance.depenses", l: "Dépenses visées par année", u: "$/an", s: 1000, h: "0 : votre budget actuel, sans les paiements de dettes. En dollars d'aujourd'hui." },
     { p: "independance.anneeNaissance", l: "Votre année de naissance", u: "", s: 1, h: "Facultatif : pour afficher votre âge à chaque jalon." },
   ];
@@ -3123,7 +3123,7 @@ window.Verrou.quandOuvert(function () {
     const z = document.getElementById("pa-frais"); z.textContent = "";
     const f = +S.epargne.frais || 0, bas = 0.25, p = R.projection, fin = p.length - 1;
     if (!f) {
-      z.appendChild(el("p", "aide", "Inscrivez les frais de gestion de vos placements (RFG), bouton Modifier : les fonds communs coûtent souvent de 1,5 à 2,5 % par année ; les fonds indiciels négociés en bourse (FNB), de 0,1 à 0,5 %."));
+      z.appendChild(el("p", "aide", "Inscrivez les frais de gestion de vos placements (RFG), bouton Modifier : les fonds communs coûtent souvent de 1,5 à 2,5 % par année ; les fonds indiciels négociés en bourse (FNB), de 0,1 à 0,5 %."));
       return;
     }
     const cetteAnnee = (p[0].placements - p[0].encaisse) * f / 100;
@@ -3155,10 +3155,10 @@ window.Verrou.quandOuvert(function () {
     const z = document.getElementById("pa-repartition"); z.textContent = "";
     const e = S.epargne, cible = pctActionsCible();
     const comptes = [
-      { k: "reer", nom: "REER", solde: +e.reer.solde || 0, note: "Obligations d'abord : l'intérêt y échappe à l'impôt. Titres américains : pas de retenue de 15 % sur leurs dividendes." },
+      { k: "reer", nom: "REER", solde: +e.reer.solde || 0, note: "Obligations d'abord : l'intérêt y échappe à l'impôt. Titres américains : pas de retenue de 15 % sur leurs dividendes." },
       { k: "celi", nom: "CELI", solde: +e.celi.solde || 0, note: "Actions de croissance : la croissance n'y est jamais imposée." },
       { k: "celiapp", nom: "CELIAPP", solde: +e.celiapp.solde || 0, note: "Prudent si l'achat de la propriété est dans moins de trois ans." },
-      { k: "societe", nom: "Société", solde: +S.societe.solde || 0, note: "Actions canadiennes et gains en capital, moins imposés. Au-delà de 50 000 $ de revenu passif par année, la déduction fédérale pour petite entreprise diminue." },
+      { k: "societe", nom: "Société", solde: +S.societe.solde || 0, note: "Actions canadiennes et gains en capital, moins imposés. Au-delà de 50 000 $ de revenu passif par année, la déduction fédérale pour petite entreprise diminue." },
     ].filter(c => c.solde > 0);
     const total = comptes.reduce((t, c) => t + c.solde, 0);
     if (!total) { z.appendChild(el("p", "aide", "Inscrivez le solde de vos REER, CELI et CELIAPP (Modifier) : vous verrez quoi placer dans chaque compte selon votre profil.")); return; }
@@ -3241,7 +3241,7 @@ window.Verrou.quandOuvert(function () {
 
   /* ============================================================
      PATRIMOINE : bilan d'aujourd'hui, réel comparé au plan, objectifs
-     d'épargne et « où mettre le prochain 1 000 $ ».
+     d'épargne et « où mettre le prochain 1 000 $ ».
      ============================================================ */
   const TYPES_ACTIF = {
     immobilier: { nom: "Immobilier : chalet, terrain, immeuble", croissance: 3 },
@@ -3472,7 +3472,7 @@ window.Verrou.quandOuvert(function () {
     z.appendChild(rangees(el("div"), [{ titre: "Ajouter un objectif", ico: "plus", cls: "ajout", action: feuilleNouvelObjectif }]));
   }
 
-  // Où mettre le prochain 1 000 $ : valeur dans 10 ans de chaque choix, après impôt.
+  // Où mettre le prochain 1 000 $ : valeur dans 10 ans de chaque choix, après impôt.
   function optionsProchain(R) {
     const N = 10, r = R.hyp.rendement / 100, f = Math.pow(1 + r, N), t = R.tauxDeduction, tr = (S.epargne.tauxRetrait ?? 35) / 100;
     const o = [
@@ -3483,7 +3483,7 @@ window.Verrou.quandOuvert(function () {
     if (R.locataire && (ca.solde || 0) < 40000 && (ca.cotisationAnnuelle || 0) < 8000)
       o.push({ titre: "CELIAPP", sous: `Déduction de ${pct(t, 0)} et retrait sans impôt pour une première maison`, v: 1000 * f * (1 + t) });
     if (S.epargne.reee.enfants.some(e => e.age < 17) && S.epargne.reee.cotisationAnnuelle < 2500)
-      o.push({ titre: "REEE", sous: "Subventions de 30 % jusqu'à 2 500 $ par enfant par année ; retraits imposés au nom de l'étudiant", v: 1300 * f });
+      o.push({ titre: "REEE", sous: "Subventions de 30 % jusqu'à 2 500 $ par enfant par année ; retraits imposés au nom de l'étudiant", v: 1300 * f });
     S.dettes.forEach(d => {
       if (!(d.solde > 0) || !(d.taux > 0)) return;
       const eff = d.taux / 100 * (1 - (d.creditImpot || 0) / 100);
@@ -3499,7 +3499,7 @@ window.Verrou.quandOuvert(function () {
     const o = optionsProchain(R);
     z.appendChild(rangees(el("div"), o.map((x, i) => ({ titre: x.titre, sous: x.sous, ico: i === 0 ? "ok" : String(i + 1), cls: i === 0 ? "choisi" : null,
       valeur: $(x.v), valeurSous: `${pct(Math.pow(x.v / 1000, 1 / 10) - 1, 1)} par année` }))));
-    z.appendChild(el("p", "aide", `Valeur dans 10 ans de 1 000 $ mis aujourd'hui, au rendement du scénario ${SCENARIOS[R.scenario].toLowerCase()} (${nb(R.hyp.rendement, 1)} %). Le rendement des placements n'est pas garanti ; l'intérêt évité en remboursant une dette, oui. Le REER passe devant le CELI quand votre taux d'imposition au retrait (${pct((S.epargne.tauxRetrait ?? 35) / 100, 0)}, modifiable dans Modifier) est plus bas que votre taux d'imposition d'aujourd'hui (${pct(R.tauxDeduction, 0)}).`));
+    z.appendChild(el("p", "aide", `Valeur dans 10 ans de 1 000 $ mis aujourd'hui, au rendement du scénario ${SCENARIOS[R.scenario].toLowerCase()} (${nb(R.hyp.rendement, 1)} %). Le rendement des placements n'est pas garanti ; l'intérêt évité en remboursant une dette, oui. Le REER passe devant le CELI quand votre taux d'imposition au retrait (${pct((S.epargne.tauxRetrait ?? 35) / 100, 0)}, modifiable dans Modifier) est plus bas que votre taux d'imposition d'aujourd'hui (${pct(R.tauxDeduction, 0)}).`));
   }
 
   /* Dépenses annuelles : quand elles tombent, et ce qu'il faut mettre de côté chaque mois. */
@@ -4399,8 +4399,8 @@ window.Verrou.quandOuvert(function () {
       c.appendChild(asGroupe(asNombre(nouvelle ? "Patients déjà inscrits au départ" : "Patients inscrits auprès de vous", "inscrits", "pat."),
         nouvelle && asNombre("Nouveaux patients attendus la première année", "nouveaux", "pat.", 1, "Ceux du guichet d'accès : chacun donne un supplément d'inscription et une visite de prise en charge."),
         asNombre("Patients vulnérables", "vulnerables", "%", 1, "Au moins un code de vulnérabilité : un forfait annuel de plus par patient."),
-        asCase("Membre d'un GMF", "membreGmf", "Forfait de 9,35 $ par patient inscrit vu dans l'année. Un GMF-U est un GMF."),
-        clinique && asNombre("Part de votre facturation remise à la clinique", "fraisPct", "%", 0.5, "Les frais de cabinet : loyer, personnel, équipement. Souvent de 25 à 35 % en clinique privée.")));
+        asCase("Membre d'un GMF", "membreGmf", "Forfait de 9,35 $ par patient inscrit vu dans l'année. Un GMF-U est un GMF."),
+        clinique && asNombre("Part de votre facturation remise à la clinique", "fraisPct", "%", 0.5, "Les frais de cabinet : loyer, personnel, équipement. Souvent de 25 à 35 % en clinique privée.")));
       c.appendChild(el("p", "aide", "Tout le reste (types de visites, tarifs, forfaits, apprenants) part des valeurs de la RAMQ : précisez-le ensuite dans Revenu, Modifier."));
     } },
     { titre: "Vos activités en établissement", rendre: c => {
@@ -4428,7 +4428,7 @@ window.Verrou.quandOuvert(function () {
         asCase("Prêt étudiant (aide financière aux études)", "pret", null, true),
         A.pret && asNombre("Solde du prêt étudiant", "pretSolde", "$", 500),
         A.pret && asNombre("Taux du prêt étudiant", "pretTaux", "%", 0.01, "Sur votre entente avec l'institution financière.", true),
-        A.pret && asNombre("Paiement par mois", "pretPaiement", "$/mois", 10, "0 : vous ne payez que les intérêts pour l'instant. Le remboursement du capital commence six mois après la fin des études ; une remise de 15 % de la dette est possible selon vos bourses et la durée de vos études (Québec.ca)."),
+        A.pret && asNombre("Paiement par mois", "pretPaiement", "$/mois", 10, "0 : vous ne payez que les intérêts pour l'instant. Le remboursement du capital commence six mois après la fin des études ; une remise de 15 % de la dette est possible selon vos bourses et la durée de vos études (Québec.ca)."),
         asCase("Prêt auto", "auto", null, true),
         A.auto && asNombre("Solde du prêt auto", "autoSolde", "$", 500), A.auto && asNombre("Taux du prêt auto", "autoTaux", "%", 0.01, null, true),
         A.auto && asNombre("Paiement par mois", "autoPaiement", "$/mois", 10)));
@@ -4497,7 +4497,7 @@ window.Verrou.quandOuvert(function () {
   const semainesClinique = A => Math.max(0, Math.min(52, 52 - Math.max(0, +A.vacances || 0)));
   /* Portrait de départ à partir des réponses : rien d'autre ne vient de l'exemple que les tarifs,
      les paramètres d'impôt, les hypothèses de l'avenir et la répartition des types de visites.
-     Prêt d'études : remboursement du capital six mois après la fin des études ; remise de 15 %
+     Prêt d'études : remboursement du capital six mois après la fin des études ; remise de 15 %
      possible (Québec.ca, « Rembourser son prêt » et « Remise de votre dette d'études », consultés
      le 31 octobre 2026 : https://www.quebec.ca/en/education/student-financial-assistance/repayment). */
   function portraitDepuis(A) {

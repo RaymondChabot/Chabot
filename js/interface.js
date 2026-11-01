@@ -141,7 +141,7 @@
     rangeesT.forEach(r => { const tr = el("tr", r.cls || null); r.cellules.forEach((c, i) => tr.appendChild(el("td", r.classes && r.classes[i] || null, c))); tb.appendChild(tr); });
     table.appendChild(tb);
   }
-  const moins = v => $(v > 0.5 ? -v : 0);  // évite « -0 $ »
+  const moins = v => $(v > 0.5 ? -v : 0);  // évite « -0 $ »
   const signePct = v => (v >= 0 ? "+" : "−") + nb(Math.abs(v), 1) + "\u00a0%";
 
   /* ============================================================
@@ -165,10 +165,10 @@
     let min = options.baseLibre ? Math.min(...tous) : Math.min(0, ...tous), max = Math.max(1, ...tous);
     const pas = pasJoli((max - min) / 4), bas = min;
     min = Math.floor(min / pas) * pas; max = Math.ceil(max / pas) * pas;
-    // Un creux négatif petit devant le pas (−40 000 $ pour des millions) : l'axe s'arrête juste sous lui,
+    // Un creux négatif petit devant le pas (−40 000 $ pour des millions) : l'axe s'arrête juste sous lui,
     // plutôt qu'un pas entier plus bas ; les graduations restent des multiples du pas.
     if (bas < 0 && -bas < pas / 4) min = bas - (max - bas) * 0.03;
-    const axe = v => Math.abs(v) < 1e-6 ? "0 $" : Math.abs(v) >= 1e6 ? nb(v / 1e6, 1) + " M$" : pas < 10000 ? nb(v / 1000, 1) + " k$" : k$(v);
+    const axe = v => Math.abs(v) < 1e-6 ? "0 $" : Math.abs(v) >= 1e6 ? nb(v / 1e6, 1) + " M$" : pas < 10000 ? nb(v / 1000, 1) + " k$" : k$(v);
     const x = i => m.l + (n <= 1 ? iw / 2 : (i / (n - 1)) * iw);
     const y = v => m.t + ih - ((v - min) / (max - min)) * ih;
     let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="group" aria-label="${esc(options.titre)}">`;
