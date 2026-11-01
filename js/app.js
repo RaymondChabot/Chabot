@@ -134,6 +134,8 @@ window.Verrou.quandOuvert(function () {
      CHAMPS DE SAISIE : ils vivent dans le panneau « Modifier »
      ============================================================ */
   // Un champ : libellé, puis saisie (nombre, liste, mois, date) ou interrupteur.
+  // Les choix d'une liste : fixes, ou calculés à l'ouverture (les années autour d'aujourd'hui).
+  const optionsDe = c => typeof c.o === "function" ? c.o() : c.o;
   function creerChamp(c, id, lier, confirmable) {
     const ligne = el("div", "champ" + (c.t === "check" ? " case" : c.t === "select" || c.t === "month" || c.t === "date" || c.t === "paire" ? " large" : ""));
     if (c.si) ligne.dataset.si = c.si;
@@ -156,7 +158,8 @@ window.Verrou.quandOuvert(function () {
       const boite = el("div", "saisie");
       if (c.t === "select") {
         inp = el("select");
-        for (const [v, t] of c.o) { const o = el("option", null, texteDe(t)); o.value = v; inp.appendChild(o); }
+        for (const [v, t] of optionsDe(c)) { const o = el("option", null, texteDe(t)); o.value = v; inp.appendChild(o); }
+        if (c.nombre) inp.dataset.nombre = "1";   // une liste d'années : la valeur reste un nombre
       } else {
         inp = el("input"); inp.type = c.t === "month" || c.t === "date" ? c.t : "number";
         if (inp.type === "number") { inp.step = c.s || 1; inp.inputMode = "decimal"; if (c.neg) { inp.dataset.neg = "1"; inp.inputMode = "text"; } else inp.min = "0"; }
@@ -251,7 +254,7 @@ window.Verrou.quandOuvert(function () {
   const FEUILLES = {
     revenu: ["Revenu", CHAMPS.revenu],
     impot: ["Impôt", CHAMPS.impot],
-    menage: ["Ménage et couple", CHAMPS.menage],
+    menage: ["Famille et ménage", CHAMPS.menage],
     strategie: ["Plan de remboursement", CHAMPS.strategie],
     epargne: ["Épargne et biens", CHAMPS.epargne],
     hypotheses: ["Hypothèses de l'avenir", CHAMPS.hypotheses],
@@ -319,7 +322,7 @@ window.Verrou.quandOuvert(function () {
         return;
       }
     }
-    c.appendChild(el("p", "aide", "Montant, période et qui paie. « Partagée » suit votre part des dépenses partagées (bouton Ménage du budget)." + (AIDE_CATEGORIE[g] ? " " + AIDE_CATEGORIE[g] : "")));
+    c.appendChild(el("p", "aide", "Montant, période et qui paie. « Partagée » suit votre part des dépenses partagées (bouton Famille du budget)." + (AIDE_CATEGORIE[g] ? " " + AIDE_CATEGORIE[g] : "")));
     S.budget.forEach((b, i) => { if (categorie(b) === g) c.appendChild(ligneDepense(b, i)); });
     if (g === "Autres dépenses") {
       const a = el("div", "feuille-actions");
@@ -1080,9 +1083,9 @@ window.Verrou.quandOuvert(function () {
     if (R.celiappVoulu > R.celiappAnnee(0) + 0.5) action("info", `Votre cotisation CELIAPP prévue (${$(R.celiappVoulu)} par année) dépasse vos droits : l'app compte ${$(R.celiappAnnee(0))} cette année (8 000 $ par année, plus les droits reportés, et 40 000 $ à vie).`);
     if (S.revenu.annee === "premiere" && !R.residenceActive && +S.revenu.anneePremiere && +String(S.strategie.debut).slice(0, 4) > +S.revenu.anneePremiere)
       action("info", `Votre première année de pratique (${S.revenu.anneePremiere}) est terminée : quand votre clientèle sera bâtie, choisissez « Année type » (Revenu, Modifier).`);
-    if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Ménage) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
+    if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Famille) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     // En résidence, le régime d'assurance collective de l'entente de la FMRQ couvre les médicaments (art. 28.10).
-    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si cette assurance collective vous couvre, décochez le régime public (Budget, bouton Ménage) ; la prime, jusqu'à 789 $, ne s'applique pas.");
+    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si cette assurance collective vous couvre, décochez le régime public (Budget, bouton Famille) ; la prime, jusqu'à 789 $, ne s'applique pas.");
     else if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
       action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 789 $ par adulte du 1er juillet 2026 au 30 juin 2027, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
     const auj = new Date(S.strategie.debut + "-01T00:00:00");
@@ -2195,7 +2198,7 @@ window.Verrou.quandOuvert(function () {
     });
     rangees("bu-depenses", [
       ...lignesCat.filter(x => !x.vide),
-      { titre: vue === "conjointe" ? "Son épargne" : "Épargne : REEE, REER, CELI, objectifs", sous: vue === "conjointe" ? "Bouton Ménage" : vue === "menage" && R.epargneConjointe ? `La vôtre et celle de ${votreP()}` : "Page Patrimoine", valeur: $(V.epargne) },
+      { titre: vue === "conjointe" ? "Son épargne" : "Épargne : REEE, REER, CELI, objectifs", sous: vue === "conjointe" ? "Bouton Famille" : vue === "menage" && R.epargneConjointe ? `La vôtre et celle de ${votreP()}` : "Page Patrimoine", valeur: $(V.epargne) },
       { titre: "Total des dépenses et de l'épargne", cls: "total", valeur: $(V.dep + V.epargne) },
     ]);
     const vides = lignesCat.filter(x => x.vide);
@@ -3004,7 +3007,7 @@ window.Verrou.quandOuvert(function () {
     return out;
   }
   function changementsPlan(a, b) {
-    const valeurTexte = (c, v) => c.t === "select" ? texteDe((c.o.find(([k]) => String(k) === String(v)) || [null, v])[1]) : c.t === "check" ? (v ? "oui" : "non") : typeof v === "number" ? nb(v) : String(v ?? "—");
+    const valeurTexte = (c, v) => c.t === "select" ? texteDe((optionsDe(c).find(([k]) => String(k) === String(v)) || [null, v])[1]) : c.t === "check" ? (v ? "oui" : "non") : typeof v === "number" ? nb(v) : String(v ?? "—");
     const champs = [], autres = new Set();
     for (const [p, va, vb] of differences(a, b)) {
       const c = DEF_CHAMPS.get(p);
@@ -3611,6 +3614,7 @@ window.Verrou.quandOuvert(function () {
   const plusTard = () => { clearTimeout(minuterie); minuterie = setTimeout(() => { sauver(); tout(); }, 120); };
   function valeur(inp) {
     if (inp.type === "checkbox") return inp.checked;
+    if (inp.dataset.nombre) return +inp.value || 0;
     if (inp.type === "number") { const v = parseFloat(String(inp.value).replace(",", ".")); return isFinite(v) ? (inp.dataset.neg ? v : Math.max(0, v)) : null; }
     return inp.value;
   }

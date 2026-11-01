@@ -1332,6 +1332,13 @@ async function prochainPaiement(b, base) {
   const x = await p.evaluate(() => document.getElementById("im-r-payer").textContent);
   verifier("impôt : le prochain paiement est l'acompte du 15 mars, même derrière cinq autres échéances", x.includes("Acompte provisionnel") && !x.includes("Aucun acompte"), x);
   const coupes = await p.evaluate(() => { window.Wealthnord.rendreTout(); return (document.querySelector("main") || document.body).innerText.match(/.{0,30}\d [$%].{0,10}/g); });
+  await remplacer(p, { "revenu.annee": "premiere", "revenu.anneePremiere": 0 }); await p.reload(); await pret(p); await allerA(p, "revenu");
+  await p.click("#v-revenu .bouton-modifier"); await p.waitForTimeout(200);
+  const choixAn = await p.evaluate(() => [...document.querySelectorAll("#c-revenu-anneePremiere option")].map(o => o.textContent));
+  await p.selectOption("#c-revenu-anneePremiere", "2027"); await p.waitForTimeout(300);
+  const anPrem = await p.evaluate(() => window.Wealthnord.etat().revenu.anneePremiere);
+  verifier("revenu : l'année de la première année se choisit dans une liste ; la valeur reste un nombre", choixAn[0] === "L'année du début du plan" && choixAn.includes("2027") && anPrem === 2027, { choixAn, anPrem });
+  await p.keyboard.press("Escape");
   verifier("typographie : aucun montant ne se coupe avant « $ » ou « % »", !coupes, coupes);
   verifier("impôt : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
