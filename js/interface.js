@@ -194,7 +194,7 @@
     (options.points || []).forEach(p => { s += `<circle class="point-fixe" r="4.5" cx="${x(Math.min(n - 1, p.i)).toFixed(1)}" cy="${y(p.v).toFixed(1)}" style="fill:${p.couleur}"/>`; });
     s += `<line class="reticule" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" visibility="hidden"/>`;
     series.forEach((se, j) => { s += `<circle class="point" r="5" cx="0" cy="0" visibility="hidden" data-j="${j}" style="fill:${se.couleur}"/>`; });
-    s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" tabindex="0" data-zone="1" role="slider" aria-valuemin="0" aria-valuemax="${n - 1}" aria-valuenow="${n - 1}" aria-label="${options.titre} : glissez ou utilisez les flèches pour les valeurs"/>`;
+    s += `<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" tabindex="0" data-zone="1" role="slider" aria-valuemin="0" aria-valuemax="${n - 1}" aria-valuenow="${n - 1}" aria-valuetext="${esc(`${options.titreX ? options.titreX(n - 1) : etiquettesX[n - 1]} : ${series.map(se => `${se.nom} ${$(se.valeurs[n - 1])}`).join(", ")}`)}" aria-label="${esc(options.titre)} : glissez ou utilisez les flèches pour les valeurs"/>`;
     s += "</svg>";
     boite.innerHTML = s;
     const bulle = el("div", "bulle"); bulle.hidden = true; boite.appendChild(bulle);

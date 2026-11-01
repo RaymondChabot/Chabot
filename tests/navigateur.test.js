@@ -78,7 +78,7 @@ async function exemple(b, base) {
     const d = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     verifier(`page ${page} : pas de défilement horizontal à 390 px`, d <= 0, d);
   }
-  verifier("données : restaurer une sauvegarde", (await p.textContent('label[for="importer"]')).includes("Restaurer une sauvegarde"));
+  verifier("données : restaurer une sauvegarde, un vrai bouton", (await p.textContent("#restaurer-fichier")).includes("Restaurer une sauvegarde"));
   await allerA(p, "apercu");
   await p.click("#ap-assistant"); await p.waitForTimeout(300);
   verifier("assistant : pas d'import", !(await p.evaluate(() => [...document.querySelectorAll("#assistant label, #assistant button")].some(x => /import/i.test(x.textContent)))));
@@ -1246,6 +1246,26 @@ async function importSur(b, base) {
   await ctx.close();
 }
 
+/* 37. Accessibilité (lot 8) : restaurer au clavier ; le focus reste dans un dialogue ; contrastes du thème sombre ;
+   les liens « Détail » nommés par leur carte. */
+async function accessibiliteLot8(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "donnees" });
+  verifier("a11y : « Restaurer une sauvegarde » est un bouton atteignable", await p.evaluate(() => { const x = document.getElementById("restaurer-fichier"); x.focus(); return document.activeElement === x && x.tagName === "BUTTON"; }));
+  await allerA(p, "revenu"); await p.click("#v-revenu .bouton-modifier"); await p.waitForTimeout(200);
+  const dansDialogue = [];
+  for (let i = 0; i < 80; i++) { await p.keyboard.press("Tab"); dansDialogue.push(await p.evaluate(() => !!document.activeElement.closest("dialog") && document.activeElement !== document.body)); }
+  verifier("a11y : Tab ne sort jamais du panneau ouvert", dansDialogue.every(Boolean));
+  await p.keyboard.press("Escape");
+  const lien = await p.evaluate(() => document.querySelector("#rv-r-sources a.lien-carte").getAttribute("aria-label"));
+  verifier("a11y : le lien « Détail » dit sa carte", lien === "Détail : D'où vient le revenu", lien);
+  await p.emulateMedia({ colorScheme: "dark" });
+  const couleurs = await p.evaluate(() => { const b = document.createElement("button"); b.className = "bouton danger plein"; document.body.appendChild(b);
+    const c = getComputedStyle(b).color; b.remove(); return { c, axe: getComputedStyle(document.documentElement).getPropertyValue("--axe").trim() }; });
+  verifier("a11y : en sombre, texte foncé sur le bouton destructeur", couleurs.c === "rgb(14, 14, 13)", couleurs);
+  verifier("a11y : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 30. Le plan suit le calendrier : au premier lancement d'un nouveau mois, il repart du mois courant ; les soldes ne
    bougent pas (la personne les met à jour avec ses relevés). L'avis permet d'annuler pour ce mois-ci, sans perdre une
    modification faite pendant l'avis. Niveau de résidence au 1er juillet ; enfants et privilège au 1er janvier ;
@@ -1302,7 +1322,7 @@ async function planCalendrier(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

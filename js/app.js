@@ -937,7 +937,7 @@ window.Verrou.quandOuvert(function () {
   function carteResume(id, titre, lien, ...contenu) {
     const c = document.getElementById(id); c.textContent = "";
     const tete = el("div", "carte-tete"); tete.appendChild(el("h2", null, titre));
-    if (lien) { const a = el("a", "lien-carte", lien[0]); a.href = lien[1]; tete.appendChild(a); }
+    if (lien) { const a = el("a", "lien-carte", lien[0]); a.href = lien[1]; a.setAttribute("aria-label", `${lien[0]} : ${titre}`); tete.appendChild(a); }
     c.appendChild(tete);
     contenu.filter(Boolean).forEach(x => c.appendChild(typeof x === "string" ? el("p", "aide", x) : x));
     return c;
@@ -2526,6 +2526,25 @@ window.Verrou.quandOuvert(function () {
     });
   }
   document.getElementById("outils-avances").addEventListener("change", e => { e.stopPropagation(); basculerAvances(e.target.checked); });
+  // Dialogues : Tab et Maj+Tab tournent dans le dialogue, sans passer par la page (focus toujours visible).
+  document.querySelectorAll("dialog").forEach(d => d.addEventListener("keydown", e => {
+    if (e.key !== "Tab") return;
+    const f = [...d.querySelectorAll("a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])")].filter(x => !x.disabled && x.getClientRects().length);
+    if (!f.length) return;
+    const premier = f[0], dernier = f[f.length - 1];
+    if (e.shiftKey && (document.activeElement === premier || !d.contains(document.activeElement))) { e.preventDefault(); dernier.focus(); }
+    else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier.focus(); }
+  }));
+  // Tableaux qui défilent à l'horizontale : atteignables au clavier, nommés par leur carte.
+  function tableauxDefilants() {
+    document.querySelectorAll(".tableau-defile").forEach(z => {
+      if (z.scrollWidth > z.clientWidth + 1) {
+        z.tabIndex = 0; z.setAttribute("role", "region");
+        const h = z.closest(".carte") && z.closest(".carte").querySelector("h2");
+        z.setAttribute("aria-label", `${h ? h.textContent : "Tableau"} : faites défiler pour tout voir`);
+      } else { z.removeAttribute("tabindex"); z.removeAttribute("role"); z.removeAttribute("aria-label"); }
+    });
+  }
   function tout() {
     R = calculer();
     document.getElementById("pied-parametres").textContent = `paramètres fiscaux ${R.parametres.annee}${R.parametres.provisoire ? " (provisoires)" : ""}`;
@@ -2538,6 +2557,7 @@ window.Verrou.quandOuvert(function () {
     if (feuille.open) lexique(corps, LEXIQUE);
     document.querySelectorAll(".onglets").forEach(indiceDefilement);
     liensAvances();
+    tableauxDefilants();
   }
   // Sous-onglets qui débordent : un fondu au bord droit, tant qu'il reste des onglets à voir.
   function indiceDefilement(o) { o.classList.toggle("defile-plus", o.scrollLeft + o.clientWidth < o.scrollWidth - 2); }
@@ -3892,6 +3912,7 @@ window.Verrou.quandOuvert(function () {
   const formFichier = document.getElementById("fichier-chiffre"), phraseFichier = document.getElementById("fichier-phrase");
   let fichierChiffre = null;
   const fermerFichier = () => { fichierChiffre = null; phraseFichier.value = ""; formFichier.hidden = true; };
+  document.getElementById("restaurer-fichier").addEventListener("click", () => document.getElementById("importer").click());
   document.getElementById("importer").addEventListener("change", e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const lecteur = new FileReader();

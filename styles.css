@@ -22,7 +22,7 @@
   --encre: #121211;
   --encre-2: #45443f;
   --discret: #67655e;   /* 4,5:1 au moins sur toutes les surfaces claires */
-  --axe: #8b8981;
+  --axe: #6e6c65;   /* 4,5:1 au moins sur le blanc et sur le fond */
   --grille: #ecebe6;
   --trait: #d9d7cf;
   --ligne: #e8e6df;
@@ -610,7 +610,7 @@ a.tuile:hover { border-color: var(--trait); }
 .ligne-depense > .ligne-aide { grid-column: 1 / -1; margin: -2px 0 0; }
 .bouton-details { align-self: flex-start; margin: 4px 0 6px; }
 .bouton-details[aria-pressed="true"] { background: var(--surface-2); }
-.supprimer { width: 32px; height: 32px; border: 0; border-radius: 50%; background: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; padding: 0; }
+.supprimer { width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; padding: 0; }
 .supprimer:hover { background: var(--danger-lavis); }
 .feuille-actions { display: flex; flex-direction: column; gap: 10px; padding-top: 18px; }
 .nom-element { font: 600 16px var(--police); width: 100%; color: var(--encre); background: var(--surface-2); border: 1px solid transparent; border-radius: var(--rayon-petit); padding: 10px 12px; }
@@ -737,7 +737,8 @@ a.tuile:hover { border-color: var(--trait); }
 .as-points li { width: 20px; height: 4px; border-radius: 999px; background: var(--surface-3); }
 .as-points li.fait { background: var(--marque); }
 .as-corps { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 10px 18px 22px; display: flex; flex-direction: column; gap: 12px; }
-.as-corps h2 { font: 500 1.75rem/1.15 var(--police-titre); letter-spacing: -0.01em; outline: none; }
+.as-corps h2 { font: 500 1.75rem/1.15 var(--police-titre); letter-spacing: -0.01em; }
+.as-corps h2:focus:not(:focus-visible) { outline: none; }
 .as-etape { font-size: 0.76rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--discret); }
 .as-intro { color: var(--encre-2); font-size: 1rem; line-height: 1.5; }
 .as-choix { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -890,7 +891,7 @@ a.tuile:hover { border-color: var(--trait); }
    La barre suit la page ouverte (app.js). */
 .barre-outils { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding-top: 0; }
 .barre-outils [hidden] { display: none; }
-.barre-outils > * { min-height: 40px; justify-content: center; }
+.barre-outils > * { min-height: 44px; justify-content: center; }
 .barre-outils .bouton-icone { width: auto; border-radius: 999px; }
 .barre-outils .bouton-installer { order: 9; }
 /* Ordinateur : ces boutons sont dans la colonne de gauche et l'en-tête de chaque page. */
@@ -1072,3 +1073,10 @@ a.tuile:hover { border-color: var(--trait); }
   .vue { gap: 18px; }
 }
 @media screen and (min-width: 960px) { .vue { gap: 24px; } }
+
+/* Accessibilité, thème sombre : un texte foncé sur le rouge et le vert clairs (4,5:1 au moins). */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .bouton.danger.plein, :root:not([data-theme="light"]) .conf[aria-pressed="true"], :root:not([data-theme="light"]) .puce-conf { color: #0e0e0d; }
+}
+:root[data-theme="dark"] .bouton.danger.plein, :root[data-theme="dark"] .conf[aria-pressed="true"], :root[data-theme="dark"] .puce-conf { color: #0e0e0d; }
+.tableau-defile[tabindex]:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
