@@ -1102,3 +1102,19 @@ a.tuile:hover { border-color: var(--trait); }
 @media (min-width: 1100px) { .vue.mode-detail { align-items: stretch; } .vue.mode-detail > .hero { align-self: start; } }
 /* Téléphone étroit : les boutons longs passent à la ligne plutôt que de déborder. */
 @media (max-width: 359px) { #exporter-plan, #theme-choix button { white-space: normal; } #theme-choix button { min-width: 0; padding-left: 6px; padding-right: 6px; } }
+
+/* ============================================================
+   Finition de l'interface (après le lot 7)
+   ============================================================ */
+/* Téléphone, résumé : sur chaque page, le grand chiffre monte à côté des boutons, comme dans l'aperçu ;
+   plus de vide à gauche des boutons empilés. */
+@media screen and (max-width: 959px) {
+  .vue:not(#v-apercu):not(.avec-parcours):not(.mode-detail) > .barre-outils { grid-row: 1 / span 3; }
+  .vue:not(#v-apercu):not(.avec-parcours):not(.mode-detail) > .hero { display: contents; }
+  .vue:not(#v-apercu):not(.avec-parcours):not(.mode-detail) > .hero .hero-etiquette { grid-column: 1; grid-row: 2; align-self: end; }
+  .vue:not(#v-apercu):not(.avec-parcours):not(.mode-detail) > .hero .hero-valeur { grid-column: 1; grid-row: 3; align-self: start; font-size: clamp(1.9rem, 8.2vw, 3.2rem); }
+  .vue:not(#v-apercu):not(.avec-parcours):not(.mode-detail) > .hero .hero-sous { grid-column: 1 / -1; grid-row: 4; }
+  /* Impôt et Patrimoine : le titre, plus long, garde sa ligne ; Modifier passe dessous, à côté des boutons. */
+  .vue:is(#v-impot, #v-avenir):not(.avec-parcours):not(.mode-detail) > .tete-page { grid-column: 1; flex-wrap: wrap; }
+  .vue:is(#v-impot, #v-avenir):not(.avec-parcours):not(.mode-detail) > .barre-outils { grid-row: 1 / span 3; }
+}
