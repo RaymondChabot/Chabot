@@ -552,7 +552,7 @@ async function apercuCoherent(b, base) {
   await p.check('input[name="as-logement"][value="proprietaire"]'); await suivant(); await suivant(); await suivant();
   await p.waitForTimeout(300);
   const neuf = await p.evaluate(() => ({ etiquette: document.querySelector("#ap-hero .hero-etiquette").textContent, lien: !!document.querySelector('#ap-hero a[href="#budget/mois"]') }));
-  verifier("aperçu sans dépenses : revenu net et lien vers le budget", neuf.etiquette === "Votre revenu net mensuel" && neuf.lien, neuf);
+  verifier("aperçu sans dépenses : revenu disponible et lien vers le budget", neuf.etiquette === "Votre revenu disponible, par mois" && neuf.lien, neuf);
   await remplacer(p, { "budget.0.montant": 500 });
   verifier("aperçu avec une dépense : surplus", (await p.textContent("#ap-hero .hero-etiquette")) === "Votre surplus mensuel");
   verifier("aperçu : aucune erreur", erreurs.length === 0, erreurs);
@@ -913,7 +913,7 @@ async function residence(b, base) {
   verifier("résidence : la page Revenu montre le salaire et cache la pratique", rv.carte && rv.pratique && rv.invitation && rv.detail.includes("Salaire de l'échelle, R2") && rv.detail.includes("Début de la pratique"), rv);
   const rvr = await p.evaluate(() => ({ tuiles: [...document.querySelectorAll("#rv-r-tuiles .tuile-titre")].map(x => x.textContent), niveau: document.querySelector("#rv-r-tuiles .tuile:nth-child(3) .tuile-valeur").textContent,
     cartes: [...document.querySelectorAll("#v-revenu .resume-seul")].filter(x => x.getClientRects().length).map(x => x.id || x.className) }));
-  verifier("résidence : le résumé du Revenu montre la paie et le niveau, pas la pratique", rvr.tuiles.join() === "Net par mois,Par paie,Niveau,Début de la pratique" && rvr.niveau === "R2"
+  verifier("résidence : le résumé du Revenu montre la paie et le niveau, pas la pratique", rvr.tuiles.join() === "Net de la paie,Par paie,Niveau,Début de la pratique" && rvr.niveau === "R2"
     && !rvr.cartes.includes("rv-r-sources") && !rvr.cartes.includes("rv-r-sens"), rvr);
   await allerA(p, "impot");
   const im = await p.evaluate(() => ({ titre: document.getElementById("im-acomptes-titre").textContent, tableau: document.getElementById("im-tableau").textContent,

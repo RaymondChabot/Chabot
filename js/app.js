@@ -217,7 +217,7 @@ window.Verrou.quandOuvert(function () {
   const detailsAffiches = () => { try { return localStorage.getItem("wm.details") === "1"; } catch (e) { return false; } };
   function boutonDetails(c) {
     const b = el("button", "bouton secondaire bouton-details"); b.type = "button";
-    const maj = () => { const d = detailsAffiches(); b.textContent = d ? "Afficher l'essentiel seulement" : "Optimiser : afficher tous les détails"; b.setAttribute("aria-pressed", d ? "true" : "false"); };
+    const maj = () => { const d = detailsAffiches(); b.textContent = d ? "Afficher l'essentiel seulement" : "Afficher les tarifs, forfaits et apprenants"; b.setAttribute("aria-pressed", d ? "true" : "false"); };
     b.addEventListener("click", () => { try { localStorage.setItem("wm.details", detailsAffiches() ? "0" : "1"); } catch (e) { /* préférence non gardée */ } maj(); majVisibilite(); });
     maj(); c.appendChild(b);
   }
@@ -992,7 +992,7 @@ window.Verrou.quandOuvert(function () {
       b.type = "button"; if (suite) b.addEventListener("click", suite.action);
       carteResume("ap-r-portrait", `Votre portrait : ${P.pct} %`, ["Voir", "#apercu/detail"], j, b);
     }
-    carteResume("ap-r-mois", "Ce mois-ci", ["Budget", "#budget"], barreLegende([["Dépenses", R.depMoi, SERIES[0]], ["Dettes", R.dettesMoi, SERIES[1]],
+    carteResume("ap-r-mois", "Ce mois-ci", ["Budget", "#budget"], barreLegende([["Dépenses", R.depMoi, SERIES[0]], ["Paiements de dettes", R.dettesMoi, SERIES[1]],
       ["Épargne", R.epargneMoi, SERIES[2]], ["Surplus", Math.max(0, R.surplusMoi), SERIES[3]]]));
     const top = [...actions].sort((x, y) => ORDRE_ACTION[x.type] - ORDRE_ACTION[y.type]).slice(0, 3);
     carteResume("ap-r-actions", "À faire", actions.length > 3 ? [`Tout voir (${actions.length})`, "#apercu/detail"] : null, listeActions(el("ul", "a-faire"), top));
@@ -1010,9 +1010,9 @@ window.Verrou.quandOuvert(function () {
     if (!S.meta.exemple && !categoriesBudget().some(categorieRemplie)) {
       const lien = el("a", "lien-carte", "Entrez vos dépenses du mois"); lien.href = "#budget/mois";
       const suite = el("span"); suite.append(lien, document.createTextNode(" pour voir ce qu'il vous reste."));
-      hero("ap-hero", "Votre revenu net mensuel" + enVue, $(R.netMoi), [suite, quand], R.netMoi);
+      hero("ap-hero", "Votre revenu disponible, par mois" + enVue, $(R.netMoi), [suite, quand], R.netMoi);
     } else hero("ap-hero", "Votre surplus mensuel" + enVue, $(R.surplusMoi), [
-      R.surplusMoi >= 0 ? `Sur un revenu net de ${$(R.netMoi)} par mois` : puce("Vos sorties dépassent vos revenus", "bas", false), quand,
+      R.surplusMoi >= 0 ? `Sur un revenu disponible de ${$(R.netMoi)} par mois` : puce("Vos sorties dépassent vos revenus", "bas", false), quand,
     ], R.surplusMoi);
 
     // Ce mois-ci : où va votre revenu net.
@@ -1027,7 +1027,7 @@ window.Verrou.quandOuvert(function () {
     const base = Math.max(1, R.netMoi);
     flux.appendChild(rangees(el("div"), [
       ...parts.map(([n, v, c]) => ({ titre: n, couleur: c, valeur: $(v), valeurSous: pct(v / base, 0) + " du revenu" })),
-      { titre: "Revenu net", cls: "total", valeur: $(R.netMoi) },
+      { titre: "Revenu disponible", cls: "total", valeur: $(R.netMoi) },
     ]));
 
     const t = document.getElementById("ap-tuiles"); t.textContent = "";
@@ -1040,8 +1040,8 @@ window.Verrou.quandOuvert(function () {
     const p = R.projection, dix = p[Math.min(10, p.length - 1)];
     t.append(
       tuileLien("revenu", "Revenu brut", $(R.brutVue), R.vueResidence ? `Salaire de résident, R${R.res.niveau}` : libelleRevenu()),
-      tuileLien("impot", "Net de l'année", $(R.netVue), R.vueResidence ? "Après impôt et retenues" : R.fraisPerso(R.mode) > 0 ? "Après impôt et frais" : "Après impôt"),
-      tuileLien("budget/dettes", "Dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
+      tuileLien("impot", R.vueResidence ? "Net de la paie, l'année" : "Net de la pratique, l'année", $(R.netVue), R.vueResidence ? "Après impôt et retenues" : R.fraisPerso(R.mode) > 0 ? "Après impôt et frais" : "Après impôt"),
+      tuileLien("budget/dettes", "Solde des dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
       tuileLien("avenir", "Valeur nette", $(p[0].moi), `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}`),
     );
 
@@ -1230,13 +1230,13 @@ window.Verrou.quandOuvert(function () {
   function resumeRevenu(R) {
     if (R.vueResidence) {
       const x = R.res;
-      tuilesResume("rv-r-tuiles", [{ titre: "Net par mois", valeur: $(R.netVue / 12), sous: "Après impôt et retenues" }, { titre: "Par paie", valeur: $(R.impot.net / 26), sous: "Aux deux semaines" },
+      tuilesResume("rv-r-tuiles", [{ titre: "Net de la paie", valeur: $(R.netVue / 12), sous: "Par mois, après impôt et retenues" }, { titre: "Par paie", valeur: $(R.impot.net / 26), sous: "Aux deux semaines" },
         { titre: "Niveau", valeur: `R${x.niveau}`, sous: x.prochain ? `R${x.prochain.niveau} au ${dateLongue(x.prochain.date)}` : "Jusqu'à la pratique" },
         { titre: "Début de la pratique", valeur: moisLong(R.debutPratique), sous: delaiMois(R.moisAvantPratiqueAuj) }]);
       return;
     }
     const g = R.rev, x = g[R.mode];
-    tuilesResume("rv-r-tuiles", [{ titre: "Net par mois", valeur: $(R.nets[R.mode] / 12), sous: R.fraisPerso(R.mode) > 0 ? "Après impôt et frais" : "Après impôt" },
+    tuilesResume("rv-r-tuiles", [{ titre: "Net de la pratique", valeur: $(R.nets[R.mode] / 12), sous: R.fraisPerso(R.mode) > 0 ? "Par mois, après impôt et frais" : "Par mois, après impôt" },
       { titre: "Heures en clinique", valeur: nb(g.heures, 0) + " h", sous: "Par année" }, { titre: "Visites", valeur: nb(g.nbVisites, 0), sous: "Par année, en clinique" },
       { titre: "Patients inscrits", valeur: nb(g.inscritsFin, 0), sous: "En fin d'année" }]);
     const l = PARTS_REVENU.map(([n, f]) => [n, f(x)]).filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
@@ -1268,7 +1268,9 @@ window.Verrou.quandOuvert(function () {
       x.enseignement > 0 && { titre: "Prime de responsabilité d'enseignement", sous: `${$(x.enseignement / C.FMRQ.periodes)} par période de 28 jours`, valeur: $(x.enseignement) },
       x.autres > 0 && { titre: "Autres revenus d'emploi", valeur: $(x.autres) },
       { titre: "Total brut", cls: "total", valeur: $(x.brut) },
-      { titre: "Net après impôt et retenues", sous: `Environ ${$(R.impot.net / 26)} par paie, aux deux semaines${x.scolarite ? ` ; moins ${$(x.scolarite)} de droits de scolarité par année` : ""}`, valeur: $(net) },
+      { titre: "Paies nettes de l'année", sous: `Environ ${$(R.impot.net / 26)} par paie, aux deux semaines`, valeur: $(R.impot.net) },
+      x.scolarite > 0 && { titre: "Droits de scolarité", sous: "Payés à l'université, déjà comptés dans l'impôt", valeur: $(-x.scolarite) },
+      { titre: "Net après impôt et retenues", cls: "total", valeur: $(net) },
       x.prochain && { titre: `Au ${dateLongue(x.prochain.date)} : R${x.prochain.niveau}`, sous: "Une année de formation de plus", valeur: $(x.prochain.total + x.autres) },
       { titre: "Début de la pratique", sous: delaiMois(R.moisAvantPratiqueAuj), valeur: moisLong(R.debutPratique) },
     ]);
@@ -2327,8 +2329,8 @@ window.Verrou.quandOuvert(function () {
   }
   // Budget : le mois en tuiles ; les dépenses (estimation ou catégories) ; les dettes ; l'année.
   function resumeBudget(R, V, parCat) {
-    tuilesResume("bu-r-tuiles", [{ titre: "Revenus nets", valeur: $(V.rev), sous: "Par mois" }, { titre: "Dépenses", valeur: $(V.dep), sous: "Par mois" },
-      { titre: "Dettes", valeur: $(V.dettes), sous: "Paiements par mois" }, { titre: "Épargne", valeur: $(V.epargne), sous: "Par mois" }]);
+    tuilesResume("bu-r-tuiles", [{ titre: "Revenu disponible", valeur: $(V.rev), sous: "Par mois" }, { titre: "Dépenses", valeur: $(V.dep), sous: "Par mois" },
+      { titre: "Paiements de dettes", valeur: $(V.dettes), sous: "Par mois" }, { titre: "Épargne", valeur: $(V.epargne), sous: "Par mois" }]);
     const simple = budgetSimpleActif();
     const ed = document.getElementById("bu-r-editeur"), barres = document.getElementById("bu-r-barres"), actions = document.getElementById("bu-r-actions");
     ed.hidden = !simple; barres.hidden = simple;
@@ -2343,7 +2345,7 @@ window.Verrou.quandOuvert(function () {
     b.type = "button"; b.id = simple ? "bu-revenir-detail" : "bu-passer-estimation";
     b.addEventListener("click", () => choisirNiveauBudget(simple ? "detail" : "estimation"));
     actions.appendChild(b);
-    carteResume("bu-r-dettes", "Dettes", ["Plan", "#budget/dettes"], rangees(el("div"), S.dettes.length ? [
+    carteResume("bu-r-dettes", "Solde des dettes", ["Plan", "#budget/dettes"], rangees(el("div"), S.dettes.length ? [
       { titre: "Total aujourd'hui", sous: `${S.dettes.length} dette${S.dettes.length > 1 ? "s" : ""}`, valeur: $(R.detteTotale) },
       { titre: "Plus aucune dette", sous: `Méthode ${NOMS_METHODES[R.methode].toLowerCase()}`, valeur: R.sim.libre ? moisAn(R.sim.libre) : "jamais" },
     ] : [{ titre: "Aucune dette", sous: "Votre surplus va à l'épargne" }]));
@@ -2362,7 +2364,7 @@ window.Verrou.quandOuvert(function () {
       { titre: "Valeur nette projetée", aire: true, hauteur: 170 });
     tuilesResume("pa-r-tuiles", [{ titre: "Placements", valeur: $(x.placements), sous: "REER, CELI, comptes" },
       R.locataire ? { titre: "Logement", valeur: "Locataire", sous: "Aucune maison" } : { titre: "Équité de la maison", valeur: $(x.equiteMoi), sous: "Votre part" },
-      { titre: "Dettes", valeur: $(R.detteTotale), sous: R.sim.libre ? `Remboursées en ${moisAn(R.sim.libre)}` : "Jamais remboursées" },
+      { titre: "Solde des dettes", valeur: $(R.detteTotale), sous: R.sim.libre ? `Remboursées en ${moisAn(R.sim.libre)}` : "Jamais remboursées" },
       { titre: "Indépendance", valeur: F.annee ? String(F.annee) : "—", sous: F.annee ? `${nb(F.mult)} fois vos dépenses` : "Pas sur l'horizon" }]);
     const o = optionsProchain(R)[0];
     carteResume("pa-r-prochain", "Le prochain 1 000 $", ["Détail", "#avenir/aujourdhui"], rangees(el("div"), [
@@ -2390,7 +2392,7 @@ window.Verrou.quandOuvert(function () {
     const montrer = i => {
       const d = val[i] - val[0];
       hero("vn-hero", i === 0 ? `${qui} aujourd'hui` : `${qui} en ${p[i].annee}${unite}`, $(val[i]), [
-        i === 0 ? puce(`${signe(val[10] - val[0])} d'ici ${p[10].annee}`, val[10] >= val[0] ? "haut" : "bas", val[10] >= val[0]) : puce(`${signe(d)} par rapport à aujourd'hui`, d >= 0 ? "haut" : "bas", d >= 0),
+        i === 0 ? puce(`${p[10].annee} : ${$(val[10])} (${signe(val[10] - val[0])})`, val[10] >= val[0] ? "haut" : "bas", val[10] >= val[0]) : puce(`${signe(d)} par rapport à aujourd'hui`, d >= 0 ? "haut" : "bas", d >= 0),
         i === 0 ? null : `Entre ${$(bas[i])} et ${$(haut[i])} selon le scénario`,
       ], i === 0 ? val[0] : undefined);
     };
@@ -2547,6 +2549,7 @@ window.Verrou.quandOuvert(function () {
   }
   function tout() {
     R = calculer();
+    document.documentElement.classList.toggle("donnees-exemple", !!S.meta.exemple);   // un rappel « Exemple » près de chaque titre
     document.getElementById("pied-parametres").textContent = `paramètres fiscaux ${R.parametres.annee}${R.parametres.provisoire ? " (provisoires)" : ""}`;
     appliquerVue(R);
     appliquerSous("revenu"); appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
