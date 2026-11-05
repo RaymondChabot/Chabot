@@ -1374,11 +1374,11 @@ async function superviseurAB(b, base) {
     debord: document.documentElement.scrollWidth > document.documentElement.clientWidth, focus: document.activeElement.id }));
   const v0 = await lire();
   const x = await p.evaluate(() => window.Calc.demiJourneeSupervision({ lieu: "etablissement", palier: 1, heuresParDJ: 3.5, residents: 1, externes: 1, pec: 1, suivi: 6, pctVuln: 20 }));
-  const base0 = x.forfait + x.perDiem, ecart0 = x.intervention - x.visites;
+  const base0 = x.forfait + x.perDiem, interv0 = x.intervention + x.responsabilite, ecart0 = interv0 - x.visites;
   verifier("supervision : la demi-journée du plan (1 résident, 1 externe, 1 PEC, 6 suivis) ; l'intervention et les visites côte à côte ; rien ne déborde à 320 px",
     v0.valeurs["sab-residents"] === "1" && v0.valeurs["sab-externes"] === "1" && v0.valeurs["sab-pec"] === "1" && v0.valeurs["sab-suivi"] === "6" && v0.valeurs["sab-vuln"].startsWith("20")
     && v0.valeurs["sab-heures"].startsWith("3,5") && v0.garde === null && !v0.plan && !v0.debord
-    && v0.totaux[0].replace(/\s/g, "") === `${Math.round(base0 + x.intervention)}$` && v0.totaux[1].replace(/\s/g, "") === `${Math.round(base0 + x.visites)}$`
+    && x.responsabilite > 0 && v0.totaux[0].replace(/\s/g, "") === `${Math.round(base0 + interv0)}$` && v0.totaux[1].replace(/\s/g, "") === `${Math.round(base0 + x.visites)}$`
     && v0.choisi === (ecart0 > 0 ? "sab-total-intervention" : "sab-total-visites")
     && v0.ecart.replace(/\s/g, "").includes(`${Math.round(Math.abs(ecart0))}$`) && v0.ecart.replace(/\s/g, " ").includes("80 demi-journées"), { v0, x });
   // Des suivis de plus : les visites finissent par l'emporter.

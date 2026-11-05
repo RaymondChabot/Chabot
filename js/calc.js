@@ -413,7 +413,9 @@
     const mixte = {
       forfaitHoraire: heures * m("forfaitHoraireMixte") * maj,
       visites: (visitesMixte + visitesSrv + (visitesApprenants ? visitesAppr + visitesPendant : 0)) * maj * m("pctMixte") / 100,
-      supervision: visitesApprenants ? 0 : W * T * heuresSup * m("acteSupervision") * maj * m("pctSupervision") / 100,
+      // Avec l'intervention : l'acte, plus le forfait de responsabilité des patients vulnérables examinés pendant le bloc.
+      supervision: visitesApprenants ? 0 : W * T * heuresSup * m("acteSupervision") * maj * m("pctSupervision") / 100
+        + W * T * (apprenants + pendant) * (partVisite(r.mix, "suiviV") + partVisite(r.mix, "perioV")) * m("forfaitResponsabilite") * maj,
       ...base,
     };
     mixte.total = mixte.forfaitHoraire + mixte.visites + mixte.supervision + commun;
@@ -549,9 +551,11 @@
     const resid = Math.max(0, +o.residents || 0), ext = Math.max(0, +o.externes || 0);
     const nbVisites = resid * Math.max(0, o.patientsParResident ?? 4.5) + ext * Math.max(0, o.patientsParExterne ?? 2.5) + Math.max(0, +o.pendant || 0);
     const parVisite = Math.max(0, +o.tarifMoyen || 0) * maj * D.pctMixte / 100;
-    const supervision = heures * D.acteSupervision * maj * D.pctSupervision / 100, visites = nbVisites * parVisite;
-    return { heures, nbVisites, parVisite, supervision, visites, ecart: visites - supervision, meilleur: visites > supervision + 0.005 ? "visites" : "acte",
-      seuil: parVisite > 0 ? supervision / parVisite : null, forfait: H * D.forfaitHoraireMixte * maj, perDiem: (resid * D.perDiemResident + ext * D.perDiemExterne) * maj };
+    // Avec l'intervention : le forfait de responsabilité des patients vulnérables examinés (part des visites, pctVuln).
+    const parVuln = borne((+o.pctVuln || 0) / 100, 0, 1) * D.forfaitResponsabilite * maj;
+    const acte = heures * D.acteSupervision * maj * D.pctSupervision / 100, responsabilite = nbVisites * parVuln, supervision = acte + responsabilite, visites = nbVisites * parVisite;
+    return { heures, nbVisites, parVisite, acte, responsabilite, supervision, visites, ecart: visites - supervision, meilleur: visites > supervision + 0.005 ? "visites" : "acte",
+      parVuln, seuil: parVisite > parVuln ? acte / (parVisite - parVuln) : null, forfait: H * D.forfaitHoraireMixte * maj, perDiem: (resid * D.perDiemResident + ext * D.perDiemExterne) * maj };
   }
   /* Une demi-journée de supervision au mixte, en GMF-U, à comparer à une autre : forfait horaire, demi-per diem des
      apprenants (EP 42), et soit l'intervention de supervision (un seul acte, au plus 3,5 h, 5 h l'après-midi), soit les
@@ -566,12 +570,17 @@
     const tarifPec = tarif("pecNonVuln", "pecVuln"), tarifSuivi = tarif("suivi", "suiviV"), pct = D.pctMixte / 100;
     const forfait = H * D.forfaitHoraireMixte * maj, perDiem = (resid * D.perDiemResident + ext * D.perDiemExterne) * maj;
     const intervention = heures * D.acteSupervision * maj * D.pctSupervision / 100;
+    // Avec l'intervention, le forfait de responsabilité de chaque patient vulnérable examiné pendant la période qu'elle
+    // couvre se facture en plus (EP 40, par. 6.02 ; RAMQ, « Forfaits et suppléments pour l'inscription individuelle ») ;
+    // avec les visites, il est compris dans le tarif des visites de patients vulnérables.
+    const vulnerables = (pec + suivi) * v, responsabilite = vulnerables * D.forfaitResponsabilite * maj;
     const visitesPec = pec * tarifPec * pct, visitesSuivi = suivi * tarifSuivi * pct, visites = visitesPec + visitesSuivi;
-    const meilleur = visites > intervention + 0.005 ? "visites" : "acte";
+    const avecIntervention = intervention + responsabilite;
+    const meilleur = visites > avecIntervention + 0.005 ? "visites" : "acte";
     const choisi = o.facturation === "acte" || o.facturation === "visites" ? o.facturation : meilleur;
-    const facture = choisi === "visites" ? visites : intervention, total = forfait + perDiem + facture;
-    return { H, heures, residents: resid, externes: ext, pec, suivi, tarifPec, tarifSuivi, forfait, perDiem, intervention, visitesPec, visitesSuivi, visites,
-      meilleur, choisi, facture, total, parHeure: H > 0 ? total / H : null };
+    const facture = choisi === "visites" ? visites : avecIntervention, total = forfait + perDiem + facture;
+    return { H, heures, residents: resid, externes: ext, pec, suivi, tarifPec, tarifSuivi, forfait, perDiem, intervention, vulnerables, responsabilite,
+      visitesPec, visitesSuivi, visites, meilleur, choisi, facture, total, parHeure: H > 0 ? total / H : null };
   }
   // Une demi-journée de votre choix : les actes et les formulaires comptés, au taux horaire, au mixte et à l'acte,
   // avant et après les frais de cabinet (à l'acte ; aussi aux autres modes si la clinique les exige).

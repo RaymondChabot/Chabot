@@ -1366,9 +1366,9 @@ window.Verrou.quandOuvert(function () {
   // La demi-journée réglée : les deux façons de facturer, l'écart, l'année d'enseignement et les suivis qui manquent aux visites.
   function calculSupervision(R) {
     // Hors GMF-U, la demi-journée d'enseignement se prépare aux tarifs d'établissement (ceux du GMF-U, par défaut).
-    const o = optionsActes(R, R.milieu === "gmfu" ? null : "etablissement"), r = S.revenu, v = supervisionDJ(), M = { ...C.RAMQ, ...o.montants };
+    const o = optionsActes(R, R.milieu === "gmfu" ? null : "etablissement"), r = S.revenu, v = supervisionDJ(), M = { ...C.RAMQ, ...C.montantsLieu(o.lieu, o.liste), ...o.montants };
     const x = C.demiJourneeSupervision({ ...o, heuresParDJ: v.heures, apresMidi: v.moment === "pm", residents: v.residents, externes: v.externes, pec: v.pec, suivi: v.suivi, pctVuln: v.vuln });
-    const base = x.forfait + x.perDiem, avecIntervention = base + x.intervention, avecVisites = base + x.visites, ecart = avecVisites - avecIntervention;
+    const base = x.forfait + x.perDiem, avecIntervention = base + x.intervention + x.responsabilite, avecVisites = base + x.visites, ecart = avecVisites - avecIntervention;
     const anDJ = Math.min(+r.enseignement || 0, +r.demiJournees || 0) * Math.max(0, +r.semaines || 0);
     const parSuivi = x.tarifSuivi * M.pctMixte / 100, manque = ecart < -0.005 && parSuivi > 0 ? Math.floor(-ecart / parSuivi + 1e-9) + 1 : 0;
     return { o, v, M, x, avecIntervention, avecVisites, ecart, egal: Math.abs(ecart) < 0.5, anDJ, manque };
@@ -1438,16 +1438,20 @@ window.Verrou.quandOuvert(function () {
       { cellules: ["Forfait horaire", $2(x.forfait), $2(x.forfait)] },
       { cellules: ["Demi-per diem des apprenants", $2(x.perDiem), $2(x.perDiem)] },
       { cellules: [`Intervention de supervision, ${nb(x.heures, 2)} h`, $2(x.intervention), "—"] },
+      { cellules: [`Forfait de responsabilité, ${nb(x.vulnerables, 1)} patient${x.vulnerables > 1 ? "s" : ""} vulnérable${x.vulnerables > 1 ? "s" : ""}`, $2(x.responsabilite), "compris"] },
       { cellules: [`Visites de prise en charge (${nb(x.pec, 0)})`, "—", $2(x.visitesPec)] },
       { cellules: [`Visites de suivi (${nb(x.suivi, 0)})`, "—", $2(x.visitesSuivi)] },
       { cls: "total", cellules: ["Total de la demi-journée", $2(avecIntervention), $2(avecVisites)] },
     ]);
     document.getElementById("sab-note").textContent = `Forfait horaire : ${$2(M.forfaitHoraireMixte * maj)} l'heure, dans les deux cas. Demi-per diem (EP 42) : par résident et par externe, dans les deux cas. `
       + `Intervention de supervision : ${$2(M.acteSupervision * maj)} l'heure payée à ${nb(M.pctSupervision, 2)} %, au plus ${nb(M.supervisionMaxH, 1)} h (5 h l'après-midi), un seul acte quel que soit le nombre d'apprenants ; `
-      + "les visites faites pendant le bloc ne se facturent alors pas. "
-      + `Visites : ${nb(M.pctMixte, 2)} % du tarif, les vôtres et celles des apprenants ; prise en charge ${$2(x.tarifPec)} et suivi ${$2(x.tarifSuivi)}, selon la part de patients vulnérables. Montants avant les frais et l'impôt.`;
+      + `les visites faites pendant le bloc ne se facturent alors pas, mais le forfait de responsabilité (${$2(M.forfaitResponsabilite * maj)}) de chaque patient vulnérable examiné, oui (EP 40, par. 6.02). `
+      + `Visites : ${nb(M.pctMixte, 2)} % du tarif, les vôtres et celles des apprenants ; prise en charge ${$2(x.tarifPec)} et suivi ${$2(x.tarifSuivi)}, selon la part de patients vulnérables (le forfait de responsabilité est compris dans le tarif des visites de patients vulnérables). Montants avant les frais et l'impôt.`;
     if (U.sdjFocus) { const f = document.getElementById(U.sdjFocus); U.sdjFocus = null; if (f && !f.disabled) f.focus(); }
   }
+  // Part des visites du plan faites à des patients vulnérables (suivis et périodiques de patients vulnérables), en %.
+  const pctVulnPlan = () => { const m = S.revenu.mix || {}, cles = ["suivi", "suiviV", "perioV", "pedia", "gross"], t = cles.reduce((a, k) => a + Math.max(0, +m[k] || 0), 0);
+    return t > 0 ? (Math.max(0, +m.suiviV || 0) + Math.max(0, +m.perioV || 0)) / t * 100 : 0; };
   const NOMS_MODE_ACTES = { horaire: "Le taux horaire", mixte: "Le mixte", acte: "L'acte" };
   function rendreActes(R) {
     const r = S.revenu, o = optionsActes(R), D = { ...C.RAMQ, ...o.montants }, maj = 1 + (+r.majorationPct || 0) / 100;
@@ -1469,9 +1473,10 @@ window.Verrou.quandOuvert(function () {
       { p: "revenu.heuresParDJ", l: "Heures par demi-journée", u: "h", s: 0.25 },
     ]);
     const so = C.supervisionOuVisites({ ...o, heuresParDJ: r.heuresParDJ, apresMidi: pm, residents: r.residents, externes: r.externes,
-      patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision });
+      patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision, pctVuln: pctVulnPlan() });
     rangees("rv-sup-resultat", [
-      { titre: "Intervention de supervision", sous: `${nb(so.heures, 2)} h × ${$2(D.acteSupervision * maj)} × ${nb(D.pctSupervision, 2)} %${pm ? " (jusqu'à 5 h l'après-midi)" : " (au plus 3,5 h)"}`, valeur: $2(so.supervision), cls: so.meilleur === "acte" ? "choisi" : null },
+      { titre: "Intervention de supervision", sous: `${nb(so.heures, 2)} h × ${$2(D.acteSupervision * maj)} × ${nb(D.pctSupervision, 2)} %${pm ? " (jusqu'à 5 h l'après-midi)" : " (au plus 3,5 h)"}`
+        + (so.responsabilite > 0.005 ? `, plus ${$2(so.responsabilite)} de forfaits de responsabilité (patients vulnérables)` : ""), valeur: $2(so.supervision), cls: so.meilleur === "acte" ? "choisi" : null },
       { titre: "Visites des apprenants", sous: `${nb(so.nbVisites, 1)} visites × ${$2(so.parVisite)} (${nb(D.pctMixte, 2)} % d'une visite moyenne de ${$2(o.tarifMoyen * maj)})`, valeur: $2(so.visites), cls: so.meilleur === "visites" ? "choisi" : null },
       { titre: "En plus, dans les deux cas", sous: `Forfait horaire ${$2(so.forfait)}${so.perDiem > 0 ? ` ; demi-per diem ${$2(so.perDiem)}` : ""}`, valeur: $2(so.forfait + so.perDiem) },
     ]);
@@ -1492,7 +1497,7 @@ window.Verrou.quandOuvert(function () {
     }
     const nCour = Math.round(so.nbVisites * 10) / 10, liste = [...new Set([2, 4, 6, 8, 10, 12, 14, 16, nCour])].filter(n => n > 0).sort((a, b) => a - b);
     lignes(document.getElementById("rv-sup-table"), ["Visites", "Rapportent", "Écart"],
-      liste.map(n => ({ cls: n === nCour ? "choisi" : null, cellules: [nb(n, 1), $2(n * so.parVisite), signe$2(n * so.parVisite - so.supervision)] })));
+      liste.map(n => ({ cls: n === nCour ? "choisi" : null, cellules: [nb(n, 1), $2(n * so.parVisite), signe$2(n * (so.parVisite - so.parVuln) - so.acte)] })));
 
     // 2. Ce que rapporte chaque acte.
     const actes = C.valeurActes(o), sup15 = D.acteSupervision / 4 * maj * D.pctSupervision / 100;
@@ -1573,7 +1578,7 @@ window.Verrou.quandOuvert(function () {
       const o = optionsActes(R), T = Math.min(+r.enseignement || 0, +r.demiJournees || 0);
       const pm = U.supMoment ? U.supMoment === "pm" : T > 0 && (+r.enseignementApresMidi || 0) >= T;
       const so = C.supervisionOuVisites({ ...o, heuresParDJ: r.heuresParDJ, apresMidi: pm, residents: r.residents, externes: r.externes,
-        patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision });
+        patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision, pctVuln: pctVulnPlan() });
       const n = des(so.seuil);
       const morceau = (q, un, plusieurs) => {
         const p = Math.max(0, +q || 0);

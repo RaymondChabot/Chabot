@@ -177,7 +177,9 @@ const gtv = C.revenuGmfu({ ...rev, partVulnerable: 10, partTresVulnerable: 10, f
 verifier("très vulnérables : forfait annuel propre", proche(gtv.acte.forfaitVulnerable - C.revenuGmfu({ ...rev, partVulnerable: 20 }).acte.forfaitVulnerable, 500 * 0.10 * (155 - 47), 0.01));
 const gsup = C.revenuGmfu({ ...rev, supervisionFacturation: "visites", residents: 1, externes: 1 });
 verifier("apprenants : 4,5 + 2,5 visites par demi-journée d'enseignement", proche(gsup.visitesApprenants, 46 * 3 * 7, 1e-9) && gsup.mixte.supervision === 0 && gsup.mixte.visites > g.mixte.visites);
-verifier("apprenants : au mixte, intervention de supervision par défaut", proche(g.mixte.visites, g0.mixte.visites, 1e-6) && proche(g.mixte.supervision, 46 * 3 * 3.5 * 99.48 * 0.6215, 0.01));
+// Avec l'intervention, le forfait de responsabilité (8,25 $ en établissement) de chaque patient vulnérable examiné : 20 % des visites ici.
+verifier("apprenants : au mixte, intervention de supervision par défaut, avec le forfait de responsabilité des vulnérables",
+  proche(g.mixte.visites, g0.mixte.visites, 1e-6) && proche(g.mixte.supervision, 46 * 3 * 3.5 * 99.48 * 0.6215 + 46 * 3 * 4.5 * 0.20 * 8.25, 0.01));
 const gsrv = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, pctSrvComplexe: 50 });
 verifier("SRV : patient payé moins qu'une visite de rendez-vous", gsrv.tarifMoyenSrv < gsrv.tarifMoyenRdv && gsrv.tarifMoyenSrv > 0);
 verifier("SRV : visites ponctuelles à l'acte, sans supplément", proche(gsrv.acte.total - C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 0 }).acte.total, 46 * 12 * (0.5 * 17.70 + 0.5 * 35.40), 0.5) && gsrv.acte.supplementsSRV === undefined);
@@ -415,8 +417,8 @@ verifier("supervision : les patients vus pendant le bloc ne se facturent pas ave
   && sup({ patientsPendantSupervision: 3, supervisionFacturation: "visites" }).mixte.visites > sup({ supervisionFacturation: "visites" }).mixte.visites
   && sup({ patientsPendantSupervision: 3 }).acte.visites > sup().acte.visites);
 verifier("supervision : 3,5 h l'avant-midi, jusqu'à 5 h l'après-midi (2 473,07 $ de plus pour 80 demi-journées de 4 h)",
-  proche(sup().mixte.supervision, 40 * 2 * 3.5 * 99.48 * 0.6215, 1e-6) && proche(sup({ enseignementApresMidi: 2 }).mixte.supervision - sup().mixte.supervision, 2473.07, 0.01)
-  && proche(sup({ enseignementApresMidi: 1 }).mixte.supervision, 40 * (3.5 + 4) * 99.48 * 0.6215, 1e-6));
+  proche(sup().mixte.supervision, 40 * 2 * 3.5 * 99.48 * 0.6215 + 40 * 2 * 4.5 * 0.20 * 8.25, 1e-6) && proche(sup({ enseignementApresMidi: 2 }).mixte.supervision - sup().mixte.supervision, 2473.07, 0.01)
+  && proche(sup({ enseignementApresMidi: 1 }).mixte.supervision, 40 * (3.5 + 4) * 99.48 * 0.6215 + 40 * 2 * 4.5 * 0.20 * 8.25, 1e-6));
 const dme = o => C.compensationCabinet({ patientsParDJ: 0, membreGmf: false, annee: "type", ...o }, 40, 8, 600).dme;
 verifier("DMÉ : hors GMF, licences et équipements ; le lien Internet et le commutateur (19977) seulement si réclamé", proche(dme({}), 4 * (459.90 + 287.45), 1e-6)
   && proche(dme({ dmeInternet: true }), 4 * (459.90 + 287.45 + 700.35), 1e-6) && proche(dme({ dmeInternet: true, membreGmf: true }), 4 * 459.90, 1e-6));
@@ -491,19 +493,23 @@ const simEtudes = C.simulerDettes([pretEtudes], { debut: "2026-06", methode: "mi
 verifier("intérêts d'études : la première année est sous 1 500 $, le total suit les paiements, puis 0",
   periodesEtudes[0] > 0 && periodesEtudes[0] < 1500 && proche(sommeEtudes, simEtudes.interetsTotaux, 0.05)
   && proche(sommeEtudes, 8183.46, 0.05) && periodesEtudes[periodesEtudes.length - 1] === 0, { an0: periodesEtudes[0], somme: sommeEtudes });
+const sov = C.supervisionOuVisites({ heuresParDJ: 3.5, residents: 1, tarifMoyen: 36.95, pctVuln: 20 });
+verifier("supervision ou visites : l'intervention compte le forfait de responsabilité des vulnérables ; le seuil en tient compte",
+  proche(sov.responsabilite, 4.5 * 0.2 * 8.25, 1e-9) && proche(sov.supervision, sov.acte + sov.responsabilite, 1e-9)
+  && proche(sov.seuil, sov.acte / (36.95 * 0.6358 - 0.2 * 8.25), 1e-9), sov);
 // Demi-journée de supervision au mixte, A contre B : 3,5 h, établissement, moins de 500 inscrits, 20 % de vulnérables.
 const djA = C.demiJourneeSupervision({ heuresParDJ: 3.5, residents: 1, pec: 1, suivi: 4, pctVuln: 20 });
 const djB = C.demiJourneeSupervision({ heuresParDJ: 3.5, residents: 2, pec: 1, suivi: 9, pctVuln: 20 });
-verifier("supervision A/B : forfait 208,88 $, demi-per diem 41,45 $, intervention 216,39 $ (l'emporte sur 5 visites)",
-  proche(djA.forfait, 208.88, 0.005) && proche(djA.perDiem, 41.45, 0.005) && proche(djA.intervention, 3.5 * 99.48 * 0.6215, 1e-6)
-  && proche(djA.tarifPec, 0.8 * 64.50 + 0.2 * 72.65, 1e-9) && djA.choisi === "acte" && proche(djA.total, 208.88 + 41.45 + 216.39387, 0.001), djA);
+verifier("supervision A/B : forfait 208,88 $, demi-per diem 41,45 $, intervention 216,39 $ plus le forfait de responsabilité d'un vulnérable sur 5 (8,25 $)",
+  proche(djA.forfait, 208.88, 0.005) && proche(djA.perDiem, 41.45, 0.005) && proche(djA.intervention, 3.5 * 99.48 * 0.6215, 1e-6) && proche(djA.responsabilite, 8.25, 1e-9)
+  && proche(djA.tarifPec, 0.8 * 64.50 + 0.2 * 72.65, 1e-9) && djA.choisi === "acte" && proche(djA.total, 208.88 + 41.45 + 216.39387 + 8.25, 0.001), djA);
 verifier("supervision A/B : avec deux résidents et 10 visites, les visites l'emportent ; un choix imposé est respecté",
   djB.choisi === "visites" && proche(djB.visites, (66.13 + 9 * (0.8 * 32.25 + 0.2 * 40.50)) * 0.6358, 0.001) && proche(djB.perDiem, 82.90, 0.005)
   && C.demiJourneeSupervision({ heuresParDJ: 3.5, residents: 2, pec: 1, suivi: 9, pctVuln: 20, facturation: "acte" }).choisi === "acte"
   && C.demiJourneeSupervision({ heuresParDJ: 4, apresMidi: true }).heures === 4 && C.demiJourneeSupervision({ heuresParDJ: 4 }).heures === 3.5, djB);
 // Supervision au mixte : recalcul indépendant, montants recopiés de la Brochure no 1 (audit B), sur une grille de cas.
 {
-  const OFF = { heure: 59.68, pct: 0.6358, sup: 24.87 * 4, pctT: 0.6215,
+  const OFF = { heure: 59.68, pct: 0.6358, sup: 24.87 * 4, pctT: 0.6215, resp: { etablissement: 8.25, cabinet: 10.60 },
     perDiem: { etablissement: { 1: [41.45, 49.85], 2: [65.20, 73.55] }, cabinet: { 1: [55.35, 66.45], 2: [86.95, 98.00] } },
     t: { etablissement: { pec: [64.50, 74.75], pecV: [72.65, 82.90], suivi: [32.25, 36.95], suiviV: [40.50, 45.20] },
       cabinet: { pec: [85.75, 99.40], pecV: [96.35, 110.00], suivi: [42.85, 49.15], suiviV: [53.50, 59.80] } } };
@@ -513,9 +519,9 @@ verifier("supervision A/B : avec deux résidents et 10 visites, les visites l'em
     const x = C.demiJourneeSupervision({ lieu, palier, liste, majorationPct: maj, heuresParDJ: H, apresMidi: pm, residents: res, externes: ext, pec, suivi, pctVuln: vuln });
     const m = 1 + maj / 100, t = OFF.t[lieu], v = vuln / 100, [pr, pe] = OFF.perDiem[lieu][liste];
     const base = H * OFF.heure * m + (res * pr + ext * pe) * m;
-    const interv = base + Math.min(H, pm ? 5 : 3.5) * OFF.sup * m * OFF.pctT;
+    const interv = base + Math.min(H, pm ? 5 : 3.5) * OFF.sup * m * OFF.pctT + (pec + suivi) * v * OFF.resp[lieu] * m;
     const visites = base + (pec * ((1 - v) * t.pec[palier] + v * t.pecV[palier]) + suivi * ((1 - v) * t.suivi[palier] + v * t.suiviV[palier])) * m * OFF.pct;
-    pire = Math.max(pire, Math.abs(x.forfait + x.perDiem + x.intervention - interv), Math.abs(x.forfait + x.perDiem + x.visites - visites)); n++;
+    pire = Math.max(pire, Math.abs(x.forfait + x.perDiem + x.intervention + x.responsabilite - interv), Math.abs(x.forfait + x.perDiem + x.visites - visites)); n++;
   }
   verifier(`supervision : ${n} cas recalculés à partir des montants officiels, au cent près`, pire < 0.005, pire);
 }

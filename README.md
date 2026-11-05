@@ -185,7 +185,8 @@ ou 500 inscrits et plus) ; les formulaires de la CNESST et de l'IVAC
   Supervision de Revenu, et carte du résumé de Revenu en GMF-U) : une demi-journée à régler (résidents,
   externes, visites de prise en charge et de suivi, part de patients
   vulnérables, moment et durée), et côte à côte ce qu'elle rapporte au
-  mixte avec l'intervention de supervision et avec les visites. Taux horaire plafonné à 1 540 heures par année à 100 %
+  mixte avec l'intervention de supervision (plus le forfait de responsabilité
+  de chaque patient vulnérable examiné, EP 40, par. 6.02) et avec les visites. Taux horaire plafonné à 1 540 heures par année à 100 %
   (dépassement autorisé modifiable). Montants liés au volume de patients
   et majoration de la pratique polyvalente sur les activités en
   établissement. Tous les tarifs, forfaits et suppléments se modifient ;
