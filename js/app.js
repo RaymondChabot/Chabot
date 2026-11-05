@@ -1321,113 +1321,90 @@ window.Verrou.quandOuvert(function () {
     const total = cles.reduce((t, k) => t + Math.max(0, +mix[k] || 0), 0) || 1;
     return Object.fromEntries(cles.map(k => [k, p * Math.max(0, +mix[k] || 0) / total]));
   }
-  /* Deux demi-journées de supervision au mixte (GMF-U), A et B côte à côte : apprenants, visites (prises en charge et
-     suivis), patients vulnérables, moment et facturation. Au départ, A est la demi-journée d'enseignement du plan et B,
-     la même avec un résident de plus. Les valeurs sont gardées dès qu'on en change une ; « Selon mon plan » repart du plan. */
-  const SAB_CHAMPS = [["residents", "Résidents", 0, 6, 1], ["externes", "Externes", 0, 6, 1], ["pec", "Visites de prise en charge", 0, 30, 1],
+  /* Une demi-journée de supervision au mixte (GMF-U) : une seule colonne de réglages (apprenants, visites de prise en
+     charge et de suivi, patients vulnérables, moment, durée), et côte à côte ce qu'elle rapporte avec l'intervention de
+     supervision et avec les visites facturées. Au départ, la demi-journée d'enseignement du plan ; les valeurs restent
+     dès qu'on en change une, et « Selon mon plan » repart du plan. */
+  const SDJ_CHAMPS = [["residents", "Résidents", 0, 6, 1], ["externes", "Externes", 0, 6, 1], ["pec", "Visites de prise en charge", 0, 30, 1],
     ["suivi", "Visites de suivi", 0, 40, 1], ["vuln", "Patients vulnérables", 0, 100, 10]];
-  const SAB_FACTURATION = [["meilleur", "Au mieux"], ["acte", "Intervention"], ["visites", "Visites"]];
   function supervisionDepart() {
     const r = S.revenu, T = Math.min(+r.enseignement || 0, +r.demiJournees || 0), pm = T > 0 && (+r.enseignementApresMidi || 0) >= T;
-    const resid = Math.max(1, Math.round(+r.residents || 0)), ext = Math.max(0, Math.round(+r.externes || 0)), ppr = +(r.patientsParResident ?? 4.5) || 0;
-    const visites = Math.round(resid * ppr + ext * (+(r.patientsParExterne ?? 2.5) || 0) + Math.max(0, +r.patientsPendantSupervision || 0));
-    const a = { residents: Math.min(6, resid), externes: Math.min(6, ext), pec: visites > 0 ? 1 : 0, suivi: Math.min(40, Math.max(0, visites - 1)),
-      vuln: Math.min(100, Math.round((+r.partVulnerable || 0) / 10) * 10), moment: pm ? "pm" : "am", facturation: "meilleur" };
-    return { heures: Math.min(8, Math.max(1, +r.heuresParDJ || 3.5)), a, b: { ...a, residents: Math.min(6, a.residents + 1), suivi: Math.min(40, a.suivi + Math.round(ppr)) } };
+    const resid = Math.max(1, Math.round(+r.residents || 0)), ext = Math.max(0, Math.round(+r.externes || 0));
+    const visites = Math.round(resid * (+(r.patientsParResident ?? 4.5) || 0) + ext * (+(r.patientsParExterne ?? 2.5) || 0) + Math.max(0, +r.patientsPendantSupervision || 0));
+    return { heures: Math.min(8, Math.max(1, +r.heuresParDJ || 3.5)), residents: Math.min(6, resid), externes: Math.min(6, ext), pec: visites > 0 ? 1 : 0,
+      suivi: Math.min(40, Math.max(0, visites - 1)), vuln: Math.min(100, Math.round((+r.partVulnerable || 0) / 10) * 10), moment: pm ? "pm" : "am" };
   }
   // Les valeurs gardées, bornées (elles peuvent venir d'un fichier importé).
-  function supervisionAB() {
-    const x = S.revenu.supervisionAB && typeof S.revenu.supervisionAB === "object" ? S.revenu.supervisionAB : null, d = supervisionDepart();
+  function supervisionDJ() {
+    const x = S.revenu.supervisionDJ && typeof S.revenu.supervisionDJ === "object" ? S.revenu.supervisionDJ : null, d = supervisionDepart();
     if (!x) return { ...d, plan: true };
-    const col = (c, dc) => {
-      const o = c && typeof c === "object" ? c : {}, y = {};
-      for (const [k, , min, max] of SAB_CHAMPS) y[k] = Number.isFinite(+o[k]) ? Math.min(max, Math.max(min, Math.round(+o[k]))) : dc[k];
-      y.moment = o.moment === "pm" ? "pm" : "am"; y.facturation = SAB_FACTURATION.some(([v]) => v === o.facturation) ? o.facturation : "meilleur";
-      return y;
-    };
-    return { heures: Number.isFinite(+x.heures) ? Math.min(8, Math.max(1, +x.heures)) : d.heures, a: col(x.a, d.a), b: col(x.b, d.b), plan: false };
+    const y = { plan: false };
+    for (const [k, , min, max] of SDJ_CHAMPS) y[k] = Number.isFinite(+x[k]) ? Math.min(max, Math.max(min, Math.round(+x[k]))) : d[k];
+    y.heures = Number.isFinite(+x.heures) ? Math.min(8, Math.max(1, +x.heures)) : d.heures;
+    y.moment = x.moment === "pm" ? "pm" : "am";
+    return y;
   }
   function changerSupervision(f, focus) {
-    const v = supervisionAB(); delete v.plan; f(v);
-    S.revenu.supervisionAB = v; S.meta.exemple = false; U.sabFocus = focus || null; sauver(); tout();
+    const v = supervisionDJ(); delete v.plan; f(v);
+    S.revenu.supervisionDJ = v; S.meta.exemple = false; U.sdjFocus = focus || null; sauver(); tout();
   }
-  function rendreSupervisionAB(o) {
-    const v = supervisionAB(), r = S.revenu, maj = 1 + (+r.majorationPct || 0) / 100;
-    const calc = c => C.demiJourneeSupervision({ ...o, heuresParDJ: v.heures, apresMidi: c.moment === "pm", residents: c.residents, externes: c.externes,
-      pec: c.pec, suivi: c.suivi, pctVuln: c.vuln, facturation: c.facturation });
-    const res = { a: calc(v.a), b: calc(v.b) }, ecart = res.b.total - res.a.total;
+  function rendreSupervisionDJ(o, anDJ) {
+    const v = supervisionDJ(), r = S.revenu, maj = 1 + (+r.majorationPct || 0) / 100, M = { ...C.RAMQ, ...o.montants };
+    const x = C.demiJourneeSupervision({ ...o, heuresParDJ: v.heures, apresMidi: v.moment === "pm", residents: v.residents, externes: v.externes, pec: v.pec, suivi: v.suivi, pctVuln: v.vuln });
+    const base = x.forfait + x.perDiem, avecIntervention = base + x.intervention, avecVisites = base + x.visites, ecart = avecVisites - avecIntervention;
     document.getElementById("sab-plan").hidden = v.plan;
-    document.getElementById("sab-intro").textContent = "Au mixte, en GMF-U : changez les apprenants et les visites de chaque demi-journée ; l'écart s'affiche en haut. AM comprend le soir. "
-      + `Tarifs ${o.lieu === "cabinet" ? "en cabinet" : "en établissement"}, ${o.palier ? "500 inscrits et plus" : "moins de 500 inscrits"}${maj !== 1 ? `, majoration de ${nb(+r.majorationPct, 1)} %` : ""}.`;
+    document.getElementById("sab-intro").textContent = "Au mixte, en GMF-U, vous facturez pour la demi-journée soit l'intervention de supervision, soit les visites. "
+      + `Réglez votre demi-journée (AM comprend le soir) : les deux montants se comparent en haut. Tarifs ${o.lieu === "cabinet" ? "en cabinet" : "en établissement"}, `
+      + `${o.palier ? "500 inscrits et plus" : "moins de 500 inscrits"}${maj !== 1 ? `, majoration de ${nb(+r.majorationPct, 1)} %` : ""}.`;
     const z = document.getElementById("sab"); z.textContent = "";
-    // En haut : le total de chaque demi-journée, la meilleure en or, et l'écart.
-    const totaux = el("div", "sab-totaux");
-    for (const k of ["a", "b"]) {
-      const x = res[k], t = el("div", "sab-total" + (Math.abs(ecart) >= 0.005 && (k === "b") === (ecart > 0) ? " choisi" : ""));
-      t.append(el("span", "sab-lettre", `Demi-journée ${k.toUpperCase()}`), el("strong", "sab-montant", $(x.total)),
-        el("span", "sab-sous", `${x.choisi === "visites" ? "Visites facturées" : "Intervention de supervision"}${x.parHeure != null ? ` · ${$(x.parHeure)}/h` : ""}`));
+    // En haut : les deux façons de facturer, la meilleure en or, puis l'écart.
+    const totaux = el("div", "sab-totaux"), egal = Math.abs(ecart) < 0.5;
+    for (const [cle, nom, total, sous] of [["intervention", "Intervention de supervision", avecIntervention, `${nb(x.heures, 2)} h payées`],
+      ["visites", "Visites facturées", avecVisites, `${nb(x.pec + x.suivi, 0)} visite${x.pec + x.suivi > 1 ? "s" : ""}`]]) {
+      const t = el("div", "sab-total" + (!egal && (cle === "visites") === (ecart > 0) ? " choisi" : "")); t.id = "sab-total-" + cle;
+      t.append(el("span", "sab-lettre", nom), el("strong", "sab-montant", $(total)), el("span", "sab-sous", `${sous} · ${$(total / Math.max(v.heures, 0.25))}/h`));
       totaux.appendChild(t);
     }
     const phrase = el("p", "conclusion sab-ecart"); phrase.id = "sab-ecart"; phrase.setAttribute("aria-live", "polite");
-    phrase.textContent = Math.abs(ecart) < 0.5 ? "Les deux demi-journées rapportent autant."
-      : `${ecart > 0 ? "B" : "A"} rapporte ${$(Math.abs(ecart))} de plus par demi-journée (${nb(Math.abs(ecart) / Math.min(res.a.total, res.b.total) * 100, 0)} %).`;
+    const parSuivi = x.tarifSuivi * M.pctMixte / 100, manque = ecart < 0 && parSuivi > 0 ? Math.floor(-ecart / parSuivi + 1e-9) + 1 : 0;
+    phrase.textContent = egal ? "Les deux façons de facturer rapportent autant."
+      : `${ecart > 0 ? "Les visites rapportent" : "L'intervention de supervision rapporte"} ${$(Math.abs(ecart))} de plus par demi-journée`
+        + `${anDJ > 0 ? `, environ ${$(Math.abs(ecart) * anDJ)} sur vos ${nb(anDJ, 0)} demi-journées d'enseignement de l'année` : ""}.`
+        + (manque > 0 ? ` Les visites l'emporteraient avec ${nb(manque, 0)} suivi${manque > 1 ? "s" : ""} de plus.` : "");
     z.append(totaux, phrase);
-    // Les réglages : un libellé, puis A et B côte à côte.
+    // Les réglages : une seule colonne.
     const grille = el("div", "sab-grille");
-    grille.append(el("span", "sab-entete"), el("span", "sab-entete", "A"), el("span", "sab-entete", "B"));
-    const ligne = (nom, cellule) => { grille.appendChild(el("span", "sab-nom", nom)); for (const k of ["a", "b"]) { const c = el("div", "sab-cell"); c.appendChild(cellule(k)); grille.appendChild(c); } };
-    ligne("Moment", k => {
-      const g = el("div", "segment petit sab-moment"); g.setAttribute("role", "radiogroup"); g.setAttribute("aria-label", `Moment, demi-journée ${k.toUpperCase()}`);
-      [["am", "AM", "Avant-midi ou soir"], ["pm", "PM", "Après-midi"]].forEach(([m, t, long]) => { const b = el("button", null, t); b.type = "button"; b.id = `sab-${k}-moment-${m}`; b.setAttribute("role", "radio");
-        b.setAttribute("aria-label", long); b.title = long;
-        b.setAttribute("aria-checked", v[k].moment === m ? "true" : "false");
-        b.addEventListener("click", () => changerSupervision(x => { x[k].moment = m; }, b.id)); g.appendChild(b); });
-      return g;
-    });
-    for (const [cle, nom, min, max, pasV] of SAB_CHAMPS) ligne(nom, k => {
-      const val = v[k][cle], boite = el("div", "sab-pas"), unite = cle === "vuln" ? " %" : "";
-      const bouton = (d, ok) => { const b = el("button", "pas", d > 0 ? "+" : "−"); b.type = "button"; b.id = `sab-${k}-${cle}-${d > 0 ? "plus" : "moins"}`; b.disabled = !ok;
-        b.setAttribute("aria-label", `${nom}, demi-journée ${k.toUpperCase()} : ${d > 0 ? "plus" : "moins"}`);
-        b.addEventListener("click", () => changerSupervision(x => { x[k][cle] = Math.min(max, Math.max(min, x[k][cle] + d * pasV)); }, b.id)); return b; };
-      const valeur = el("strong", "sab-valeur", nb(val, 0) + unite); valeur.id = `sab-${k}-${cle}`;
-      boite.append(bouton(-1, val > min), valeur, bouton(1, val < max));
+    const ligne = (nom, contenu) => { grille.appendChild(el("span", "sab-nom", nom)); const c = el("div", "sab-cell"); c.appendChild(contenu); grille.appendChild(c); };
+    const pas = (id, etiquette, symbole, ok, f) => { const b = el("button", "pas", symbole); b.type = "button"; b.id = id; b.disabled = !ok;
+      b.setAttribute("aria-label", etiquette); b.addEventListener("click", () => changerSupervision(f, id)); return b; };
+    const reglage = (cle, nom, texte, moinsOk, plusOk, f) => {
+      const boite = el("div", "sab-pas"), valeur = el("strong", "sab-valeur", texte); valeur.id = `sab-${cle}`;
+      boite.append(pas(`sab-${cle}-moins`, `${nom} : moins`, "−", moinsOk, y => f(y, -1)), valeur, pas(`sab-${cle}-plus`, `${nom} : plus`, "+", plusOk, y => f(y, 1)));
       return boite;
-    });
-    ligne("Facturer", k => {
-      const boite = el("div", "saisie"), sel = el("select"); sel.id = `sab-${k}-facturation`; sel.setAttribute("aria-label", `Facturer, demi-journée ${k.toUpperCase()}`);
-      for (const [val, t] of SAB_FACTURATION) { const op = el("option", null, t); op.value = val; sel.appendChild(op); }
-      sel.value = v[k].facturation;
-      sel.addEventListener("change", () => changerSupervision(x => { x[k].facturation = sel.value; }, sel.id));
-      boite.appendChild(sel); return boite;
-    });
+    };
+    const moment = el("div", "segment petit sab-moment"); moment.setAttribute("role", "radiogroup"); moment.setAttribute("aria-label", "Moment de la demi-journée");
+    [["am", "AM", "Avant-midi ou soir"], ["pm", "PM", "Après-midi"]].forEach(([m, t, long]) => { const b = el("button", null, t); b.type = "button"; b.id = `sab-moment-${m}`; b.setAttribute("role", "radio");
+      b.setAttribute("aria-label", long); b.title = long;
+      b.setAttribute("aria-checked", v.moment === m ? "true" : "false"); b.addEventListener("click", () => changerSupervision(y => { y.moment = m; }, b.id)); moment.appendChild(b); });
+    ligne("Moment", moment);
+    ligne("Durée", reglage("heures", "Durée de la demi-journée", `${nb(v.heures, 2)} h`, v.heures > 1, v.heures < 8, (y, d) => { y.heures = Math.min(8, Math.max(1, y.heures + d * 0.25)); }));
+    for (const [cle, nom, min, max, pasV] of SDJ_CHAMPS)
+      ligne(nom, reglage(cle, nom, nb(v[cle], 0) + (cle === "vuln" ? " %" : ""), v[cle] > min, v[cle] < max, (y, d) => { y[cle] = Math.min(max, Math.max(min, y[cle] + d * pasV)); }));
     z.appendChild(grille);
-    // Durée commune et raccourcis.
-    const duree = el("div", "sab-duree"), dPas = (d, ok) => { const b = el("button", "pas", d > 0 ? "+" : "−"); b.type = "button"; b.id = `sab-heures-${d > 0 ? "plus" : "moins"}`; b.disabled = !ok;
-      b.setAttribute("aria-label", `Durée de la demi-journée : ${d > 0 ? "plus" : "moins"} 15 minutes`);
-      b.addEventListener("click", () => changerSupervision(x => { x.heures = Math.min(8, Math.max(1, x.heures + d * 0.25)); }, b.id)); return b; };
-    const dv = el("strong", "sab-valeur", `${nb(v.heures, 2)} h`); dv.id = "sab-heures";
-    const dPasBloc = el("div", "sab-pas"); dPasBloc.append(dPas(-1, v.heures > 1), dv, dPas(1, v.heures < 8));
-    duree.append(el("span", "sab-nom", "Durée de chaque demi-journée"), dPasBloc);
-    const actions = el("div", "actions"), copier = el("button", "bouton secondaire", "Copier A dans B"); copier.type = "button"; copier.id = "sab-copier";
-    copier.addEventListener("click", () => changerSupervision(x => { x.b = { ...x.a }; }, "sab-copier"));
-    actions.appendChild(copier);
-    z.append(duree, actions);
     // Le calcul, ligne par ligne.
-    const A = res.a, B = res.b, M = { ...C.RAMQ, ...o.montants };
-    const montant = (x, oui) => oui ? $2(x) : `(${$2(x)})`;   // entre parenthèses : ce que l'autre option aurait donné
-    lignes(document.getElementById("sab-table"), ["", "A", "B"], [
-      { cellules: ["Forfait horaire", $2(A.forfait), $2(B.forfait)] },
-      { cellules: ["Demi-per diem des apprenants", $2(A.perDiem), $2(B.perDiem)] },
-      { cellules: ["Intervention de supervision", montant(A.intervention, A.choisi === "acte"), montant(B.intervention, B.choisi === "acte")] },
-      { cellules: ["Visites de prise en charge", montant(A.visitesPec, A.choisi === "visites"), montant(B.visitesPec, B.choisi === "visites")] },
-      { cellules: ["Visites de suivi", montant(A.visitesSuivi, A.choisi === "visites"), montant(B.visitesSuivi, B.choisi === "visites")] },
-      { cls: "total", cellules: ["Total de la demi-journée", $2(A.total), $2(B.total)] },
+    lignes(document.getElementById("sab-table"), ["", "Intervention", "Visites"], [
+      { cellules: ["Forfait horaire", $2(x.forfait), $2(x.forfait)] },
+      { cellules: ["Demi-per diem des apprenants", $2(x.perDiem), $2(x.perDiem)] },
+      { cellules: [`Intervention de supervision, ${nb(x.heures, 2)} h`, $2(x.intervention), "—"] },
+      { cellules: [`Visites de prise en charge (${nb(x.pec, 0)})`, "—", $2(x.visitesPec)] },
+      { cellules: [`Visites de suivi (${nb(x.suivi, 0)})`, "—", $2(x.visitesSuivi)] },
+      { cls: "total", cellules: ["Total de la demi-journée", $2(avecIntervention), $2(avecVisites)] },
     ]);
-    document.getElementById("sab-note").textContent = `Forfait horaire : ${$2(M.forfaitHoraireMixte * maj)} l'heure. Demi-per diem (EP 42) : par résident et par externe. `
-      + `Intervention de supervision : ${$2(M.acteSupervision * maj)} l'heure payée à ${nb(M.pctSupervision, 2)} %, au plus ${nb(M.supervisionMaxH, 1)} h (5 h l'après-midi), un seul acte quel que soit le nombre d'apprenants. `
-      + `Visites : ${nb(M.pctMixte, 2)} % du tarif ; prise en charge ${$2(A.tarifPec)} et suivi ${$2(A.tarifSuivi)} en A, selon la part de patients vulnérables. `
-      + "Avec l'intervention, les visites faites pendant le bloc ne se facturent pas ; entre parenthèses, ce que l'autre option aurait donné. Montants avant les frais et l'impôt.";
-    if (U.sabFocus) { const f = document.getElementById(U.sabFocus); U.sabFocus = null; if (f && !f.disabled) f.focus(); }
+    document.getElementById("sab-note").textContent = `Forfait horaire : ${$2(M.forfaitHoraireMixte * maj)} l'heure, dans les deux cas. Demi-per diem (EP 42) : par résident et par externe, dans les deux cas. `
+      + `Intervention de supervision : ${$2(M.acteSupervision * maj)} l'heure payée à ${nb(M.pctSupervision, 2)} %, au plus ${nb(M.supervisionMaxH, 1)} h (5 h l'après-midi), un seul acte quel que soit le nombre d'apprenants ; `
+      + "les visites faites pendant le bloc ne se facturent alors pas. "
+      + `Visites : ${nb(M.pctMixte, 2)} % du tarif, les vôtres et celles des apprenants ; prise en charge ${$2(x.tarifPec)} et suivi ${$2(x.tarifSuivi)}, selon la part de patients vulnérables. Montants avant les frais et l'impôt.`;
+    if (U.sdjFocus) { const f = document.getElementById(U.sdjFocus); U.sdjFocus = null; if (f && !f.disabled) f.focus(); }
   }
   const NOMS_MODE_ACTES = { horaire: "Le taux horaire", mixte: "Le mixte", acte: "L'acte" };
   function rendreActes(R) {
@@ -1436,10 +1413,10 @@ window.Verrou.quandOuvert(function () {
     segment("rv-actes-lieu", [["cabinet", "Cabinet"], ["etablissement", "Établissement"]], o.lieu, v => { U.actesLieu = v; tout(); }, "Colonne de tarifs");
     segment("rv-actes-palier", [["0", "Moins de 500 inscrits"], ["1", "500 et plus"]], String(o.palier), v => { U.actesPalier = +v; tout(); }, "Palier d'inscrits");
 
-    // 1. Deux demi-journées de supervision (mixte, GMF-U), puis le seuil intervention ou visites selon le plan.
+    // 1. Une demi-journée de supervision (mixte, GMF-U) : intervention ou visites ; puis le seuil selon le plan.
     const gmfu = R.milieu === "gmfu";
-    if (gmfu) rendreSupervisionAB(o);
     const T = Math.min(+r.enseignement || 0, +r.demiJournees || 0), anDJ = T * Math.max(0, +r.semaines || 0);
+    if (gmfu) rendreSupervisionDJ(o, anDJ);
     const pm = U.supMoment ? U.supMoment === "pm" : T > 0 && (+r.enseignementApresMidi || 0) >= T;
     segment("rv-sup-moment", [["am", "Avant-midi ou soir"], ["pm", "Après-midi"]], pm ? "pm" : "am", v => { U.supMoment = v; tout(); }, "Moment de la demi-journée");
     document.getElementById("rv-sup-intro").textContent = (gmfu ? "" : "En GMF-U seulement : votre pratique principale est ailleurs, la comparaison sert à préparer une demi-journée d'enseignement. ")
@@ -1662,7 +1639,7 @@ window.Verrou.quandOuvert(function () {
     if (!S.revenu.demiJourneeType) S.revenu.demiJourneeType = demiJourneeDuPlan();
     S.revenu.demiJourneeType[inp.dataset.dj] = v; S.meta.exemple = false; plusTard();
   });
-  document.getElementById("sab-plan").addEventListener("click", () => { S.revenu.supervisionAB = null; sauver(); tout(); toast("Les deux demi-journées repartent de votre plan."); });
+  document.getElementById("sab-plan").addEventListener("click", () => { S.revenu.supervisionDJ = null; sauver(); tout(); toast("La demi-journée repart de votre plan."); });
   document.getElementById("rv-dj-plan").addEventListener("click", () => { S.revenu.demiJourneeType = null; sauver(); tout(); document.getElementById("rv-dj-intro").focus?.(); });
 
   /* Comparer deux offres : votre plan et une autre pratique (milieu, mode, semaine), côte à côte. L'offre est gardée

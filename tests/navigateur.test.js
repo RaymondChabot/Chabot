@@ -1345,46 +1345,47 @@ async function prochainPaiement(b, base) {
   await ctx.close();
 }
 
-/* 40. Deux demi-journées de supervision au mixte (GMF-U), A et B côte à côte : A selon le plan, B avec un résident de
-   plus ; les boutons gardent le focus, les valeurs restent après un rechargement, « Selon mon plan » repart du plan,
-   des valeurs importées hors bornes sont ramenées dans les bornes. */
+/* 40. Supervision au mixte (GMF-U) : une demi-journée à régler, l'intervention de supervision et les visites côte à
+   côte. Au départ la demi-journée du plan ; les boutons gardent le focus, les valeurs restent après un rechargement,
+   « Selon mon plan » repart du plan, des valeurs importées hors bornes sont ramenées dans les bornes. */
 async function superviseurAB(b, base) {
   const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu", largeur: 320 });
   await remplacer(p, { "revenu.milieu": "gmfu", "revenu.lieuTarifs": "auto", "revenu.modeBudget": "mixte", "revenu.residents": 1, "revenu.externes": 1, "revenu.patientsParResident": 4.5,
-    "revenu.patientsParExterne": 2.5, "revenu.heuresParDJ": 3.5, "revenu.enseignement": 2, "revenu.enseignementApresMidi": 0, "revenu.demiJournees": 8, "revenu.inscritsDebut": 600,
-    "revenu.annee": "type", "revenu.partVulnerable": 20, "revenu.patientsPendantSupervision": 0, "revenu.supervisionAB": null });
+    "revenu.patientsParExterne": 2.5, "revenu.heuresParDJ": 3.5, "revenu.enseignement": 2, "revenu.enseignementApresMidi": 0, "revenu.demiJournees": 8, "revenu.semaines": 40,
+    "revenu.inscritsDebut": 600, "revenu.annee": "type", "revenu.partVulnerable": 20, "revenu.patientsPendantSupervision": 0, "revenu.supervisionDJ": null });
   await allerA(p, "revenu/actes");
   const lire = () => p.evaluate(() => ({ totaux: [...document.querySelectorAll("#sab .sab-montant")].map(x => x.textContent), ecart: document.getElementById("sab-ecart").textContent,
-    valeurs: Object.fromEntries([...document.querySelectorAll("#sab .sab-valeur")].map(x => [x.id, x.textContent])), plan: !document.getElementById("sab-plan").hidden,
-    garde: window.Wealthnord.etat().revenu.supervisionAB, debord: document.documentElement.scrollWidth > document.documentElement.clientWidth, focus: document.activeElement.id }));
+    choisi: (document.querySelector("#sab .sab-total.choisi") || {}).id || "", valeurs: Object.fromEntries([...document.querySelectorAll("#sab .sab-valeur")].map(x => [x.id, x.textContent])),
+    plan: !document.getElementById("sab-plan").hidden, garde: window.Wealthnord.etat().revenu.supervisionDJ,
+    debord: document.documentElement.scrollWidth > document.documentElement.clientWidth, focus: document.activeElement.id }));
   const v0 = await lire();
-  const attendu = await p.evaluate(() => { const C = window.Calc; const o = { lieu: "etablissement", palier: 1, heuresParDJ: 3.5, residents: 1, externes: 1, pec: 1, suivi: 6, pctVuln: 20 };
-    return [C.demiJourneeSupervision(o).total, C.demiJourneeSupervision({ ...o, residents: 2, suivi: 11 }).total]; });
-  verifier("supervision A/B : A selon le plan (1 résident, 1 externe, 1 PEC et 6 suivis), B avec un résident et 5 suivis de plus ; rien ne déborde à 320 px",
-    v0.valeurs["sab-a-residents"] === "1" && v0.valeurs["sab-a-externes"] === "1" && v0.valeurs["sab-a-pec"] === "1" && v0.valeurs["sab-a-suivi"] === "6"
-    && v0.valeurs["sab-b-residents"] === "2" && v0.valeurs["sab-b-suivi"] === "11" && v0.valeurs["sab-a-vuln"].startsWith("20") && v0.garde === null && !v0.plan && !v0.debord
-    && v0.totaux[0].replace(/\s/g, "") === `${Math.round(attendu[0])}$` && v0.totaux[1].replace(/\s/g, "") === `${Math.round(attendu[1])}$`
-    && v0.ecart.startsWith("B rapporte") && v0.ecart.replace(/\s/g, "").includes(`${Math.round(attendu[1] - attendu[0])}$`) , { v0, attendu });
-  await p.click("#sab-b-residents-plus"); await p.waitForTimeout(250);
+  const x = await p.evaluate(() => window.Calc.demiJourneeSupervision({ lieu: "etablissement", palier: 1, heuresParDJ: 3.5, residents: 1, externes: 1, pec: 1, suivi: 6, pctVuln: 20 }));
+  const base0 = x.forfait + x.perDiem, ecart0 = x.intervention - x.visites;
+  verifier("supervision : la demi-journée du plan (1 résident, 1 externe, 1 PEC, 6 suivis) ; l'intervention et les visites côte à côte ; rien ne déborde à 320 px",
+    v0.valeurs["sab-residents"] === "1" && v0.valeurs["sab-externes"] === "1" && v0.valeurs["sab-pec"] === "1" && v0.valeurs["sab-suivi"] === "6" && v0.valeurs["sab-vuln"].startsWith("20")
+    && v0.valeurs["sab-heures"].startsWith("3,5") && v0.garde === null && !v0.plan && !v0.debord
+    && v0.totaux[0].replace(/\s/g, "") === `${Math.round(base0 + x.intervention)}$` && v0.totaux[1].replace(/\s/g, "") === `${Math.round(base0 + x.visites)}$`
+    && v0.choisi === (ecart0 > 0 ? "sab-total-intervention" : "sab-total-visites")
+    && v0.ecart.replace(/\s/g, "").includes(`${Math.round(Math.abs(ecart0))}$`) && v0.ecart.replace(/\s/g, " ").includes("80 demi-journées"), { v0, x });
+  // Des suivis de plus : les visites finissent par l'emporter.
+  for (let i = 0; i < 8; i++) { await p.click("#sab-suivi-plus"); await p.waitForTimeout(120); }
   const v1 = await lire();
-  verifier("supervision A/B : + garde le focus, met B à jour et garde les valeurs", v1.focus === "sab-b-residents-plus" && v1.valeurs["sab-b-residents"] === "3"
-    && v1.garde && v1.garde.b.residents === 3 && v1.plan, v1);
-  await p.selectOption("#sab-a-facturation", "visites"); await p.waitForTimeout(250);
-  await p.click("#sab-a-moment-pm"); await p.waitForTimeout(250);
-  const sousA = await p.evaluate(() => document.querySelector("#sab .sab-total .sab-sous").textContent);
-  verifier("supervision A/B : facturer les visites et l'après-midi", sousA.startsWith("Visites facturées") && await p.evaluate(() => window.Wealthnord.etat().revenu.supervisionAB.a.moment === "pm"), sousA);
+  verifier("supervision : + garde le focus ; avec 14 suivis, les visites l'emportent ; les valeurs sont gardées", v1.focus === "sab-suivi-plus" && v1.valeurs["sab-suivi"] === "14"
+    && v1.choisi === "sab-total-visites" && v1.ecart.startsWith("Les visites rapportent") && v1.garde && v1.garde.suivi === 14 && v1.plan, v1);
+  await p.click("#sab-moment-pm"); await p.waitForTimeout(200);
   await p.reload(); await pret(p); await allerA(p, "revenu/actes");
   const v2 = await lire();
-  verifier("supervision A/B : les valeurs restent après un rechargement", v2.valeurs["sab-b-residents"] === "3" && v2.garde.a.facturation === "visites", v2.garde);
+  verifier("supervision : les valeurs restent après un rechargement", v2.valeurs["sab-suivi"] === "14" && v2.garde.moment === "pm"
+    && await p.evaluate(() => document.getElementById("sab-moment-pm").getAttribute("aria-checked") === "true"), v2.garde);
   await p.click("#sab-plan"); await p.waitForTimeout(250);
   const v3 = await lire();
-  verifier("supervision A/B : « Selon mon plan » repart du plan", v3.garde === null && v3.valeurs["sab-b-residents"] === "2" && !v3.plan, v3.garde);
-  await remplacer(p, { "revenu.supervisionAB": { heures: 99, a: { residents: 999, externes: -4, pec: "x", suivi: 3, vuln: 250, moment: "nuit", facturation: "tout" }, b: "rien" } });
+  verifier("supervision : « Selon mon plan » repart du plan", v3.garde === null && v3.valeurs["sab-suivi"] === "6" && !v3.plan, v3.garde);
+  await remplacer(p, { "revenu.supervisionDJ": { heures: 99, residents: 999, externes: -4, pec: "x", suivi: 3, vuln: 250, moment: "nuit" } });
   await allerA(p, "revenu/actes");
   const v4 = await lire();
-  verifier("supervision A/B : des valeurs importées hors bornes sont ramenées dans les bornes", v4.valeurs["sab-heures"].startsWith("8") && v4.valeurs["sab-a-residents"] === "6"
-    && v4.valeurs["sab-a-externes"] === "0" && v4.valeurs["sab-a-pec"] === "1" && v4.valeurs["sab-a-vuln"].startsWith("100") && v4.totaux.every(t => /\d/.test(t)), v4.valeurs);
-  verifier("supervision A/B : aucune erreur", erreurs.length === 0, erreurs);
+  verifier("supervision : des valeurs importées hors bornes sont ramenées dans les bornes", v4.valeurs["sab-heures"].startsWith("8") && v4.valeurs["sab-residents"] === "6"
+    && v4.valeurs["sab-externes"] === "0" && v4.valeurs["sab-pec"] === "1" && v4.valeurs["sab-vuln"].startsWith("100") && v4.totaux.every(t => /\d/.test(t)), v4.valeurs);
+  verifier("supervision : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
 
