@@ -1341,13 +1341,13 @@ window.Verrou.quandOuvert(function () {
      supervision et avec les visites facturées. Au départ, la demi-journée d'enseignement du plan ; les valeurs restent
      dès qu'on en change une, et « Selon mon plan » repart du plan. */
   const SDJ_CHAMPS = [["residents", "Résidents", 0, 6, 1], ["externes", "Externes", 0, 6, 1], ["pec", "Visites de prise en charge", 0, 30, 1],
-    ["suivi", "Visites de suivi", 0, 40, 1], ["vuln", "Patients vulnérables", 0, 100, 10]];
+    ["suivi", "Visites de suivi", 0, 40, 1], ["vuln", "Patients vulnérables", 0, 100, 5]];
   function supervisionDepart() {
     const r = S.revenu, T = Math.min(+r.enseignement || 0, +r.demiJournees || 0), pm = T > 0 && (+r.enseignementApresMidi || 0) >= T;
     const resid = Math.max(1, Math.round(+r.residents || 0)), ext = Math.max(0, Math.round(+r.externes || 0));
     const visites = Math.round(resid * (+(r.patientsParResident ?? 4.5) || 0) + ext * (+(r.patientsParExterne ?? 2.5) || 0) + Math.max(0, +r.patientsPendantSupervision || 0));
     return { heures: Math.min(8, Math.max(1, +r.heuresParDJ || 3.5)), residents: Math.min(6, resid), externes: Math.min(6, ext), pec: visites > 0 ? 1 : 0,
-      suivi: Math.min(40, Math.max(0, visites - 1)), vuln: Math.min(100, Math.round((+r.partVulnerable || 0) / 10) * 10), moment: pm ? "pm" : "am" };
+      suivi: Math.min(40, Math.max(0, visites - 1)), vuln: Math.min(100, Math.round((+r.partVulnerable || 0) / 5) * 5), moment: pm ? "pm" : "am" };
   }
   // Les valeurs gardées, bornées (elles peuvent venir d'un fichier importé).
   function supervisionDJ() {

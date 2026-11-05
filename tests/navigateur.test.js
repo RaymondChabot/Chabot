@@ -1386,6 +1386,10 @@ async function superviseurAB(b, base) {
   const v1 = await lire();
   verifier("supervision : + garde le focus ; avec 14 suivis, les visites l'emportent ; les valeurs sont gardées", v1.focus === "sab-suivi-plus" && v1.valeurs["sab-suivi"] === "14"
     && v1.choisi === "sab-total-visites" && v1.ecart.startsWith("Les visites rapportent") && v1.garde && v1.garde.suivi === 14 && v1.plan, v1);
+  await p.click("#sab-vuln-plus"); await p.waitForTimeout(200);
+  const vuln = await lire();
+  verifier("supervision : les patients vulnérables vont par pas de 5 %", vuln.valeurs["sab-vuln"].startsWith("25") && vuln.garde.vuln === 25, vuln.valeurs["sab-vuln"]);
+  await p.click("#sab-vuln-moins"); await p.waitForTimeout(200);
   await p.click("#sab-moment-pm"); await p.waitForTimeout(200);
   await p.reload(); await pret(p); await allerA(p, "revenu/supervision");
   const v2 = await lire();
