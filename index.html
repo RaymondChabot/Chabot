@@ -192,14 +192,22 @@
       </div>
       <!-- Comparer les actes : un sous-onglet du détail, dès qu'il y a plusieurs modes. Les résultats d'abord ;
            les champs et les tableaux se déplient pour aller plus loin. -->
-      <div class="carte detail-seul" id="rv-carte-seuils" data-sous="actes"></div>
+      <!-- Supervision au mixte (GMF-U) : deux demi-journées côte à côte, l'écart en haut. Le seuil « intervention ou
+           visites » selon le plan se déplie en dessous. -->
       <div class="carte detail-seul" id="rv-carte-supervision" data-sous="actes">
-        <div class="carte-tete"><h2>Supervision ou visites des apprenants</h2></div>
-        <div class="rangees" id="rv-sup-resultat"></div>
-        <p class="conclusion" id="rv-sup-conclusion"></p>
-        <div class="actions" id="rv-sup-actions"></div>
+        <div class="carte-tete"><h2>Deux demi-journées de supervision</h2><button type="button" class="lien-carte" id="sab-plan">Selon mon plan</button></div>
+        <p class="aide" id="sab-intro"></p>
+        <div class="sab" id="sab"></div>
+        <details class="plus-loin" id="sab-calcul">
+          <summary>Voir le calcul</summary>
+          <div class="tableau-defile"><table class="tableau" id="sab-table"></table></div>
+          <p class="aide" id="sab-note"></p>
+        </details>
         <details class="plus-loin" id="rv-sup-plus">
-          <summary>Ajuster les apprenants et le moment</summary>
+          <summary>Intervention ou visites : le seuil selon votre plan</summary>
+          <div class="rangees" id="rv-sup-resultat"></div>
+          <p class="conclusion" id="rv-sup-conclusion"></p>
+          <div class="actions" id="rv-sup-actions"></div>
           <p class="aide" id="rv-sup-intro"></p>
           <div class="choix-actes"><div class="segment petit" id="rv-sup-moment"></div></div>
           <div class="champs-rapides" id="rv-sup-champs"></div>
@@ -207,6 +215,7 @@
           <div class="tableau-defile"><table class="tableau" id="rv-sup-table"></table></div>
         </details>
       </div>
+      <div class="carte detail-seul" id="rv-carte-seuils" data-sous="actes"></div>
       <div class="carte detail-seul" id="rv-carte-demijournee" data-sous="actes">
         <div class="carte-tete"><h2>Ma demi-journée</h2><button type="button" class="lien-carte" id="rv-dj-plan">Selon mon plan</button></div>
         <p class="aide" id="rv-dj-intro"></p>

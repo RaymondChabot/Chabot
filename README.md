@@ -181,7 +181,10 @@ ou 500 inscrits et plus) ; les formulaires de la CNESST et de l'IVAC
   demi-per diem diffère (41,45 $ et 49,85 $ en établissement), selon le
   lieu et la région ; au mixte, intervention de
   supervision ou visites des apprenants ; à l'acte, visites des
-  apprenants. Taux horaire plafonné à 1 540 heures par année à 100 %
+  apprenants. En GMF-U, « Deux demi-journées de supervision » (Revenu,
+  Comparer les actes) compare côte à côte deux demi-journées au mixte :
+  résidents, externes, visites de prise en charge et de suivi, part de
+  patients vulnérables, moment (AM ou PM) et facturation. Taux horaire plafonné à 1 540 heures par année à 100 %
   (dépassement autorisé modifiable). Montants liés au volume de patients
   et majoration de la pratique polyvalente sur les activités en
   établissement. Tous les tarifs, forfaits et suppléments se modifient ;

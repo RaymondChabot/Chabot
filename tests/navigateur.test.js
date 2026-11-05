@@ -1071,11 +1071,12 @@ async function comparerActes(b, base) {
   const vue = await p.evaluate(() => ({ hash: location.hash, onglets: [...document.querySelectorAll("#rv-onglets button")].map(x => x.textContent),
     visibles: [...document.querySelectorAll("#v-revenu .carte")].filter(c => c.offsetParent).map(c => c.id), conclusion: document.getElementById("rv-sup-conclusion").textContent,
     bouton: (document.querySelector("#rv-sup-actions button") || {}).textContent || "", debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
-  verifier("actes : le sous-onglet de Revenu : les seuils, la supervision, la demi-journée ; les actes et la CNESST repliés", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Comparer les actes"
-    && vue.visibles.join() === "rv-carte-seuils,rv-carte-supervision,rv-carte-demijournee,rv-carte-actes,rv-carte-cnesst" && !vue.debord
+  verifier("actes : le sous-onglet de Revenu : la supervision, les seuils, la demi-journée ; les actes et la CNESST repliés", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Comparer les actes"
+    && vue.visibles.join() === "rv-carte-supervision,rv-carte-seuils,rv-carte-demijournee,rv-carte-actes,rv-carte-cnesst" && !vue.debord
     && await p.evaluate(() => !document.getElementById("rv-carte-actes").open && !document.getElementById("rv-carte-cnesst").open && !document.getElementById("rv-sup-plus").open), vue);
   verifier("actes : la supervision rapporte 51,94 $ de plus, environ 4 156 $ sur 80 demi-journées ; les visites dès 10", vue.conclusion.includes("51,94") && vue.conclusion.replace(/\s/g, " ").includes("4 156")
     && vue.conclusion.includes("80 demi-journées") && vue.conclusion.includes("dès 10 visites"), vue.conclusion);
+  await p.evaluate(() => { document.getElementById("rv-sup-plus").open = true; });
   await p.click("#rv-sup-actions button"); await p.waitForTimeout(300);
   verifier("actes : le bouton applique l'intervention de supervision au plan", vue.bouton === "Facturer l'intervention de supervision"
     && await p.evaluate(() => window.Wealthnord.etat().revenu.supervisionFacturation === "acte"), vue.bouton);
@@ -1344,11 +1345,54 @@ async function prochainPaiement(b, base) {
   await ctx.close();
 }
 
+/* 40. Deux demi-journées de supervision au mixte (GMF-U), A et B côte à côte : A selon le plan, B avec un résident de
+   plus ; les boutons gardent le focus, les valeurs restent après un rechargement, « Selon mon plan » repart du plan,
+   des valeurs importées hors bornes sont ramenées dans les bornes. */
+async function superviseurAB(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu", largeur: 320 });
+  await remplacer(p, { "revenu.milieu": "gmfu", "revenu.lieuTarifs": "auto", "revenu.modeBudget": "mixte", "revenu.residents": 1, "revenu.externes": 1, "revenu.patientsParResident": 4.5,
+    "revenu.patientsParExterne": 2.5, "revenu.heuresParDJ": 3.5, "revenu.enseignement": 2, "revenu.enseignementApresMidi": 0, "revenu.demiJournees": 8, "revenu.inscritsDebut": 600,
+    "revenu.annee": "type", "revenu.partVulnerable": 20, "revenu.patientsPendantSupervision": 0, "revenu.supervisionAB": null });
+  await allerA(p, "revenu/actes");
+  const lire = () => p.evaluate(() => ({ totaux: [...document.querySelectorAll("#sab .sab-montant")].map(x => x.textContent), ecart: document.getElementById("sab-ecart").textContent,
+    valeurs: Object.fromEntries([...document.querySelectorAll("#sab .sab-valeur")].map(x => [x.id, x.textContent])), plan: !document.getElementById("sab-plan").hidden,
+    garde: window.Wealthnord.etat().revenu.supervisionAB, debord: document.documentElement.scrollWidth > document.documentElement.clientWidth, focus: document.activeElement.id }));
+  const v0 = await lire();
+  const attendu = await p.evaluate(() => { const C = window.Calc; const o = { lieu: "etablissement", palier: 1, heuresParDJ: 3.5, residents: 1, externes: 1, pec: 1, suivi: 6, pctVuln: 20 };
+    return [C.demiJourneeSupervision(o).total, C.demiJourneeSupervision({ ...o, residents: 2, suivi: 11 }).total]; });
+  verifier("supervision A/B : A selon le plan (1 résident, 1 externe, 1 PEC et 6 suivis), B avec un résident et 5 suivis de plus ; rien ne déborde à 320 px",
+    v0.valeurs["sab-a-residents"] === "1" && v0.valeurs["sab-a-externes"] === "1" && v0.valeurs["sab-a-pec"] === "1" && v0.valeurs["sab-a-suivi"] === "6"
+    && v0.valeurs["sab-b-residents"] === "2" && v0.valeurs["sab-b-suivi"] === "11" && v0.valeurs["sab-a-vuln"].startsWith("20") && v0.garde === null && !v0.plan && !v0.debord
+    && v0.totaux[0].replace(/\s/g, "") === `${Math.round(attendu[0])}$` && v0.totaux[1].replace(/\s/g, "") === `${Math.round(attendu[1])}$`
+    && v0.ecart.startsWith("B rapporte") && v0.ecart.replace(/\s/g, "").includes(`${Math.round(attendu[1] - attendu[0])}$`) , { v0, attendu });
+  await p.click("#sab-b-residents-plus"); await p.waitForTimeout(250);
+  const v1 = await lire();
+  verifier("supervision A/B : + garde le focus, met B à jour et garde les valeurs", v1.focus === "sab-b-residents-plus" && v1.valeurs["sab-b-residents"] === "3"
+    && v1.garde && v1.garde.b.residents === 3 && v1.plan, v1);
+  await p.selectOption("#sab-a-facturation", "visites"); await p.waitForTimeout(250);
+  await p.click("#sab-a-moment-pm"); await p.waitForTimeout(250);
+  const sousA = await p.evaluate(() => document.querySelector("#sab .sab-total .sab-sous").textContent);
+  verifier("supervision A/B : facturer les visites et l'après-midi", sousA.startsWith("Visites facturées") && await p.evaluate(() => window.Wealthnord.etat().revenu.supervisionAB.a.moment === "pm"), sousA);
+  await p.reload(); await pret(p); await allerA(p, "revenu/actes");
+  const v2 = await lire();
+  verifier("supervision A/B : les valeurs restent après un rechargement", v2.valeurs["sab-b-residents"] === "3" && v2.garde.a.facturation === "visites", v2.garde);
+  await p.click("#sab-plan"); await p.waitForTimeout(250);
+  const v3 = await lire();
+  verifier("supervision A/B : « Selon mon plan » repart du plan", v3.garde === null && v3.valeurs["sab-b-residents"] === "2" && !v3.plan, v3.garde);
+  await remplacer(p, { "revenu.supervisionAB": { heures: 99, a: { residents: 999, externes: -4, pec: "x", suivi: 3, vuln: 250, moment: "nuit", facturation: "tout" }, b: "rien" } });
+  await allerA(p, "revenu/actes");
+  const v4 = await lire();
+  verifier("supervision A/B : des valeurs importées hors bornes sont ramenées dans les bornes", v4.valeurs["sab-heures"].startsWith("8") && v4.valeurs["sab-a-residents"] === "6"
+    && v4.valeurs["sab-a-externes"] === "0" && v4.valeurs["sab-a-pec"] === "1" && v4.valeurs["sab-a-vuln"].startsWith("100") && v4.totaux.every(t => /\d/.test(t)), v4.valeurs);
+  verifier("supervision A/B : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement, superviseurAB]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

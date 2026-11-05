@@ -553,6 +553,26 @@
     return { heures, nbVisites, parVisite, supervision, visites, ecart: visites - supervision, meilleur: visites > supervision + 0.005 ? "visites" : "acte",
       seuil: parVisite > 0 ? supervision / parVisite : null, forfait: H * D.forfaitHoraireMixte * maj, perDiem: (resid * D.perDiemResident + ext * D.perDiemExterne) * maj };
   }
+  /* Une demi-journée de supervision au mixte, en GMF-U, à comparer à une autre : forfait horaire, demi-per diem des
+     apprenants (EP 42), et soit l'intervention de supervision (un seul acte, au plus 3,5 h, 5 h l'après-midi), soit les
+     visites facturées pendant la demi-journée (prises en charge et suivis, les vôtres et celles des apprenants, à
+     63,58 % du tarif). Avec l'intervention, les visites faites pendant le bloc ne se facturent pas (annexe XXIII, B-2,
+     par. 3.1 ii). facturation : « meilleur » (par défaut), « acte » (l'intervention) ou « visites ». */
+  function demiJourneeSupervision(o = {}) {
+    const { palier, T, D, maj } = baseActes(o), n = (x, max) => Math.min(max, Math.max(0, Math.round(+x || 0)));
+    const H = Math.min(12, Math.max(0, +o.heuresParDJ || 0)), heures = Math.min(H, o.apresMidi ? SUPERVISION_MAX_APRES_MIDI : D.supervisionMaxH);
+    const resid = n(o.residents, 20), ext = n(o.externes, 20), pec = n(o.pec, 60), suivi = n(o.suivi, 60), v = borne((+o.pctVuln || 0) / 100, 0, 1);
+    const tarif = (a, b) => ((1 - v) * (+T[a][palier] || 0) + v * (+T[b][palier] || 0)) * maj;
+    const tarifPec = tarif("pecNonVuln", "pecVuln"), tarifSuivi = tarif("suivi", "suiviV"), pct = D.pctMixte / 100;
+    const forfait = H * D.forfaitHoraireMixte * maj, perDiem = (resid * D.perDiemResident + ext * D.perDiemExterne) * maj;
+    const intervention = heures * D.acteSupervision * maj * D.pctSupervision / 100;
+    const visitesPec = pec * tarifPec * pct, visitesSuivi = suivi * tarifSuivi * pct, visites = visitesPec + visitesSuivi;
+    const meilleur = visites > intervention + 0.005 ? "visites" : "acte";
+    const choisi = o.facturation === "acte" || o.facturation === "visites" ? o.facturation : meilleur;
+    const facture = choisi === "visites" ? visites : intervention, total = forfait + perDiem + facture;
+    return { H, heures, residents: resid, externes: ext, pec, suivi, tarifPec, tarifSuivi, forfait, perDiem, intervention, visitesPec, visitesSuivi, visites,
+      meilleur, choisi, facture, total, parHeure: H > 0 ? total / H : null };
+  }
   // Une demi-journée de votre choix : les actes et les formulaires comptés, au taux horaire, au mixte et à l'acte,
   // avant et après les frais de cabinet (à l'acte ; aussi aux autres modes si la clinique les exige).
   function demiJourneeActes(o = {}) {
@@ -1175,7 +1195,7 @@
     return { plafondQc, admissibleQc, taux, creditQc: admissibleQc * taux, plafondFed, deduction };
   }
 
-  const Calc = { CELIAPP, celiappParAn, ACTES, CNESST, valeurActes, supervisionOuVisites, demiJourneeActes, P2026, P2027, parametres, utiliserAnnee, avecAnnee, parametresActifs: () => PAR, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, SUPERVISION_MAX_APRES_MIDI, partAssiduite, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
+  const Calc = { CELIAPP, celiappParAn, ACTES, CNESST, valeurActes, supervisionOuVisites, demiJourneeSupervision, demiJourneeActes, P2026, P2027, parametres, utiliserAnnee, avecAnnee, parametresActifs: () => PAR, VISITES, PRISE_EN_CHARGE, TARIFS_DEFAUT, TARIFS_LIEU, MONTANTS_LIEU, RAMQ, PCT_AU_DELA, PCT_GARDE, GARDE_MAX_94, SUPERVISION_MAX_APRES_MIDI, partAssiduite, lieuTarifs, montantsLieu, montantsVolume, tauxPolyvalence, SEUILS_POLYVALENCE, ACTIVITES_POLYVALENTES, compensationCabinet, tarifVisite, revenuGmfu, joursActivite, revenuActivite, impotParticulier, impotSalarie, impotMixte, FMRQ, salaireResident, transfertsConjoints, prestationsFamille, primeMedicaments, tauxMarginal,
     remboursementReer, impotDividendes, impotSociete, impotSalaireEtSociete, comparerSociete, simulerDettes, interetsEtudesPeriodes, tauxReel, tauxMensuel, moisRestants, paiementPour, projeterReee, projeterValeurNette, rendementProfil, fraisGarde };
   if (typeof module !== "undefined" && module.exports) module.exports = Calc;
   else racine.Calc = Calc;

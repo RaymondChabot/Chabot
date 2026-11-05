@@ -33,6 +33,7 @@
       dureesActes: {}, demiJourneeType: null,
       // Comparer deux offres : l'autre pratique (vide : aucune).
       offreB: null,
+      supervisionAB: null,   // deux demi-journées de supervision à comparer (Comparer les actes) ; null : selon le plan
       mix: { suivi: 70, suiviV: 15, perioV: 5, pedia: 5, gross: 5 },
       grossessesAn: null,   // grossesses prises en charge au premier trimestre ; vide : estimées d'après les suivis
       heuresGardeSurPlace: 0,   // au taux horaire, en plus des heures en clinique

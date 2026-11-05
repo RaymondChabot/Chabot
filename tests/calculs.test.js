@@ -491,6 +491,16 @@ const simEtudes = C.simulerDettes([pretEtudes], { debut: "2026-06", methode: "mi
 verifier("intérêts d'études : la première année est sous 1 500 $, le total suit les paiements, puis 0",
   periodesEtudes[0] > 0 && periodesEtudes[0] < 1500 && proche(sommeEtudes, simEtudes.interetsTotaux, 0.05)
   && proche(sommeEtudes, 8183.46, 0.05) && periodesEtudes[periodesEtudes.length - 1] === 0, { an0: periodesEtudes[0], somme: sommeEtudes });
+// Demi-journée de supervision au mixte, A contre B : 3,5 h, établissement, moins de 500 inscrits, 20 % de vulnérables.
+const djA = C.demiJourneeSupervision({ heuresParDJ: 3.5, residents: 1, pec: 1, suivi: 4, pctVuln: 20 });
+const djB = C.demiJourneeSupervision({ heuresParDJ: 3.5, residents: 2, pec: 1, suivi: 9, pctVuln: 20 });
+verifier("supervision A/B : forfait 208,88 $, demi-per diem 41,45 $, intervention 216,39 $ (l'emporte sur 5 visites)",
+  proche(djA.forfait, 208.88, 0.005) && proche(djA.perDiem, 41.45, 0.005) && proche(djA.intervention, 3.5 * 99.48 * 0.6215, 1e-6)
+  && proche(djA.tarifPec, 0.8 * 64.50 + 0.2 * 72.65, 1e-9) && djA.choisi === "acte" && proche(djA.total, 208.88 + 41.45 + 216.39387, 0.001), djA);
+verifier("supervision A/B : avec deux résidents et 10 visites, les visites l'emportent ; un choix imposé est respecté",
+  djB.choisi === "visites" && proche(djB.visites, (66.13 + 9 * (0.8 * 32.25 + 0.2 * 40.50)) * 0.6358, 0.001) && proche(djB.perDiem, 82.90, 0.005)
+  && C.demiJourneeSupervision({ heuresParDJ: 3.5, residents: 2, pec: 1, suivi: 9, pctVuln: 20, facturation: "acte" }).choisi === "acte"
+  && C.demiJourneeSupervision({ heuresParDJ: 4, apresMidi: true }).heures === 4 && C.demiJourneeSupervision({ heuresParDJ: 4 }).heures === 3.5, djB);
 const div40 = C.impotDividendes(40000);
 verifier("dividendes : le FSS de la première bande, 150 $, entre dans le total", proche(div40.fss, 150, 0.01) && proche(div40.total, div40.fed + div40.qc + 150, 1e-6) && proche(div40.total, 2363.52, 0.05), div40);
 const persoSep = C.impotMixte({ salaire: 32440, scolarite: 550 });

@@ -1118,3 +1118,31 @@ a.tuile:hover { border-color: var(--trait); }
   .vue:is(#v-impot, #v-avenir):not(.avec-parcours):not(.mode-detail) > .tete-page { grid-column: 1; flex-wrap: wrap; }
   .vue:is(#v-impot, #v-avenir):not(.avec-parcours):not(.mode-detail) > .barre-outils { grid-row: 1 / span 3; }
 }
+
+/* Deux demi-journées de supervision (Revenu, Comparer les actes) : A et B côte à côte, l'écart en haut. */
+.sab-totaux { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 4px; }
+.sab-total { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 14px; background: var(--fond); border: 1px solid var(--trait); min-width: 0; }
+.sab-total.choisi { border-color: var(--or-texte); box-shadow: inset 0 0 0 1px var(--or-texte); }
+.sab-lettre { font-size: 0.82rem; color: var(--discret); }
+.sab-montant { font: 500 clamp(1.5rem, 6.4vw, 2rem)/1.1 var(--police-titre); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.sab-total.choisi .sab-montant { color: var(--or-texte); }
+.sab-sous { font-size: 0.78rem; color: var(--encre-2); }
+.sab-ecart { margin: 8px 0 2px; }
+.sab-grille { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; row-gap: 4px; align-items: center; margin-top: 8px; }
+.sab-entete { display: none; }
+.sab-nom { grid-column: 1 / -1; font-size: 0.9rem; color: var(--encre-2); margin-top: 8px; }
+.sab-cell { min-width: 0; }
+.sab-pas { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 4px; }
+.sab-valeur { text-align: center; font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sab-moment { display: flex; width: 100%; }
+.sab-moment button { flex: 1; min-height: 44px; padding: 0 6px; }
+.sab-cell .saisie select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.sab-duree { display: grid; grid-template-columns: 1fr minmax(150px, 46%); align-items: center; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--grille); }
+.sab-duree .sab-nom { grid-column: auto; margin: 0; }
+@media (min-width: 600px) {
+  .sab-grille { grid-template-columns: minmax(130px, 1fr) minmax(0, 1.2fr) minmax(0, 1.2fr); row-gap: 8px; }
+  .sab-entete { display: block; font-size: 0.82rem; color: var(--discret); text-align: center; }
+  .sab-nom { grid-column: auto; margin: 0; }
+  .sab-cell > *, .sab-duree .sab-pas { max-width: 220px; margin: 0 auto; }
+  .sab-duree { grid-template-columns: minmax(130px, 1fr) minmax(0, 2.4fr); }
+}
