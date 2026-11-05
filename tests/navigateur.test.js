@@ -1129,10 +1129,12 @@ async function comparerActes(b, base) {
   await allerA(p, "revenu/actes");
   const clinique = await p.evaluate(() => ({ hash: location.hash, modes: document.getElementById("rv-r-modes").hidden,
     onglet: document.getElementById("rv-onglets").hidden, sup: !!document.getElementById("rv-carte-supervision").offsetParent }));
-  verifier("actes : en clinique, à l'acte seulement, ni le sous-onglet ni la carte des modes", clinique.hash === "#revenu/detail" && clinique.modes && clinique.onglet && !clinique.sup, clinique);
+  verifier("actes : en clinique, à l'acte seulement, ni l'onglet Actes ni la carte des modes", clinique.hash === "#revenu/detail" && clinique.modes && !clinique.onglet && !clinique.sup, clinique);
   await allerA(p, "revenu/supervision");
-  const horsGmfu = await p.evaluate(() => ({ hash: location.hash, resume: document.getElementById("rv-r-supervision").hidden }));
-  verifier("supervision : hors GMF-U, ni l'onglet ni la carte du résumé ; l'adresse mène au détail", horsGmfu.hash === "#revenu/detail" && horsGmfu.resume, horsGmfu);
+  const horsGmfu = await p.evaluate(() => ({ hash: location.hash, resume: document.getElementById("rv-r-supervision").hidden, onglets: [...document.querySelectorAll("#rv-onglets button")].map(x => x.textContent),
+    intro: document.getElementById("sab-intro").textContent, sup: !!document.getElementById("rv-carte-supervision").offsetParent }));
+  verifier("supervision : hors GMF-U, l'onglet Supervision reste (tarifs d'établissement), sans la carte du résumé de Revenu", horsGmfu.hash === "#revenu/supervision" && horsGmfu.resume
+    && horsGmfu.onglets.join() === "Votre revenu,Supervision" && horsGmfu.sup && horsGmfu.intro.includes("pas en GMF-U") && horsGmfu.intro.includes("en établissement"), horsGmfu);
   verifier("actes : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
@@ -1397,6 +1399,15 @@ async function superviseurAB(b, base) {
   const v4 = await lire();
   verifier("supervision : des valeurs importées hors bornes sont ramenées dans les bornes", v4.valeurs["sab-heures"].startsWith("8") && v4.valeurs["sab-residents"] === "6"
     && v4.valeurs["sab-externes"] === "0" && v4.valeurs["sab-pec"] === "1" && v4.valeurs["sab-vuln"].startsWith("100") && v4.totaux.every(t => /\d/.test(t)), v4.valeurs);
+  // L'Aperçu : l'onglet « Comparaison demi-journée », avec les deux montants, mène au comparatif.
+  await allerA(p, "apercu");
+  const ap = await p.evaluate(() => { const a = document.getElementById("ap-demijournee"), h = document.getElementById("ap-hero");
+    return { vu: !!a.offsetParent, href: a.getAttribute("href"), texte: a.textContent, sousLeChiffre: a.getBoundingClientRect().top > h.getBoundingClientRect().top,
+      haut: a.getBoundingClientRect().top < window.innerHeight * 1.2, totaux: [...document.querySelectorAll("#sab .sab-montant")].map(x => x.textContent.replace(/\s/g, "")) }; });
+  verifier("aperçu : l'onglet « Comparaison demi-journée », sous le chiffre principal, avec les deux montants", ap.vu && ap.href === "#revenu/supervision" && ap.sousLeChiffre && ap.haut
+    && ap.texte.includes("Comparaison demi-journée") && ap.totaux.every(t => ap.texte.replace(/\s/g, "").includes(t)), ap);
+  await p.click("#ap-demijournee"); await p.waitForTimeout(300);
+  verifier("aperçu : l'onglet mène au comparatif", await p.evaluate(() => location.hash === "#revenu/supervision" && !!document.getElementById("rv-carte-supervision").offsetParent));
   verifier("supervision : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }

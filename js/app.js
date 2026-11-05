@@ -1003,7 +1003,22 @@ window.Verrou.quandOuvert(function () {
     carteResume("ap-r-avenir", "À venir", ["Tout voir", "#apercu/detail"], rangees(el("div"), [ech[0], jal[0]]));
   }
 
+  // Aperçu : l'onglet « Comparaison demi-journée », vers le comparatif de supervision (intervention ou visites).
+  function ongletDemiJournee(R) {
+    const a = document.getElementById("ap-demijournee");
+    a.hidden = !!R.vueResidence;
+    if (a.hidden) return;
+    const c = calculSupervision(R), meilleur = c.egal ? null : c.ecart > 0 ? "visites" : "intervention";
+    const sous = el("span", "od-sous");
+    sous.append("Supervision : ", el("span", meilleur === "intervention" ? "od-mieux" : null, `intervention ${$(c.avecIntervention)}`), " ou ",
+      el("span", meilleur === "visites" ? "od-mieux" : null, `visites ${$(c.avecVisites)}`));
+    const texte = el("span", "od-texte"); texte.append(el("strong", "od-titre", "Comparaison demi-journée"), sous);
+    a.textContent = ""; a.append(el("span", "od-icone"), texte, icone("chevron", "chevron"));
+    a.querySelector(".od-icone").appendChild(icone("balance"));
+    a.setAttribute("aria-label", `Comparaison demi-journée : intervention de supervision ${$(c.avecIntervention)}, visites ${$(c.avecVisites)}`);
+  }
   function rendreApercu(R) {
+    ongletDemiJournee(R);
     document.getElementById("ap-exemple").hidden = !S.meta.exemple;
     rendrePortrait();
     // Sans aucune dépense entrée, le « surplus » serait le revenu net en entier : on montre le revenu, et la suite.
@@ -1305,8 +1320,8 @@ window.Verrou.quandOuvert(function () {
   // Montants de la RAMQ du plan : ceux de tous les lieux, et ceux de la colonne du plan si on la regarde.
   const MONTANTS_TOUS_LIEUX = ["tarifHoraire", "forfaitHoraireMixte", "pctMixte", "acteSupervision", "pctSupervision", "supervisionMaxH"];
   const MONTANTS_DU_LIEU = ["forfaitResponsabilite", "suppExamenEnfant", "suppSuiviGrossesse", "perDiemResident", "perDiemExterne"];
-  function optionsActes(R) {
-    const r = S.revenu, lieuPlan = C.lieuTarifs(r), lieu = U.actesLieu || lieuPlan, memeLieu = lieu === lieuPlan;
+  function optionsActes(R, lieuDefaut) {
+    const r = S.revenu, lieuPlan = C.lieuTarifs(r), lieu = U.actesLieu || lieuDefaut || lieuPlan, memeLieu = lieu === lieuPlan;
     const palier = U.actesPalier != null ? U.actesPalier : R.rev.inscritsFin >= 499.999 ? 1 : 0;
     const cles = [...MONTANTS_TOUS_LIEUX, ...(memeLieu ? MONTANTS_DU_LIEU : [])].filter(k => r[k] !== undefined && r[k] !== null && r[k] !== "");
     const tarifs = memeLieu ? r.tarifs : undefined;
@@ -1350,7 +1365,8 @@ window.Verrou.quandOuvert(function () {
   }
   // La demi-journée réglée : les deux façons de facturer, l'écart, l'année d'enseignement et les suivis qui manquent aux visites.
   function calculSupervision(R) {
-    const o = optionsActes(R), r = S.revenu, v = supervisionDJ(), M = { ...C.RAMQ, ...o.montants };
+    // Hors GMF-U, la demi-journée d'enseignement se prépare aux tarifs d'établissement (ceux du GMF-U, par défaut).
+    const o = optionsActes(R, R.milieu === "gmfu" ? null : "etablissement"), r = S.revenu, v = supervisionDJ(), M = { ...C.RAMQ, ...o.montants };
     const x = C.demiJourneeSupervision({ ...o, heuresParDJ: v.heures, apresMidi: v.moment === "pm", residents: v.residents, externes: v.externes, pec: v.pec, suivi: v.suivi, pctVuln: v.vuln });
     const base = x.forfait + x.perDiem, avecIntervention = base + x.intervention, avecVisites = base + x.visites, ecart = avecVisites - avecIntervention;
     const anDJ = Math.min(+r.enseignement || 0, +r.demiJournees || 0) * Math.max(0, +r.semaines || 0);
@@ -1382,7 +1398,8 @@ window.Verrou.quandOuvert(function () {
   function rendreSupervisionDJ(R) {
     const c = calculSupervision(R), { o, v, M, x, avecIntervention, avecVisites, ecart } = c, r = S.revenu, maj = 1 + (+r.majorationPct || 0) / 100;
     document.getElementById("sab-plan").hidden = v.plan;
-    document.getElementById("sab-intro").textContent = "Au mixte, en GMF-U, vous facturez pour la demi-journée soit l'intervention de supervision, soit les visites. "
+    document.getElementById("sab-intro").textContent = (R.milieu === "gmfu" ? "" : "Votre pratique principale n'est pas en GMF-U : la comparaison sert à préparer une demi-journée d'enseignement en GMF-U. ")
+      + "Au mixte, en GMF-U, vous facturez pour la demi-journée soit l'intervention de supervision, soit les visites. "
       + `Réglez votre demi-journée (AM comprend le soir) : les deux montants se comparent en haut. Tarifs ${o.lieu === "cabinet" ? "en cabinet" : "en établissement"}, `
       + `${o.palier ? "500 inscrits et plus" : "moins de 500 inscrits"}${maj !== 1 ? `, majoration de ${nb(+r.majorationPct, 1)} %` : ""}.`;
     const z = document.getElementById("sab"); z.textContent = "";
@@ -1441,7 +1458,7 @@ window.Verrou.quandOuvert(function () {
     // 1. Une demi-journée de supervision (mixte, GMF-U) : intervention ou visites ; puis le seuil selon le plan.
     const gmfu = R.milieu === "gmfu";
     const T = Math.min(+r.enseignement || 0, +r.demiJournees || 0), anDJ = T * Math.max(0, +r.semaines || 0);
-    if (gmfu) rendreSupervisionDJ(R);
+    rendreSupervisionDJ(R);
     const pm = U.supMoment ? U.supMoment === "pm" : T > 0 && (+r.enseignementApresMidi || 0) >= T;
     segment("rv-sup-moment", [["am", "Avant-midi ou soir"], ["pm", "Après-midi"]], pm ? "pm" : "am", v => { U.supMoment = v; tout(); }, "Moment de la demi-journée");
     document.getElementById("rv-sup-intro").textContent = (gmfu ? "" : "En GMF-U seulement : votre pratique principale est ailleurs, la comparaison sert à préparer une demi-journée d'enseignement. ")
@@ -1517,8 +1534,8 @@ window.Verrou.quandOuvert(function () {
     const suivi = actes.find(a => a.cle === "suivi");
     document.getElementById("rv-actes-resume").textContent = `Un suivi : ${$2(suivi.acte)} à l'acte, ${$2(suivi.mixte)} au mixte`;
     document.getElementById("rv-cnesst-resume").textContent = `${nb(C.CNESST.length, 0)} formulaires, payés à 100 % dans tous les modes`;
-    // L'intervention de supervision n'existe qu'en GMF-U.
-    document.getElementById("rv-carte-supervision").hidden = !gmfu;
+    // Supervision : son onglet, pour toute pratique (hors GMF-U, pour préparer une demi-journée d'enseignement).
+    document.getElementById("rv-carte-supervision").hidden = false;
   }
   // Quand un mode de rémunération devient plus payant qu'un autre, selon les tarifs de la personne.
   function rendreSeuils(R) {
@@ -3838,8 +3855,8 @@ window.Verrou.quandOuvert(function () {
   function ongletsDe(page) {
     const tous = SOUS_ONGLETS[page];
     if (!tous) return null;
-    // Supervision : en GMF-U seulement (l'intervention de supervision n'existe qu'au mixte en GMF-U).
-    if (page === "revenu") return tous.filter(([k]) => !(k === "actes" && unSeulMode()) && !(k === "supervision" && S.revenu.milieu !== "gmfu"));
+    // Supervision : pour toute pratique ; Actes : dès qu'il y a plusieurs modes à comparer.
+    if (page === "revenu") return tous.filter(([k]) => !(k === "actes" && unSeulMode()));
     return tous;
   }
   function sousChoisi(page) {

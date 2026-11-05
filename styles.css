@@ -1137,3 +1137,17 @@ a.tuile:hover { border-color: var(--trait); }
 .sab-valeur { text-align: center; font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sab-moment { display: flex; width: 100%; }
 .sab-moment button { flex: 1; min-height: 44px; padding: 0 6px; }
+
+/* Aperçu : l'onglet « Comparaison demi-journée », bien en vue sous le chiffre principal. */
+.onglet-demi { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 14px; border-radius: 16px; text-decoration: none; color: var(--encre);
+  background: var(--surface); border: 1px solid var(--or-texte); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--or-texte) 35%, transparent); }
+.onglet-demi[hidden] { display: none; }
+.onglet-demi:hover { box-shadow: inset 0 0 0 1px var(--or-texte); }
+.onglet-demi:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+.od-icone { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--or-texte) 14%, transparent); }
+.od-icone svg { width: 22px; height: 22px; fill: none; stroke: var(--or-texte); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.od-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.od-titre { font: 500 1.12rem/1.2 var(--police-titre); }
+.od-sous { font-size: 0.86rem; color: var(--encre-2); }
+.od-mieux { color: var(--or-texte); font-weight: 600; }
+@media print { .onglet-demi { display: none !important; } }
