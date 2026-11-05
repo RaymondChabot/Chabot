@@ -501,6 +501,24 @@ verifier("supervision A/B : avec deux résidents et 10 visites, les visites l'em
   djB.choisi === "visites" && proche(djB.visites, (66.13 + 9 * (0.8 * 32.25 + 0.2 * 40.50)) * 0.6358, 0.001) && proche(djB.perDiem, 82.90, 0.005)
   && C.demiJourneeSupervision({ heuresParDJ: 3.5, residents: 2, pec: 1, suivi: 9, pctVuln: 20, facturation: "acte" }).choisi === "acte"
   && C.demiJourneeSupervision({ heuresParDJ: 4, apresMidi: true }).heures === 4 && C.demiJourneeSupervision({ heuresParDJ: 4 }).heures === 3.5, djB);
+// Supervision au mixte : recalcul indépendant, montants recopiés de la Brochure no 1 (audit B), sur une grille de cas.
+{
+  const OFF = { heure: 59.68, pct: 0.6358, sup: 24.87 * 4, pctT: 0.6215,
+    perDiem: { etablissement: { 1: [41.45, 49.85], 2: [65.20, 73.55] }, cabinet: { 1: [55.35, 66.45], 2: [86.95, 98.00] } },
+    t: { etablissement: { pec: [64.50, 74.75], pecV: [72.65, 82.90], suivi: [32.25, 36.95], suiviV: [40.50, 45.20] },
+      cabinet: { pec: [85.75, 99.40], pecV: [96.35, 110.00], suivi: [42.85, 49.15], suiviV: [53.50, 59.80] } } };
+  let pire = 0, n = 0;
+  for (const lieu of ["etablissement", "cabinet"]) for (const palier of [0, 1]) for (const liste of [1, 2]) for (const maj of [0, 15]) for (const H of [3, 4.5])
+  for (const pm of [false, true]) for (const [res, ext] of [[0, 0], [2, 1]]) for (const [pec, suivi] of [[0, 0], [2, 9]]) for (const vuln of [0, 40]) {
+    const x = C.demiJourneeSupervision({ lieu, palier, liste, majorationPct: maj, heuresParDJ: H, apresMidi: pm, residents: res, externes: ext, pec, suivi, pctVuln: vuln });
+    const m = 1 + maj / 100, t = OFF.t[lieu], v = vuln / 100, [pr, pe] = OFF.perDiem[lieu][liste];
+    const base = H * OFF.heure * m + (res * pr + ext * pe) * m;
+    const interv = base + Math.min(H, pm ? 5 : 3.5) * OFF.sup * m * OFF.pctT;
+    const visites = base + (pec * ((1 - v) * t.pec[palier] + v * t.pecV[palier]) + suivi * ((1 - v) * t.suivi[palier] + v * t.suiviV[palier])) * m * OFF.pct;
+    pire = Math.max(pire, Math.abs(x.forfait + x.perDiem + x.intervention - interv), Math.abs(x.forfait + x.perDiem + x.visites - visites)); n++;
+  }
+  verifier(`supervision : ${n} cas recalculés à partir des montants officiels, au cent près`, pire < 0.005, pire);
+}
 const div40 = C.impotDividendes(40000);
 verifier("dividendes : le FSS de la première bande, 150 $, entre dans le total", proche(div40.fss, 150, 0.01) && proche(div40.total, div40.fed + div40.qc + 150, 1e-6) && proche(div40.total, 2363.52, 0.05), div40);
 const persoSep = C.impotMixte({ salaire: 32440, scolarite: 550 });

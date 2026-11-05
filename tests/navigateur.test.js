@@ -1071,13 +1071,17 @@ async function comparerActes(b, base) {
   const vue = await p.evaluate(() => ({ hash: location.hash, onglets: [...document.querySelectorAll("#rv-onglets button")].map(x => x.textContent),
     visibles: [...document.querySelectorAll("#v-revenu .carte")].filter(c => c.offsetParent).map(c => c.id), conclusion: document.getElementById("rv-sup-conclusion").textContent,
     bouton: (document.querySelector("#rv-sup-actions button") || {}).textContent || "", debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
-  verifier("actes : le sous-onglet de Revenu : la supervision, les seuils, la demi-journée ; les actes et la CNESST repliés", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Comparer les actes"
-    && vue.visibles.join() === "rv-carte-supervision,rv-carte-seuils,rv-carte-demijournee,rv-carte-actes,rv-carte-cnesst" && !vue.debord
+  verifier("actes : en GMF-U, trois sous-onglets ; Actes : les seuils, la demi-journée ; les actes et la CNESST repliés", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Supervision,Actes"
+    && vue.visibles.join() === "rv-carte-seuils,rv-carte-demijournee,rv-carte-actes,rv-carte-cnesst" && !vue.debord
     && await p.evaluate(() => !document.getElementById("rv-carte-actes").open && !document.getElementById("rv-carte-cnesst").open && !document.getElementById("rv-sup-plus").open), vue);
   verifier("actes : la supervision rapporte 51,94 $ de plus, environ 4 156 $ sur 80 demi-journées ; les visites dès 10", vue.conclusion.includes("51,94") && vue.conclusion.replace(/\s/g, " ").includes("4 156")
     && vue.conclusion.includes("80 demi-journées") && vue.conclusion.includes("dès 10 visites"), vue.conclusion);
+  await allerA(p, "revenu/supervision");
+  verifier("supervision : son propre sous-onglet, une seule carte", await p.evaluate(() => location.hash === "#revenu/supervision"
+    && [...document.querySelectorAll("#v-revenu .carte")].filter(c => c.offsetParent).map(c => c.id).join() === "rv-carte-supervision"));
   await p.evaluate(() => { document.getElementById("rv-sup-plus").open = true; });
   await p.click("#rv-sup-actions button"); await p.waitForTimeout(300);
+  await allerA(p, "revenu/actes");
   verifier("actes : le bouton applique l'intervention de supervision au plan", vue.bouton === "Facturer l'intervention de supervision"
     && await p.evaluate(() => window.Wealthnord.etat().revenu.supervisionFacturation === "acte"), vue.bouton);
   await p.click("#rv-carte-actes > summary"); await p.fill("#duree-suivi", "20"); await p.waitForTimeout(400);
@@ -1106,6 +1110,11 @@ async function comparerActes(b, base) {
     resume.vu && resume.lien === "#revenu/actes" && resume.texte.includes("Vos trois modes") && resume.texte.includes("net par année") && resume.texte.includes("rapporte le plus")
     && resume.lignes === 3 && resume.choisis === 1 && resume.sousLeChiffre && resume.avantLeReste && !resume.anciennes && !resume.debord, resume);
   verifier("résumé : le chiffre du haut compare le net, comme la carte", resume.puce.includes("net par rapport"), resume.puce);
+  const sup = await p.evaluate(() => { const c = document.getElementById("rv-r-supervision"), m = document.getElementById("rv-r-modes");
+    return { vu: !!c.offsetParent, lien: (c.querySelector("a.lien-carte") || {}).getAttribute?.("href"), avant: c.getBoundingClientRect().top < m.getBoundingClientRect().top,
+      lignes: c.querySelectorAll(".rangee").length, choisis: c.querySelectorAll(".rangee.choisi").length, texte: c.textContent }; });
+  verifier("résumé : en GMF-U, la carte de la supervision, avant les trois modes ; elle mène à son sous-onglet", sup.vu && sup.lien === "#revenu/supervision" && sup.avant
+    && sup.lignes === 2 && sup.choisis === 1 && sup.texte.includes("Intervention de supervision") && sup.texte.includes("Visites facturées") && sup.texte.includes("de plus par demi-journée"), sup);
   await allerA(p, "revenu/detail");
   verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent
     && document.getElementById("rv-seuil").textContent.includes("dès") && document.getElementById("rv-seuil").textContent.includes("forfait de responsabilité")));
@@ -1121,6 +1130,9 @@ async function comparerActes(b, base) {
   const clinique = await p.evaluate(() => ({ hash: location.hash, modes: document.getElementById("rv-r-modes").hidden,
     onglet: document.getElementById("rv-onglets").hidden, sup: !!document.getElementById("rv-carte-supervision").offsetParent }));
   verifier("actes : en clinique, à l'acte seulement, ni le sous-onglet ni la carte des modes", clinique.hash === "#revenu/detail" && clinique.modes && clinique.onglet && !clinique.sup, clinique);
+  await allerA(p, "revenu/supervision");
+  const horsGmfu = await p.evaluate(() => ({ hash: location.hash, resume: document.getElementById("rv-r-supervision").hidden }));
+  verifier("supervision : hors GMF-U, ni l'onglet ni la carte du résumé ; l'adresse mène au détail", horsGmfu.hash === "#revenu/detail" && horsGmfu.resume, horsGmfu);
   verifier("actes : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
@@ -1353,7 +1365,7 @@ async function superviseurAB(b, base) {
   await remplacer(p, { "revenu.milieu": "gmfu", "revenu.lieuTarifs": "auto", "revenu.modeBudget": "mixte", "revenu.residents": 1, "revenu.externes": 1, "revenu.patientsParResident": 4.5,
     "revenu.patientsParExterne": 2.5, "revenu.heuresParDJ": 3.5, "revenu.enseignement": 2, "revenu.enseignementApresMidi": 0, "revenu.demiJournees": 8, "revenu.semaines": 40,
     "revenu.inscritsDebut": 600, "revenu.annee": "type", "revenu.partVulnerable": 20, "revenu.patientsPendantSupervision": 0, "revenu.supervisionDJ": null });
-  await allerA(p, "revenu/actes");
+  await allerA(p, "revenu/supervision");
   const lire = () => p.evaluate(() => ({ totaux: [...document.querySelectorAll("#sab .sab-montant")].map(x => x.textContent), ecart: document.getElementById("sab-ecart").textContent,
     choisi: (document.querySelector("#sab .sab-total.choisi") || {}).id || "", valeurs: Object.fromEntries([...document.querySelectorAll("#sab .sab-valeur")].map(x => [x.id, x.textContent])),
     plan: !document.getElementById("sab-plan").hidden, garde: window.Wealthnord.etat().revenu.supervisionDJ,
@@ -1373,7 +1385,7 @@ async function superviseurAB(b, base) {
   verifier("supervision : + garde le focus ; avec 14 suivis, les visites l'emportent ; les valeurs sont gardées", v1.focus === "sab-suivi-plus" && v1.valeurs["sab-suivi"] === "14"
     && v1.choisi === "sab-total-visites" && v1.ecart.startsWith("Les visites rapportent") && v1.garde && v1.garde.suivi === 14 && v1.plan, v1);
   await p.click("#sab-moment-pm"); await p.waitForTimeout(200);
-  await p.reload(); await pret(p); await allerA(p, "revenu/actes");
+  await p.reload(); await pret(p); await allerA(p, "revenu/supervision");
   const v2 = await lire();
   verifier("supervision : les valeurs restent après un rechargement", v2.valeurs["sab-suivi"] === "14" && v2.garde.moment === "pm"
     && await p.evaluate(() => document.getElementById("sab-moment-pm").getAttribute("aria-checked") === "true"), v2.garde);
@@ -1381,7 +1393,7 @@ async function superviseurAB(b, base) {
   const v3 = await lire();
   verifier("supervision : « Selon mon plan » repart du plan", v3.garde === null && v3.valeurs["sab-suivi"] === "6" && !v3.plan, v3.garde);
   await remplacer(p, { "revenu.supervisionDJ": { heures: 99, residents: 999, externes: -4, pec: "x", suivi: 3, vuln: 250, moment: "nuit" } });
-  await allerA(p, "revenu/actes");
+  await allerA(p, "revenu/supervision");
   const v4 = await lire();
   verifier("supervision : des valeurs importées hors bornes sont ramenées dans les bornes", v4.valeurs["sab-heures"].startsWith("8") && v4.valeurs["sab-residents"] === "6"
     && v4.valeurs["sab-externes"] === "0" && v4.valeurs["sab-pec"] === "1" && v4.valeurs["sab-vuln"].startsWith("100") && v4.totaux.every(t => /\d/.test(t)), v4.valeurs);

@@ -182,7 +182,7 @@ ou 500 inscrits et plus) ; les formulaires de la CNESST et de l'IVAC
   lieu et la région ; au mixte, intervention de
   supervision ou visites des apprenants ; à l'acte, visites des
   apprenants. En GMF-U, « Supervision : intervention ou visites ? »
-  (Revenu, Comparer les actes) : une demi-journée à régler (résidents,
+  (résumé de Revenu, et son sous-onglet Supervision) : une demi-journée à régler (résidents,
   externes, visites de prise en charge et de suivi, part de patients
   vulnérables, moment et durée), et côte à côte ce qu'elle rapporte au
   mixte avec l'intervention de supervision et avec les visites. Taux horaire plafonné à 1 540 heures par année à 100 %

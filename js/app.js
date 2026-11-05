@@ -1348,17 +1348,46 @@ window.Verrou.quandOuvert(function () {
     const v = supervisionDJ(); delete v.plan; f(v);
     S.revenu.supervisionDJ = v; S.meta.exemple = false; U.sdjFocus = focus || null; sauver(); tout();
   }
-  function rendreSupervisionDJ(o, anDJ) {
-    const v = supervisionDJ(), r = S.revenu, maj = 1 + (+r.majorationPct || 0) / 100, M = { ...C.RAMQ, ...o.montants };
+  // La demi-journée réglée : les deux façons de facturer, l'écart, l'année d'enseignement et les suivis qui manquent aux visites.
+  function calculSupervision(R) {
+    const o = optionsActes(R), r = S.revenu, v = supervisionDJ(), M = { ...C.RAMQ, ...o.montants };
     const x = C.demiJourneeSupervision({ ...o, heuresParDJ: v.heures, apresMidi: v.moment === "pm", residents: v.residents, externes: v.externes, pec: v.pec, suivi: v.suivi, pctVuln: v.vuln });
     const base = x.forfait + x.perDiem, avecIntervention = base + x.intervention, avecVisites = base + x.visites, ecart = avecVisites - avecIntervention;
+    const anDJ = Math.min(+r.enseignement || 0, +r.demiJournees || 0) * Math.max(0, +r.semaines || 0);
+    const parSuivi = x.tarifSuivi * M.pctMixte / 100, manque = ecart < -0.005 && parSuivi > 0 ? Math.floor(-ecart / parSuivi + 1e-9) + 1 : 0;
+    return { o, v, M, x, avecIntervention, avecVisites, ecart, egal: Math.abs(ecart) < 0.5, anDJ, manque };
+  }
+  function phraseSupervision(c) {
+    return c.egal ? "Les deux façons de facturer rapportent autant."
+      : `${c.ecart > 0 ? "Les visites rapportent" : "L'intervention de supervision rapporte"} ${$(Math.abs(c.ecart))} de plus par demi-journée`
+        + `${c.anDJ > 0 ? `, environ ${$(Math.abs(c.ecart) * c.anDJ)} sur vos ${nb(c.anDJ, 0)} demi-journées d'enseignement de l'année` : ""}.`
+        + (c.manque > 0 ? ` Les visites l'emporteraient avec ${nb(c.manque, 0)} suivi${c.manque > 1 ? "s" : ""} de plus.` : "");
+  }
+  // Revenu, résumé (GMF-U) : la demi-journée de supervision en bref, et le lien vers son onglet.
+  function resumeSupervision(R) {
+    const carte = document.getElementById("rv-r-supervision"), montrer = R.milieu === "gmfu" && !R.vueResidence;
+    carte.hidden = !montrer;
+    if (!montrer) { carte.textContent = ""; return; }
+    const c = calculSupervision(R), v = c.v, x = c.x, nV = x.pec + x.suivi;
+    const meilleur = c.egal ? null : c.ecart > 0 ? "visites" : "intervention";
+    carteResume("rv-r-supervision", "Supervision : intervention ou visites ?", ["Ajuster", "#revenu/supervision"],
+      el("p", "aide", `${nb(v.residents, 0)} résident${v.residents > 1 ? "s" : ""}, ${nb(v.externes, 0)} externe${v.externes > 1 ? "s" : ""}, ${nb(nV, 0)} visite${nV > 1 ? "s" : ""}`
+        + ` · ${v.moment === "pm" ? "après-midi" : "avant-midi"}, ${nb(v.heures, 2)} h${v.plan ? " · selon votre plan" : ""}`),
+      rangees(el("div"), [
+        { titre: "Intervention de supervision", sous: `${nb(x.heures, 2)} h payées`, valeur: $(c.avecIntervention), cls: meilleur === "intervention" ? "choisi" : null },
+        { titre: "Visites facturées", sous: `${nb(nV, 0)} visite${nV > 1 ? "s" : ""} au mixte`, valeur: $(c.avecVisites), cls: meilleur === "visites" ? "choisi" : null },
+      ]),
+      el("p", "conclusion", phraseSupervision(c)));
+  }
+  function rendreSupervisionDJ(R) {
+    const c = calculSupervision(R), { o, v, M, x, avecIntervention, avecVisites, ecart } = c, r = S.revenu, maj = 1 + (+r.majorationPct || 0) / 100;
     document.getElementById("sab-plan").hidden = v.plan;
     document.getElementById("sab-intro").textContent = "Au mixte, en GMF-U, vous facturez pour la demi-journée soit l'intervention de supervision, soit les visites. "
       + `Réglez votre demi-journée (AM comprend le soir) : les deux montants se comparent en haut. Tarifs ${o.lieu === "cabinet" ? "en cabinet" : "en établissement"}, `
       + `${o.palier ? "500 inscrits et plus" : "moins de 500 inscrits"}${maj !== 1 ? `, majoration de ${nb(+r.majorationPct, 1)} %` : ""}.`;
     const z = document.getElementById("sab"); z.textContent = "";
     // En haut : les deux façons de facturer, la meilleure en or, puis l'écart.
-    const totaux = el("div", "sab-totaux"), egal = Math.abs(ecart) < 0.5;
+    const totaux = el("div", "sab-totaux"), egal = c.egal;
     for (const [cle, nom, total, sous] of [["intervention", "Intervention de supervision", avecIntervention, `${nb(x.heures, 2)} h payées`],
       ["visites", "Visites facturées", avecVisites, `${nb(x.pec + x.suivi, 0)} visite${x.pec + x.suivi > 1 ? "s" : ""}`]]) {
       const t = el("div", "sab-total" + (!egal && (cle === "visites") === (ecart > 0) ? " choisi" : "")); t.id = "sab-total-" + cle;
@@ -1366,11 +1395,7 @@ window.Verrou.quandOuvert(function () {
       totaux.appendChild(t);
     }
     const phrase = el("p", "conclusion sab-ecart"); phrase.id = "sab-ecart"; phrase.setAttribute("aria-live", "polite");
-    const parSuivi = x.tarifSuivi * M.pctMixte / 100, manque = ecart < 0 && parSuivi > 0 ? Math.floor(-ecart / parSuivi + 1e-9) + 1 : 0;
-    phrase.textContent = egal ? "Les deux façons de facturer rapportent autant."
-      : `${ecart > 0 ? "Les visites rapportent" : "L'intervention de supervision rapporte"} ${$(Math.abs(ecart))} de plus par demi-journée`
-        + `${anDJ > 0 ? `, environ ${$(Math.abs(ecart) * anDJ)} sur vos ${nb(anDJ, 0)} demi-journées d'enseignement de l'année` : ""}.`
-        + (manque > 0 ? ` Les visites l'emporteraient avec ${nb(manque, 0)} suivi${manque > 1 ? "s" : ""} de plus.` : "");
+    phrase.textContent = phraseSupervision(c);
     z.append(totaux, phrase);
     // Les réglages : une seule colonne.
     const grille = el("div", "sab-grille");
@@ -1416,7 +1441,7 @@ window.Verrou.quandOuvert(function () {
     // 1. Une demi-journée de supervision (mixte, GMF-U) : intervention ou visites ; puis le seuil selon le plan.
     const gmfu = R.milieu === "gmfu";
     const T = Math.min(+r.enseignement || 0, +r.demiJournees || 0), anDJ = T * Math.max(0, +r.semaines || 0);
-    if (gmfu) rendreSupervisionDJ(o, anDJ);
+    if (gmfu) rendreSupervisionDJ(R);
     const pm = U.supMoment ? U.supMoment === "pm" : T > 0 && (+r.enseignementApresMidi || 0) >= T;
     segment("rv-sup-moment", [["am", "Avant-midi ou soir"], ["pm", "Après-midi"]], pm ? "pm" : "am", v => { U.supMoment = v; tout(); }, "Moment de la demi-journée");
     document.getElementById("rv-sup-intro").textContent = (gmfu ? "" : "En GMF-U seulement : votre pratique principale est ailleurs, la comparaison sert à préparer une demi-journée d'enseignement. ")
@@ -1598,7 +1623,7 @@ window.Verrou.quandOuvert(function () {
     }
     const h = R.modes.filter(m => v[m].heure != null), mh = h.length ? h.reduce((a, m) => v[m].heure > v[a].heure ? m : a, h[0]) : null;
     const note = el("p", "aide", mh ? `$/h : par heure en clinique, après les frais de cabinet et avant l'impôt, sans les activités en établissement. À l'heure, ${NOMS_MODE_ACTES[mh].toLowerCase()} paie le mieux (${$(v[mh].heure)}).` : "");
-    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", [R.milieu === "gmfu" ? "Supervision et actes" : "Seuils et actes", "#revenu/actes"], rangees(el("div"), lignesModes), el("p", "conclusion", phrase), note, bloc);
+    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"], rangees(el("div"), lignesModes), el("p", "conclusion", phrase), note, bloc);
     if (U.essaiFocus) { const f = document.getElementById(U.essaiFocus); U.essaiFocus = null; if (f && !f.disabled) f.focus(); }
   }
   const signe$2 = v => (v >= 0 ? "+" : "−") + $2(Math.abs(v));
@@ -1705,6 +1730,7 @@ window.Verrou.quandOuvert(function () {
     rendreActes(R);
     rendreSeuils(R);
     resumeModes(R);
+    resumeSupervision(R);
     rendreResidence(R);
     resumeRevenu(R);
     if (R.vueResidence) { rendreAutresRevenus(); return; }
@@ -3803,7 +3829,7 @@ window.Verrou.quandOuvert(function () {
   /* Sous-onglets du Budget et du Patrimoine : des pages plus courtes sur téléphone. Le choix est
      gardé sur cet appareil ; une adresse comme #budget/dettes ouvre directement un sous-onglet. */
   const SOUS_ONGLETS = {
-    revenu: [["detail", "Votre revenu"], ["actes", "Comparer les actes"]],
+    revenu: [["detail", "Votre revenu"], ["supervision", "Supervision"], ["actes", "Actes"]],
     budget: [["mois", "Ce mois-ci"], ["annee", "L'année"], ["dettes", "Dettes"]],
     avenir: [["aujourdhui", "Aujourd'hui"], ["projection", "Projection"], ["placements", "Placements"], ["proches", "Proches"]],
   };
@@ -3812,7 +3838,8 @@ window.Verrou.quandOuvert(function () {
   function ongletsDe(page) {
     const tous = SOUS_ONGLETS[page];
     if (!tous) return null;
-    if (page === "revenu" && unSeulMode()) return tous.filter(([k]) => k !== "actes");
+    // Supervision : en GMF-U seulement (l'intervention de supervision n'existe qu'au mixte en GMF-U).
+    if (page === "revenu") return tous.filter(([k]) => !(k === "actes" && unSeulMode()) && !(k === "supervision" && S.revenu.milieu !== "gmfu"));
     return tous;
   }
   function sousChoisi(page) {
@@ -3834,14 +3861,14 @@ window.Verrou.quandOuvert(function () {
     }
     const cle = sousChoisi(page);
     document.querySelectorAll(`#v-${page} [data-sous]`).forEach(c => c.classList.toggle("hors-onglet", c.dataset.sous !== cle));
-    if (page === "revenu" && unSeulMode() && location.hash === "#revenu/actes") history.replaceState(null, "", "#revenu/detail");
+    if (page === "revenu" && /^#revenu\/(actes|supervision)$/.test(location.hash) && !onglets.some(([k]) => `#revenu/${k}` === location.hash)) history.replaceState(null, "", "#revenu/detail");
   }
   /* Chaque page : son résumé (#budget), ou tout son détail (#budget/detail, ou un sous-onglet : #budget/dettes).
      Le bouton Retour du téléphone ramène du détail au résumé. */
   function ouvrir(nom, sansRendu) {
     let [page, sous] = String(nom).split("/");
     nom = ALIAS[page] || page;
-    if (nom === "revenu" && sous === "actes" && unSeulMode()) sous = "detail";
+    if (nom === "revenu" && (sous === "actes" || sous === "supervision") && !ongletsDe("revenu").some(([k]) => k === sous)) sous = "detail";
     const onglets = ongletsDe(nom);
     const sousOnglet = !!(sous && onglets && onglets.some(([k]) => k === sous));
     if (sousOnglet) garderSous(nom, sous);
