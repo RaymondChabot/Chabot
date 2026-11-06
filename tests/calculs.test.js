@@ -526,6 +526,17 @@ verifier("supervision A/B : avec deux résidents et 10 visites, les visites l'em
   }
   verifier(`supervision : ${n} cas recalculés à partir des montants officiels, au cent près`, pire < 0.005, pire);
 }
+// Répertoire des actes : mêmes tarifs que le moteur (onglet B, établissement ; mixte), codes uniques.
+{
+  const Rp = require("../js/repertoire.js"), E = C.TARIFS_LIEU.etablissement, par = c => Rp.ACTES.find(a => a.c.includes(c));
+  const pareil = (a, b) => Array.isArray(a) && a.length === b.length && a.every((x, i) => proche(x, b[i], 1e-9));
+  const visites = [["15803", "suivi"], ["15823", "suiviV"], ["15819", "perioV"], ["15813", "pedia"], ["15811", "gross"], ["15801", "pecNonVuln"], ["15821", "pecVuln"], ["15765", "srvMineure"], ["15773", "srvComplexe"]];
+  const codes = Rp.ACTES.flatMap(a => a.c);
+  verifier("répertoire : les visites ont les tarifs du moteur ; le mixte, ses pourcentages ; aucun code en double",
+    visites.every(([c, k]) => pareil(par(c).t, E[k])) && Rp.MED === C.RAMQ.pctMixte && Rp.TEMPS === C.RAMQ.pctSupervision
+    && proche(par("42094").t, C.RAMQ.forfaitHoraireMixte, 1e-9) && proche(par("42096").t * 4, C.RAMQ.acteSupervision, 1e-9)
+    && new Set(codes).size === codes.length && !C.CNESST.some(x => codes.includes(x.code)), visites.filter(([c, k]) => !pareil(par(c).t, E[k])));
+}
 const div40 = C.impotDividendes(40000);
 verifier("dividendes : le FSS de la première bande, 150 $, entre dans le total", proche(div40.fss, 150, 0.01) && proche(div40.total, div40.fed + div40.qc + 150, 1e-6) && proche(div40.total, 2363.52, 0.05), div40);
 const persoSep = C.impotMixte({ salaire: 32440, scolarite: 550 });

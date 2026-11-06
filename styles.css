@@ -1151,3 +1151,23 @@ a.tuile:hover { border-color: var(--trait); }
 .od-sous { font-size: 0.86rem; color: var(--encre-2); }
 .od-mieux { color: var(--or-texte); font-weight: 600; }
 @media print { .onglet-demi { display: none !important; } }
+
+/* Répertoire des actes (Revenu, onglet Actes) : recherche, filtres en pastilles, liste par groupe. */
+.rep-recherche { margin: 10px 0 8px; }
+.rep-recherche input { width: 100%; min-height: 48px; padding: 0 14px 0 42px; border-radius: 14px; border: 1px solid var(--trait); background: var(--fond); color: var(--encre);
+  font: 500 1rem var(--police); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2385601f' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='m16 16 4.5 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 13px center; background-size: 20px; }
+.rep-recherche input:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+.rep-groupes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.rep-groupe { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--trait); background: var(--surface); color: var(--encre-2); font: 500 0.84rem var(--police); cursor: pointer; }
+.rep-groupe[aria-pressed="true"] { background: var(--encre); color: var(--fond); border-color: var(--encre); }
+.rep-titre { font: 500 1.02rem/1.3 var(--police-titre); margin: 16px 0 2px; color: var(--or-texte); }
+.rep-liste .rangee-valeur { white-space: nowrap; }
+/* Téléphone : le libellé sur toute la largeur, les montants en dessous, alignés à gauche. */
+@media (max-width: 599px) {
+  .rep-liste .rangee { flex-wrap: wrap; align-items: flex-start; row-gap: 4px; }
+  .rep-liste .rangee-texte { flex-basis: 100%; }
+  .rep-liste .rangee-droite { flex: 1 1 100%; min-width: 0; flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; text-align: left; }
+}
+.rep-liste .rangee.rep-non .rangee-valeur { color: var(--discret); font-weight: 500; }
+@media (pointer: coarse) { .rep-groupe { min-height: 44px; } }

@@ -1453,6 +1453,59 @@ window.Verrou.quandOuvert(function () {
   // Part des visites du plan faites à des patients vulnérables (suivis et périodiques de patients vulnérables), en %.
   const pctVulnPlan = () => { const m = S.revenu.mix || {}, cles = ["suivi", "suiviV", "perioV", "pedia", "gross"], t = cles.reduce((a, k) => a + Math.max(0, +m[k] || 0), 0);
     return t > 0 ? (Math.max(0, +m.suiviV || 0) + Math.max(0, +m.perioV || 0)) / t * 100 : 0; };
+  /* Répertoire des actes (js/repertoire.js) : recherche par code ou par mot, sans accents ni majuscules ; filtres par
+     groupe. Construit une fois ; la saisie ne refait que la liste (le focus reste dans le champ). */
+  const sansAccents = t => String(t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const REP = { q: "", groupe: "tous", actes: null };
+  function actesRepertoire() {
+    if (REP.actes) return REP.actes;
+    const Rp = window.Repertoire, noms = Object.fromEntries(Rp.GROUPES);
+    // Les formulaires de la CNESST viennent du moteur (un seul endroit pour leurs tarifs) ; en tête de leur groupe.
+    const cnesst = C.CNESST.map(x => ({ g: "formulaires", n: `CNESST : ${x.nom.charAt(0).toLowerCase()}${x.nom.slice(1)}`, c: [x.code], t: x.tarif, p: Rp.PLEIN, k: "cnesst travail accident ivac formulaire" }));
+    const i = Rp.ACTES.findIndex(a => a.g === "formulaires");
+    const liste = [...Rp.ACTES.slice(0, i), ...cnesst, ...Rp.ACTES.slice(i)];
+    REP.actes = liste.map((a, rang) => ({ ...a, rang, texte: sansAccents([a.n, a.c.join(" "), a.k || "", noms[a.g], a.note || ""].join(" ")) }));
+    return REP.actes;
+  }
+  const deux = (t, f) => Array.isArray(t) ? `${f(t[0])} / ${f(t[1])}` : f(t);
+  const montantRep = (t, pct) => t == null ? "—" : deux(t, v => $2(v * pct / 100).replace(/\s\$$/, "")) + " $";
+  function ligneRepertoire(a) {
+    const paliers = Array.isArray(a.t) ? (a.d ? a.d.join(" / ") : "moins de 500 / 500 inscrits et plus") : "";
+    const sous = [a.c.length ? a.c.join(", ") : "", paliers, a.note || ""].filter(Boolean).join(" · ");
+    if (!a.p) return { titre: a.n, sous, valeur: "Compris", valeurSous: a.c.length ? "hors GMF-U" : "dans la visite", cls: "rep-non" };
+    return { titre: a.n, sous, valeur: montantRep(a.t, 100), valeurSous: a.t == null ? "à confirmer" : a.p === 100 ? "payé à 100 %" : `au mixte ${montantRep(a.t, a.p)}` };
+  }
+  function filtrerRepertoire() {
+    const mots = sansAccents(REP.q).split(/\s+/).filter(Boolean);
+    return actesRepertoire().filter(a => (REP.groupe === "tous" || a.g === REP.groupe) && mots.every(m => a.texte.includes(m)));
+  }
+  function listeRepertoire() {
+    const z = document.getElementById("rep-liste"), trouves = filtrerRepertoire(), noms = Object.fromEntries(window.Repertoire.GROUPES);
+    z.textContent = "";
+    document.getElementById("rep-compte").textContent = `${nb(trouves.length, 0)} acte${trouves.length > 1 ? "s" : ""}`;
+    if (!trouves.length) { z.appendChild(el("p", "aide", "Aucun acte ne correspond. Essayez un code (15804) ou un mot (suivi, stérilet, cryochirurgie).")); return; }
+    // Sans recherche : par groupe, dans l'ordre de fréquence ; avec une recherche : les résultats, avec leur groupe.
+    const parGroupe = !REP.q.trim();
+    for (const [g] of window.Repertoire.GROUPES) {
+      const items = trouves.filter(a => a.g === g);
+      if (!items.length) continue;
+      if (parGroupe && REP.groupe === "tous") z.appendChild(el("h3", "rep-titre", noms[g]));
+      z.appendChild(rangees(el("div"), items.map(a => { const l = ligneRepertoire(a); return { ...l, sous: (parGroupe ? "" : noms[a.g] + " · ") + l.sous }; })));
+    }
+  }
+  function initRepertoire() {
+    const q = document.getElementById("rep-q"), groupes = document.getElementById("rep-groupes");
+    [["tous", "Tous"], ...window.Repertoire.GROUPES].forEach(([v, t]) => {
+      const b = el("button", "rep-groupe", t); b.type = "button"; b.dataset.v = v; b.setAttribute("aria-pressed", v === REP.groupe ? "true" : "false");
+      b.addEventListener("click", () => { REP.groupe = v; groupes.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === v ? "true" : "false")); listeRepertoire(); });
+      groupes.appendChild(b);
+    });
+    q.addEventListener("input", () => { REP.q = q.value; listeRepertoire(); });
+    document.getElementById("rep-source").textContent = `Tarifs : ${window.Repertoire.source}, colonne « En CLSC ou en GMF-U en établissement », avant la majoration selon le territoire. `
+      + "Au mixte en GMF-U : 63,58 % des services médicaux, 62,15 % des services sur base de temps, 100 % des suppléments et des formulaires, en plus du forfait horaire. "
+      + "Les actes chirurgicaux sont publiés en dollars entiers. Ordre : du plus fréquent au plus rare.";
+    listeRepertoire();
+  }
   const NOMS_MODE_ACTES = { horaire: "Le taux horaire", mixte: "Le mixte", acte: "L'acte" };
   function rendreActes(R) {
     const r = S.revenu, o = optionsActes(R), D = { ...C.RAMQ, ...o.montants }, maj = 1 + (+r.majorationPct || 0) / 100;
@@ -1687,6 +1740,7 @@ window.Verrou.quandOuvert(function () {
     if (!S.revenu.demiJourneeType) S.revenu.demiJourneeType = demiJourneeDuPlan();
     S.revenu.demiJourneeType[inp.dataset.dj] = v; S.meta.exemple = false; plusTard();
   });
+  initRepertoire();
   document.getElementById("sab-plan").addEventListener("click", () => { S.revenu.supervisionDJ = null; sauver(); tout(); toast("La demi-journée repart de votre plan."); });
   document.getElementById("rv-dj-plan").addEventListener("click", () => { S.revenu.demiJourneeType = null; sauver(); tout(); document.getElementById("rv-dj-intro").focus?.(); });
 

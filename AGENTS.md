@@ -52,6 +52,7 @@ Lisez ce fichier en entier avant de commencer. Il passe avant vos habitudes.
 | Fichier | Rôle |
 |---|---|
 | `js/calc.js` | Moteur de calcul pur (`window.Calc`, aussi chargé par Node) : `P2026` (paramètres fiscaux), tarifs de la RAMQ (`TARIFS_LIEU`, `MONTANTS_LIEU`), `impotParticulier`, `impotSalarie`, `impotMixte`, `FMRQ` et `salaireResident`, `simulerDettes`, `projeterValeurNette`, `projeterReee`, `fraisGarde`, `prestationsFamille`. |
+| `js/repertoire.js` | Répertoire des actes d'un médecin en GMF-U en établissement, au mode mixte (`window.Repertoire`) : codes, tarifs du manuel de la RAMQ, part payée au mixte, groupes ; recherche dans Revenu, onglet Actes. |
 | `js/catalogues.js` | État de départ (exemple fictif), schéma `CHAMPS` (validation et migration des données importées), panneaux « Modifier » (`FEUILLES`), lexique des sigles. |
 | `js/app.js` | Calcul des résultats (`calculer()` → `R`), rendu des pages (`rendre*`, résumés `resume*`), navigation (`ouvrir()`, routes `#page` et `#page/detail`), « À faire », échéances, trésorerie, assistant de départ, lien de transfert. |
 | `js/interface.js` | Petits outils d'interface : `el()`, `rangees()`, graphiques SVG, lexique. |

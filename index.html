@@ -217,6 +217,18 @@
           <div class="tableau-defile"><table class="tableau" id="rv-sup-table"></table></div>
         </details>
       </div>
+      <!-- Répertoire des actes (GMF-U en établissement, mode mixte) : recherche par code ou par mot, filtres par groupe. -->
+      <div class="carte detail-seul" id="rv-carte-repertoire" data-sous="actes">
+        <div class="carte-tete"><h2>Répertoire des actes</h2><span class="carte-sous" id="rep-compte" aria-live="polite"></span></div>
+        <p class="aide">GMF-U en établissement, au mode mixte : le tarif de la RAMQ et ce que vous recevez. Cherchez par code ou par mot.</p>
+        <div class="rep-recherche">
+          <label for="rep-q" class="visuellement-cache">Chercher un acte, par code ou par mot</label>
+          <input id="rep-q" type="search" placeholder="Code ou mot : suivi, stérilet, 15804…" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        </div>
+        <div class="rep-groupes" id="rep-groupes" role="group" aria-label="Groupes d'actes"></div>
+        <div class="rep-liste" id="rep-liste"></div>
+        <p class="aide" id="rep-source"></p>
+      </div>
       <div class="carte detail-seul" id="rv-carte-seuils" data-sous="actes"></div>
       <div class="carte detail-seul" id="rv-carte-demijournee" data-sous="actes">
         <div class="carte-tete"><h2>Ma demi-journée</h2><button type="button" class="lien-carte" id="rv-dj-plan">Selon mon plan</button></div>
@@ -563,6 +575,7 @@
 <div class="toast" id="toast" role="status" hidden><span id="toast-texte"></span><button type="button" id="toast-annuler">Annuler</button></div>
 
 <script src="js/calc.js"></script>
+<script src="js/repertoire.js"></script>
 <script src="js/verrou.js"></script>
 <script src="js/catalogues.js"></script>
 <script src="js/interface.js"></script>

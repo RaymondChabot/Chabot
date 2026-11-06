@@ -1071,8 +1071,8 @@ async function comparerActes(b, base) {
   const vue = await p.evaluate(() => ({ hash: location.hash, onglets: [...document.querySelectorAll("#rv-onglets button")].map(x => x.textContent),
     visibles: [...document.querySelectorAll("#v-revenu .carte")].filter(c => c.offsetParent).map(c => c.id), conclusion: document.getElementById("rv-sup-conclusion").textContent,
     bouton: (document.querySelector("#rv-sup-actions button") || {}).textContent || "", debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
-  verifier("actes : en GMF-U, trois sous-onglets ; Actes : les seuils, la demi-journée ; les actes et la CNESST repliés", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Supervision,Actes"
-    && vue.visibles.join() === "rv-carte-seuils,rv-carte-demijournee,rv-carte-actes,rv-carte-cnesst" && !vue.debord
+  verifier("actes : en GMF-U, trois sous-onglets ; Actes : le répertoire, les seuils, la demi-journée ; les actes et la CNESST repliés", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Supervision,Actes"
+    && vue.visibles.join() === "rv-carte-repertoire,rv-carte-seuils,rv-carte-demijournee,rv-carte-actes,rv-carte-cnesst" && !vue.debord
     && await p.evaluate(() => !document.getElementById("rv-carte-actes").open && !document.getElementById("rv-carte-cnesst").open && !document.getElementById("rv-sup-plus").open), vue);
   verifier("actes : la supervision rapporte 51,94 $ de plus, environ 4 156 $ sur 80 demi-journées ; les visites dès 10", vue.conclusion.includes("51,94") && vue.conclusion.replace(/\s/g, " ").includes("4 156")
     && vue.conclusion.includes("80 demi-journées") && vue.conclusion.includes("dès 10 visites"), vue.conclusion);
@@ -1416,11 +1416,42 @@ async function superviseurAB(b, base) {
   await ctx.close();
 }
 
+/* 41. Répertoire des actes (onglet Actes) : tous les actes, la recherche par mot sans accents et par code, les filtres
+   par groupe ; la saisie garde le focus ; rien ne déborde à 320 px. */
+async function repertoireActes(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu", largeur: 320 });
+  await remplacer(p, { "revenu.milieu": "gmfu", "revenu.modeBudget": "mixte", "revenu.enseignement": 2, "revenu.residents": 1 });
+  await allerA(p, "revenu/actes");
+  const etat = () => p.evaluate(() => ({ compte: document.getElementById("rep-compte").textContent, titres: [...document.querySelectorAll("#rep-liste .rangee-titre")].map(x => x.textContent),
+    valeurs: [...document.querySelectorAll("#rep-liste .rangee-droite")].map(x => x.textContent), focus: document.activeElement.id,
+    debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
+  const total = await p.evaluate(() => window.Repertoire.ACTES.length + window.Calc.CNESST.length);
+  const tous = await etat();
+  verifier("répertoire : tous les actes, groupés, rien ne déborde à 320 px", tous.compte === `${total} actes` && tous.titres.length === total && tous.titres[0].startsWith("Forfait horaire") && !tous.debord, { compte: tous.compte, n: tous.titres.length, premier: tous.titres[0], debord: tous.debord });
+  await p.fill("#rep-q", "STERILET");
+  const st = await etat();
+  verifier("répertoire : « STERILET » trouve les 3 actes du stérilet, sans accents ni majuscules ; le focus reste dans le champ",
+    st.compte === "3 actes" && st.titres.every(t => t.includes("stérilet")) && st.focus === "rep-q", st);
+  await p.fill("#rep-q", "15804");
+  const code = await etat();
+  verifier("répertoire : un code trouve son acte, avec le tarif et la part au mixte", code.compte === "1 acte" && code.titres[0].startsWith("Suivi, patient non vulnérable")
+    && code.valeurs[0].replace(/\s/g, " ").includes("32,25 / 36,95 $") && code.valeurs[0].replace(/\s/g, " ").includes("au mixte 20,50 / 23,49 $"), code);
+  await p.fill("#rep-q", "");
+  await p.click('#rep-groupes button[data-v="non"]');
+  const non = await etat();
+  verifier("répertoire : le filtre « Non facturables à part » : la cryothérapie simple, compris dans la visite", non.titres.some(t => t.startsWith("Cryothérapie d'une lésion"))
+    && non.valeurs.every(v => v.includes("Compris")), non.titres);
+  await p.click('#rep-groupes button[data-v="tous"]'); await p.fill("#rep-q", "zzzz");
+  verifier("répertoire : aucune correspondance, un message", (await p.evaluate(() => document.getElementById("rep-liste").textContent)).includes("Aucun acte ne correspond"));
+  verifier("répertoire : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement, superviseurAB]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, repertoireActes]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
