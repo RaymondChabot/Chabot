@@ -178,8 +178,9 @@ verifier("très vulnérables : forfait annuel propre", proche(gtv.acte.forfaitVu
 const gsup = C.revenuGmfu({ ...rev, supervisionFacturation: "visites", residents: 1, externes: 1 });
 verifier("apprenants : 4,5 + 2,5 visites par demi-journée d'enseignement", proche(gsup.visitesApprenants, 46 * 3 * 7, 1e-9) && gsup.mixte.supervision === 0 && gsup.mixte.visites > g.mixte.visites);
 // Avec l'intervention, le forfait de responsabilité (8,25 $ en établissement) de chaque patient vulnérable examiné : 20 % des visites ici.
-verifier("apprenants : au mixte, intervention de supervision par défaut, avec le forfait de responsabilité des vulnérables",
-  proche(g.mixte.visites, g0.mixte.visites, 1e-6) && proche(g.mixte.supervision, 46 * 3 * 3.5 * 99.48 * 0.6215 + 46 * 3 * 4.5 * 0.20 * 8.25, 0.01));
+// Plus, à 100 % (annexe II à l'annexe XXIII) : 13,35 $ par examen périodique d'un enfant (5 %) et 8,95 $ par suivi de grossesse (5 %).
+verifier("apprenants : au mixte, intervention de supervision par défaut, avec les suppléments de l'annexe II (vulnérables, enfants, grossesse)",
+  proche(g.mixte.visites, g0.mixte.visites, 1e-6) && proche(g.mixte.supervision, 46 * 3 * 3.5 * 99.48 * 0.6215 + 46 * 3 * 4.5 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95), 0.01));
 const gsrv = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, pctSrvComplexe: 50 });
 verifier("SRV : patient payé moins qu'une visite de rendez-vous", gsrv.tarifMoyenSrv < gsrv.tarifMoyenRdv && gsrv.tarifMoyenSrv > 0);
 verifier("SRV : visites ponctuelles à l'acte, sans supplément", proche(gsrv.acte.total - C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 0 }).acte.total, 46 * 12 * (0.5 * 17.70 + 0.5 * 35.40), 0.5) && gsrv.acte.supplementsSRV === undefined);
@@ -417,8 +418,8 @@ verifier("supervision : les patients vus pendant le bloc ne se facturent pas ave
   && sup({ patientsPendantSupervision: 3, supervisionFacturation: "visites" }).mixte.visites > sup({ supervisionFacturation: "visites" }).mixte.visites
   && sup({ patientsPendantSupervision: 3 }).acte.visites > sup().acte.visites);
 verifier("supervision : 3,5 h l'avant-midi, jusqu'à 5 h l'après-midi (2 473,07 $ de plus pour 80 demi-journées de 4 h)",
-  proche(sup().mixte.supervision, 40 * 2 * 3.5 * 99.48 * 0.6215 + 40 * 2 * 4.5 * 0.20 * 8.25, 1e-6) && proche(sup({ enseignementApresMidi: 2 }).mixte.supervision - sup().mixte.supervision, 2473.07, 0.01)
-  && proche(sup({ enseignementApresMidi: 1 }).mixte.supervision, 40 * (3.5 + 4) * 99.48 * 0.6215 + 40 * 2 * 4.5 * 0.20 * 8.25, 1e-6));
+  proche(sup().mixte.supervision, 40 * 2 * 3.5 * 99.48 * 0.6215 + 40 * 2 * 4.5 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95), 1e-6) && proche(sup({ enseignementApresMidi: 2 }).mixte.supervision - sup().mixte.supervision, 2473.07, 0.01)
+  && proche(sup({ enseignementApresMidi: 1 }).mixte.supervision, 40 * (3.5 + 4) * 99.48 * 0.6215 + 40 * 2 * 4.5 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95), 1e-6));
 const dme = o => C.compensationCabinet({ patientsParDJ: 0, membreGmf: false, annee: "type", ...o }, 40, 8, 600).dme;
 verifier("DMÉ : hors GMF, licences et équipements ; le lien Internet et le commutateur (19977) seulement si réclamé", proche(dme({}), 4 * (459.90 + 287.45), 1e-6)
   && proche(dme({ dmeInternet: true }), 4 * (459.90 + 287.45 + 700.35), 1e-6) && proche(dme({ dmeInternet: true, membreGmf: true }), 4 * 459.90, 1e-6));

@@ -413,9 +413,12 @@
     const mixte = {
       forfaitHoraire: heures * m("forfaitHoraireMixte") * maj,
       visites: (visitesMixte + visitesSrv + (visitesApprenants ? visitesAppr + visitesPendant : 0)) * maj * m("pctMixte") / 100,
-      // Avec l'intervention : l'acte, plus le forfait de responsabilité des patients vulnérables examinés pendant le bloc.
+      // Avec l'intervention : l'acte, plus, à 100 %, les suppléments de l'annexe II à l'annexe XXIII permis durant la période
+      // visée (Brochure no 1, version en vigueur au 5 novembre 2026) : forfait de responsabilité des patients vulnérables
+      // inscrits (15169, 15170), supplément à l'examen périodique d'un enfant de 0 à 5 ans (08877) et au suivi de grossesse (15145).
       supervision: visitesApprenants ? 0 : W * T * heuresSup * m("acteSupervision") * maj * m("pctSupervision") / 100
-        + W * T * (apprenants + pendant) * (partVisite(r.mix, "suiviV") + partVisite(r.mix, "perioV")) * m("forfaitResponsabilite") * maj,
+        + W * T * (apprenants + pendant) * ((partVisite(r.mix, "suiviV") + partVisite(r.mix, "perioV")) * m("forfaitResponsabilite")
+          + partVisite(r.mix, "pedia") * m("suppExamenEnfant") + partVisite(r.mix, "gross") * m("suppSuiviGrossesse")) * maj,
       ...base,
     };
     mixte.total = mixte.forfaitHoraire + mixte.visites + mixte.supervision + commun;
@@ -570,9 +573,9 @@
     const tarifPec = tarif("pecNonVuln", "pecVuln"), tarifSuivi = tarif("suivi", "suiviV"), pct = D.pctMixte / 100;
     const forfait = H * D.forfaitHoraireMixte * maj, perDiem = (resid * D.perDiemResident + ext * D.perDiemExterne) * maj;
     const intervention = heures * D.acteSupervision * maj * D.pctSupervision / 100;
-    // Avec l'intervention, le forfait de responsabilité de chaque patient vulnérable examiné pendant la période qu'elle
-    // couvre se facture en plus (EP 40, par. 6.02 ; RAMQ, « Forfaits et suppléments pour l'inscription individuelle ») ;
-    // avec les visites, il est compris dans le tarif des visites de patients vulnérables.
+    // Avec l'intervention, le forfait de responsabilité de chaque patient vulnérable inscrit examiné pendant la période
+    // qu'elle couvre se facture en plus, à 100 % (annexe II à l'annexe XXIII, Brochure no 1 en vigueur au 5 novembre 2026 ;
+    // EP 40, par. 6.02) ; avec les visites, il est compris dans le tarif des visites de patients vulnérables.
     const vulnerables = (pec + suivi) * v, responsabilite = vulnerables * D.forfaitResponsabilite * maj;
     const visitesPec = pec * tarifPec * pct, visitesSuivi = suivi * tarifSuivi * pct, visites = visitesPec + visitesSuivi;
     const avecIntervention = intervention + responsabilite;

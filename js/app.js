@@ -1445,7 +1445,8 @@ window.Verrou.quandOuvert(function () {
     ]);
     document.getElementById("sab-note").textContent = `Forfait horaire : ${$2(M.forfaitHoraireMixte * maj)} l'heure, dans les deux cas. Demi-per diem (EP 42) : par résident et par externe, dans les deux cas. `
       + `Intervention de supervision : ${$2(M.acteSupervision * maj)} l'heure payée à ${nb(M.pctSupervision, 2)} %, au plus ${nb(M.supervisionMaxH, 1)} h (5 h l'après-midi), un seul acte quel que soit le nombre d'apprenants ; `
-      + `les visites faites pendant le bloc ne se facturent alors pas, mais le forfait de responsabilité (${$2(M.forfaitResponsabilite * maj)}) de chaque patient vulnérable examiné, oui (EP 40, par. 6.02). `
+      + `les visites faites pendant le bloc ne se facturent alors pas, mais le forfait de responsabilité (${$2(M.forfaitResponsabilite * maj)}) de chaque patient vulnérable inscrit examiné, oui, à 100 % (annexe II à l'annexe XXIII). `
+      + `Les suppléments à l'examen périodique d'un enfant de 0 à 5 ans (${$2(M.suppExamenEnfant * maj)}) et au suivi de grossesse (${$2(M.suppSuiviGrossesse * maj)}) aussi : ils ne sont pas comptés ici. `
       + `Visites : ${nb(M.pctMixte, 2)} % du tarif, les vôtres et celles des apprenants ; prise en charge ${$2(x.tarifPec)} et suivi ${$2(x.tarifSuivi)}, selon la part de patients vulnérables (le forfait de responsabilité est compris dans le tarif des visites de patients vulnérables). Montants avant les frais et l'impôt.`;
     if (U.sdjFocus) { const f = document.getElementById(U.sdjFocus); U.sdjFocus = null; if (f && !f.disabled) f.focus(); }
   }
