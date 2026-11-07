@@ -1028,8 +1028,17 @@ a.tuile:hover { border-color: var(--trait); }
 .mini-barres strong { font-size: 0.94rem; font-weight: 600; text-align: right; }
 
 /* Portrait en une carte courte : la jauge et le bouton pour continuer. */
-.portrait-court .jauge span { background: var(--marque); }
-.portrait-court .bouton { align-self: stretch; justify-content: center; }
+/* Aperçu : le portrait à compléter, en une ligne discrète. */
+.portrait-ligne { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px 14px 8px 16px; border: 1px solid var(--ligne);
+  border-radius: 999px; background: transparent; color: var(--encre-2); font: inherit; font-size: 0.9rem; line-height: 1.35; text-align: left; cursor: pointer; }
+.portrait-ligne .jauge { flex: 0 0 52px; height: 6px; }
+.portrait-ligne .jauge span { background: var(--marque); }
+.portrait-ligne .pl-texte { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; row-gap: 1px; }
+.portrait-ligne .pl-suite { color: var(--or-texte); font-weight: 500; }
+.portrait-ligne strong { color: var(--encre); font-weight: 600; }
+.portrait-ligne:hover { border-color: var(--or-texte); }
+.portrait-ligne:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+@media print { .portrait-ligne { display: none; } }
 
 /* Résumé : les tuiles sur toute la largeur passent à quatre de front quand la place le permet. */
 @media (min-width: 720px) { .tuiles.quatre { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

@@ -985,21 +985,31 @@ window.Verrou.quandOuvert(function () {
     return ul;
   }
   const ORDRE_ACTION = { important: 0, info: 1, bon: 2 };
-  // Aperçu : le portrait en une ligne, ce mois-ci, les 3 actions les plus importantes, la prochaine échéance et le prochain jalon.
+  // « À faire », résumé : la première phrase ; trop longue, ce qui précède le deux-points ; au besoin, coupée.
+  function abreger(t) {
+    let x = String(t).split(/\.\s+(?=[A-ZÀÂÉÈÊÎÔÛÇ«])/)[0].replace(/\.$/, "");
+    if (x.length > 80) { const i = x.indexOf(" : "); if (i >= 25) x = x.slice(0, i); }
+    if (x.length > 96) x = x.slice(0, x.lastIndexOf(" ", 92)) + "…";
+    return x;
+  }
+  // Aperçu : le portrait en une ligne discrète, ce mois-ci, les 2 actions les plus importantes en version courte,
+  // la prochaine échéance et le prochain jalon.
   function resumeApercu(R, actions, ech, jal) {
     const pc = document.getElementById("ap-r-portrait"), P = portrait();
     pc.hidden = S.meta.exemple || P.pct >= 100 || portraitMasque();
+    pc.textContent = "";
     if (!pc.hidden) {
-      const suite = P.items.find(x => x.f < 1), j = el("div", "jauge"), b = el("button", "bouton petit", suite ? `Continuer : ${suite.titre.toLowerCase()}` : "Continuer");
-      j.setAttribute("role", "progressbar"); j.setAttribute("aria-valuemin", "0"); j.setAttribute("aria-valuemax", "100"); j.setAttribute("aria-valuenow", P.pct);
-      j.setAttribute("aria-label", "Portrait complété"); const sp = el("span"); sp.style.width = P.pct + "%"; j.appendChild(sp);
-      b.type = "button"; if (suite) b.addEventListener("click", suite.action);
-      carteResume("ap-r-portrait", `Votre portrait : ${P.pct} %`, ["Voir", "#apercu/detail"], j, b);
+      const suite = P.items.find(x => x.f < 1), b = el("button", "portrait-ligne"), j = el("span", "jauge"), sp = el("span"), t = el("span", "pl-texte");
+      b.type = "button"; j.setAttribute("aria-hidden", "true"); sp.style.width = P.pct + "%"; j.appendChild(sp);
+      t.append(el("strong", null, `Portrait à ${P.pct} %`), el("span", "pl-suite", suite ? `Continuer : ${suite.titre.toLowerCase()}` : "Voir"));
+      b.setAttribute("aria-label", `Votre portrait est complété à ${P.pct} %. ${suite ? `Continuer : ${suite.titre.toLowerCase()}` : "Voir le portrait"}`);
+      b.addEventListener("click", suite ? suite.action : () => ouvrir("apercu/detail"));
+      b.append(j, t, icone("chevron", "chevron")); pc.appendChild(b);
     }
     carteResume("ap-r-mois", "Ce mois-ci", ["Budget", "#budget"], barreLegende([["Dépenses", R.depMoi, SERIES[0]], ["Paiements de dettes", R.dettesMoi, SERIES[1]],
       ["Épargne", R.epargneMoi, SERIES[2]], ["Surplus", Math.max(0, R.surplusMoi), SERIES[3]]]));
-    const top = [...actions].sort((x, y) => ORDRE_ACTION[x.type] - ORDRE_ACTION[y.type]).slice(0, 3);
-    carteResume("ap-r-actions", "À faire", actions.length > 3 ? [`Tout voir (${actions.length})`, "#apercu/detail"] : null, listeActions(el("ul", "a-faire"), top));
+    const top = [...actions].sort((x, y) => ORDRE_ACTION[x.type] - ORDRE_ACTION[y.type]).slice(0, 2).map(x => ({ type: x.type, texte: x.court || abreger(x.texte) }));
+    carteResume("ap-r-actions", "À faire", actions.length > 2 ? [`Tout voir (${actions.length})`, "#apercu/detail"] : null, listeActions(el("ul", "a-faire"), top));
     carteResume("ap-r-avenir", "À venir", ["Tout voir", "#apercu/detail"], rangees(el("div"), [ech[0], jal[0]]));
   }
 
@@ -1084,11 +1094,14 @@ window.Verrou.quandOuvert(function () {
       tuileLien("avenir", "Valeur nette", $(p[0].moi), `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}`),
     );
 
-    // À faire : toute la liste dans le détail ; les trois plus importantes dans le résumé.
-    const actions = [], action = (type, texte) => actions.push({ type, texte });
-    if (R.vueResidence) action("bon", "En résidence, l'impôt et les cotisations sont retenus sur chaque paie : rien à mettre de côté.");
-    else if (R.societeActive) action("important", `La société garde environ ${$(R.impot.societe.impotSociete / 12)} par mois pour son impôt ; vous, environ ${$(R.impot.total / 12)} par mois pour l'impôt sur vos dividendes.`);
-    else action("important", `Mettez ${pct((R.impot.total + R.primeMoi) / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$((R.impot.total + R.primeMoi) / 12)} par mois.`);
+    // À faire : toute la liste dans le détail ; les deux plus importantes dans le résumé, en version courte
+    // (la troisième valeur, sinon la phrase abrégée).
+    const actions = [], action = (type, texte, court) => actions.push({ type, texte, court });
+    if (R.vueResidence) action("bon", "En résidence, l'impôt et les cotisations sont retenus sur chaque paie : rien à mettre de côté.", "En résidence, l'impôt est retenu sur chaque paie");
+    else if (R.societeActive) action("important", `La société garde environ ${$(R.impot.societe.impotSociete / 12)} par mois pour son impôt ; vous, environ ${$(R.impot.total / 12)} par mois pour l'impôt sur vos dividendes.`,
+      `Impôt : ${$(R.impot.societe.impotSociete / 12)} par mois dans la société, ${$(R.impot.total / 12)} pour vous`);
+    else action("important", `Mettez ${pct((R.impot.total + R.primeMoi) / Math.max(1, R.brut), 0)} de chaque paiement de la RAMQ de côté pour l'impôt et les cotisations, environ ${$((R.impot.total + R.primeMoi) / 12)} par mois.`,
+      `Mettez ${$((R.impot.total + R.primeMoi) / 12)} de côté par mois pour l'impôt`);
     // Après l'assistant : ce qu'il reste à entrer.
     if (S.meta.assistant) {
       const depensesInsuffisantes = budgetSimpleActif() ? !(S.budgetSimple.reste > 0) && !S.budget.some(b => b.k === "loyer" && b.montant > 0)
@@ -1110,7 +1123,8 @@ window.Verrou.quandOuvert(function () {
     if (R.residenceActive && R.moisAvantPratiqueAuj <= 0) action("important", `Votre pratique a commencé en ${moisLong(R.debutPratique)}, mais votre plan part de ${moisLong(S.strategie.debut)}, en résidence : mettez vos soldes à jour, puis le début de la simulation (Budget, Dettes : Plan de remboursement, Modifier).`);
     if (R.residenceActive && !S.residence.debutPratique) action("important", `Inscrivez la date de début de votre pratique (Revenu, Modifier) : l'app suppose ${moisLong(R.debutPratique)}.`);
     if (S.residence && S.residence.active && !R.residenceActive) action("info", "Votre date de début de pratique est passée : l'app compte maintenant votre pratique. Si c'est fait, retirez la résidence (Revenu, Modifier).");
-    if (S.revenu.annee === "premiere" && !R.residenceActive) action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total + R.primeMoi)} seront à payer d'un coup le 30 avril ${R.anImpotPremiere}.`);
+    if (S.revenu.annee === "premiere" && !R.residenceActive) action("important", `Première année de pratique : aucun acompte n'est exigé, mais environ ${$(R.impot.total + R.primeMoi)} seront à payer d'un coup le 30 avril ${R.anImpotPremiere}.`,
+      `Première année : environ ${$(R.impot.total + R.primeMoi)} d'impôt à payer le 30 avril ${R.anImpotPremiere}`);
     if (S.meta.planAvance && S.meta.planAvance === S.strategie.debut && S.meta.planAvance === moisCle(new Date()))
       action("info", `Le plan part maintenant de ${moisLong(S.strategie.debut)}, avec les soldes que vous avez inscrits : mettez-les à jour avec vos relevés (Budget, Dettes ; Patrimoine, Aujourd'hui).`);
     // Terme échu au début du plan : le moteur le renouvelle au taux supposé ; la personne inscrit le vrai terme.
@@ -1146,7 +1160,7 @@ window.Verrou.quandOuvert(function () {
     const mix = Object.values(S.revenu.mix).reduce((a, x) => a + (+x || 0), 0);
     if (!R.vueResidence && Math.abs(mix - 100) > 0.5) action("info", `Vos types de visites totalisent ${nb(mix)} % : le calcul les ramène à 100 %. Ajustez-les dans Revenu, Modifier, pour refléter votre pratique.`);
     if (R.surplusMoi < 0) action("important", `Votre budget est négatif de ${$(-R.surplusMoi)} par mois : revoyez les dépenses ou leur partage.`);
-    else action("bon", `Votre surplus de ${$(R.surplusMoi)} par mois va sur les dettes, dans l'ordre de la méthode choisie.`);
+    else action("bon", `Votre surplus de ${$(R.surplusMoi)} par mois va sur les dettes, dans l'ordre de la méthode choisie.`, `Surplus de ${$(R.surplusMoi)} par mois, versé sur les dettes`);
 
     listeActions(document.getElementById("ap-actions"), actions);
     const ech = echeances(R), jal = jalons(R);
@@ -1228,24 +1242,29 @@ window.Verrou.quandOuvert(function () {
     const g = R.rev, rv = S.revenu, inscrits = Math.round(g.inscritsFin);
     if (R.mode === "horaire" && g.heuresAuDela > 0) action("important", `Taux horaire : ${nb(g.heuresAuDela, 0)} h au-delà de ${nb(g.plafondHeures, 0)} h par année sont payées `
       + (g.gardeAuDela > 0.5 ? `à 71,8 % (${nb(g.autresAuDela, 0)} h) et à 94 % pour la garde sur place (${nb(g.gardeAuDela, 0)} h)` : "à 71,8 %") + `, environ ${$(g.perteHeures)} de moins. `
-      + (g.plafondHeures < 2420 ? "Si votre chef de département autorise le dépassement (jusqu'à 880 h, annexe XIV), inscrivez-le dans Revenu, Modifier." : "C'est au-delà du dépassement maximal de 880 heures."));
+      + (g.plafondHeures < 2420 ? "Si votre chef de département autorise le dépassement (jusqu'à 880 h, annexe XIV), inscrivez-le dans Revenu, Modifier." : "C'est au-delà du dépassement maximal de 880 heures."),
+      `Taux horaire : ${nb(g.heuresAuDela, 0)} h au-delà du plafond, environ ${$(g.perteHeures)} de moins`);
     if (R.mode !== "horaire" && inscrits >= 350 && inscrits < 500 && g.gainPalier > 0)
       action("info", `Encore ${nb(500 - inscrits, 0)} patients inscrits pour atteindre 500 : chaque visite est alors payée environ ${pct(g.gainPalier, 0)} de plus.`);
     const seuil = [[750, 7500], [1000, 15000]].find(([s]) => inscrits < s && inscrits >= s - 100);
-    if (seuil) action("info", `Encore ${nb(seuil[0] - inscrits, 0)} patients inscrits actifs au 31 décembre pour recevoir ${$(seuil[1])}${seuil[0] === 1000 ? " au lieu de 7 500 $" : ""} en juin (EP 40, par. 4.15).`);
+    if (seuil) action("info", `Encore ${nb(seuil[0] - inscrits, 0)} patients inscrits actifs au 31 décembre pour recevoir ${$(seuil[1])}${seuil[0] === 1000 ? " au lieu de 7 500 $" : ""} en juin (EP 40, par. 4.15).`,
+      `Encore ${nb(seuil[0] - inscrits, 0)} patients inscrits pour recevoir ${$(seuil[1])} en juin`);
     if (g.basePolyvalence > 0) {
       const n = Math.round(g.inscritsFin + Math.max(0, g.vulnerablesFin - 245) * 1.5), prochain = C.SEUILS_POLYVALENCE[g.anneePratique].find(s => s > n);
       if (prochain && prochain - n <= 100) {
         const taux = C.tauxPolyvalence(prochain, 0, g.anneePratique);
-        action("info", `Encore ${nb(prochain - n, 0)} patients inscrits pour une majoration de ${nb(taux, 1)} % de vos activités en établissement (pratique polyvalente), environ ${$(g.basePolyvalence * (taux - g.pctPolyvalence) / 100)} de plus.`);
+        action("info", `Encore ${nb(prochain - n, 0)} patients inscrits pour une majoration de ${nb(taux, 1)} % de vos activités en établissement (pratique polyvalente), environ ${$(g.basePolyvalence * (taux - g.pctPolyvalence) / 100)} de plus.`,
+          `Encore ${nb(prochain - n, 0)} patients inscrits : environ ${$(g.basePolyvalence * (taux - g.pctPolyvalence) / 100)} de plus (pratique polyvalente)`);
       }
     }
     if (C.partAssiduite(rv.assiduite) < 1) {
       const perdu = C.montantsVolume(g.inscritsFin, g.vulnerablesFin, "80").supplements - g.detailVolume.supplements;
-      if (perdu > 0) action("info", `Avec un taux d'assiduité de 80 %, vous recevriez ${$(perdu)} de plus en suppléments au volume (EP 40, par. 15.03 et 15.05).`);
+      if (perdu > 0) action("info", `Avec un taux d'assiduité de 80 %, vous recevriez ${$(perdu)} de plus en suppléments au volume (EP 40, par. 15.03 et 15.05).`,
+        `Assiduité de 80 % : ${$(perdu)} de plus en suppléments au volume`);
     }
     if (!rv.membreGmf && !S.confirmes["revenu.membreGmf"] && g.forfaitGmfPossible > 0)
-      action("info", `${R.milieu === "gmfu" ? "Un GMF-U est un GMF : le" : R.milieu === "clsc" ? "Si votre CLSC fait partie d'un GMF, le" : "Si votre clinique est un GMF, le"} forfait de 9,35 $ par patient vu dans l'année (code 08875) ajouterait environ ${$(g.forfaitGmfPossible)}. Vérifiez-le, puis cochez ou non « Membre d'un GMF » (Revenu, Modifier).`);
+      action("info", `${R.milieu === "gmfu" ? "Un GMF-U est un GMF : le" : R.milieu === "clsc" ? "Si votre CLSC fait partie d'un GMF, le" : "Si votre clinique est un GMF, le"} forfait de 9,35 $ par patient vu dans l'année (code 08875) ajouterait environ ${$(g.forfaitGmfPossible)}. Vérifiez-le, puis cochez ou non « Membre d'un GMF » (Revenu, Modifier).`,
+      `Forfait GMF (08875) : environ ${$(g.forfaitGmfPossible)} de plus, à vérifier`);
   }
 
   const COURT_MODE = { horaire: "Horaire", mixte: "Mixte", acte: "À l'acte" };

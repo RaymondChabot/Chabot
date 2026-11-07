@@ -983,16 +983,20 @@ async function resumeDetail(b, base) {
   const tuiles = await p.evaluate(() => ["rv-r-tuiles", "im-r-tuiles", "bu-r-tuiles", "pa-r-tuiles"].map(id =>
     [...document.querySelectorAll(`#${id} .tuile`)].filter(t => t.querySelector(".tuile-valeur").textContent.trim()).length));
   verifier("résumé : quatre tuiles remplies par page", tuiles.every(n => n === 4), tuiles);
-  // Aperçu : les 3 actions les plus importantes, tirées de la liste complète ; ce mois-ci, les montants du détail.
+  // Aperçu : les 2 actions les plus importantes, en version courte, tirées de la liste complète ; ce mois-ci, les montants du détail.
   const ap = await p.evaluate(() => {
     const textes = sel => [...document.querySelectorAll(sel)].map(x => x.textContent.replace(/\s/g, " "));
+    const types = sel => [...document.querySelectorAll(sel)].map(i => [...i.classList].find(c => c !== "ico")), ordre = { important: 0, info: 1, bon: 2 };
     return { resume: textes("#ap-r-actions li"), tout: textes("#ap-actions li"), importants: textes("#ap-actions li .ico.important + span"),
+      typesResume: types("#ap-r-actions li .ico"), typesTout: types("#ap-actions li .ico").sort((x, y) => ordre[x] - ordre[y]),
       lien: (document.querySelector("#ap-r-actions .lien-carte") || {}).textContent || "", mois: textes("#ap-r-mois .legende-cases strong"),
       flux: document.getElementById("ap-flux").textContent.replace(/\s/g, " "), avenir: document.querySelectorAll("#ap-r-avenir .rangee").length };
   });
-  verifier("résumé : trois actions, les importantes d'abord", ap.resume.length === Math.min(3, ap.tout.length) && ap.resume.every(t => ap.tout.includes(t))
-    && ap.resume.slice(0, Math.min(3, ap.importants.length)).every(t => ap.importants.includes(t)), ap);
-  verifier("résumé : « Tout voir » compte toutes les actions", ap.tout.length <= 3 || ap.lien === `Tout voir (${ap.tout.length})`, ap.lien);
+  verifier("résumé : deux actions courtes, les importantes d'abord ; d'abord ce qu'il faut mettre de côté pour l'impôt", ap.resume.length === Math.min(2, ap.tout.length)
+    && ap.resume.every(t => t.length <= 97 && !t.endsWith(".")) && ap.typesResume.join() === ap.typesTout.slice(0, ap.resume.length).join()
+    && /^Mettez \d[\d ]* \$ de côté par mois pour l'impôt$/.test(ap.resume[0].replace(/^(Important|À noter|Bien) : /, ""))
+    && ap.resume.every(t => t.length < Math.max(...ap.tout.map(x => x.length))), ap);
+  verifier("résumé : « Tout voir » compte toutes les actions", ap.tout.length <= 2 || ap.lien === `Tout voir (${ap.tout.length})`, ap.lien);
   verifier("résumé : ce mois-ci, les montants du détail ; la prochaine échéance et le prochain jalon", ap.mois.length === 4 && ap.mois.every(m => ap.flux.includes(m)) && ap.avenir === 2, ap);
   // Impôt : chaque 100 $ se partage en entier ; Budget : le total des dettes.
   const chiffres = await p.evaluate(() => {
@@ -1268,6 +1272,14 @@ async function demarrageRapide(b, base) {
   verifier("rapide : trois questions, puis vos trois modes (page Comparer)", q1.etape === "Question 1 sur 2" && q1.titre === "Votre pratique" && q1.retour && accueil === "Bienvenue dans WealthMorand"
     && q2.etape === "Question 2 sur 2" && q2.bouton === "Voir mes modes" && fin.hash === "#comparer" && fin.modes && fin.S.revenu.milieu === "gmfu" && fin.S.revenu.patientsParDJ === 8
     && fin.toast.includes("Complétez votre portrait"), { q1, accueil, q2, hash: fin.hash, toast: fin.toast });
+  await allerA(p, "apercu");
+  const ligne = await p.evaluate(() => { const b = document.querySelector("#ap-r-portrait .portrait-ligne");
+    return b && { texte: b.textContent, hauteur: b.getBoundingClientRect().height, carte: document.getElementById("ap-r-portrait").classList.contains("carte"), etiquette: b.getAttribute("aria-label") }; });
+  verifier("rapide : dans l'Aperçu, le portrait en une rangée discrète (pas une carte), qui mène à la suite", ligne && /^Portrait à \d+ %Continuer : /.test(ligne.texte) && ligne.hauteur <= 64
+    && !ligne.carte && ligne.etiquette.startsWith("Votre portrait est complété à"), ligne);
+  await p.click("#ap-r-portrait .portrait-ligne"); await p.waitForTimeout(300);
+  verifier("rapide : la rangée du portrait ouvre l'étape suivante", await p.evaluate(() => !!document.querySelector("dialog[open], .feuille[open]")));
+  await p.evaluate(() => { const f = document.querySelector("dialog[open]"); if (f) f.close(); });
   await allerA(p, "apercu/detail");
   verifier("rapide : le portrait complet reste à faire", fin.S.meta.portraitRapide === true && await p.evaluate(() => !document.getElementById("ap-portrait").hidden
     && document.getElementById("ap-portrait-titre").textContent !== "Votre portrait : 100 % complété"));
