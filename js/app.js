@@ -1027,7 +1027,7 @@ window.Verrou.quandOuvert(function () {
     const lignes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: m === R.mode ? "Votre mode" : "", valeur: $(R.rev[m].total),
       valeurSous: `net ${$(R.nets[m])}${R.societeActive ? " pour vous" : ""}`, cls: m === meilleur ? "choisi" : null }));
     const phrase = second ? `${NOMS_MODE_ACTES[meilleur]} rapporte le plus : ${$(R.nets[meilleur] - R.nets[second])} net de plus que ${AU_MODE[second].replace(/^au /, "le ").replace(/^à /, "")} par année.` : "";
-    carteResume("ap-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Comparer", "#revenu"],
+    carteResume("ap-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Comparer", "#comparer"],
       rangeesModes(lignes, R.modes.map(m => R.rev[m].total), R.modes.map(m => R.nets[m])), el("p", "conclusion", phrase), el("p", "aide", LEGENDE_BARRES));
   }
   function rendreApercu(R) {
@@ -1284,7 +1284,7 @@ window.Verrou.quandOuvert(function () {
     const dj = S.revenu.demiJournees, pat = S.revenu.patientsParDJ, net = k => k + "Net";
     const ecart = (liste, v) => { const a = liste.find(y => y.v === v), b = liste.find(y => y.v > v); return a && b ? (b[net(R.mode)] - a[net(R.mode)]) / (b.v - a.v) : null; };
     const plusDJ = ecart(R.sensDJ, dj), plusPat = ecart(R.sensPat, pat);
-    carteResume("rv-r-sens", "Travailler un peu plus", ["Détail", "#revenu/detail"], rangees(el("div"), [
+    carteResume("rv-r-sens", "Travailler un peu plus", ["Comparer", "#comparer/modes"], rangees(el("div"), [
       plusDJ != null && { titre: "Une demi-journée de plus par semaine", sous: `${nb(dj)} aujourd'hui`, valeur: signe(plusDJ), valeurSous: "net par année" },
       plusPat != null && { titre: "Un patient de plus par demi-journée", sous: `${nb(pat)} aujourd'hui`, valeur: signe(plusPat), valeurSous: R.mode === "horaire" ? "au taux horaire, rien" : "net par année" },
     ]));
@@ -1399,16 +1399,15 @@ window.Verrou.quandOuvert(function () {
         + `${c.anDJ > 0 ? `, environ ${$(Math.abs(c.ecart) * c.anDJ)} sur vos ${nb(c.anDJ, 0)} demi-journées d'enseignement de l'année` : ""}.`
         + (c.manque > 0 ? ` Les visites l'emporteraient avec ${nb(c.manque, 0)} suivi${c.manque > 1 ? "s" : ""} de plus.` : "");
   }
-  // Revenu, résumé (GMF-U) : la demi-journée de supervision en bref, et le lien vers son onglet.
+  // Comparer, résumé : la demi-journée de supervision en bref, et le lien vers son onglet. Pour toute pratique :
+  // hors GMF-U, elle se prépare aux tarifs d'établissement du GMF-U.
   function resumeSupervision(R) {
-    const carte = document.getElementById("rv-r-supervision"), montrer = R.milieu === "gmfu" && !R.vueResidence;
-    carte.hidden = !montrer;
-    if (!montrer) { carte.textContent = ""; return; }
+    document.getElementById("rv-r-supervision").hidden = false;
     const c = calculSupervision(R), v = c.v, x = c.x, nV = x.pec + x.suivi;
     const meilleur = c.egal ? null : c.ecart > 0 ? "visites" : "intervention";
-    carteResume("rv-r-supervision", "Supervision : intervention ou visites ?", ["Ajuster", "#revenu/supervision"],
+    carteResume("rv-r-supervision", "Supervision : intervention ou visites ?", ["Ajuster", "#comparer/demijournee"],
       el("p", "aide", `${nb(v.residents, 0)} résident${v.residents > 1 ? "s" : ""}, ${nb(v.externes, 0)} externe${v.externes > 1 ? "s" : ""}, ${nb(nV, 0)} visite${nV > 1 ? "s" : ""}`
-        + ` · ${v.moment === "pm" ? "après-midi" : "avant-midi"}, ${nb(v.heures, 2)} h${v.plan ? " · selon votre plan" : ""}`),
+        + ` · ${v.moment === "pm" ? "après-midi" : "avant-midi"}, ${nb(v.heures, 2)} h${v.plan ? " · selon votre plan" : ""}${R.milieu === "gmfu" ? "" : " · tarifs du GMF-U"}`),
       rangees(el("div"), [
         { titre: "Intervention de supervision", sous: `${nb(x.heures, 2)} h payées`, valeur: $(c.avecIntervention), cls: meilleur === "intervention" ? "choisi" : null },
         { titre: "Visites facturées", sous: `${nb(nV, 0)} visite${nV > 1 ? "s" : ""} au mixte`, valeur: $(c.avecVisites), cls: meilleur === "visites" ? "choisi" : null },
@@ -1711,7 +1710,7 @@ window.Verrou.quandOuvert(function () {
   }
   const LEGENDE_BARRES = "Barre : le brut ; partie pleine : le net, après impôt et frais. En or : le meilleur net.";
   function resumeModes(R) {
-    const carte = document.getElementById("rv-r-modes"), montrer = R.plusieursModes && !R.vueResidence;
+    const carte = document.getElementById("rv-r-modes"), montrer = R.plusieursModes;
     carte.hidden = !montrer;
     if (!montrer) { carte.textContent = ""; return; }
     // « Et si… » : d'autres patients et d'autres demi-journées, pour cet écran seulement, jusqu'à « Garder ces valeurs ».
@@ -1748,7 +1747,7 @@ window.Verrou.quandOuvert(function () {
     const h = R.modes.filter(m => v[m].heure != null), mh = h.length ? h.reduce((a, m) => v[m].heure > v[a].heure ? m : a, h[0]) : null;
     const note = el("p", "aide", `${LEGENDE_BARRES} `
       + (mh ? `$/h : par heure en clinique, après les frais de cabinet et avant l'impôt, sans les activités en établissement. À l'heure, ${NOMS_MODE_ACTES[mh].toLowerCase()} paie le mieux (${$(v[mh].heure)}).` : ""));
-    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"],
+    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Détail", "#comparer/modes"],
       rangeesModes(lignesModes, R.modes.map(m => v[m].brut), R.modes.map(m => v[m].net)), el("p", "conclusion", phrase), note, bloc);
     if (U.essaiFocus) { const f = document.getElementById(U.essaiFocus); U.essaiFocus = null; if (f && !f.disabled) f.focus(); }
   }
@@ -1852,12 +1851,72 @@ window.Verrou.quandOuvert(function () {
     ], x => x.p.endsWith(".mode") ? b.mode : lire(x.p));
   }
 
-  function rendreRevenu(R) {
-    rendreOffres(R);
-    rendreActes(R);
-    rendreSeuils(R);
+  /* Comparer : le meilleur mode (avec « Et si… »), une demi-journée de supervision, les actes et deux offres.
+     Toujours la pratique, même en vue résidence : la comparaison sert à la choisir. */
+  function rendreComparer(R) {
+    heroComparer(R);
     resumeModes(R);
     resumeSupervision(R);
+    liensComparer(R);
+    rendreComparaisonModes(R);
+    rendreSensibilite(R);
+    rendreSeuils(R);
+    rendreActes(R);
+    rendreOffres(R);
+  }
+  // En tête : le mode le plus payant, son brut en gros et son net dessous. Avec un seul mode, rien : la supervision suit.
+  function heroComparer(R) {
+    const z = document.getElementById("cp-hero");
+    z.hidden = !R.plusieursModes;
+    if (z.hidden) { z.textContent = ""; delete z.dataset.nombre; return; }
+    const meilleur = R.modes.reduce((a, m) => R.nets[m] > R.nets[a] ? m : a, R.modes[0]);
+    const second = R.modes.filter(m => m !== meilleur).reduce((a, m) => !a || R.nets[m] > R.nets[a] ? m : a, null);
+    const brut = R.rev[meilleur].total;
+    hero("cp-hero", `Le plus payant : ${NOM_MODE[meilleur].toLowerCase()}, brut de l'année`, $(brut), [
+      `${R.libelleNet(meilleur)}${R.societeActive ? ", pour vous" : ""} : ${$(R.nets[meilleur])}`,
+      puce(`${signe(R.nets[meilleur] - R.nets[second])} net par rapport ${AU_MODE[second]}`, "haut", true),
+      R.mode === meilleur ? "C'est le mode de votre budget" : `Votre budget est calculé ${AU_MODE[R.mode]}`,
+      R.residenceActive ? puce(`En pratique, dès ${moisLong(R.debutPratique)}`) : null,
+    ], brut);
+  }
+  // Résumé : un lien vers chaque sous-onglet, avec ce qu'on y trouve.
+  function liensComparer(R) {
+    const liens = [
+      ["modes", "barres", libelleModes(), R.plusieursModes ? `${R.modes.length === 3 ? "Les trois modes" : "Vos modes"} côte à côte, les seuils, et selon vos demi-journées` : "Votre revenu selon vos demi-journées et vos patients"],
+      ["demijournee", "horloge", "Demi-journée", "Intervention de supervision ou visites ; ma demi-journée, acte par acte"],
+      ["actes", "loupe", "Actes", `Le répertoire, ${nb(window.Repertoire.ACTES.length, 0)} actes avec recherche ; les formulaires de la CNESST`],
+      ["offres", "offres", "Offres", S.revenu.offreB ? "Votre plan à côté de l'autre offre" : "Votre plan à côté d'une autre offre"],
+    ];
+    const ul = el("ul", "liens-comparer");
+    for (const [k, ico, titre, sous] of liens) {
+      const li = el("li"), a = el("a", "lien-comparer"), i = el("span", "lc-icone"), t = el("span", "lc-texte");
+      a.href = `#comparer/${k}`; i.appendChild(icone(ico)); t.append(el("strong", null, titre), el("span", null, sous));
+      a.append(i, t, icone("chevron", "chevron")); li.appendChild(a); ul.appendChild(li);
+    }
+    carteResume("cp-r-liens", "Toutes les comparaisons", null, ul);
+  }
+  // Modes : les barres de chaque mode (le brut ; le net dessous), l'écart avec le mode du budget et les seuils en une phrase.
+  function rendreComparaisonModes(R) {
+    document.getElementById("rv-carte-modes").hidden = !R.plusieursModes;
+    if (!R.plusieursModes) return;
+    const g = R.rev, autres = R.modes.filter(m => m !== R.mode), meilleur = R.modes.reduce((a, m) => R.nets[m] > R.nets[a] ? m : a, R.modes[0]);
+    const comp = document.getElementById("rv-comparaison"); comp.textContent = ""; comp.className = "barres";
+    const sous = k => { const t = [k === R.mode ? "dans votre budget" : "", g[k].fraisCabinet ? `frais de cabinet ${moins(g[k].fraisCabinet)}` : "",
+      R.societeActive ? `laissé dans la société ${$(R.impots[k].societe.retenu)}` : ""].filter(Boolean).join(" · "); return t && t[0].toUpperCase() + t.slice(1); };
+    comp.append(rangeesModes(R.modes.map(k => ({ titre: NOM_MODE[k], sous: sous(k), valeur: $(g[k].total), valeurSous: `net ${$(R.nets[k])}${R.societeActive ? " pour vous" : ""}`,
+      cls: k === meilleur ? "choisi" : null })), R.modes.map(k => g[k].total), R.modes.map(k => R.nets[k])), el("p", "aide", LEGENDE_BARRES));
+    comp.appendChild(rangees(el("div"), autres.map((m, i) => ({ titre: `${NOM_MODE[m]} par rapport ${AU_MODE[R.mode]}`,
+      sous: R.societeActive ? `Laissé dans la société : ${signe(R.impots[m].societe.retenu - R.impots[R.mode].societe.retenu)}` : `Après impôt et frais : ${signe(R.nets[m] - R.nets[R.mode])}`,
+      valeur: signe(g[m].total - g[R.mode].total), cls: i === 0 ? "total" : null }))));
+    const dPat = s => { const n = des(s); return n == null ? null : n === 0 ? "dès le premier patient" : `dès ${nb(n, 0)} patient${n > 1 ? "s" : ""}`; };
+    const mD = dPat(g.seuilMixte), aD = dPat(g.seuilActeMixte);
+    document.getElementById("rv-seuil").textContent = [
+      mD ? `En clinique, le mixte rapporte plus que l'horaire ${mD} par demi-journée` : "En clinique, le mixte ne dépasse pas l'horaire",
+      aD ? ` ; l'acte dépasse le mixte ${aD} par demi-journée.` : " ; l'acte ne dépasse pas le mixte.",
+      ` Vous en voyez ${nb(S.revenu.patientsParDJ)}. Le forfait de responsabilité du taux horaire est compris.`,
+    ].join("");
+  }
+  function rendreRevenu(R) {
     rendreResidence(R);
     resumeRevenu(R);
     if (R.vueResidence) { rendreAutresRevenus(); return; }
@@ -1866,8 +1925,6 @@ window.Verrou.quandOuvert(function () {
     if (!choix.options.length) for (const [k, m] of Object.entries(MILIEUX)) { const o = el("option", null, m.long); o.value = k; choix.appendChild(o); }
     choix.value = R.milieu;
     document.getElementById("rv-milieu-aide").textContent = MILIEUX[R.milieu].aide;
-    document.getElementById("rv-carte-modes").hidden = !R.plusieursModes;
-    document.getElementById("rv-carte-faits").classList.toggle("demi", R.plusieursModes);
     choixMode("rv-mode");
     rendreActivites(R);
     rendreAutresRevenus();
@@ -1880,39 +1937,6 @@ window.Verrou.quandOuvert(function () {
         : g.activites ? puce(`Dont ${$(g.activites)} d'activités en établissement`) : null,
       R.residenceActive ? puce(`Dès ${moisLong(R.debutPratique)}`) : null,
     ], g[R.mode].total);
-
-    if (R.plusieursModes) {
-      const comp = document.getElementById("rv-comparaison"); comp.textContent = ""; comp.className = "barres";
-      const max = Math.max(...R.modes.map(m => g[m].total), 1);
-      R.modes.forEach(k => {
-        const b = el("div", "barre-bloc");
-        const tete = el("div", "barre-tete");
-        const nom = el("span", "barre-nom", NOM_MODE[k]);
-        if (R.mode === k) nom.appendChild(el("span", "etiquette-choix", "Utilisé dans le budget"));
-        tete.append(nom, el("span", "barre-total", $(g[k].total)));
-        const piste = el("div", "barre-piste"); const barre = el("div", "barre");
-        const sp = el("span"); sp.style.background = R.mode === k ? "var(--encre)" : "var(--trait)"; barre.appendChild(sp);
-        barre.style.width = (g[k].total / max * 100) + "%";
-        piste.appendChild(barre);
-        const fr = g[k].fraisCabinet ? `Frais de cabinet : ${moins(g[k].fraisCabinet)} · ` : "";
-        b.append(tete, piste, el("div", "aide", R.societeActive
-          ? `${fr}Pour vous : ${$(R.nets[k])} · laissé dans la société : ${$(R.impots[k].societe.retenu)}`
-          : `${fr}${R.libelleNet(k)} : ${$(R.nets[k])}`));
-        comp.appendChild(b);
-      });
-      comp.appendChild(rangees(el("div"), autres.map((m, i) => ({ titre: `${NOM_MODE[m]} par rapport ${AU_MODE[R.mode]}`,
-        sous: R.societeActive ? `Laissé dans la société : ${signe(R.impots[m].societe.retenu - R.impots[R.mode].societe.retenu)}` : `Après impôt et frais : ${signe(R.nets[m] - R.nets[R.mode])}`,
-        valeur: signe(g[m].total - g[R.mode].total), cls: i === 0 ? "total" : null }))));
-      const dPat = s => { const n = des(s); return n == null ? null : n === 0 ? "dès le premier patient" : `dès ${nb(n, 0)} patient${n > 1 ? "s" : ""}`; };
-      const mD = dPat(g.seuilMixte), aD = dPat(g.seuilActeMixte);
-      document.getElementById("rv-seuil").textContent = [
-        mD ? `En clinique, le mixte rapporte plus que l'horaire ${mD} par demi-journée` : "En clinique, le mixte ne dépasse pas l'horaire",
-        aD ? ` ; l'acte dépasse le mixte ${aD} par demi-journée.` : " ; l'acte ne dépasse pas le mixte.",
-        ` Vous en voyez ${nb(S.revenu.patientsParDJ)}. Le forfait de responsabilité du taux horaire est compris.`,
-      ].join("");
-    }
-
-    rendreSensibilite(R);
 
     const parts = PARTS_REVENU;
     const zone = document.getElementById("rv-barres"); zone.textContent = ""; zone.className = "barres";
@@ -2575,7 +2599,8 @@ window.Verrou.quandOuvert(function () {
   }
   // Budget : le mois en tuiles ; les dépenses (estimation ou catégories) ; les dettes ; l'année.
   function resumeBudget(R, V, parCat) {
-    tuilesResume("bu-r-tuiles", [{ titre: "Revenu disponible", valeur: $(V.rev), sous: "Par mois" }, { titre: "Dépenses", valeur: $(V.dep), sous: "Par mois" },
+    // Le revenu disponible mène à l'impôt (rangé avec le revenu).
+    tuilesResume("bu-r-tuiles", [{ titre: "Revenu disponible", valeur: $(V.rev), sous: "Par mois, après impôt", href: "#impot" }, { titre: "Dépenses", valeur: $(V.dep), sous: "Par mois" },
       { titre: "Paiements de dettes", valeur: $(V.dettes), sous: "Par mois" }, { titre: "Épargne", valeur: $(V.epargne), sous: "Par mois" }]);
     const simple = budgetSimpleActif();
     const ed = document.getElementById("bu-r-editeur"), barres = document.getElementById("bu-r-barres"), actions = document.getElementById("bu-r-actions");
@@ -2798,10 +2823,10 @@ window.Verrou.quandOuvert(function () {
     document.documentElement.classList.toggle("donnees-exemple", !!S.meta.exemple);   // un rappel « Exemple » près de chaque titre
     document.getElementById("pied-parametres").textContent = `paramètres fiscaux ${R.parametres.annee}${R.parametres.provisoire ? " (provisoires)" : ""}`;
     appliquerVue(R);
-    appliquerSous("revenu"); appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
+    appliquerSous("comparer"); appliquerSous("budget"); appliquerSous("avenir");   // avant les graphiques : ils prennent la largeur des cartes visibles
     // Seule la page affichée se redessine (lot 10 de l'audit) : ouvrir une page appelle tout() de nouveau.
     const visible = (document.querySelector(".vue:not([hidden])") || {}).id || "v-apercu";
-    ({ "v-apercu": () => rendreApercu(R), "v-revenu": () => rendreRevenu(R), "v-impot": () => rendreImpot(R), "v-budget": () => rendreBudget(R),
+    ({ "v-apercu": () => rendreApercu(R), "v-revenu": () => rendreRevenu(R), "v-comparer": () => rendreComparer(R), "v-impot": () => rendreImpot(R), "v-budget": () => rendreBudget(R),
       "v-avenir": () => rendreAvenir(R), "v-donnees": () => rendreFiabilite() })[visible]?.();
     if (feuilleCourante && feuilleCourante.maj) feuilleCourante.maj();
     // Sigles de la RAMQ : définition au toucher, dans les pages et le panneau ouvert.
@@ -3951,22 +3976,24 @@ window.Verrou.quandOuvert(function () {
     annulerToast = null; boiteToast.hidden = true;
   });
 
-  /* Pages, avec la page ouverte dans l'adresse (#revenu, #impot…). */
+  /* Pages, avec la page ouverte dans l'adresse (#revenu, #impot…). L'impôt est rangé avec le revenu
+     (« Votre revenu · Impôt ») ; la supervision et les actes, autrefois sous Revenu, sont dans Comparer. */
   const ALIAS = { epargne: "avenir", patrimoine: "avenir" };
-  /* Sous-onglets du Budget et du Patrimoine : des pages plus courtes sur téléphone. Le choix est
+  const ANCIENNES = { "revenu/supervision": "comparer/demijournee", "revenu/actes": "comparer/actes" };
+  /* Sous-onglets de Comparer, du Budget et du Patrimoine : des pages plus courtes sur téléphone. Le choix est
      gardé sur cet appareil ; une adresse comme #budget/dettes ouvre directement un sous-onglet. */
   const SOUS_ONGLETS = {
-    revenu: [["detail", "Votre revenu"], ["supervision", "Supervision"], ["actes", "Actes"]],
+    comparer: [["modes", "Modes"], ["demijournee", "Demi-journée"], ["actes", "Actes"], ["offres", "Offres"]],
     budget: [["mois", "Ce mois-ci"], ["annee", "L'année"], ["dettes", "Dettes"]],
     avenir: [["aujourdhui", "Aujourd'hui"], ["projection", "Projection"], ["placements", "Placements"], ["proches", "Proches"]],
   };
-  // Comparer les actes : dès qu'il y a plusieurs modes à comparer (GMF-U, CLSC). En clinique, à l'acte seulement, l'onglet n'existe pas.
+  // Un seul mode (en clinique, à l'acte seulement) : l'onglet Modes garde le revenu selon les demi-journées, sous le nom « Rythme ».
   const unSeulMode = () => (MILIEUX[S.revenu.milieu] || MILIEUX.clinique).modes.length < 2;
+  const libelleModes = () => unSeulMode() ? "Rythme" : "Modes";
   function ongletsDe(page) {
     const tous = SOUS_ONGLETS[page];
     if (!tous) return null;
-    // Supervision : pour toute pratique ; Actes : dès qu'il y a plusieurs modes à comparer.
-    if (page === "revenu") return tous.filter(([k]) => !(k === "actes" && unSeulMode()));
+    if (page === "comparer") return tous.map(([k, t]) => [k, k === "modes" ? libelleModes() : t]);
     return tous;
   }
   function sousChoisi(page) {
@@ -3976,7 +4003,7 @@ window.Verrou.quandOuvert(function () {
     return onglets.some(([k]) => k === v) ? v : onglets[0][0];
   }
   function garderSous(page, cle) { try { localStorage.setItem("wm.sous." + page, cle); } catch (e) { /* préférence non gardée */ } }
-  const BARRE_SOUS = { revenu: ["rv-onglets", "Sections du revenu"], budget: ["bu-onglets", "Sections du budget"], avenir: ["pa-onglets", "Sections du patrimoine"] };
+  const BARRE_SOUS = { comparer: ["cp-onglets", "Comparaisons"], budget: ["bu-onglets", "Sections du budget"], avenir: ["pa-onglets", "Sections du patrimoine"] };
   function appliquerSous(page) {
     const onglets = ongletsDe(page), barre = document.getElementById(BARRE_SOUS[page][0]);
     if (onglets.length < 2) { barre.hidden = true; barre.textContent = ""; delete barre.dataset.cle; }
@@ -3988,14 +4015,15 @@ window.Verrou.quandOuvert(function () {
     }
     const cle = sousChoisi(page);
     document.querySelectorAll(`#v-${page} [data-sous]`).forEach(c => c.classList.toggle("hors-onglet", c.dataset.sous !== cle));
-    if (page === "revenu" && /^#revenu\/(actes|supervision)$/.test(location.hash) && !onglets.some(([k]) => `#revenu/${k}` === location.hash)) history.replaceState(null, "", "#revenu/detail");
+    // L'adresse suit l'onglet montré (un onglet disparu, par exemple, laisse place au premier).
+    const m = location.hash.match(/^#([a-z]+)\/([a-z]+)$/);
+    if (m && m[1] === page && m[2] !== cle) history.replaceState(null, "", `#${page}/${cle}`);
   }
   /* Chaque page : son résumé (#budget), ou tout son détail (#budget/detail, ou un sous-onglet : #budget/dettes).
      Le bouton Retour du téléphone ramène du détail au résumé. */
   function ouvrir(nom, sansRendu) {
-    let [page, sous] = String(nom).split("/");
+    let [page, sous] = String(ANCIENNES[nom] || nom).split("/");
     nom = ALIAS[page] || page;
-    if (nom === "revenu" && (sous === "actes" || sous === "supervision") && !ongletsDe("revenu").some(([k]) => k === sous)) sous = "detail";
     const onglets = ongletsDe(nom);
     const sousOnglet = !!(sous && onglets && onglets.some(([k]) => k === sous));
     if (sousOnglet) garderSous(nom, sous);
@@ -4006,7 +4034,10 @@ window.Verrou.quandOuvert(function () {
     // Téléphone : les boutons du haut suivent la page, à droite de son titre.
     document.querySelector(`#v-${nom} > .tete-page`).after(document.querySelector(".barre-outils"));
     document.getElementById("barre-pdf").hidden = nom !== "apercu";
-    document.querySelectorAll(".nav [data-onglet], .barre-outils [data-onglet]").forEach(a => { if (a.dataset.onglet === nom) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    // L'impôt est rangé avec le revenu : Revenu reste marqué dans la barre ; « Votre revenu · Impôt » marque la page ouverte.
+    const section = nom === "impot" ? "revenu" : nom;
+    document.querySelectorAll(".nav [data-onglet], .barre-outils [data-onglet]").forEach(a => { if (a.dataset.onglet === section) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    document.querySelectorAll(".onglets-section a").forEach(a => { if (a.dataset.section === nom) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     document.querySelectorAll(".vue").forEach(v => { v.hidden = v.id !== "v-" + nom; });
     if (location.hash !== adresse) history.replaceState(null, "", adresse);
     // Le lien touché (« Voir tout le détail », « Résumé ») disparaît : le focus va au début du contenu.
@@ -4448,7 +4479,7 @@ window.Verrou.quandOuvert(function () {
   window.Wealthnord = {
     etat: () => S, resultats: () => R,
     // Toutes les pages, même cachées (les tests lisent parfois une autre page que celle affichée).
-    rendreTout: () => { rendreApercu(R); rendreRevenu(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite(); lexique(document.querySelector("main"), LEXIQUE); },
+    rendreTout: () => { rendreApercu(R); rendreRevenu(R); rendreComparer(R); rendreImpot(R); rendreBudget(R); rendreAvenir(R); rendreFiabilite(); lexique(document.querySelector("main"), LEXIQUE); },
     plan: () => planActif === null ? null : principal.plans[planActif].nom,
     verification: () => {
       let total = 0, egaux = 0, pire = 0;
@@ -4809,8 +4840,10 @@ window.Verrou.quandOuvert(function () {
   function terminerAssistant() {
     const rapide = !!A.rapide;
     sortirPlan(true); S = portraitDepuis(A); sauver(); fermerAssistant();
-    ouvrir(rapide ? "revenu" : "apercu"); tout();
-    toast(rapide ? "Vos modes, côte à côte. Complétez votre portrait quand vous voulez : famille, logement, dettes (Aperçu)."
+    // Le chemin rapide mène aux modes côte à côte (Comparer) ; avec un seul mode, au revenu.
+    const modes = rapide && !unSeulMode();
+    ouvrir(rapide ? (modes ? "comparer" : "revenu") : "apercu"); tout();
+    toast(rapide ? `${modes ? "Vos modes, côte à côte." : "Votre revenu estimé."} Complétez votre portrait quand vous voulez : famille, logement, dettes (Aperçu).`
       : "Votre portrait est prêt. Précisez maintenant vos revenus et vos dépenses du mois.");
   }
 

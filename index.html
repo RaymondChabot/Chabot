@@ -62,7 +62,7 @@
     <a class="marque nav-marque" href="#apercu" aria-label="WealthMorand : accueil"><svg class="nav-sceau" aria-hidden="true"><use href="#wm-sceau"/></svg></a>
     <a href="#apercu" data-onglet="apercu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7V20a.5.5 0 0 1-.5.5h-5v-6h-6v6H4a.5.5 0 0 1-.5-.5Z"/></svg><span>Aperçu</span></a>
     <a href="#revenu" data-onglet="revenu"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="13" rx="2.5"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7M12 11.5v4M10 13.5h4"/></svg><span>Revenu</span></a>
-    <a href="#impot" data-onglet="impot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4Z"/><path d="M9.5 9.5h.01M14.5 14.5h.01M15 9l-6 6"/></svg><span>Impôt</span></a>
+    <a href="#comparer" data-onglet="comparer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M8 20h8M5 7h14M5 7l-2.5 6.5a2.6 2.6 0 0 0 5 0zM19 7l-2.5 6.5a2.6 2.6 0 0 0 5 0z"/></svg><span>Comparer</span></a>
     <a href="#budget" data-onglet="budget"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16.5" height="11.5" rx="2.5"/><path d="M16 13.75h.01"/></svg><span>Budget</span></a>
     <a href="#avenir" data-onglet="avenir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 17.5 9 12l3.5 3.5 8-8"/><path d="M15 7.5h5.5V13"/></svg><span>Patrimoine</span></a>
     <button type="button" class="nav-installer" data-installer hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10"/><path d="M4.5 15.5v2.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/></svg><span>Installer l'app</span></button>
@@ -97,7 +97,7 @@
       </div>
       <div class="hero" id="ap-hero"></div>
       <div class="carte resume-seul pratique-seule" id="ap-r-modes" hidden></div>
-      <a class="onglet-demi resume-seul" id="ap-demijournee" href="#revenu/supervision" hidden></a>
+      <a class="onglet-demi resume-seul" id="ap-demijournee" href="#comparer/demijournee" hidden></a>
       <div class="carte resume-seul portrait-court" id="ap-r-portrait" hidden></div>
       <div class="carte demi resume-seul" id="ap-r-mois"></div>
       <div class="carte portrait detail-seul" id="ap-portrait" hidden>
@@ -137,19 +137,17 @@
     <!-- ============ REVENU ============ -->
     <section class="vue" id="v-revenu" aria-labelledby="h-revenu" hidden>
       <header class="tete-page"><a class="retour-resume detail-seul" href="#revenu">Résumé</a><h1 id="h-revenu">Revenu</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
-      <div class="onglets detail-seul" id="rv-onglets"></div>
+      <nav class="onglets onglets-section" aria-label="Revenu et impôt"><a href="#revenu" data-section="revenu">Votre revenu</a><a href="#impot" data-section="impot">Impôt</a></nav>
       <div class="segment parcours" id="rv-parcours"></div>
-      <div class="choix-milieu pratique-seule detail-seul" data-sous="detail">
+      <div class="choix-milieu pratique-seule detail-seul">
         <label for="rv-milieu">Pratique principale</label>
         <div class="saisie"><select id="rv-milieu"></select></div>
         <p class="aide" id="rv-milieu-aide"></p>
       </div>
-      <div class="segment pratique-seule detail-seul" id="rv-mode" data-sous="detail"></div>
+      <div class="segment pratique-seule detail-seul" id="rv-mode"></div>
       <div class="hero" id="rv-hero"></div>
-      <div class="carte resume-seul pratique-seule" id="rv-r-modes" hidden></div>
-      <div class="carte resume-seul pratique-seule" id="rv-r-supervision" hidden></div>
       <div class="tuiles quatre resume-seul" id="rv-r-tuiles"></div>
-      <div class="carte residence-seule detail-seul" id="rv-residence" data-sous="detail" hidden>
+      <div class="carte residence-seule detail-seul" id="rv-residence" hidden>
         <div class="carte-tete"><h2>Votre résidence</h2><button type="button" class="lien-carte" data-feuille="residence">Modifier</button></div>
         <div class="rangees" id="rv-residence-detail"></div>
         <p class="aide" id="rv-residence-note"></p>
@@ -157,26 +155,49 @@
       <div class="carte demi resume-seul pratique-seule" id="rv-r-sources"></div>
       <div class="carte demi resume-seul pratique-seule" id="rv-r-sens"></div>
       <a class="bouton secondaire large bouton-detail resume-seul" href="#revenu/detail">Voir tout le détail</a>
-      <div class="carte demi pratique-seule detail-seul" id="rv-carte-modes" data-sous="detail">
-        <div class="carte-tete"><h2>Comparer les modes</h2></div>
-        <div id="rv-comparaison"></div>
-        <p class="aide" id="rv-seuil"></p>
-      </div>
-      <div class="carte demi pratique-seule detail-seul" id="rv-carte-faits" data-sous="detail">
+      <div class="carte pratique-seule detail-seul" id="rv-carte-faits">
         <div class="carte-tete"><h2>Votre année en chiffres</h2></div>
         <div class="rangees" id="rv-faits"></div>
       </div>
-      <div class="carte detail-seul" id="rv-carte-offres" data-sous="detail"></div>
-      <div class="carte demi pratique-seule detail-seul" id="rv-carte-activites" data-sous="detail">
+      <div class="carte demi pratique-seule detail-seul" id="rv-carte-activites">
         <div class="carte-tete"><h2>Activités en établissement</h2></div>
         <div id="rv-activites"></div>
         <div class="actions"><button type="button" class="bouton secondaire" id="rv-ajout-activite">Ajouter une activité</button></div>
       </div>
-      <div class="carte demi detail-seul" id="rv-carte-autres" data-sous="detail">
+      <div class="carte demi detail-seul" id="rv-carte-autres">
         <div class="carte-tete"><h2>Autres revenus</h2><button type="button" class="lien-carte" id="rv-autres-modifier">Modifier</button></div>
         <div id="rv-autres"></div>
       </div>
-      <div class="carte pratique-seule detail-seul" id="rv-carte-sens" data-sous="detail">
+      <div class="carte pratique-seule detail-seul" id="rv-carte-source">
+        <div class="carte-tete"><h2>D'où vient le revenu</h2></div>
+        <div id="rv-barres"></div>
+        <div class="legende" id="rv-legende"></div>
+        <div class="tableau-defile"><table class="tableau" id="rv-detail"></table></div>
+      </div>
+      <div class="carte detail-seul" id="rv-residence-ajout" hidden>
+        <div class="carte-tete"><h2 id="rv-residence-ajout-titre">En résidence ?</h2></div>
+        <p class="aide" id="rv-residence-ajout-texte">Ajoutez votre salaire de résident (échelle de la FMRQ) et la date de début de votre pratique : l'app montre l'une ou l'autre, et vos projections passent de la résidence à la pratique à cette date.</p>
+        <div class="actions"><button type="button" class="bouton secondaire" id="rv-residence-ajouter">Ajouter ma résidence</button></div>
+      </div>
+    </section>
+
+    <!-- ============ COMPARER ============ -->
+    <!-- Comparer : le meilleur mode, une demi-journée de supervision, les actes et deux offres. Le résumé d'abord ;
+         le détail en sous-onglets (Modes · Demi-journée · Actes · Offres). Les cartes gardent leurs identifiants. -->
+    <section class="vue" id="v-comparer" aria-labelledby="h-comparer" hidden>
+      <header class="tete-page"><a class="retour-resume detail-seul" href="#comparer">Résumé</a><h1 id="h-comparer">Comparer</h1><button type="button" class="bouton-modifier" data-feuille="revenu">Modifier</button></header>
+      <div class="onglets detail-seul" id="cp-onglets"></div>
+      <div class="hero resume-seul" id="cp-hero"></div>
+      <div class="carte resume-seul" id="rv-r-modes" hidden></div>
+      <div class="carte resume-seul" id="rv-r-supervision" hidden></div>
+      <div class="carte resume-seul" id="cp-r-liens"></div>
+      <a class="bouton secondaire large bouton-detail resume-seul" href="#comparer/detail">Voir tout le détail</a>
+      <div class="carte detail-seul" id="rv-carte-modes" data-sous="modes">
+        <div class="carte-tete"><h2>Les modes côte à côte</h2></div>
+        <div id="rv-comparaison"></div>
+        <p class="aide" id="rv-seuil"></p>
+      </div>
+      <div class="carte detail-seul" id="rv-carte-sens" data-sous="modes">
         <div class="carte-tete"><h2 id="rv-sens-titre">Selon vos demi-journées</h2><div class="segment petit compact" id="rv-sens-vue"></div></div>
         <div class="legende" id="rv-sens-legende"></div>
         <div class="graphique" id="rv-sens-graph"></div>
@@ -187,17 +208,8 @@
         </div>
         <p class="aide" id="rv-sens-note"></p>
       </div>
-      <div class="carte pratique-seule detail-seul" id="rv-carte-source" data-sous="detail">
-        <div class="carte-tete"><h2>D'où vient le revenu</h2></div>
-        <div id="rv-barres"></div>
-        <div class="legende" id="rv-legende"></div>
-        <div class="tableau-defile"><table class="tableau" id="rv-detail"></table></div>
-      </div>
-      <!-- Comparer les actes : un sous-onglet du détail, dès qu'il y a plusieurs modes. Les résultats d'abord ;
-           les champs et les tableaux se déplient pour aller plus loin. -->
-      <!-- Supervision au mixte (GMF-U) : une demi-journée à régler ; l'intervention de supervision et les visites côte à
-           côte, l'écart en haut. Le seuil selon le plan se déplie en dessous. -->
-      <div class="carte detail-seul" id="rv-carte-supervision" data-sous="supervision">
+      <div class="carte detail-seul" id="rv-carte-seuils" data-sous="modes"></div>
+      <div class="carte detail-seul" id="rv-carte-supervision" data-sous="demijournee">
         <div class="carte-tete"><h2>Supervision : intervention ou visites ?</h2><button type="button" class="lien-carte" id="sab-plan">Selon mon plan</button></div>
         <p class="aide" id="sab-intro"></p>
         <div class="sab" id="sab"></div>
@@ -218,7 +230,16 @@
           <div class="tableau-defile"><table class="tableau" id="rv-sup-table"></table></div>
         </details>
       </div>
-      <!-- Répertoire des actes (GMF-U en établissement, mode mixte) : recherche par code ou par mot, filtres par groupe. -->
+      <div class="carte detail-seul" id="rv-carte-demijournee" data-sous="demijournee">
+        <div class="carte-tete"><h2>Ma demi-journée</h2><button type="button" class="lien-carte" id="rv-dj-plan">Selon mon plan</button></div>
+        <p class="aide" id="rv-dj-intro"></p>
+        <div class="rangees" id="rv-dj-resultat"></div>
+        <p class="conclusion" id="rv-dj-conclusion"></p>
+        <details class="plus-loin" id="rv-dj-plus">
+          <summary>Changer les actes de la demi-journée</summary>
+          <div class="champs-rapides" id="rv-dj-champs"></div>
+        </details>
+      </div>
       <div class="carte detail-seul" id="rv-carte-repertoire" data-sous="actes">
         <div class="carte-tete"><h2>Répertoire des actes</h2><span class="carte-sous" id="rep-compte" aria-live="polite"></span></div>
         <p class="aide">GMF-U en établissement, au mode mixte : le tarif de la RAMQ et ce que vous recevez. Cherchez par code ou par mot.</p>
@@ -229,17 +250,6 @@
         <div class="rep-groupes" id="rep-groupes" role="group" aria-label="Groupes d'actes"></div>
         <div class="rep-liste" id="rep-liste"></div>
         <p class="aide" id="rep-source"></p>
-      </div>
-      <div class="carte detail-seul" id="rv-carte-seuils" data-sous="actes"></div>
-      <div class="carte detail-seul" id="rv-carte-demijournee" data-sous="actes">
-        <div class="carte-tete"><h2>Ma demi-journée</h2><button type="button" class="lien-carte" id="rv-dj-plan">Selon mon plan</button></div>
-        <p class="aide" id="rv-dj-intro"></p>
-        <div class="rangees" id="rv-dj-resultat"></div>
-        <p class="conclusion" id="rv-dj-conclusion"></p>
-        <details class="plus-loin" id="rv-dj-plus">
-          <summary>Changer les actes de la demi-journée</summary>
-          <div class="champs-rapides" id="rv-dj-champs"></div>
-        </details>
       </div>
       <details class="carte carte-repliable detail-seul" id="rv-carte-actes" data-sous="actes">
         <summary><h2>Ce que rapporte chaque acte</h2><span class="repli-resume" id="rv-actes-resume"></span></summary>
@@ -255,16 +265,13 @@
         <div class="tableau-defile"><table class="tableau" id="rv-cnesst"></table></div>
         <p class="aide" id="rv-cnesst-note"></p>
       </details>
-      <div class="carte detail-seul" id="rv-residence-ajout" data-sous="detail" hidden>
-        <div class="carte-tete"><h2 id="rv-residence-ajout-titre">En résidence ?</h2></div>
-        <p class="aide" id="rv-residence-ajout-texte">Ajoutez votre salaire de résident (échelle de la FMRQ) et la date de début de votre pratique : l'app montre l'une ou l'autre, et vos projections passent de la résidence à la pratique à cette date.</p>
-        <div class="actions"><button type="button" class="bouton secondaire" id="rv-residence-ajouter">Ajouter ma résidence</button></div>
-      </div>
+      <div class="carte detail-seul" id="rv-carte-offres" data-sous="offres"></div>
     </section>
 
-    <!-- ============ IMPÔT ============ -->
+    <!-- ============ IMPÔT (avec Revenu : « Votre revenu · Impôt ») ============ -->
     <section class="vue" id="v-impot" aria-labelledby="h-impot" hidden>
       <header class="tete-page"><a class="retour-resume detail-seul" href="#impot">Résumé</a><h1 id="h-impot">Impôt 2026</h1><button type="button" class="bouton-modifier" data-feuille="impot">Modifier</button></header>
+      <nav class="onglets onglets-section" aria-label="Revenu et impôt"><a href="#revenu" data-section="revenu">Votre revenu</a><a href="#impot" data-section="impot">Impôt</a></nav>
       <div class="segment parcours" id="im-parcours"></div>
       <div class="segment pratique-seule detail-seul" id="im-mode"></div>
       <div class="hero" id="im-hero"></div>

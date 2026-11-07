@@ -74,7 +74,7 @@ async function exemple(b, base) {
   const e = await resultat(p);
   verifier("exemple : revenu calculé, clinique à l'acte", e.brut > 100000 && e.milieu === "clinique" && e.mode === "acte", e.brut);
   verifier("accueil : pas d'import", !(await p.$('#ap-exemple a[href="#donnees"]')) && !/import/i.test(await p.textContent("#ap-exemple")));
-  for (const page of ["apercu", "apercu/detail", "revenu", "revenu/detail", "impot", "impot/detail", "budget", "budget/detail", "avenir", "avenir/detail", "donnees"]) {
+  for (const page of ["apercu", "apercu/detail", "revenu", "revenu/detail", "comparer", "comparer/modes", "comparer/demijournee", "comparer/actes", "comparer/offres", "impot", "impot/detail", "budget", "budget/detail", "avenir", "avenir/detail", "donnees"]) {
     await allerA(p, page);
     const d = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     verifier(`page ${page} : pas de défilement horizontal à 390 px`, d <= 0, d);
@@ -189,7 +189,7 @@ async function injection(b, base) {
     localStorage.setItem("boussole.v1", JSON.stringify(S));
   });
   await p.reload(); await pret(p);
-  for (const page of ["apercu", "revenu", "impot", "budget", "avenir", "donnees"]) await allerA(p, page);
+  for (const page of ["apercu", "revenu", "comparer", "impot", "budget", "avenir", "donnees"]) await allerA(p, page);
   await p.evaluate(() => { const r = window.Wealthnord.rapport; r.construire(); r.construire({ fiche: true }); });
   await p.waitForTimeout(500);
   verifier("noms piégés : aucun code exécuté", !(await p.evaluate(() => window.__xss)), await p.evaluate(() => window.__xss));
@@ -964,7 +964,7 @@ async function resumeDetail(b, base) {
     return { detail: v.classList.contains("mode-detail"), resume: [...v.querySelectorAll(".resume-seul")].filter(vu).length,
       details: [...v.querySelectorAll(".detail-seul")].filter(vu).length, hauteur: document.documentElement.scrollHeight, adresse: location.hash };
   }, pg);
-  for (const pg of ["apercu", "revenu", "impot", "budget", "avenir"]) {
+  for (const pg of ["apercu", "revenu", "comparer", "impot", "budget", "avenir"]) {
     await allerA(p, pg);
     const r = await vus(pg);
     verifier(`résumé : ${pg} s'ouvre sur son résumé`, !r.detail && r.resume >= 3 && r.details === 0 && r.adresse === "#" + pg, r);
@@ -972,7 +972,8 @@ async function resumeDetail(b, base) {
     const d = await vus(pg);
     verifier(`détail : ${pg} montre tout, sans le résumé`, d.detail && d.resume === 0 && d.details >= 3 && d.adresse.startsWith(`#${pg}/`), d);
     // Budget : le détail du mois replie le bilan et les catégories vides, il reste donc proche du résumé.
-    const plafond = pg === "budget" ? 1 : 0.75;
+    // Comparer : le détail est réparti en quatre onglets, chacun court.
+    const plafond = pg === "budget" || pg === "comparer" ? 1 : 0.75;
     verifier(`résumé : ${pg} tient en moins de place que le détail`, r.hauteur < d.hauteur * plafond, { resume: r.hauteur, detail: d.hauteur });
     await p.click(`#v-${pg} .retour-resume`); await p.waitForTimeout(250);
     const retour = await vus(pg);
@@ -1065,88 +1066,112 @@ async function tempsQuiPasse(b, base) {
   verifier("temps : aucune erreur", [janvier, aout, refus].every(x => x.erreurs.length === 0), [...janvier.erreurs, ...aout.erreurs, ...refus.erreurs]);
 }
 
-/* 31. Comparer les actes (Revenu, sous-onglet, GMF-U seulement) : supervision ou visites des apprenants,
-   choix appliqué au plan ; durée d'un acte ; ma demi-journée, puis celle du plan ; carte du résumé ;
-   seuils de rémunération ; hors GMF-U, la section disparaît. Aucun débordement. */
+/* 31. Comparer (page de la barre du bas) : le résumé (le mode le plus payant, vos trois modes, la supervision, un lien
+   par onglet), puis quatre sous-onglets : Modes, Demi-journée, Actes, Offres. Supervision ou visites des apprenants,
+   choix appliqué au plan ; durée d'un acte ; ma demi-journée, puis celle du plan ; seuils de rémunération ; en CLSC
+   et en clinique. Les anciennes adresses (#revenu/actes, #revenu/supervision) mènent aux nouvelles. Aucun débordement. */
 async function comparerActes(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu" });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "comparer" });
   await remplacer(p, { "revenu.milieu": "gmfu", "revenu.lieuTarifs": "auto", "revenu.modeBudget": "mixte", "revenu.residents": 1, "revenu.externes": 1, "revenu.patientsParResident": 4.5,
     "revenu.patientsParExterne": 2.5, "revenu.heuresParDJ": 3.5, "revenu.enseignement": 2, "revenu.enseignementApresMidi": 0, "revenu.demiJournees": 8, "revenu.semaines": 40,
     "revenu.annee": "type", "revenu.inscritsDebut": 600, "revenu.patientsPendantSupervision": 0, "revenu.supervisionFacturation": "visites", "revenu.patientsParDJ": 6,
     "revenu.mix": { suivi: 100, suiviV: 0, perioV: 0, pedia: 0, gross: 0 } });
+  const debord = () => p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  const visibles = () => p.evaluate(() => [...document.querySelectorAll("#v-comparer .carte")].filter(c => c.offsetParent).map(c => c.id));
   await allerA(p, "revenu/actes");
-  const vue = await p.evaluate(() => ({ hash: location.hash, onglets: [...document.querySelectorAll("#rv-onglets button")].map(x => x.textContent),
-    visibles: [...document.querySelectorAll("#v-revenu .carte")].filter(c => c.offsetParent).map(c => c.id), conclusion: document.getElementById("rv-sup-conclusion").textContent,
-    bouton: (document.querySelector("#rv-sup-actions button") || {}).textContent || "", debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
-  verifier("actes : en GMF-U, trois sous-onglets ; Actes : le répertoire, les seuils, la demi-journée ; les actes et la CNESST repliés", vue.hash === "#revenu/actes" && vue.onglets.join() === "Votre revenu,Supervision,Actes"
-    && vue.visibles.join() === "rv-carte-repertoire,rv-carte-seuils,rv-carte-demijournee,rv-carte-actes,rv-carte-cnesst" && !vue.debord
-    && await p.evaluate(() => !document.getElementById("rv-carte-actes").open && !document.getElementById("rv-carte-cnesst").open && !document.getElementById("rv-sup-plus").open), vue);
+  const vue = await p.evaluate(() => ({ hash: location.hash, onglets: [...document.querySelectorAll("#cp-onglets button")].map(x => x.textContent),
+    conclusion: document.getElementById("rv-sup-conclusion").textContent, bouton: (document.querySelector("#rv-sup-actions button") || {}).textContent || "",
+    nav: (document.querySelector('.nav [aria-current="page"]') || {}).dataset?.onglet }));
+  const actes = await visibles();
+  verifier("comparer : #revenu/actes mène à l'onglet Actes ; quatre sous-onglets ; le répertoire, puis les actes et la CNESST repliés",
+    vue.hash === "#comparer/actes" && vue.onglets.join() === "Modes,Demi-journée,Actes,Offres" && vue.nav === "comparer"
+    && actes.join() === "rv-carte-repertoire,rv-carte-actes,rv-carte-cnesst" && !(await debord())
+    && await p.evaluate(() => !document.getElementById("rv-carte-actes").open && !document.getElementById("rv-carte-cnesst").open && !document.getElementById("rv-sup-plus").open), { vue, actes });
   verifier("actes : la supervision rapporte 51,94 $ de plus, environ 4 156 $ sur 80 demi-journées ; les visites dès 10", vue.conclusion.includes("51,94") && vue.conclusion.replace(/\s/g, " ").includes("4 156")
     && vue.conclusion.includes("80 demi-journées") && vue.conclusion.includes("dès 10 visites"), vue.conclusion);
   await allerA(p, "revenu/supervision");
-  verifier("supervision : son propre sous-onglet, une seule carte", await p.evaluate(() => location.hash === "#revenu/supervision"
-    && [...document.querySelectorAll("#v-revenu .carte")].filter(c => c.offsetParent).map(c => c.id).join() === "rv-carte-supervision"));
+  const dem = { hash: await p.evaluate(() => location.hash), cartes: await visibles() };
+  verifier("demi-journée : #revenu/supervision mène à l'onglet Demi-journée : la supervision, puis ma demi-journée",
+    dem.hash === "#comparer/demijournee" && dem.cartes.join() === "rv-carte-supervision,rv-carte-demijournee", dem);
   await p.evaluate(() => { document.getElementById("rv-sup-plus").open = true; });
   await p.click("#rv-sup-actions button"); await p.waitForTimeout(300);
-  await allerA(p, "revenu/actes");
   verifier("actes : le bouton applique l'intervention de supervision au plan", vue.bouton === "Facturer l'intervention de supervision"
     && await p.evaluate(() => window.Wealthnord.etat().revenu.supervisionFacturation === "acte"), vue.bouton);
-  await p.click("#rv-carte-actes > summary"); await p.fill("#duree-suivi", "20"); await p.waitForTimeout(400);
-  const duree = await p.evaluate(() => ({ s: window.Wealthnord.etat().revenu.dureesActes.suivi, acte: document.querySelector('#rv-actes-heure tr[data-acte="suivi"] td[data-m="acte"]').textContent }));
-  verifier("actes : la durée d'un suivi change ce qu'il rapporte à l'heure", duree.s === 20 && duree.acte.replace(/\s/g, "") === "111$", duree);
   await p.click("#rv-dj-plus > summary"); await p.fill("#rapide-suivi", "6"); await p.waitForTimeout(400);
   const dj = await p.evaluate(() => ({ t: window.Wealthnord.etat().revenu.demiJourneeType, plan: !document.getElementById("rv-dj-plan").hidden, c: document.getElementById("rv-dj-conclusion").textContent }));
   verifier("actes : ma demi-journée se garde, avec les autres actes ; « Selon mon plan » apparaît", dj.t && dj.t.suivi === 6 && "perioV" in dj.t && dj.plan && dj.c.includes("rapporte le plus"), dj);
   await p.click("#rv-dj-plan"); await p.waitForTimeout(300);
   verifier("actes : « Selon mon plan » revient à la demi-journée du plan", await p.evaluate(() => window.Wealthnord.etat().revenu.demiJourneeType === null));
+  await allerA(p, "comparer/actes");
+  await p.click("#rv-carte-actes > summary"); await p.fill("#duree-suivi", "20"); await p.waitForTimeout(400);
+  const duree = await p.evaluate(() => ({ s: window.Wealthnord.etat().revenu.dureesActes.suivi, acte: document.querySelector('#rv-actes-heure tr[data-acte="suivi"] td[data-m="acte"]').textContent }));
+  verifier("actes : la durée d'un suivi change ce qu'il rapporte à l'heure", duree.s === 20 && duree.acte.replace(/\s/g, "") === "111$", duree);
+  await allerA(p, "comparer/modes");
+  const modes = await p.evaluate(() => { const c = document.getElementById("rv-comparaison");
+    return { lignes: c.querySelectorAll(".modes-barres .rangee").length, barres: c.querySelectorAll(".barre-mode").length, choisi: c.querySelectorAll(".rangee.choisi").length,
+      seuil: document.getElementById("rv-seuil").textContent, texte: c.textContent }; });
+  const cartesModes = await visibles();
+  verifier("modes : les modes côte à côte (barres, le meilleur net en or), le revenu selon les demi-journées, puis les seuils",
+    cartesModes.join() === "rv-carte-modes,rv-carte-sens,rv-carte-seuils" && modes.lignes === 3 && modes.barres === 3 && modes.choisi === 1 && modes.texte.includes("Dans votre budget")
+    && modes.seuil.includes("dès") && modes.seuil.includes("forfait de responsabilité") && !(await debord()), { cartesModes, modes });
   const seuils = await p.evaluate(() => document.getElementById("rv-carte-seuils").textContent);
-  verifier("seuils : en tête du sous-onglet, dès tant de patients le mixte, puis l'acte ; dès tant de visites la supervision ; l'année aussi",
+  verifier("seuils : dès tant de patients le mixte, puis l'acte ; dès tant de visites la supervision ; l'année aussi",
     seuils.includes("Quand changer de mode") && seuils.includes("patients par demi-journée") && seuils.includes("Mixte plutôt que l'horaire") && seuils.includes("L'acte plutôt que le mixte")
     && seuils.includes("Visites plutôt que la supervision") && seuils.includes("Dès 6") && seuils.includes("Dès 16") && seuils.includes("Dès 10") && !/Dès [3-9]\d/.test(seuils)
     && seuils.includes("3 résidents") && seuils.includes("4,5") && seuils.includes("Sur l'année") && seuils.includes("Comment ces seuils sont calculés"), seuils);
-  await allerA(p, "revenu"); await p.waitForTimeout(200);
+  await allerA(p, "comparer/offres");
+  verifier("offres : leur propre onglet", (await visibles()).join() === "rv-carte-offres");
+  const parOnglet = await p.evaluate(() => { const n = {}; document.querySelectorAll("#v-comparer .detail-seul[data-sous]").forEach(c => { n[c.dataset.sous] = (n[c.dataset.sous] || 0) + 1; });
+    return { n, cartes: document.querySelectorAll("#v-comparer .carte.detail-seul").length }; });
+  verifier("comparer : chaque carte du détail appartient à un onglet", Object.values(parOnglet.n).reduce((a, x) => a + x, 0) === parOnglet.cartes
+    && Object.keys(parOnglet.n).join() === "modes,demijournee,actes,offres", parOnglet);
+  await allerA(p, "comparer"); await p.waitForTimeout(200);
   const resume = await p.evaluate(() => {
-    const c = document.getElementById("rv-r-modes"), hero = document.getElementById("rv-hero"), sources = document.getElementById("rv-r-sources");
+    const c = document.getElementById("rv-r-modes"), hero = document.getElementById("cp-hero"), liens = document.getElementById("cp-r-liens");
     return { lien: c.querySelector("a.lien-carte").getAttribute("href"), texte: c.textContent, vu: !!c.offsetParent, choisis: c.querySelectorAll(".rangee.choisi").length,
       lignes: c.querySelectorAll(".rangee").length, sousLeChiffre: c.getBoundingClientRect().top > hero.getBoundingClientRect().top,
-      avantLeReste: !sources.offsetParent || c.getBoundingClientRect().top < sources.getBoundingClientRect().top, puce: hero.textContent,
-      anciennes: !!document.getElementById("rv-r-seuils") || !!document.getElementById("rv-r-actes"),
+      avantLesLiens: c.getBoundingClientRect().top < liens.getBoundingClientRect().top, etiquette: hero.querySelector(".hero-etiquette").textContent, hero: hero.textContent, heroVu: !!hero.offsetParent,
+      liens: [...liens.querySelectorAll("a")].map(a => a.getAttribute("href")),
+      dansRevenu: !!document.querySelector("#v-revenu :is(#rv-r-modes, #rv-r-supervision, #rv-carte-modes, #rv-carte-sens, #rv-carte-supervision, #rv-carte-repertoire, #rv-carte-offres)"),
       debord: document.documentElement.scrollWidth > document.documentElement.clientWidth };
   });
-  verifier("résumé : une seule carte « Vos trois modes », sous le chiffre, le meilleur net en évidence ; elle mène aux seuils et aux actes",
-    resume.vu && resume.lien === "#revenu/actes" && resume.texte.includes("Vos trois modes") && /net\s\d/.test(resume.texte) && resume.texte.includes("rapporte le plus")
-    && resume.lignes === 3 && resume.choisis === 1 && resume.sousLeChiffre && resume.avantLeReste && !resume.anciennes && !resume.debord, resume);
-  verifier("résumé : le chiffre du haut compare le net, comme la carte", resume.puce.includes("net par rapport"), resume.puce);
+  verifier("résumé de Comparer : en tête, le mode le plus payant (le brut en gros, le net dessous) ; « Vos trois modes » dessous, le meilleur net en évidence ; elle mène à l'onglet Modes",
+    resume.heroVu && /^Le plus payant : (taux horaire|taux mixte|à l'acte), brut de l'année$/.test(resume.etiquette) && resume.hero.includes("net par rapport")
+    && resume.vu && resume.lien === "#comparer/modes" && resume.texte.includes("Vos trois modes") && /net\s\d/.test(resume.texte) && resume.texte.includes("rapporte le plus")
+    && resume.lignes === 3 && resume.choisis === 1 && resume.sousLeChiffre && resume.avantLesLiens && !resume.debord, resume);
+  verifier("résumé de Comparer : un lien vers chaque onglet ; plus rien à comparer dans la page Revenu",
+    resume.liens.join() === "#comparer/modes,#comparer/demijournee,#comparer/actes,#comparer/offres" && !resume.dansRevenu, resume.liens);
   const sup = await p.evaluate(() => { const c = document.getElementById("rv-r-supervision"), m = document.getElementById("rv-r-modes");
     return { vu: !!c.offsetParent, lien: (c.querySelector("a.lien-carte") || {}).getAttribute?.("href"), apres: c.getBoundingClientRect().top > m.getBoundingClientRect().top,
       barres: [...m.querySelectorAll(".barre-mode > .barre-brut")].map(i => parseFloat(i.style.width)), nets: [...m.querySelectorAll(".barre-brut > i")].map(i => parseFloat(i.style.width)),
       grands: [...m.querySelectorAll(".rangee-valeur")].map(x => x.textContent), petits: [...m.querySelectorAll(".rangee-valeur-sous")].map(x => x.textContent),
       lignes: c.querySelectorAll(".rangee").length, choisis: c.querySelectorAll(".rangee.choisi").length, texte: c.textContent }; });
-  verifier("résumé : en GMF-U, les trois modes d'abord (le brut en gros, le net dessous ; barre = brut, partie pleine = net), puis la supervision, qui mène à son sous-onglet",
+  verifier("résumé de Comparer : en GMF-U, les trois modes d'abord (le brut en gros, le net dessous ; barre = brut, partie pleine = net), puis la supervision, qui mène à son onglet",
     sup.barres.length === 3 && Math.max(...sup.barres) === 100 && sup.barres.every(x => x > 0 && x <= 100) && sup.nets.every(x => x > 0 && x < 100)
-    && sup.petits.every(t => t.startsWith("net ")) && sup.grands.every((g, i) => +g.replace(/\D/g, "") > +sup.petits[i].replace(/\D/g, "")) && sup.vu && sup.lien === "#revenu/supervision" && sup.apres
+    && sup.petits.every(t => t.startsWith("net ")) && sup.grands.every((g, i) => +g.replace(/\D/g, "") > +sup.petits[i].replace(/\D/g, "")) && sup.vu && sup.lien === "#comparer/demijournee" && sup.apres
     && sup.lignes === 2 && sup.choisis === 1 && sup.texte.includes("Intervention de supervision") && sup.texte.includes("Visites facturées") && sup.texte.includes("de plus par demi-journée"), sup);
   await allerA(p, "revenu/detail");
-  verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent
-    && document.getElementById("rv-seuil").textContent.includes("dès") && document.getElementById("rv-seuil").textContent.includes("forfait de responsabilité")));
+  verifier("revenu : le détail garde le revenu (sources, activités), sans sous-onglets ni comparaisons", await p.evaluate(() => location.hash === "#revenu/detail"
+    && !!document.getElementById("rv-carte-source").offsetParent && !document.getElementById("rv-onglets") && !document.querySelector("#v-revenu .hors-onglet")));
   await remplacer(p, { "revenu.milieu": "clsc" });
-  await allerA(p, "revenu/actes");
-  const clsc = await p.evaluate(() => ({ hash: location.hash, onglet: !document.getElementById("rv-onglets").hidden, seuils: !!document.getElementById("rv-carte-seuils").offsetParent,
-    sup: !!document.getElementById("rv-carte-supervision").offsetParent, texte: document.getElementById("rv-carte-seuils").textContent,
+  await allerA(p, "comparer/modes");
+  const clsc = await p.evaluate(() => ({ hash: location.hash, onglets: [...document.querySelectorAll("#cp-onglets button")].map(x => x.textContent),
+    seuils: !!document.getElementById("rv-carte-seuils").offsetParent, texte: document.getElementById("rv-carte-seuils").textContent,
     debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
-  verifier("seuils : en CLSC, le sous-onglet et les seuils, sans la supervision", clsc.hash === "#revenu/actes" && clsc.onglet && clsc.seuils && !clsc.sup && !clsc.debord
+  verifier("seuils : en CLSC, l'onglet Modes et ses seuils, sans la supervision", clsc.hash === "#comparer/modes" && clsc.onglets.join() === "Modes,Demi-journée,Actes,Offres" && clsc.seuils && !clsc.debord
     && clsc.texte.includes("patients par demi-journée") && clsc.texte.includes("Dès") && !clsc.texte.includes("Visites plutôt que la supervision"), clsc);
   await remplacer(p, { "revenu.milieu": "clinique" });
-  await allerA(p, "revenu/actes");
-  const clinique = await p.evaluate(() => ({ hash: location.hash, modes: document.getElementById("rv-r-modes").hidden,
-    onglet: document.getElementById("rv-onglets").hidden, sup: !!document.getElementById("rv-carte-supervision").offsetParent }));
-  verifier("actes : en clinique, à l'acte seulement, ni l'onglet Actes ni la carte des modes", clinique.hash === "#revenu/detail" && clinique.modes && !clinique.onglet && !clinique.sup, clinique);
-  await allerA(p, "revenu/supervision");
-  const horsGmfu = await p.evaluate(() => ({ hash: location.hash, resume: document.getElementById("rv-r-supervision").hidden, onglets: [...document.querySelectorAll("#rv-onglets button")].map(x => x.textContent),
-    intro: document.getElementById("sab-intro").textContent, sup: !!document.getElementById("rv-carte-supervision").offsetParent }));
-  verifier("supervision : hors GMF-U, l'onglet Supervision reste (tarifs d'établissement), sans la carte du résumé de Revenu", horsGmfu.hash === "#revenu/supervision" && horsGmfu.resume
-    && horsGmfu.onglets.join() === "Votre revenu,Supervision" && horsGmfu.sup && horsGmfu.intro.includes("pas en GMF-U") && horsGmfu.intro.includes("en établissement"), horsGmfu);
-  verifier("actes : aucune erreur", erreurs.length === 0, erreurs);
+  await allerA(p, "comparer/modes");
+  const clinique = { hash: await p.evaluate(() => location.hash), onglets: await p.evaluate(() => [...document.querySelectorAll("#cp-onglets button")].map(x => x.textContent)), cartes: await visibles() };
+  verifier("comparer : en clinique, à l'acte seulement, l'onglet « Rythme » garde le revenu selon les demi-journées, sans les modes ni les seuils",
+    clinique.hash === "#comparer/modes" && clinique.onglets.join() === "Rythme,Demi-journée,Actes,Offres" && clinique.cartes.join() === "rv-carte-sens", clinique);
+  await allerA(p, "comparer");
+  const horsGmfu = await p.evaluate(() => ({ hero: document.getElementById("cp-hero").hidden, modes: document.getElementById("rv-r-modes").hidden,
+    sup: !!document.getElementById("rv-r-supervision").offsetParent, texte: document.getElementById("rv-r-supervision").textContent, intro: document.getElementById("sab-intro").textContent,
+    rythme: (document.querySelector('#cp-r-liens a[href="#comparer/modes"]') || {}).textContent || "" }));
+  verifier("supervision : hors GMF-U, le résumé de Comparer la garde (tarifs du GMF-U), sans l'en-tête des modes", horsGmfu.hero && horsGmfu.modes && horsGmfu.sup
+    && horsGmfu.texte.includes("tarifs du GMF-U") && horsGmfu.intro.includes("pas en GMF-U") && horsGmfu.intro.includes("en établissement") && horsGmfu.rythme.startsWith("Rythme"), horsGmfu);
+  verifier("comparer : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
 
@@ -1174,7 +1199,7 @@ async function outilsAvances(b, base) {
 /* 33. « Et si… » dans Vos trois modes : + et − changent les nets en direct, sans toucher au plan ; « Garder ces valeurs »
    l'applique ; « Revenir à mon plan » l'annule. Le focus reste sur le bouton touché. */
 async function etSi(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu" });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "comparer" });
   await remplacer(p, { "revenu.milieu": "gmfu", "revenu.modeBudget": "mixte", "revenu.lieuTarifs": "auto", "revenu.patientsParDJ": 6, "revenu.demiJournees": 8, "revenu.enseignement": 2 });
   const nets = () => p.evaluate(() => [...document.querySelectorAll("#rv-r-modes .rangee .rangee-valeur")].map(x => +x.textContent.replace(/[^\d]/g, "")));
   const avant = await nets();
@@ -1200,7 +1225,7 @@ async function etSi(b, base) {
 /* 34. Comparer deux offres : votre plan et une autre pratique côte à côte ; la même offre que le plan donne le même net ;
    les réglages se gardent ; on peut la retirer. */
 async function deuxOffres(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu/detail" });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "comparer/offres" });
   await remplacer(p, {});
   const pareil = await p.evaluate(() => { const R = window.Wealthnord.resultats(), S = window.Wealthnord.etat(), r = S.revenu;
     const o = R.offre({ milieu: r.milieu, mode: R.mode, demiJournees: r.demiJournees, patientsParDJ: r.patientsParDJ, semaines: r.semaines, heuresParDJ: r.heuresParDJ, fraisCabinetPct: r.fraisCabinetPct, activites: true });
@@ -1240,8 +1265,8 @@ async function demarrageRapide(b, base) {
   await p.fill("#as-patientsParDJ", "8"); await p.click("#as-suivant"); await p.waitForTimeout(400);
   const fin = await p.evaluate(() => ({ hash: location.hash, modes: !!document.getElementById("rv-r-modes").offsetParent, S: window.Wealthnord.etat(),
     toast: document.getElementById("toast-texte").textContent }));
-  verifier("rapide : trois questions, puis vos trois modes", q1.etape === "Question 1 sur 2" && q1.titre === "Votre pratique" && q1.retour && accueil === "Bienvenue dans WealthMorand"
-    && q2.etape === "Question 2 sur 2" && q2.bouton === "Voir mes modes" && fin.hash === "#revenu" && fin.modes && fin.S.revenu.milieu === "gmfu" && fin.S.revenu.patientsParDJ === 8
+  verifier("rapide : trois questions, puis vos trois modes (page Comparer)", q1.etape === "Question 1 sur 2" && q1.titre === "Votre pratique" && q1.retour && accueil === "Bienvenue dans WealthMorand"
+    && q2.etape === "Question 2 sur 2" && q2.bouton === "Voir mes modes" && fin.hash === "#comparer" && fin.modes && fin.S.revenu.milieu === "gmfu" && fin.S.revenu.patientsParDJ === 8
     && fin.toast.includes("Complétez votre portrait"), { q1, accueil, q2, hash: fin.hash, toast: fin.toast });
   await allerA(p, "apercu/detail");
   verifier("rapide : le portrait complet reste à faire", fin.S.meta.portraitRapide === true && await p.evaluate(() => !document.getElementById("ap-portrait").hidden
@@ -1374,11 +1399,11 @@ async function prochainPaiement(b, base) {
    côte. Au départ la demi-journée du plan ; les boutons gardent le focus, les valeurs restent après un rechargement,
    « Selon mon plan » repart du plan, des valeurs importées hors bornes sont ramenées dans les bornes. */
 async function superviseurAB(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu", largeur: 320 });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "comparer", largeur: 320 });
   await remplacer(p, { "revenu.milieu": "gmfu", "revenu.lieuTarifs": "auto", "revenu.modeBudget": "mixte", "revenu.residents": 1, "revenu.externes": 1, "revenu.patientsParResident": 4.5,
     "revenu.patientsParExterne": 2.5, "revenu.heuresParDJ": 3.5, "revenu.enseignement": 2, "revenu.enseignementApresMidi": 0, "revenu.demiJournees": 8, "revenu.semaines": 40,
     "revenu.inscritsDebut": 600, "revenu.annee": "type", "revenu.partVulnerable": 20, "revenu.patientsPendantSupervision": 0, "revenu.supervisionDJ": null });
-  await allerA(p, "revenu/supervision");
+  await allerA(p, "comparer/demijournee");
   const lire = () => p.evaluate(() => ({ totaux: [...document.querySelectorAll("#sab .sab-montant")].map(x => x.textContent), ecart: document.getElementById("sab-ecart").textContent,
     choisi: (document.querySelector("#sab .sab-total.choisi") || {}).id || "", valeurs: Object.fromEntries([...document.querySelectorAll("#sab .sab-valeur")].map(x => [x.id, x.textContent])),
     plan: !document.getElementById("sab-plan").hidden, garde: window.Wealthnord.etat().revenu.supervisionDJ,
@@ -1402,7 +1427,7 @@ async function superviseurAB(b, base) {
   verifier("supervision : les patients vulnérables vont par pas de 5 %", vuln.valeurs["sab-vuln"].startsWith("25") && vuln.garde.vuln === 25, vuln.valeurs["sab-vuln"]);
   await p.click("#sab-vuln-moins"); await p.waitForTimeout(200);
   await p.click("#sab-moment-pm"); await p.waitForTimeout(200);
-  await p.reload(); await pret(p); await allerA(p, "revenu/supervision");
+  await p.reload(); await pret(p); await allerA(p, "comparer/demijournee");
   const v2 = await lire();
   verifier("supervision : les valeurs restent après un rechargement", v2.valeurs["sab-suivi"] === "14" && v2.garde.moment === "pm"
     && await p.evaluate(() => document.getElementById("sab-moment-pm").getAttribute("aria-checked") === "true"), v2.garde);
@@ -1410,7 +1435,7 @@ async function superviseurAB(b, base) {
   const v3 = await lire();
   verifier("supervision : « Selon mon plan » repart du plan", v3.garde === null && v3.valeurs["sab-suivi"] === "6" && !v3.plan, v3.garde);
   await remplacer(p, { "revenu.supervisionDJ": { heures: 99, residents: 999, externes: -4, pec: "x", suivi: 3, vuln: 250, moment: "nuit" } });
-  await allerA(p, "revenu/supervision");
+  await allerA(p, "comparer/demijournee");
   const v4 = await lire();
   verifier("supervision : des valeurs importées hors bornes sont ramenées dans les bornes", v4.valeurs["sab-heures"].startsWith("8") && v4.valeurs["sab-residents"] === "6"
     && v4.valeurs["sab-externes"] === "0" && v4.valeurs["sab-pec"] === "1" && v4.valeurs["sab-vuln"].startsWith("100") && v4.totaux.every(t => /\d/.test(t)), v4.valeurs);
@@ -1422,14 +1447,14 @@ async function superviseurAB(b, base) {
       modes: !!m.offsetParent && m.getBoundingClientRect().top > h.getBoundingClientRect().top && m.getBoundingClientRect().top < d.getBoundingClientRect().top,
       lignes: m.querySelectorAll(".rangee").length, barres: m.querySelectorAll(".barre-mode").length, choisi: m.querySelectorAll(".rangee.choisi").length, lien: m.querySelector("a.lien-carte").getAttribute("href") }; });
   verifier("aperçu : le revenu brut de l'année en grand, puis les trois modes (barres, le meilleur en or), avant la comparaison demi-journée",
-    tete.etiquette === "Votre revenu brut de l'année" && tete.valeur === `${tete.net.toLocaleString("fr-CA").replace(/\s/g, "")}$` && tete.modes && tete.lignes === 3 && tete.barres === 3 && tete.choisi === 1 && tete.lien === "#revenu", tete);
+    tete.etiquette === "Votre revenu brut de l'année" && tete.valeur === `${tete.net.toLocaleString("fr-CA").replace(/\s/g, "")}$` && tete.modes && tete.lignes === 3 && tete.barres === 3 && tete.choisi === 1 && tete.lien === "#comparer", tete);
   const ap = await p.evaluate(() => { const a = document.getElementById("ap-demijournee"), h = document.getElementById("ap-hero");
     return { vu: !!a.offsetParent, href: a.getAttribute("href"), texte: a.textContent, sousLeChiffre: a.getBoundingClientRect().top > h.getBoundingClientRect().top,
       haut: a.getBoundingClientRect().top < window.innerHeight * 1.2, totaux: [...document.querySelectorAll("#sab .sab-montant")].map(x => x.textContent.replace(/\s/g, "")) }; });
-  verifier("aperçu : l'onglet « Comparaison demi-journée », sous le chiffre principal, avec les deux montants", ap.vu && ap.href === "#revenu/supervision" && ap.sousLeChiffre && ap.haut
+  verifier("aperçu : l'onglet « Comparaison demi-journée », sous le chiffre principal, avec les deux montants", ap.vu && ap.href === "#comparer/demijournee" && ap.sousLeChiffre && ap.haut
     && ap.texte.includes("Comparaison demi-journée") && ap.totaux.every(t => ap.texte.replace(/\s/g, "").includes(t)), ap);
   await p.click("#ap-demijournee"); await p.waitForTimeout(300);
-  verifier("aperçu : l'onglet mène au comparatif", await p.evaluate(() => location.hash === "#revenu/supervision" && !!document.getElementById("rv-carte-supervision").offsetParent));
+  verifier("aperçu : l'onglet mène au comparatif", await p.evaluate(() => location.hash === "#comparer/demijournee" && !!document.getElementById("rv-carte-supervision").offsetParent));
   verifier("supervision : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
@@ -1437,9 +1462,9 @@ async function superviseurAB(b, base) {
 /* 41. Répertoire des actes (onglet Actes) : les plus fréquents au départ, puis tous ; la recherche par mot sans accents et par code, les filtres
    par groupe ; la saisie garde le focus ; rien ne déborde à 320 px. */
 async function repertoireActes(b, base) {
-  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu", largeur: 320 });
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "comparer", largeur: 320 });
   await remplacer(p, { "revenu.milieu": "gmfu", "revenu.modeBudget": "mixte", "revenu.enseignement": 2, "revenu.residents": 1 });
-  await allerA(p, "revenu/actes");
+  await allerA(p, "comparer/actes");
   const etat = () => p.evaluate(() => ({ compte: document.getElementById("rep-compte").textContent, titres: [...document.querySelectorAll("#rep-liste .rangee-titre")].map(x => x.textContent),
     valeurs: [...document.querySelectorAll("#rep-liste .rangee-droite")].map(x => x.textContent), focus: document.activeElement.id,
     debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
@@ -1472,11 +1497,45 @@ async function repertoireActes(b, base) {
   await ctx.close();
 }
 
+/* 42. La barre du bas : Aperçu, Revenu, Comparer, Budget, Patrimoine. L'impôt est rangé avec le revenu (« Votre revenu ·
+   Impôt ») : Revenu reste marqué dans la barre ; le Budget et l'Aperçu y mènent aussi. Rien ne déborde à 320 px. */
+async function revenuEtImpot(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu" });
+  const etat = () => p.evaluate(() => ({ hash: location.hash, nav: [...document.querySelectorAll(".nav > a[data-onglet]")].map(a => a.dataset.onglet),
+    noms: [...document.querySelectorAll(".nav > a[data-onglet]")].slice(0, 5).map(a => a.textContent.trim()),
+    marque: (document.querySelector('.nav [aria-current="page"]') || {}).dataset?.onglet,
+    section: [...document.querySelectorAll(".vue:not([hidden]) .onglets-section a")].map(a => `${a.textContent}${a.getAttribute("aria-current") === "page" ? "*" : ""}`) }));
+  const rv = await etat();
+  verifier("barre du bas : Aperçu, Revenu, Comparer, Budget, Patrimoine ; plus d'Impôt", rv.nav.join() === "apercu,revenu,comparer,budget,avenir,donnees"
+    && rv.noms.join() === "Aperçu,Revenu,Comparer,Budget,Patrimoine", rv);
+  verifier("revenu : « Votre revenu · Impôt » en haut, Votre revenu marqué", rv.section.join() === "Votre revenu*,Impôt" && rv.marque === "revenu", rv);
+  await p.click('#v-revenu .onglets-section a[data-section="impot"]'); await p.waitForTimeout(250);
+  const im = await etat();
+  verifier("impôt : un toucher sur « Impôt » ouvre l'impôt ; Revenu reste marqué dans la barre du bas", im.hash === "#impot" && im.section.join() === "Votre revenu,Impôt*" && im.marque === "revenu", im);
+  await p.click('#v-impot .onglets-section a[data-section="revenu"]'); await p.waitForTimeout(250);
+  verifier("impôt : « Votre revenu » ramène au revenu", (await etat()).hash === "#revenu");
+  await allerA(p, "budget");
+  const tuile = await p.evaluate(() => (document.querySelector('#bu-r-tuiles a.tuile[href="#impot"]') || {}).textContent || "");
+  verifier("budget : le revenu disponible mène à l'impôt", tuile.includes("Revenu disponible") && tuile.includes("après impôt"), tuile);
+  verifier("aperçu : la tuile de l'impôt reste", await p.evaluate(() => !!document.querySelector('#ap-tuiles a.tuile[href="#impot"]')));
+  await allerA(p, "comparer");
+  verifier("comparer : marqué dans la barre du bas", (await etat()).marque === "comparer");
+  await p.setViewportSize({ width: 320, height: 700 });
+  const debords = [];
+  for (const pg of ["revenu", "revenu/detail", "impot", "comparer", "comparer/modes", "comparer/demijournee", "comparer/actes", "comparer/offres"]) {
+    await allerA(p, pg);
+    if (await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)) debords.push(pg);
+  }
+  verifier("320 px : Revenu, Impôt et Comparer sans débordement", debords.length === 0, debords);
+  verifier("revenu et impôt : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, repertoireActes]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, repertoireActes, revenuEtImpot]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

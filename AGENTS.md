@@ -42,7 +42,8 @@ Lisez ce fichier en entier avant de commencer. Il passe avant vos habitudes.
    - Comptes : Supabase, un seul compte (celui de la personne), données
      chiffrées sur l'appareil, conception décrite dans `README.md`. Le lien de
      transfert avec code reste offert.
-   - Chaque page : un résumé, puis « Voir tout le détail ». Cinq onglets.
+   - Chaque page : un résumé, puis « Voir tout le détail ». Cinq onglets : Aperçu,
+     Revenu (avec l'Impôt : « Votre revenu · Impôt »), Comparer, Budget, Patrimoine.
    - Identité visuelle : polices Inter et Newsreader hébergées dans
      `polices/`, couleurs de `styles.css`. Pas de « pas à pas ».
    - Résident et externe supervisés : deux tarifs distincts, gardés séparés.

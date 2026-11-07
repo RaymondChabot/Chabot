@@ -50,13 +50,21 @@ chacune, alignées et de même hauteur sur ordinateur.
 - **Aperçu** : le surplus du mois ; ce mois-ci (dépenses, dettes, épargne,
   surplus) ; quatre tuiles ; les 3 actions les plus importantes ; la
   prochaine échéance et le prochain jalon.
-- **Revenu** : le net par mois, les heures, les visites et les patients
-  inscrits ; d'où vient le revenu ; ce que rapporte une demi-journée ou un
-  patient de plus. En résidence : le net par mois, la paie, le niveau et
-  le début de la pratique.
-- **Impôt** : le net de l'année, ce qu'il faut mettre de côté chaque mois,
-  l'impôt fédéral et celui du Québec ; chaque 100 $ gagnés ; le prochain
-  paiement (en résidence : la paie type, avec les retenues).
+- **Revenu** : le brut de l'année en grand, le net dessous ; le net par
+  mois, les heures, les visites et les patients inscrits ; d'où vient le
+  revenu ; ce que rapporte une demi-journée ou un patient de plus. En
+  résidence : le net par mois, la paie, le niveau et le début de la
+  pratique. En haut, « Votre revenu · Impôt » passe d'une page à l'autre.
+- **Comparer** : le mode le plus payant (le brut en gros, le net dessous) ;
+  vos trois modes, avec « Et si… » ; la demi-journée de supervision ; un
+  lien vers chaque onglet : Modes (« Rythme » en clinique, à l'acte
+  seulement), Demi-journée, Actes et Offres. Toujours la pratique, même en
+  vue résidence : la comparaison sert à la choisir.
+- **Impôt**, rangé avec le revenu (« Votre revenu · Impôt » ; la tuile de
+  l'Aperçu et le revenu disponible du Budget y mènent aussi) : le net de
+  l'année, ce qu'il faut mettre de côté chaque mois, l'impôt fédéral et
+  celui du Québec ; chaque 100 $ gagnés ; le prochain paiement (en
+  résidence : la paie type, avec les retenues).
 - **Budget** : revenus nets, dépenses, dettes et épargne du mois ; les
   dépenses par catégorie ; les dettes ; l'année (réserve, dépenses
   annuelles).
@@ -101,7 +109,7 @@ revenus d'emploi, cotisation syndicale, part des droits de scolarité
 (crédits fédéral et du Québec). Impôt d'un salarié, retenu sur la paie :
 ni acomptes ni frais de cabinet. Avec la **date de début de pratique**,
 une bascule **Résidence / Pratique** (aperçu, revenu, impôt, budget,
-rapport) montre l'une ou l'autre ; les projections et le plan des dettes
+rapport) montre l'une ou l'autre (Comparer montre toujours la pratique) ; les projections et le plan des dettes
 suivent le parcours dans les deux vues : la résidence, puis la pratique à
 cette date. L'année de transition réunit le salaire et le revenu de
 pratique dans un même calcul d'impôt (RRQ de l'employé, puis des deux
@@ -137,7 +145,7 @@ société restent cachés par défaut, pour des pages épurées. Un lien au bas 
 chaque page les nomme et les montre ; l'interrupteur est aussi dans Données
 (Apparence et rapport). Rien n'est retiré.
 
-**Vos trois modes** (résumé de Revenu, en GMF-U et en CLSC) : le net de
+**Vos trois modes** (résumé de Comparer, en GMF-U et en CLSC) : le net de
 chaque mode après impôt et frais, le meilleur en évidence, et l'écart sur
 l'année ; le chiffre du haut compare le même net. « Et si… » : deux
 réglages + et − (patients par demi-journée, demi-journées par semaine)
@@ -146,26 +154,31 @@ font bouger les trois modes en direct, sans toucher au plan, jusqu'à
 clinique (après les frais de cabinet, avant l'impôt, sans les activités en
 établissement), et le mode qui paie le mieux à l'heure.
 
-**Comparer deux offres** (détail de Revenu) : votre plan à côté d'une autre
+**Comparer deux offres** (Comparer, onglet Offres) : votre plan à côté d'une autre
 pratique (milieu, mode, demi-journées, patients, semaines, heures, frais de
 cabinet, avec ou sans vos activités en établissement) : heures, brut, net
 par année et par heure en clinique, et laquelle laisse le plus. Même
 ménage, mêmes déductions et même clientèle ; la colonne de tarifs suit le
 milieu de l'offre. Les réglages se gardent avec vos données.
 
-**Comparer les actes** (sous-onglet du détail de Revenu, dès qu'il y a
-plusieurs modes) : les résultats d'abord, les réglages se déplient pour
-aller plus loin. Quand changer de mode : dès combien de patients par
-demi-journée le mixte dépasse le taux horaire, puis l'acte le mixte, et ce
-que dit l'année entière. Au mixte, en GMF-U : l'intervention de
-supervision ou les visites des apprenants, par demi-journée et par année,
-avec le nombre de visites à partir duquel les visites rapportent plus, et
-un bouton qui applique le meilleur choix au plan. Votre demi-journée type
-(au départ, la moyenne du plan) au taux horaire, au mixte et à l'acte.
-Repliés : ce que rapporte chaque acte à l'acte et au mixte, et à l'heure
+**Les onglets de Comparer** : les résultats d'abord, les réglages se
+déplient pour aller plus loin. **Modes** : les modes côte à côte (le brut ;
+le net en partie pleine ; l'or au meilleur net), le revenu selon vos
+demi-journées et vos patients, et quand changer de mode : dès combien de
+patients par demi-journée le mixte dépasse le taux horaire, puis l'acte le
+mixte, et ce que dit l'année entière (en clinique, à l'acte seulement,
+l'onglet s'appelle « Rythme » et garde le revenu selon les demi-journées).
+**Demi-journée** : au mixte, l'intervention de supervision ou les visites
+des apprenants, par demi-journée et par année, avec le nombre de visites à
+partir duquel les visites rapportent plus, et un bouton qui applique le
+meilleur choix au plan ; votre demi-journée type (au départ, la moyenne du
+plan) au taux horaire, au mixte et à l'acte. **Actes** : le répertoire ;
+repliés, ce que rapporte chaque acte à l'acte et au mixte, et à l'heure
 selon la durée que vous choisissez (cabinet ou établissement, moins de 500
-ou 500 inscrits et plus) ; les formulaires de la CNESST et de l'IVAC
-(annexe XIII), payés à 100 % dans tous les modes.
+ou 500 inscrits et plus), et les formulaires de la CNESST et de l'IVAC
+(annexe XIII), payés à 100 % dans tous les modes. **Offres** : deux offres
+côte à côte (ci-dessus). Les anciennes adresses `#revenu/actes` et
+`#revenu/supervision` mènent aux onglets Actes et Demi-journée.
 
 - **Revenu** : pratique principale en GMF ou clinique privée (à l'acte,
   frais de cabinet), en GMF-U ou en CLSC (taux horaire, mode mixte ou à
@@ -181,10 +194,11 @@ ou 500 inscrits et plus) ; les formulaires de la CNESST et de l'IVAC
   demi-per diem diffère (41,45 $ et 49,85 $ en établissement), selon le
   lieu et la région ; au mixte, intervention de
   supervision ou visites des apprenants ; à l'acte, visites des
-  apprenants. « Répertoire des actes » (Revenu, onglet Actes) : les actes d'un médecin
+  apprenants. « Répertoire des actes » (Comparer, onglet Actes) : les actes d'un médecin
   en GMF-U au mixte, avec le tarif de la RAMQ et la part reçue au mixte, une recherche par
-  code ou par mot et des filtres par groupe. « Comparaison demi-journée » (onglet de l'Aperçu, sous-onglet
-  Supervision de Revenu, et carte du résumé de Revenu en GMF-U) : une demi-journée à régler (résidents,
+  code ou par mot et des filtres par groupe. « Comparaison demi-journée » (onglet de l'Aperçu, onglet
+  Demi-journée de Comparer, et carte du résumé de Comparer, pour toute pratique : hors GMF-U, aux tarifs
+  d'établissement du GMF-U) : une demi-journée à régler (résidents,
   externes, visites de prise en charge et de suivi, part de patients
   vulnérables, moment et durée), et côte à côte ce qu'elle rapporte au
   mixte avec l'intervention de supervision (plus le forfait de responsabilité
@@ -235,10 +249,10 @@ ou 500 inscrits et plus) ; les formulaires de la CNESST et de l'IVAC
   (prudent, équilibré, croissance), obligations placées d'abord dans le
   REER, puis la société, le CELIAPP et le CELI ; écart avec la part actuelle
   et montant à déplacer.
-- **Sous-onglets** : Budget (Ce mois-ci, L'année, Dettes) et Patrimoine
-  (Aujourd'hui, Projection, Placements, Proches) montrent une partie à la
-  fois ; l'onglet choisi est gardé et un lien peut en viser un
-  (« #budget/dettes »).
+- **Sous-onglets** : Comparer (Modes, Demi-journée, Actes, Offres), Budget
+  (Ce mois-ci, L'année, Dettes) et Patrimoine (Aujourd'hui, Projection,
+  Placements, Proches) montrent une partie à la fois ; l'onglet choisi est
+  gardé et un lien peut en viser un (« #budget/dettes », « #comparer/actes »).
 - **Dossier pour mes proches** : assurances (besoin d'assurance vie
   estimé, part du revenu remplacée en invalidité), testament, mandat,
   documents et personnes-ressources ; une page du rapport PDF.

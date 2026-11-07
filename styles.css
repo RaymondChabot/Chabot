@@ -353,6 +353,13 @@ a.tuile:hover { border-color: var(--trait); }
 .onglets button { flex: 1 0 auto; padding: 11px 8px 9px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--discret);
   font: inherit; font-size: 0.93rem; white-space: nowrap; cursor: pointer; }
 .onglets button[aria-checked="true"] { color: var(--encre); font-weight: 650; border-bottom-color: var(--marque); }
+/* Revenu et Impôt, rangés ensemble : « Votre revenu · Impôt », des liens soulignés comme les sous-onglets. */
+.onglets-section a { flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 8px 8px;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--discret); text-decoration: none; font-size: 0.93rem; white-space: nowrap; }
+.onglets-section a[aria-current="page"] { color: var(--encre); font-weight: 650; border-bottom-color: var(--marque); }
+.onglets-section a:hover:not([aria-current]) { color: var(--encre); }
+.onglets-section a:focus-visible { outline: 2px solid var(--info); outline-offset: -2px; border-radius: 6px; }
+@media print { .onglets-section { display: none; } }
 .hors-onglet { display: none !important; }
 .segment.compact { flex: none; }
 .segment.compact button { flex: 1 0 auto; padding: 5px 12px; font-size: 0.8rem; }
@@ -1046,8 +1053,8 @@ a.tuile:hover { border-color: var(--trait); }
   .hero-valeur { font-family: var(--police-titre); font-weight: 500; letter-spacing: -0.015em; font-variant-numeric: lining-nums tabular-nums; }
   .carte-tete h2, .carte-repliable > summary h2 { font-family: var(--police-titre); font-weight: 600; font-size: 1.16rem; letter-spacing: -0.005em; }
   .tableau td.meilleur { color: var(--or-texte); }
-  :is(#ap-r-modes, #rv-r-modes, #rv-r-supervision, #rv-sup-resultat, #rv-dj-resultat) .rangee.choisi .rangee-valeur { color: var(--or-texte); }
-  :is(#ap-r-modes, #rv-r-modes, #rv-r-supervision, #rv-sup-resultat, #rv-dj-resultat) .rangee.choisi .rangee-titre::after {
+  :is(#ap-r-modes, #rv-r-modes, #rv-comparaison, #rv-r-supervision, #rv-sup-resultat, #rv-dj-resultat) .rangee.choisi .rangee-valeur { color: var(--or-texte); }
+  :is(#ap-r-modes, #rv-r-modes, #rv-comparaison, #rv-r-supervision, #rv-sup-resultat, #rv-dj-resultat) .rangee.choisi .rangee-titre::after {
     content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--marque); vertical-align: 0.1em; }
   .conclusion { font-family: var(--police-titre); font-weight: 500; font-size: 1.06rem; line-height: 1.4; }
   .vue { gap: 18px; }
@@ -1109,6 +1116,22 @@ a.tuile:hover { border-color: var(--trait); }
 .od-sous { font-size: 0.86rem; color: var(--encre-2); }
 .od-mieux { color: var(--or-texte); font-weight: 600; }
 @media print { .onglet-demi { display: none !important; } }
+/* Comparer, résumé : un lien par comparaison (icône dorée, titre, ce qu'on y trouve). */
+.liens-comparer { list-style: none; margin: 0; padding: 0; display: grid; }
+.liens-comparer li + li { border-top: 1px solid var(--ligne); }
+.lien-comparer { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 2px; color: var(--encre); text-decoration: none; border-radius: 10px; }
+.lien-comparer:hover .lc-texte strong { color: var(--or-texte); }
+.lien-comparer:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+.lc-icone { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--or-texte) 12%, transparent); }
+.lc-icone svg { width: 21px; height: 21px; fill: none; stroke: var(--or-texte); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.lc-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.lc-texte strong { font: 500 1.06rem/1.25 var(--police-titre); }
+.lc-texte span { font-size: 0.86rem; color: var(--encre-2); text-wrap: pretty; }
+@media (min-width: 960px) {
+  .liens-comparer { grid-template-columns: 1fr 1fr; column-gap: 28px; }
+  .liens-comparer li:nth-child(2) { border-top: 0; }
+}
+@media print { #cp-r-liens { display: none !important; } }
 
 /* Répertoire des actes (Revenu, onglet Actes) : recherche, filtres en pastilles, liste par groupe. */
 .rep-recherche { margin: 10px 0 8px; }

@@ -33,6 +33,10 @@
     info: '<path d="M12 11v6M12 7.5h.01"/>',
     ok: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
     balance: '<path d="M12 4v16M8 20h8M5 7h14M5 7l-2.5 6.5a2.6 2.6 0 0 0 5 0zM19 7l-2.5 6.5a2.6 2.6 0 0 0 5 0z"/>',
+    barres: '<path d="M5.5 19.5V11M12 19.5V5M18.5 19.5v-6M3.5 19.5h17"/>',
+    horloge: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/>',
+    loupe: '<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 4.5 4.5"/>',
+    offres: '<rect x="3.5" y="5.5" width="7.5" height="13" rx="1.5"/><rect x="13" y="5.5" width="7.5" height="13" rx="1.5"/>',
   };
   function icone(nom, cls) {
     const s = document.createElementNS(NS, "svg");
