@@ -749,7 +749,7 @@ async function finitions(b, base) {
     fondu: document.getElementById("pa-onglets").classList.contains("defile-plus"),
     axe: [...document.querySelectorAll("#v-avenir .graphique .etiquette")].map(t => t.textContent).filter(t => /M\$|k\$|^0 \$$/.test(t)) }));
   verifier("finitions : « Aperçu » dans la navigation et en titre", r.nav === "Aperçu" && r.titre === "Aperçu", r);
-  verifier("finitions : bouton Données nommé à 390 px", r.donnees !== "none", r.donnees);
+  verifier("finitions : l'icône Données est nommée pour les lecteurs d'écran", await p.evaluate(() => document.querySelector(".barre-outils .bouton-donnees").getAttribute("aria-label") === "Données et confidentialité"), r.donnees);
   verifier("finitions : barre du bas en 12 px au moins", r.taille >= 12, r.taille);
   verifier("finitions : fondu des sous-onglets qui débordent", r.fondu);
   verifier("finitions : l'axe de projection ne descend pas à −1 M$", r.axe.length > 0 && !r.axe.some(t => t.startsWith("-") || t.startsWith("−")), r.axe);
@@ -759,28 +759,31 @@ async function finitions(b, base) {
   await allerA(p, "apercu");
   verifier("en-tête : Rapport PDF sous le logo, dans l'aperçu", await p.evaluate(() => !document.getElementById("barre-pdf").hidden && getComputedStyle(document.getElementById("rapport-pdf")).display === "none"));
   await p.setViewportSize({ width: 320, height: 700 }); await p.waitForTimeout(200);
-  verifier("finitions : icône seule sous 360 px", (await p.evaluate(() => getComputedStyle(document.querySelector(".bouton-donnees span")).display)) === "none");
+  verifier("finitions : sous 360 px, trois icônes (Installer reste dans la page Données)", await p.evaluate(() => getComputedStyle(document.querySelector(".barre-outils .bouton-installer")).display === "none"
+    && document.querySelector(".barre-outils .bouton-donnees span").getBoundingClientRect().width <= 1));
   verifier("finitions : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
 
-/* 25. En-tête : le logo et le nom sur toute la largeur, les boutons empilés à droite du titre (et du chiffre de
-   l'aperçu). Bouton Installer masqué une fois l'app installée. Champ à 0 qui s'efface au toucher. Apprenants :
-   résidents et externes sous un même libellé, comptés à part. */
+/* 25. En-tête : le logo et le nom sur toute la largeur ; au téléphone, une seule rangée d'icônes rondes de 44 px à
+   droite du titre, nommées pour les lecteurs d'écran ; le grand chiffre en pleine largeur dessous. Bouton Installer
+   masqué une fois l'app installée. Champ à 0 qui s'efface au toucher. Apprenants : résidents et externes sous un
+   même libellé, comptés à part. */
 async function enteteEtChamps(b, base) {
   const { ctx, p, erreurs } = await ouvrir(b, base, { details: true });
   const m = await p.evaluate(() => {
     const r = s => document.querySelector(s).getBoundingClientRect();
-    const marque = r(".barre-haut .marque"), barre = document.querySelector(".barre-outils"), h1 = r("#h-apercu");
-    const et = r("#ap-hero .hero-etiquette"), val = r("#ap-hero .hero-valeur"), sous = r("#ap-hero .hero-sous");
-    const boutons = [...barre.children].filter(x => getComputedStyle(x).display !== "none").map(x => x.getBoundingClientRect()).sort((a, c) => a.top - c.top);
+    const marque = r(".barre-haut .marque"), barre = document.querySelector(".barre-outils"), h1 = r("#h-apercu"), hero = r("#ap-hero");
+    const boutons = [...barre.children].filter(x => getComputedStyle(x).display !== "none");
+    const rects = boutons.map(x => x.getBoundingClientRect());
     return { largeur: Math.round(marque.width), place: innerWidth - 32, vue: barre.parentElement.id, n: boutons.length,
-      memeX: boutons.every(x => Math.abs(x.left - boutons[0].left) < 1), empiles: boutons.every((x, i) => !i || x.top >= boutons[i - 1].bottom - 1),
-      aDroite: boutons[0].left > h1.right, etUneLigne: et.height < 28 && et.right < boutons[0].left,
-      sousPleine: sous.left <= h1.left + 1 && sous.right > boutons[0].right - 1, nombre: val.width > 40 };
+      uneLigne: rects.every(x => Math.abs(x.top - rects[0].top) < 1), tailles: rects.every(x => Math.round(x.width) === 44 && Math.round(x.height) === 44),
+      noms: boutons.every(x => (x.getAttribute("aria-label") || "").length > 3), aDroite: rects[0].left > h1.right, memeHauteur: Math.abs(rects[0].top - h1.top) < 24,
+      heroPlein: hero.left <= h1.left + 1 && hero.top >= Math.max(...rects.map(x => x.bottom)) - 1 };
   });
   verifier("en-tête : le logo et le nom sur toute la largeur", m.largeur >= m.place - 1, m);
-  verifier("en-tête : boutons à droite, libellé sur une ligne, détail en pleine largeur", m.vue === "v-apercu" && m.n >= 3 && m.memeX && m.empiles && m.aDroite && m.etUneLigne && m.sousPleine && m.nombre, m);
+  verifier("en-tête : une rangée d'icônes de 44 px, nommées, à droite du titre ; le grand chiffre en pleine largeur dessous",
+    m.vue === "v-apercu" && m.n >= 3 && m.uneLigne && m.tailles && m.noms && m.aDroite && m.memeHauteur && m.heroPlein, m);
   await allerA(p, "revenu");
   verifier("en-tête : les boutons suivent la page ouverte, sans Rapport PDF", await p.evaluate(() => document.querySelector(".barre-outils").parentElement.id === "v-revenu" && document.getElementById("barre-pdf").hidden));
   await allerA(p, "apercu");
@@ -789,7 +792,7 @@ async function enteteEtChamps(b, base) {
     verifier(`en-tête : rien ne déborde à ${largeur} px`, await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll("#v-apercu > *")].every(x => x.getBoundingClientRect().right <= innerWidth - 15)));
   }
   await p.setViewportSize({ width: 1280, height: 900 }); await p.waitForTimeout(150);
-  verifier("en-tête : sur ordinateur, ni barre du haut ni boutons empilés", await p.evaluate(() => getComputedStyle(document.querySelector(".barre-outils")).display === "none"
+  verifier("en-tête : sur ordinateur, ni barre du haut ni icônes de téléphone", await p.evaluate(() => getComputedStyle(document.querySelector(".barre-outils")).display === "none"
     && getComputedStyle(document.querySelector(".barre-haut")).display === "none" && getComputedStyle(document.getElementById("rapport-pdf")).display !== "none"));
   await p.setViewportSize({ width: 390, height: 844 });
   // Installer
@@ -903,10 +906,10 @@ async function residence(b, base) {
   verifier("résidence : l'aperçu montre la résidence, avec la bascule", ap.hero.includes("en résidence") && ap.choix.join() === "Résidence,Pratique" && ap.tuile.includes("Brut 74 305 $ · salaire de résident, R2"), ap);
   const align = await p.evaluate(() => {
     const b = s => document.querySelector(s).getBoundingClientRect();
-    const titre = b("#v-apercu > .tete-page"), parcours = b("#ap-parcours"), pdf = b("#barre-pdf");
-    return { titre: Math.round(titre.width), parcours: Math.round(parcours.width), ecartHaut: Math.round(pdf.top - parcours.top), pdfX: Math.round(pdf.left), parcoursD: Math.round(parcours.right) };
+    const titre = b("#h-apercu"), parcours = b("#ap-parcours"), pdf = b("#barre-pdf"), vue = b("#v-apercu");
+    return { pdfAuTitre: Math.abs(pdf.top - titre.top) < 24 && pdf.left > titre.right, parcoursPlein: Math.round(parcours.width) >= Math.round(vue.width) - 2, parcoursDessous: parcours.top >= pdf.bottom - 1 };
   });
-  verifier("résidence : le titre a la largeur de la bascule, et les boutons partent à sa hauteur", Math.abs(align.titre - align.parcours) <= 2 && align.ecartHaut >= -2 && align.ecartHaut <= 8 && align.pdfX >= align.parcoursD - 2, align);
+  verifier("résidence : les icônes sur la ligne du titre, la bascule en pleine largeur dessous", align.pdfAuTitre && align.parcoursPlein && align.parcoursDessous, align);
   verifier("résidence : impôt retenu sur la paie, ni acompte ni alerte de la RAMQ", ap.faire.includes("retenus sur chaque paie") && !ap.faire.includes("paiement de la RAMQ") && !ap.echeances.includes("Acompte provisionnel")
     && ap.echeances.includes("Début de la pratique"), ap.echeances);
   await allerA(p, "revenu");
