@@ -1111,9 +1111,11 @@ async function comparerActes(b, base) {
     && resume.lignes === 3 && resume.choisis === 1 && resume.sousLeChiffre && resume.avantLeReste && !resume.anciennes && !resume.debord, resume);
   verifier("résumé : le chiffre du haut compare le net, comme la carte", resume.puce.includes("net par rapport"), resume.puce);
   const sup = await p.evaluate(() => { const c = document.getElementById("rv-r-supervision"), m = document.getElementById("rv-r-modes");
-    return { vu: !!c.offsetParent, lien: (c.querySelector("a.lien-carte") || {}).getAttribute?.("href"), avant: c.getBoundingClientRect().top < m.getBoundingClientRect().top,
+    return { vu: !!c.offsetParent, lien: (c.querySelector("a.lien-carte") || {}).getAttribute?.("href"), apres: c.getBoundingClientRect().top > m.getBoundingClientRect().top,
+      barres: [...m.querySelectorAll(".barre-mode > i")].map(i => parseFloat(i.style.width)), barreOr: getComputedStyle(m.querySelector(".rangee.choisi .barre-mode > i")).backgroundColor,
       lignes: c.querySelectorAll(".rangee").length, choisis: c.querySelectorAll(".rangee.choisi").length, texte: c.textContent }; });
-  verifier("résumé : en GMF-U, la carte de la supervision, avant les trois modes ; elle mène à son sous-onglet", sup.vu && sup.lien === "#revenu/supervision" && sup.avant
+  verifier("résumé : en GMF-U, les trois modes d'abord, avec une barre chacun (la plus longue = 100 %), puis la supervision, qui mène à son sous-onglet",
+    sup.barres.length === 3 && Math.max(...sup.barres) === 100 && sup.barres.every(x => x > 0 && x <= 100) && sup.vu && sup.lien === "#revenu/supervision" && sup.apres
     && sup.lignes === 2 && sup.choisis === 1 && sup.texte.includes("Intervention de supervision") && sup.texte.includes("Visites facturées") && sup.texte.includes("de plus par demi-journée"), sup);
   await allerA(p, "revenu/detail");
   verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent

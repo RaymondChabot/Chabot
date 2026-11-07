@@ -1677,6 +1677,15 @@ window.Verrou.quandOuvert(function () {
   }
   /* Résumé de Revenu : vos modes côte à côte, le net de chacun (après impôt et frais), le meilleur en évidence.
      Les seuils, la supervision et les actes sont dans le sous-onglet « Comparer les actes ». */
+  // Les modes en rangées, chacune avec une barre proportionnelle à son net ; la meilleure en or (classe « choisi »).
+  function rangeesModes(lignes, nets) {
+    const z = rangees(el("div", "modes-barres"), lignes), max = Math.max(1, ...nets.map(n => Math.max(0, n)));
+    [...z.children].forEach((r, i) => {
+      const barre = el("span", "barre-mode"), f = el("i"); barre.setAttribute("aria-hidden", "true");
+      f.style.width = `${Math.max(2, Math.max(0, nets[i]) / max * 100)}%`; barre.appendChild(f); r.appendChild(barre);
+    });
+    return z;
+  }
   function resumeModes(R) {
     const carte = document.getElementById("rv-r-modes"), montrer = R.plusieursModes && !R.vueResidence;
     carte.hidden = !montrer;
@@ -1714,7 +1723,7 @@ window.Verrou.quandOuvert(function () {
     }
     const h = R.modes.filter(m => v[m].heure != null), mh = h.length ? h.reduce((a, m) => v[m].heure > v[a].heure ? m : a, h[0]) : null;
     const note = el("p", "aide", mh ? `$/h : par heure en clinique, après les frais de cabinet et avant l'impôt, sans les activités en établissement. À l'heure, ${NOMS_MODE_ACTES[mh].toLowerCase()} paie le mieux (${$(v[mh].heure)}).` : "");
-    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"], rangees(el("div"), lignesModes), el("p", "conclusion", phrase), note, bloc);
+    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"], rangeesModes(lignesModes, R.modes.map(m => v[m].net)), el("p", "conclusion", phrase), note, bloc);
     if (U.essaiFocus) { const f = document.getElementById(U.essaiFocus); U.essaiFocus = null; if (f && !f.disabled) f.focus(); }
   }
   const signe$2 = v => (v >= 0 ? "+" : "−") + $2(Math.abs(v));
