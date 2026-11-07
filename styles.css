@@ -1076,16 +1076,23 @@ a.tuile:hover { border-color: var(--trait); }
    FINITION : les grands chiffres et les titres des cartes en Newsreader, l'or du lion pour marquer le
    meilleur, un peu plus d'air. À l'écran seulement : le rapport PDF garde sa mise en page.
    ============================================================ */
-:root { --or-texte: #85601f; }   /* or du lion, foncé : 4,5:1 au moins sur les surfaces claires */
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --or-texte: #d6b57a; } }
-:root[data-theme="dark"] { --or-texte: #d6b57a; }
+:root {
+  --or-texte: #8b6921;   /* or des chiffres et des liens : 4,5:1 au moins sur le fond de page et les cartes */
+  /* Or métallique (barres, pastilles) : un reflet clair au milieu ; la piste, champagne. */
+  --or-metal: linear-gradient(90deg, #b08a3e 0%, #d9bb72 48%, #c39a48 72%, #a98436 100%);
+  --or-piste: #f3ead4;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --or-texte: #d6b57a; --or-metal: linear-gradient(90deg, #b8934a 0%, #ecd391 48%, #d2ad62 72%, #b28d45 100%); --or-piste: color-mix(in srgb, #d6b57a 24%, #1a1a19); } }
+:root[data-theme="dark"] {
+  --or-texte: #d6b57a; --or-metal: linear-gradient(90deg, #b8934a 0%, #ecd391 48%, #d2ad62 72%, #b28d45 100%); --or-piste: color-mix(in srgb, #d6b57a 24%, #1a1a19); }
 @media screen {
   .hero-valeur { font-family: var(--police-titre); font-weight: 500; letter-spacing: -0.015em; font-variant-numeric: lining-nums tabular-nums; }
   .carte-tete h2, .carte-repliable > summary h2 { font-family: var(--police-titre); font-weight: 600; font-size: 1.16rem; letter-spacing: -0.005em; }
   .tableau td.meilleur { color: var(--or-texte); }
   :is(#ap-r-modes, #rv-r-modes, #rv-comparaison, #rv-r-supervision, #rv-sup-resultat, #rv-dj-resultat) .rangee.choisi .rangee-valeur { color: var(--or-texte); }
   :is(#ap-r-modes, #rv-r-modes, #rv-comparaison, #rv-r-supervision, #rv-sup-resultat, #rv-dj-resultat) .rangee.choisi .rangee-titre::after {
-    content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--marque); vertical-align: 0.1em; }
+    content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--or-metal); vertical-align: 0.1em; }
   .conclusion { font-family: var(--police-titre); font-weight: 500; font-size: 1.06rem; line-height: 1.4; }
   .vue { gap: 18px; }
 }
@@ -1196,8 +1203,8 @@ a.tuile:hover { border-color: var(--trait); }
 .barre-mode { flex: 0 0 100%; height: 8px; }
 .barre-brut { display: block; height: 100%; border-radius: 4px; overflow: hidden; background: color-mix(in srgb, var(--axe) 20%, var(--surface)); transition: width 320ms ease; }
 .barre-brut > i { display: block; height: 100%; border-radius: 4px; background: color-mix(in srgb, var(--axe) 55%, var(--surface)); transition: width 320ms ease; }
-.rangee.choisi .barre-brut { background: color-mix(in srgb, var(--or-texte) 24%, var(--surface)); }
-.rangee.choisi .barre-brut > i { background: var(--or-texte); }
+.rangee.choisi .barre-brut { background: var(--or-piste); }
+.rangee.choisi .barre-brut > i { background: var(--or-metal); }
 @media (prefers-reduced-motion: reduce) { .barre-brut, .barre-brut > i { transition: none; } }
 @media print { .barre-mode { display: none; } }
 
