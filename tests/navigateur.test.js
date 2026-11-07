@@ -527,21 +527,23 @@ async function monteCarlo(b, base) {
   await ctx.close();
 }
 
-/* 18. Un seul « net après impôt et frais » : le grand chiffre de l'aperçu, la page Revenu et le « Reste pour vous » de la
+/* 18. Un seul « net après impôt et frais » : sous le grand chiffre (le brut) de l'aperçu, la page Revenu et le « Reste pour vous » de la
    page Impôt montrent le même montant. Sans aucune dépense entrée, la tuile du budget montre le revenu disponible,
    pas un surplus. */
 async function apercuCoherent(b, base) {
   const { ctx, p, erreurs } = await ouvrir(b, base);
   const montant = t => +String(t).replace(/[^\d]/g, "");
-  const tuile = montant(await p.textContent("#ap-hero .hero-valeur"));
+  const brutAp = montant(await p.textContent("#ap-hero .hero-valeur"));
+  const tuile = montant((await p.textContent("#ap-hero .hero-sous span")).split(":")[1]);
   const sous = await p.textContent("#ap-hero .hero-etiquette");
   await allerA(p, "revenu");
   const revenu = montant((await p.textContent("#rv-hero .hero-sous span")).split(":")[1]);
+  const brutRv = montant(await p.textContent("#rv-hero .hero-valeur"));
   await allerA(p, "impot");
   const reste = montant(await p.evaluate(() => [...document.querySelectorAll("#im-cent .rangee")]
     .find(r => r.querySelector(".rangee-titre").textContent === "Reste pour vous").querySelector(".rangee-valeur-sous").textContent));
   verifier("net : même montant dans l'aperçu, la page Revenu et la page Impôt", tuile > 0 && tuile === revenu && revenu === reste, { tuile, revenu, reste });
-  verifier("net : le grand chiffre de l'aperçu est le revenu net de l'année", sous === "Votre revenu net de l'année", sous);
+  verifier("aperçu : le brut de l'année en grand (le même que la page Revenu), le net dessous", sous === "Votre revenu brut de l'année" && brutAp > tuile && brutAp === brutRv, { sous, brutAp, brutRv });
 
   // Assistant : propriétaire, sans dettes ni dépenses.
   await allerA(p, "apercu");
@@ -901,9 +903,9 @@ async function residence(b, base) {
   verifier("résidence : 9 mois de résidence, puis la pratique", r.mois === 9 && r.a0 === 9 && r.a1 === 0, r);
   await allerA(p, "apercu");
   const ap = await p.evaluate(() => ({ hero: document.querySelector("#ap-hero .hero-etiquette").textContent, choix: [...document.querySelectorAll("#ap-parcours button")].map(x => x.textContent),
-    tuile: document.querySelector("#ap-hero .hero-sous").textContent.replace(/\s/g, " "), faire: document.getElementById("ap-actions").textContent,
+    tuile: (document.querySelector("#ap-hero .hero-valeur").textContent + " | " + document.querySelector("#ap-hero .hero-sous").textContent).replace(/\s/g, " "), faire: document.getElementById("ap-actions").textContent,
     echeances: document.getElementById("ap-echeances").textContent }));
-  verifier("résidence : l'aperçu montre la résidence, avec la bascule", ap.hero.includes("en résidence") && ap.choix.join() === "Résidence,Pratique" && ap.tuile.includes("Brut 74 305 $ · salaire de résident, R2"), ap);
+  verifier("résidence : l'aperçu montre la résidence, avec la bascule", ap.hero.includes("en résidence") && ap.choix.join() === "Résidence,Pratique" && ap.tuile.startsWith("74 305 $ |") && ap.tuile.includes("Salaire de résident, R2"), ap);
   const align = await p.evaluate(() => {
     const b = s => document.querySelector(s).getBoundingClientRect();
     const titre = b("#h-apercu"), parcours = b("#ap-parcours"), pdf = b("#barre-pdf"), vue = b("#v-apercu");
@@ -1112,15 +1114,17 @@ async function comparerActes(b, base) {
       debord: document.documentElement.scrollWidth > document.documentElement.clientWidth };
   });
   verifier("résumé : une seule carte « Vos trois modes », sous le chiffre, le meilleur net en évidence ; elle mène aux seuils et aux actes",
-    resume.vu && resume.lien === "#revenu/actes" && resume.texte.includes("Vos trois modes") && resume.texte.includes("net par année") && resume.texte.includes("rapporte le plus")
+    resume.vu && resume.lien === "#revenu/actes" && resume.texte.includes("Vos trois modes") && /net\s\d/.test(resume.texte) && resume.texte.includes("rapporte le plus")
     && resume.lignes === 3 && resume.choisis === 1 && resume.sousLeChiffre && resume.avantLeReste && !resume.anciennes && !resume.debord, resume);
   verifier("résumé : le chiffre du haut compare le net, comme la carte", resume.puce.includes("net par rapport"), resume.puce);
   const sup = await p.evaluate(() => { const c = document.getElementById("rv-r-supervision"), m = document.getElementById("rv-r-modes");
     return { vu: !!c.offsetParent, lien: (c.querySelector("a.lien-carte") || {}).getAttribute?.("href"), apres: c.getBoundingClientRect().top > m.getBoundingClientRect().top,
-      barres: [...m.querySelectorAll(".barre-mode > i")].map(i => parseFloat(i.style.width)), barreOr: getComputedStyle(m.querySelector(".rangee.choisi .barre-mode > i")).backgroundColor,
+      barres: [...m.querySelectorAll(".barre-mode > .barre-brut")].map(i => parseFloat(i.style.width)), nets: [...m.querySelectorAll(".barre-brut > i")].map(i => parseFloat(i.style.width)),
+      grands: [...m.querySelectorAll(".rangee-valeur")].map(x => x.textContent), petits: [...m.querySelectorAll(".rangee-valeur-sous")].map(x => x.textContent),
       lignes: c.querySelectorAll(".rangee").length, choisis: c.querySelectorAll(".rangee.choisi").length, texte: c.textContent }; });
-  verifier("résumé : en GMF-U, les trois modes d'abord, avec une barre chacun (la plus longue = 100 %), puis la supervision, qui mène à son sous-onglet",
-    sup.barres.length === 3 && Math.max(...sup.barres) === 100 && sup.barres.every(x => x > 0 && x <= 100) && sup.vu && sup.lien === "#revenu/supervision" && sup.apres
+  verifier("résumé : en GMF-U, les trois modes d'abord (le brut en gros, le net dessous ; barre = brut, partie pleine = net), puis la supervision, qui mène à son sous-onglet",
+    sup.barres.length === 3 && Math.max(...sup.barres) === 100 && sup.barres.every(x => x > 0 && x <= 100) && sup.nets.every(x => x > 0 && x < 100)
+    && sup.petits.every(t => t.startsWith("net ")) && sup.grands.every((g, i) => +g.replace(/\D/g, "") > +sup.petits[i].replace(/\D/g, "")) && sup.vu && sup.lien === "#revenu/supervision" && sup.apres
     && sup.lignes === 2 && sup.choisis === 1 && sup.texte.includes("Intervention de supervision") && sup.texte.includes("Visites facturées") && sup.texte.includes("de plus par demi-journée"), sup);
   await allerA(p, "revenu/detail");
   verifier("actes : « Voir tout le détail » garde le détail du revenu", await p.evaluate(() => !document.getElementById("rv-carte-supervision").offsetParent && !!document.getElementById("rv-carte-source").offsetParent
@@ -1414,11 +1418,11 @@ async function superviseurAB(b, base) {
   // « Comparaison demi-journée », avec les deux montants, qui mène au comparatif.
   await allerA(p, "apercu");
   const tete = await p.evaluate(() => { const R = window.Wealthnord.resultats(), h = document.getElementById("ap-hero"), m = document.getElementById("ap-r-modes"), d = document.getElementById("ap-demijournee");
-    return { etiquette: h.querySelector(".hero-etiquette").textContent, valeur: h.querySelector(".hero-valeur").textContent.replace(/\s/g, ""), net: Math.round(R.netVue),
+    return { etiquette: h.querySelector(".hero-etiquette").textContent, valeur: h.querySelector(".hero-valeur").textContent.replace(/\s/g, ""), net: Math.round(R.brutVue),
       modes: !!m.offsetParent && m.getBoundingClientRect().top > h.getBoundingClientRect().top && m.getBoundingClientRect().top < d.getBoundingClientRect().top,
       lignes: m.querySelectorAll(".rangee").length, barres: m.querySelectorAll(".barre-mode").length, choisi: m.querySelectorAll(".rangee.choisi").length, lien: m.querySelector("a.lien-carte").getAttribute("href") }; });
-  verifier("aperçu : le revenu net de l'année en grand, puis les trois modes (barres, le meilleur en or), avant la comparaison demi-journée",
-    tete.etiquette === "Votre revenu net de l'année" && tete.valeur === `${tete.net.toLocaleString("fr-CA").replace(/\s/g, "")}$` && tete.modes && tete.lignes === 3 && tete.barres === 3 && tete.choisi === 1 && tete.lien === "#revenu", tete);
+  verifier("aperçu : le revenu brut de l'année en grand, puis les trois modes (barres, le meilleur en or), avant la comparaison demi-journée",
+    tete.etiquette === "Votre revenu brut de l'année" && tete.valeur === `${tete.net.toLocaleString("fr-CA").replace(/\s/g, "")}$` && tete.modes && tete.lignes === 3 && tete.barres === 3 && tete.choisi === 1 && tete.lien === "#revenu", tete);
   const ap = await p.evaluate(() => { const a = document.getElementById("ap-demijournee"), h = document.getElementById("ap-hero");
     return { vu: !!a.offsetParent, href: a.getAttribute("href"), texte: a.textContent, sousLeChiffre: a.getBoundingClientRect().top > h.getBoundingClientRect().top,
       haut: a.getBoundingClientRect().top < window.innerHeight * 1.2, totaux: [...document.querySelectorAll("#sab .sab-montant")].map(x => x.textContent.replace(/\s/g, "")) }; });

@@ -1024,10 +1024,11 @@ window.Verrou.quandOuvert(function () {
     if (!montrer) { carte.textContent = ""; return; }
     const meilleur = R.modes.reduce((a, m) => R.nets[m] > R.nets[a] ? m : a, R.modes[0]);
     const second = R.modes.filter(m => m !== meilleur).reduce((a, m) => !a || R.nets[m] > R.nets[a] ? m : a, null);
-    const lignes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: `Brut ${$(R.rev[m].total)}${m === R.mode ? " · votre mode" : ""}`, valeur: $(R.nets[m]),
-      valeurSous: R.societeActive ? "pour vous, par année" : "net par année", cls: m === meilleur ? "choisi" : null }));
+    const lignes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: m === R.mode ? "Votre mode" : "", valeur: $(R.rev[m].total),
+      valeurSous: `net ${$(R.nets[m])}${R.societeActive ? " pour vous" : ""}`, cls: m === meilleur ? "choisi" : null }));
     const phrase = second ? `${NOMS_MODE_ACTES[meilleur]} rapporte le plus : ${$(R.nets[meilleur] - R.nets[second])} net de plus que ${AU_MODE[second].replace(/^au /, "le ").replace(/^à /, "")} par année.` : "";
-    carteResume("ap-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Comparer", "#revenu"], rangeesModes(lignes, R.modes.map(m => R.nets[m])), el("p", "conclusion", phrase));
+    carteResume("ap-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Comparer", "#revenu"],
+      rangeesModes(lignes, R.modes.map(m => R.rev[m].total), R.modes.map(m => R.nets[m])), el("p", "conclusion", phrase), el("p", "aide", LEGENDE_BARRES));
   }
   function rendreApercu(R) {
     ongletDemiJournee(R);
@@ -1038,15 +1039,16 @@ window.Verrou.quandOuvert(function () {
     // Deux lignes courtes et alignées : la vue est déjà dite par la bascule, elle reste lisible sous le titre.
     const enVue = !R.residenceActive ? "" : R.vueResidence ? "\nen résidence" : "\nen pratique";
     const quand = !R.residenceActive ? null : puce(R.vueResidence ? `R${R.res.niveau}, jusqu'en ${moisLong(moisAvant(R.debutPratique))}` : `Dès ${moisLong(R.debutPratique)}`);
-    // Le grand chiffre : le revenu net estimé de l'année ; dessous, le brut et le mode, et l'écart avec le meilleur
-    // autre mode. Le budget du mois (surplus) suit, dans les tuiles et « Ce mois-ci ».
+    // Le grand chiffre : le revenu brut estimé de l'année ; dessous, le net, le milieu et le mode, et l'écart de net
+    // avec le meilleur autre mode. Le budget du mois (surplus) suit, dans les tuiles et « Ce mois-ci ».
     const autres = R.vueResidence ? [] : R.modes.filter(m => m !== R.mode);
     const meilleurAutre = autres.reduce((a, m) => !a || R.nets[m] > R.nets[a] ? m : a, null);
     const ecart = meilleurAutre ? R.nets[R.mode] - R.nets[meilleurAutre] : 0;
-    hero("ap-hero", "Votre revenu net de l'année" + enVue, $(R.netVue), [
-      `Brut ${$(R.brutVue)} · ${R.vueResidence ? `salaire de résident, R${R.res.niveau}` : libelleRevenu()}`,
+    hero("ap-hero", "Votre revenu brut de l'année" + enVue, $(R.brutVue), [
+      `${R.vueResidence ? "Net après impôt et retenues" : R.libelleNet(R.mode)} : ${$(R.netVue)}`,
+      R.vueResidence ? `Salaire de résident, R${R.res.niveau}` : libelleRevenu(),
       meilleurAutre ? puce(`${signe(ecart)} net par rapport ${AU_MODE[meilleurAutre]}`, ecart >= 0 ? "haut" : "bas", ecart >= 0) : null, quand,
-    ], R.netVue);
+    ], R.brutVue);
     modesApercu(R);
 
     // Ce mois-ci : où va votre revenu net.
@@ -1695,15 +1697,19 @@ window.Verrou.quandOuvert(function () {
   }
   /* Résumé de Revenu : vos modes côte à côte, le net de chacun (après impôt et frais), le meilleur en évidence.
      Les seuils, la supervision et les actes sont dans le sous-onglet « Comparer les actes ». */
-  // Les modes en rangées, chacune avec une barre proportionnelle à son net ; la meilleure en or (classe « choisi »).
-  function rangeesModes(lignes, nets) {
-    const z = rangees(el("div", "modes-barres"), lignes), max = Math.max(1, ...nets.map(n => Math.max(0, n)));
+  // Les modes en rangées, chacune avec une barre : sa longueur, le brut (le plus grand = toute la largeur) ; sa partie
+  // pleine, le net après impôt et frais. Le meilleur net en or (classe « choisi »).
+  function rangeesModes(lignes, bruts, nets) {
+    const z = rangees(el("div", "modes-barres"), lignes), max = Math.max(1, ...bruts.map(b => Math.max(0, b)));
     [...z.children].forEach((r, i) => {
-      const barre = el("span", "barre-mode"), f = el("i"); barre.setAttribute("aria-hidden", "true");
-      f.style.width = `${Math.max(2, Math.max(0, nets[i]) / max * 100)}%`; barre.appendChild(f); r.appendChild(barre);
+      const barre = el("span", "barre-mode"), brut = el("span", "barre-brut"), net = el("i"); barre.setAttribute("aria-hidden", "true");
+      const b = Math.max(0, bruts[i]);
+      brut.style.width = `${Math.max(2, b / max * 100)}%`; net.style.width = `${b > 0 ? Math.min(100, Math.max(0, nets[i]) / b * 100) : 0}%`;
+      brut.appendChild(net); barre.appendChild(brut); r.appendChild(barre);
     });
     return z;
   }
+  const LEGENDE_BARRES = "Barre : le brut ; partie pleine : le net, après impôt et frais. En or : le meilleur net.";
   function resumeModes(R) {
     const carte = document.getElementById("rv-r-modes"), montrer = R.plusieursModes && !R.vueResidence;
     carte.hidden = !montrer;
@@ -1714,8 +1720,8 @@ window.Verrou.quandOuvert(function () {
     const v = essai ? R.essaiModes({ patientsParDJ: e.pat, demiJournees: e.dj }) : Object.fromEntries(R.modes.map(m => [m, { brut: R.rev[m].total, net: R.nets[m], heure: R.parHeure[m] }]));
     const meilleur = R.modes.reduce((a, m) => v[m].net > v[a].net ? m : a, R.modes[0]);
     const second = R.modes.filter(m => m !== meilleur).reduce((a, m) => !a || v[m].net > v[a].net ? m : a, null);
-    const lignesModes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: `Brut ${$(v[m].brut)}${v[m].heure != null ? ` · ${$(v[m].heure)}/h` : ""}${m === R.mode ? " · dans votre budget" : ""}`,
-      valeur: $(v[m].net), valeurSous: essai ? `${signe(v[m].net - R.nets[m])} sur votre plan` : R.societeActive ? "pour vous, par année" : "net par année", cls: m === meilleur ? "choisi" : null }));
+    const lignesModes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: [v[m].heure != null ? `${$(v[m].heure)}/h` : "", m === R.mode ? "dans votre budget" : ""].filter(Boolean).join(" · "),
+      valeur: $(v[m].brut), valeurSous: `net ${$(v[m].net)}${essai ? ` (${signe(v[m].net - R.nets[m])})` : R.societeActive ? " pour vous" : ""}`, cls: m === meilleur ? "choisi" : null }));
     const ecartNet = second ? v[meilleur].net - v[second].net : 0;
     const phrase = second ? `${NOMS_MODE_ACTES[meilleur]} rapporte le plus : ${$(ecartNet)} net de plus que ${AU_MODE[second].replace(/^au /, "le ").replace(/^à /, "")} par année.` : "";
     // Les boutons + et − : le focus reste sur le bouton touché.
@@ -1740,8 +1746,10 @@ window.Verrou.quandOuvert(function () {
       a.append(garder, revenir); bloc.appendChild(a);
     }
     const h = R.modes.filter(m => v[m].heure != null), mh = h.length ? h.reduce((a, m) => v[m].heure > v[a].heure ? m : a, h[0]) : null;
-    const note = el("p", "aide", mh ? `$/h : par heure en clinique, après les frais de cabinet et avant l'impôt, sans les activités en établissement. À l'heure, ${NOMS_MODE_ACTES[mh].toLowerCase()} paie le mieux (${$(v[mh].heure)}).` : "");
-    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"], rangeesModes(lignesModes, R.modes.map(m => v[m].net)), el("p", "conclusion", phrase), note, bloc);
+    const note = el("p", "aide", `${LEGENDE_BARRES} `
+      + (mh ? `$/h : par heure en clinique, après les frais de cabinet et avant l'impôt, sans les activités en établissement. À l'heure, ${NOMS_MODE_ACTES[mh].toLowerCase()} paie le mieux (${$(v[mh].heure)}).` : ""));
+    carteResume("rv-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Seuils et actes", "#revenu/actes"],
+      rangeesModes(lignesModes, R.modes.map(m => v[m].brut), R.modes.map(m => v[m].net)), el("p", "conclusion", phrase), note, bloc);
     if (U.essaiFocus) { const f = document.getElementById(U.essaiFocus); U.essaiFocus = null; if (f && !f.disabled) f.focus(); }
   }
   const signe$2 = v => (v >= 0 ? "+" : "−") + $2(Math.abs(v));

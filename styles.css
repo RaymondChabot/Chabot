@@ -1130,12 +1130,15 @@ a.tuile:hover { border-color: var(--trait); }
 .rep-liste .rangee.rep-non .rangee-valeur { color: var(--discret); font-weight: 500; }
 @media (pointer: coarse) { .rep-groupe { min-height: 44px; } }
 
-/* Les modes, côte à côte : une barre proportionnelle au net sous chaque mode ; la meilleure en or. */
+/* Les modes, côte à côte : sous chaque mode, une barre dont la longueur est le brut et la partie pleine, le net ; le
+   meilleur net en or. */
 .modes-barres .rangee { flex-wrap: wrap; row-gap: 8px; }
-.barre-mode { flex: 0 0 100%; height: 6px; border-radius: 3px; background: var(--grille); overflow: hidden; }
-.barre-mode > i { display: block; height: 100%; border-radius: 3px; background: color-mix(in srgb, var(--axe) 45%, var(--surface)); transition: width 320ms ease; }
-.rangee.choisi .barre-mode > i { background: var(--or-texte); }
-@media (prefers-reduced-motion: reduce) { .barre-mode > i { transition: none; } }
+.barre-mode { flex: 0 0 100%; height: 8px; }
+.barre-brut { display: block; height: 100%; border-radius: 4px; overflow: hidden; background: color-mix(in srgb, var(--axe) 20%, var(--surface)); transition: width 320ms ease; }
+.barre-brut > i { display: block; height: 100%; border-radius: 4px; background: color-mix(in srgb, var(--axe) 55%, var(--surface)); transition: width 320ms ease; }
+.rangee.choisi .barre-brut { background: color-mix(in srgb, var(--or-texte) 24%, var(--surface)); }
+.rangee.choisi .barre-brut > i { background: var(--or-texte); }
+@media (prefers-reduced-motion: reduce) { .barre-brut, .barre-brut > i { transition: none; } }
 @media print { .barre-mode { display: none; } }
 
 /* ============================================================
