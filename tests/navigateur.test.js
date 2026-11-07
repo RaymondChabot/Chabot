@@ -1543,11 +1543,68 @@ async function revenuEtImpot(b, base) {
   await ctx.close();
 }
 
+/* 43. Cibles tactiles : sur un écran tactile, chaque bouton, lien, champ et choix fait au moins 44 px de côté (zone de
+   toucher comprise), dans chaque page et chaque onglet, la barre du bas, les panneaux Modifier et l'assistant. Les
+   sigles du texte (lexique) en sont exemptés, comme les champs cachés derrière leur libellé. */
+async function ciblesTactiles(b, base) {
+  const contexte = () => b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, serviceWorkers: "block" });
+  const ctx = await contexte(), p = await ctx.newPage(), erreurs = [];
+  p.on("pageerror", e => erreurs.push(String(e)));
+  await ctx.addInitScript(() => { try { localStorage.setItem("wm.assistant", "1"); sessionStorage.setItem("wm.ouverture", "1"); localStorage.setItem("wm.details", "1");
+    localStorage.setItem("wm.avance", "1"); } catch (e) { /* stockage indisponible */ } });
+  await p.goto(`${base}/index.html#apercu`); await pret(p);
+  await remplacer(p, { "revenu.milieu": "gmfu", "revenu.modeBudget": "mixte", "revenu.enseignement": 2, "revenu.residents": 1, "revenu.externes": 1 });
+  const petites = (page, racine) => page.evaluate(racine => {
+    const out = [];
+    for (const e of document.querySelectorAll(`${racine} :is(a[href], button, summary, input:not([type=hidden]), select, textarea)`)) {
+      if (!e.getClientRects().length || e.matches(".terme, .cache-visuel, .visuellement-cache")) continue;
+      // Case ou bouton radio dans son libellé : le libellé entier se touche.
+      const libelle = e.matches("input[type=radio], input[type=checkbox]") ? e.closest("label") : null;
+      const r = (libelle || e).getBoundingClientRect(), a = getComputedStyle(e, "::after");
+      let w = r.width, h = r.height;
+      if (!w || !h) continue;
+      // Zone de toucher agrandie par un ::after en position absolue (inset négatif).
+      if (!libelle && a.content !== "none" && a.position === "absolute") {
+        w = Math.max(w, r.width - (parseFloat(a.left) || 0) - (parseFloat(a.right) || 0));
+        h = Math.max(h, r.height - (parseFloat(a.top) || 0) - (parseFloat(a.bottom) || 0));
+      }
+      if (w < 43.5 || h < 43.5) out.push(`${e.id || String(e.className) || e.tagName} ${Math.round(w)}×${Math.round(h)}`);
+    }
+    return out;
+  }, racine);
+  const trop = {};
+  for (const pg of ["apercu", "apercu/detail", "revenu", "revenu/detail", "comparer", "comparer/modes", "comparer/demijournee", "comparer/actes", "comparer/offres",
+    "impot", "impot/detail", "budget", "budget/mois", "budget/annee", "budget/dettes", "avenir", "avenir/aujourdhui", "avenir/projection", "avenir/placements", "avenir/proches", "donnees"]) {
+    await allerA(p, pg);
+    await p.evaluate(() => document.querySelectorAll(".vue:not([hidden]) details").forEach(d => { d.open = true; }));
+    await p.waitForTimeout(80);
+    const x = await petites(p, ".vue:not([hidden])"); if (x.length) trop[pg] = x;
+  }
+  const nav = await petites(p, ".nav"); if (nav.length) trop.nav = nav;
+  for (const pg of ["revenu", "budget", "avenir", "impot"]) {
+    await allerA(p, pg); await p.click(`#v-${pg} .bouton-modifier`); await p.waitForTimeout(300);
+    await p.evaluate(() => document.querySelectorAll("dialog[open] details").forEach(d => { d.open = true; })); await p.waitForTimeout(80);
+    const x = await petites(p, "dialog[open]"); if (x.length) trop[`Modifier (${pg})`] = x;
+    await p.keyboard.press("Escape"); await p.waitForTimeout(200);
+  }
+  // L'assistant, au premier lancement (stockage vide).
+  const ctx2 = await contexte(), q = await ctx2.newPage();
+  q.on("pageerror", e => erreurs.push(String(e)));
+  await ctx2.addInitScript(() => { try { sessionStorage.setItem("wm.ouverture", "1"); } catch (e) { /* stockage indisponible */ } });
+  await q.goto(`${base}/index.html`); await pret(q); await q.waitForSelector("#assistant[open]", { timeout: 5000 });
+  const as = await petites(q, "#assistant[open]"); if (as.length) trop.assistant = as;
+  await q.click("#as-rapide"); await q.waitForTimeout(200);
+  const rapide = await petites(q, "#assistant[open]"); if (rapide.length) trop["assistant rapide"] = rapide;
+  verifier("cibles tactiles : 44 px au moins partout (pages, onglets, barre du bas, panneaux, assistant)", Object.keys(trop).length === 0, trop);
+  verifier("cibles tactiles : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx2.close(); await ctx.close();
+}
+
 (async () => {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, repertoireActes, revenuEtImpot]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, repertoireActes, revenuEtImpot, ciblesTactiles]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

@@ -76,7 +76,10 @@ complète ; **Résumé**, en haut de la page, ou le bouton Retour y ramène.
 L'adresse suit : `#budget` pour le résumé, `#budget/detail` ou un
 sous-onglet (`#budget/dettes`) pour le détail. La page Données montre
 tout ; ses cartes moins utilisées (installation, valeurs confirmées,
-apparence et rapport, recommencer) se déplient au toucher.
+apparence et rapport, recommencer) se déplient au toucher. Sur écran
+tactile, chaque bouton, lien, champ et choix fait au moins 44 px de côté :
+les pastilles (Modifier, Résumé, choix segmentés) gardent leur taille et
+leur zone de toucher déborde, invisible.
 
 ## Le plan suit le calendrier
 
@@ -349,7 +352,8 @@ HORLOGE=2027-03-15 node tests/navigateur.test.js   # toute la suite, comme à un
   passage du temps (horloge fixée : délais, première année de pratique),
   plan qui suit le calendrier (soldes gardés, Annuler sans perdre une
   modification, niveau de résidence, enfants, privilège, année type,
-  impôt 2027 provisoire).
+  impôt 2027 provisoire), la page Comparer et « Votre revenu · Impôt »,
+  cibles tactiles de 44 px (pages, panneaux et assistant, écran tactile).
 - GitHub Actions lance les trois à chaque publication sur `main`
   (`.github/workflows/tests.yml`). Cas fictifs seulement.
 

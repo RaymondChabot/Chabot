@@ -338,8 +338,9 @@ a.tuile:hover { border-color: var(--trait); }
 .segment:empty { display: none; }
 .segment button {
   flex: 1 1 0; min-width: 0; border: 0; background: transparent; color: var(--encre-2); cursor: pointer;
-  padding: 9px 10px; border-radius: 999px; font: 500 0.9rem var(--police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 9px 10px; border-radius: 999px; font: 500 0.9rem var(--police); white-space: nowrap;
 }
+.segment button > span { display: block; overflow: hidden; text-overflow: ellipsis; }
 .segment button[aria-checked="true"] { background: var(--surface); color: var(--encre); font-weight: 600; box-shadow: 0 1px 3px rgba(18, 18, 17, 0.12); }
 .segment.petit button { padding: 7px 8px; font-size: 0.84rem; }
 /* Bascule Résidence / Pratique : même largeur que le titre au-dessus, deux moitiés égales. */
@@ -377,6 +378,25 @@ a.tuile:hover { border-color: var(--trait); }
 .bouton.danger.plein { background: var(--danger); color: #fff; border-color: var(--danger); }
 .bouton.petit { padding: 7px 16px; font-size: 0.88rem; }
 .bouton.large { width: 100%; }
+/* Cibles tactiles : 44 px au moins. Les pastilles gardent leur taille ; leur zone de toucher déborde, invisible. */
+.bouton:not(.petit) { min-height: 44px; }
+.bouton.petit, .bouton-modifier, .retour-resume, .segment button { position: relative; }
+.bouton.petit::after, .bouton-modifier::after, .retour-resume::after, .segment button::after {
+  content: ""; position: absolute; left: 0; right: 0; top: min(0px, calc((100% - 44px) / 2)); bottom: min(0px, calc((100% - 44px) / 2)); }
+.retour-resume::after { left: -8px; right: -8px; }
+/* La coche « valeur confirmée » (28 px) : sa zone de toucher fait 44 px, dans l'espace entre les colonnes. */
+.conf { position: relative; }
+.conf::after { content: ""; position: absolute; inset: -8px; }
+/* Boutons icônes de 40 px (fermer l'assistant, thème) : zone de toucher de 44 px. */
+.bouton-icone { position: relative; }
+.bouton-icone::after { content: ""; position: absolute; inset: min(0px, calc((100% - 44px) / 2)); }
+/* Interrupteur : une bordure transparente agrandit la zone de toucher (44 px de haut), sans changer le dessin ni la place. */
+.interrupteur { box-sizing: content-box; border: 8px solid transparent; background-clip: padding-box; margin: -8px; }
+/* Écrans tactiles : champs, listes et « voir plus » à 44 px de haut. */
+@media (pointer: coarse) {
+  .saisie input, .saisie select { min-height: 44px; }
+  .plier > summary { min-height: 44px; }
+}
 .bouton-modifier {
   display: inline-flex; align-items: center; gap: 6px; flex: none;
   border: 1px solid var(--trait); background: var(--surface); color: var(--encre);
@@ -727,6 +747,7 @@ a.tuile:hover { border-color: var(--trait); }
 .simulation-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 0.94rem; }
 .simulation-tete strong { font-variant-numeric: tabular-nums; }
 .simulation input[type="range"] { width: 100%; height: 32px; accent-color: var(--encre); margin: 0; }   /* bande tactile plus haute que le fil */
+@media (pointer: coarse) { .simulation input[type="range"] { height: 44px; } }
 @media print { .simulation { display: none; } }
 
 /* ============================================================

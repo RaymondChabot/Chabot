@@ -26,9 +26,10 @@ l'onglet Actes faisait 18,5 écrans de téléphone et l'en-tête du téléphone 
 | I-04 | moyenne | Téléphone : quatre gros boutons empilés (Rapport PDF, thème, Données, Installer) en haut de chaque page. | Corrigé (v85) : une rangée d'icônes rondes de 44 px, nommées, à droite du titre. |
 | I-05 | faible | 320 px : la légende de « Ce mois-ci » faisait chevaucher libellés et montants. | Corrigé (v86) : une colonne sous 360 px. |
 | I-06 | faible | Finition : chiffres des tuiles en Inter, ombres et filets un peu marqués. | Corrigé (v86) : chiffres en Newsreader, ombres plus douces, filets plus fins, plus d'air entre les cartes. |
-| I-07 | moyenne | Cibles tactiles de moins de 44 px : liens « Détail » et « Voir » (17 px de haut), bascules (35 px), champs (38 px), bouton Modifier (35 px). Conformes au minimum WCAG 2.2 de 24 px par l'espacement, mais pas à la règle de 44 px du projet. | Non retenu pour l'instant. |
-| I-08 | faible | Aperçu : la carte « Votre portrait » et son gros bouton noir concurrencent l'essentiel ; « À faire » montre trois phrases longues. | Non retenu pour l'instant. |
+| I-07 | moyenne | Cibles tactiles de moins de 44 px : liens « Détail » et « Voir » (17 px de haut), bascules (35 px), champs (38 px), bouton Modifier (35 px). Conformes au minimum WCAG 2.2 de 24 px par l'espacement, mais pas à la règle de 44 px du projet. | Corrigé (v90) : 44 px partout sur écran tactile (pages, onglets, barre du bas, panneaux Modifier, assistant). Les pastilles gardent leur taille, leur zone de toucher déborde ; champs, listes et « voir plus » à 44 px sur écran tactile. Un test le vérifie. |
+| I-08 | faible | Aperçu : la carte « Votre portrait » et son gros bouton noir concurrencent l'essentiel ; « À faire » montre trois phrases longues. | Corrigé (v89) : le portrait en une rangée discrète ; « À faire » en deux actions courtes, la liste complète derrière « Tout voir ». |
 | I-09 | faible | Étiquettes des axes des graphiques en 11 px. | À revoir avec la finition des graphiques. |
+| I-10 | moyenne | Les comparaisons (modes, demi-journée, actes, offres) étaient dispersées dans Revenu ; l'Impôt avait sa propre page dans la barre du bas. | Corrigé (v87-v88) : le brut en gros, le net dessous ; une page « Comparer » dans la barre du bas (Modes, Demi-journée, Actes, Offres) ; l'impôt rangé avec le revenu (« Votre revenu · Impôt »). |
 
 ## Vérifié et trouvé correct
 

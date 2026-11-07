@@ -123,7 +123,7 @@
     if (c.dataset.cle !== cle) {
       c.textContent = ""; c.dataset.cle = cle;
       c.setAttribute("role", "radiogroup"); c.setAttribute("aria-label", etiquette);
-      options.forEach(([v, t]) => { const b = el("button", null, t); b.type = "button"; b.setAttribute("role", "radio"); b.dataset.v = v; c.appendChild(b); });
+      options.forEach(([v, t]) => { const b = el("button"); b.appendChild(el("span", null, t)); b.type = "button"; b.setAttribute("role", "radio"); b.dataset.v = v; c.appendChild(b); });
       c.onclick = e => { const b = e.target.closest("button"); if (b) c.surChoix(b.dataset.v); };
       c.onkeydown = e => {
         if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
