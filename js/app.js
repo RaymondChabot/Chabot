@@ -1017,6 +1017,18 @@ window.Verrou.quandOuvert(function () {
     a.querySelector(".od-icone").appendChild(icone("balance"));
     a.setAttribute("aria-label", `Comparaison demi-journée : intervention de supervision ${$(c.avecIntervention)}, visites ${$(c.avecVisites)}`);
   }
+  // Aperçu : les modes côte à côte, juste sous le revenu (pratique avec plusieurs modes seulement).
+  function modesApercu(R) {
+    const carte = document.getElementById("ap-r-modes"), montrer = R.plusieursModes && !R.vueResidence;
+    carte.hidden = !montrer;
+    if (!montrer) { carte.textContent = ""; return; }
+    const meilleur = R.modes.reduce((a, m) => R.nets[m] > R.nets[a] ? m : a, R.modes[0]);
+    const second = R.modes.filter(m => m !== meilleur).reduce((a, m) => !a || R.nets[m] > R.nets[a] ? m : a, null);
+    const lignes = R.modes.map(m => ({ titre: NOM_MODE[m], sous: `Brut ${$(R.rev[m].total)}${m === R.mode ? " · votre mode" : ""}`, valeur: $(R.nets[m]),
+      valeurSous: R.societeActive ? "pour vous, par année" : "net par année", cls: m === meilleur ? "choisi" : null }));
+    const phrase = second ? `${NOMS_MODE_ACTES[meilleur]} rapporte le plus : ${$(R.nets[meilleur] - R.nets[second])} net de plus que ${AU_MODE[second].replace(/^au /, "le ").replace(/^à /, "")} par année.` : "";
+    carteResume("ap-r-modes", R.modes.length === 3 ? "Vos trois modes" : "Vos modes", ["Comparer", "#revenu"], rangeesModes(lignes, R.modes.map(m => R.nets[m])), el("p", "conclusion", phrase));
+  }
   function rendreApercu(R) {
     ongletDemiJournee(R);
     document.getElementById("ap-exemple").hidden = !S.meta.exemple;
@@ -1026,13 +1038,16 @@ window.Verrou.quandOuvert(function () {
     // Deux lignes courtes et alignées : la vue est déjà dite par la bascule, elle reste lisible sous le titre.
     const enVue = !R.residenceActive ? "" : R.vueResidence ? "\nen résidence" : "\nen pratique";
     const quand = !R.residenceActive ? null : puce(R.vueResidence ? `R${R.res.niveau}, jusqu'en ${moisLong(moisAvant(R.debutPratique))}` : `Dès ${moisLong(R.debutPratique)}`);
-    if (!S.meta.exemple && !categoriesBudget().some(categorieRemplie)) {
-      const lien = el("a", "lien-carte", "Entrez vos dépenses du mois"); lien.href = "#budget/mois";
-      const suite = el("span"); suite.append(lien, document.createTextNode(" pour voir ce qu'il vous reste."));
-      hero("ap-hero", "Votre revenu disponible, par mois" + enVue, $(R.netMoi), [suite, quand], R.netMoi);
-    } else hero("ap-hero", "Votre surplus mensuel" + enVue, $(R.surplusMoi), [
-      R.surplusMoi >= 0 ? `Sur un revenu disponible de ${$(R.netMoi)} par mois` : puce("Vos sorties dépassent vos revenus", "bas", false), quand,
-    ], R.surplusMoi);
+    // Le grand chiffre : le revenu net estimé de l'année ; dessous, le brut et le mode, et l'écart avec le meilleur
+    // autre mode. Le budget du mois (surplus) suit, dans les tuiles et « Ce mois-ci ».
+    const autres = R.vueResidence ? [] : R.modes.filter(m => m !== R.mode);
+    const meilleurAutre = autres.reduce((a, m) => !a || R.nets[m] > R.nets[a] ? m : a, null);
+    const ecart = meilleurAutre ? R.nets[R.mode] - R.nets[meilleurAutre] : 0;
+    hero("ap-hero", "Votre revenu net de l'année" + enVue, $(R.netVue), [
+      `Brut ${$(R.brutVue)} · ${R.vueResidence ? `salaire de résident, R${R.res.niveau}` : libelleRevenu()}`,
+      meilleurAutre ? puce(`${signe(ecart)} net par rapport ${AU_MODE[meilleurAutre]}`, ecart >= 0 ? "haut" : "bas", ecart >= 0) : null, quand,
+    ], R.netVue);
+    modesApercu(R);
 
     // Ce mois-ci : où va votre revenu net.
     const flux = document.getElementById("ap-flux"); flux.textContent = "";
@@ -1057,9 +1072,12 @@ window.Verrou.quandOuvert(function () {
       return a;
     };
     const p = R.projection, dix = p[Math.min(10, p.length - 1)];
+    // Sans aucune dépense entrée, le « surplus » serait le revenu net en entier : la tuile montre le revenu disponible.
+    const sansDepenses = !S.meta.exemple && !categoriesBudget().some(categorieRemplie);
     t.append(
-      tuileLien("revenu", "Revenu brut", $(R.brutVue), R.vueResidence ? `Salaire de résident, R${R.res.niveau}` : libelleRevenu()),
-      tuileLien("impot", R.vueResidence ? "Net de la paie, l'année" : "Net de la pratique, l'année", $(R.netVue), R.vueResidence ? "Après impôt et retenues" : R.fraisPerso(R.mode) > 0 ? "Après impôt et frais" : "Après impôt"),
+      sansDepenses ? tuileLien("budget/mois", "Revenu disponible, par mois", $(R.netMoi), "Entrez vos dépenses pour voir votre surplus")
+        : tuileLien("budget/mois", "Surplus mensuel", $(R.surplusMoi), R.surplusMoi >= 0 ? `Sur ${$(R.netMoi)} disponibles par mois` : "Vos sorties dépassent vos revenus"),
+      tuileLien("impot", "Impôt et cotisations", $(R.impot.totalGlobal ?? R.impot.total), `Taux moyen ${pct(R.impot.tauxMoyen, 0)}${R.vueResidence ? ", retenu sur la paie" : ""}`),
       tuileLien("budget/dettes", "Solde des dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
       tuileLien("avenir", "Valeur nette", $(p[0].moi), `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}`),
     );
