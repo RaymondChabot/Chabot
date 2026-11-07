@@ -1456,7 +1456,7 @@ window.Verrou.quandOuvert(function () {
   /* Répertoire des actes (js/repertoire.js) : recherche par code ou par mot, sans accents ni majuscules ; filtres par
      groupe. Construit une fois ; la saisie ne refait que la liste (le focus reste dans le champ). */
   const sansAccents = t => String(t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const REP = { q: "", groupe: "tous", actes: null };
+  const REP = { q: "", groupe: "frequents", actes: null };
   function actesRepertoire() {
     if (REP.actes) return REP.actes;
     const Rp = window.Repertoire, noms = Object.fromEntries(Rp.GROUPES);
@@ -1475,35 +1475,50 @@ window.Verrou.quandOuvert(function () {
     if (!a.p) return { titre: a.n, sous, valeur: "Compris", valeurSous: a.c.length ? "hors GMF-U" : "dans la visite", cls: "rep-non" };
     return { titre: a.n, sous, valeur: montantRep(a.t, 100), valeurSous: a.t == null ? "à confirmer" : a.p === 100 ? "payé à 100 %" : `au mixte ${montantRep(a.t, a.p)}` };
   }
+  // « Les plus fréquents » au départ ; une recherche porte sur tous les actes (ou sur le groupe choisi).
   function filtrerRepertoire() {
-    const mots = sansAccents(REP.q).split(/\s+/).filter(Boolean);
-    return actesRepertoire().filter(a => (REP.groupe === "tous" || a.g === REP.groupe) && mots.every(m => a.texte.includes(m)));
+    const mots = sansAccents(REP.q).split(/\s+/).filter(Boolean), frequents = REP.groupe === "frequents" && !mots.length;
+    const dans = a => frequents ? window.Repertoire.FREQUENTS.includes(a.c[0]) : REP.groupe === "tous" || REP.groupe === "frequents" || a.g === REP.groupe;
+    return actesRepertoire().filter(a => dans(a) && mots.every(m => a.texte.includes(m)));
+  }
+  function choisirGroupeRepertoire(v) {
+    REP.groupe = v;
+    document.querySelectorAll("#rep-groupes button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === v ? "true" : "false"));
+    listeRepertoire();
   }
   function listeRepertoire() {
     const z = document.getElementById("rep-liste"), trouves = filtrerRepertoire(), noms = Object.fromEntries(window.Repertoire.GROUPES);
     z.textContent = "";
     document.getElementById("rep-compte").textContent = `${nb(trouves.length, 0)} acte${trouves.length > 1 ? "s" : ""}`;
     if (!trouves.length) { z.appendChild(el("p", "aide", "Aucun acte ne correspond. Essayez un code (15804) ou un mot (suivi, stérilet, cryochirurgie).")); return; }
-    // Sans recherche : par groupe, dans l'ordre de fréquence ; avec une recherche : les résultats, avec leur groupe.
-    const parGroupe = !REP.q.trim();
+    // Les plus fréquents : une seule liste, puis « Voir les N actes ». Sans recherche : par groupe, dans l'ordre de
+    // fréquence ; avec une recherche : les résultats, avec leur groupe.
+    const recherche = !!REP.q.trim(), frequents = REP.groupe === "frequents" && !recherche;
+    if (frequents) {
+      z.appendChild(rangees(el("div"), trouves.map(a => { const l = ligneRepertoire(a); return { ...l, sous: noms[a.g] + " · " + l.sous }; })));
+      const tous = el("button", "bouton secondaire rep-tous", `Voir les ${nb(actesRepertoire().length, 0)} actes`); tous.type = "button"; tous.id = "rep-voir-tous";
+      tous.addEventListener("click", () => { choisirGroupeRepertoire("tous"); document.querySelector('#rep-groupes button[data-v="tous"]').focus(); });
+      const a = el("div", "actions"); a.appendChild(tous); z.appendChild(a);
+      return;
+    }
     for (const [g] of window.Repertoire.GROUPES) {
       const items = trouves.filter(a => a.g === g);
       if (!items.length) continue;
-      if (parGroupe && REP.groupe === "tous") z.appendChild(el("h3", "rep-titre", noms[g]));
-      z.appendChild(rangees(el("div"), items.map(a => { const l = ligneRepertoire(a); return { ...l, sous: (parGroupe ? "" : noms[a.g] + " · ") + l.sous }; })));
+      if (!recherche && REP.groupe === "tous") z.appendChild(el("h3", "rep-titre", noms[g]));
+      z.appendChild(rangees(el("div"), items.map(a => { const l = ligneRepertoire(a); return { ...l, sous: (recherche ? noms[a.g] + " · " : "") + l.sous }; })));
     }
   }
   function initRepertoire() {
     const q = document.getElementById("rep-q"), groupes = document.getElementById("rep-groupes");
-    [["tous", "Tous"], ...window.Repertoire.GROUPES].forEach(([v, t]) => {
+    [["frequents", "Les plus fréquents"], ["tous", "Tous"], ...window.Repertoire.GROUPES].forEach(([v, t]) => {
       const b = el("button", "rep-groupe", t); b.type = "button"; b.dataset.v = v; b.setAttribute("aria-pressed", v === REP.groupe ? "true" : "false");
-      b.addEventListener("click", () => { REP.groupe = v; groupes.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === v ? "true" : "false")); listeRepertoire(); });
+      b.addEventListener("click", () => choisirGroupeRepertoire(v));
       groupes.appendChild(b);
     });
     q.addEventListener("input", () => { REP.q = q.value; listeRepertoire(); });
     document.getElementById("rep-source").textContent = `Tarifs : ${window.Repertoire.source}, colonne « En CLSC ou en GMF-U en établissement », avant la majoration selon le territoire. `
       + "Au mixte en GMF-U : 63,58 % des services médicaux, 62,15 % des services sur base de temps, 100 % des suppléments et des formulaires, en plus du forfait horaire. "
-      + "Les actes chirurgicaux sont publiés en dollars entiers. Ordre : du plus fréquent au plus rare.";
+      + "Les actes chirurgicaux sont publiés en dollars entiers. Ordre : du plus fréquent au plus rare ; la recherche porte sur tous les actes.";
     listeRepertoire();
   }
   const NOMS_MODE_ACTES = { horaire: "Le taux horaire", mixte: "Le mixte", acte: "L'acte" };

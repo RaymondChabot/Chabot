@@ -1416,7 +1416,7 @@ async function superviseurAB(b, base) {
   await ctx.close();
 }
 
-/* 41. Répertoire des actes (onglet Actes) : tous les actes, la recherche par mot sans accents et par code, les filtres
+/* 41. Répertoire des actes (onglet Actes) : les plus fréquents au départ, puis tous ; la recherche par mot sans accents et par code, les filtres
    par groupe ; la saisie garde le focus ; rien ne déborde à 320 px. */
 async function repertoireActes(b, base) {
   const { ctx, p, erreurs } = await ouvrir(b, base, { page: "revenu", largeur: 320 });
@@ -1426,6 +1426,10 @@ async function repertoireActes(b, base) {
     valeurs: [...document.querySelectorAll("#rep-liste .rangee-droite")].map(x => x.textContent), focus: document.activeElement.id,
     debord: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
   const total = await p.evaluate(() => window.Repertoire.ACTES.length + window.Calc.CNESST.length);
+  const freq = await etat();
+  verifier("répertoire : au départ, les 10 actes les plus fréquents, puis « Voir les N actes »", freq.compte === "10 actes" && freq.titres.length === 10
+    && freq.titres[0].startsWith("Forfait horaire") && (await p.textContent("#rep-voir-tous")).replace(/\s/g, " ") === `Voir les ${total} actes`, freq);
+  await p.click("#rep-voir-tous");
   const tous = await etat();
   verifier("répertoire : tous les actes, groupés, rien ne déborde à 320 px", tous.compte === `${total} actes` && tous.titres.length === total && tous.titres[0].startsWith("Forfait horaire") && !tous.debord, { compte: tous.compte, n: tous.titres.length, premier: tous.titres[0], debord: tous.debord });
   await p.fill("#rep-q", "STERILET");
@@ -1441,6 +1445,9 @@ async function repertoireActes(b, base) {
   const non = await etat();
   verifier("répertoire : le filtre « Non facturables à part » : la cryothérapie simple, compris dans la visite", non.titres.some(t => t.startsWith("Cryothérapie d'une lésion"))
     && non.valeurs.every(v => v.includes("Compris")), non.titres);
+  await p.click('#rep-groupes button[data-v="frequents"]'); await p.fill("#rep-q", "cryochirurgie");
+  const cryo = await etat();
+  verifier("répertoire : depuis « Les plus fréquents », la recherche porte sur tous les actes", cryo.titres.length === 6 && cryo.titres.every(t => t.startsWith("Cryochirurgie")), cryo.titres);
   await p.click('#rep-groupes button[data-v="tous"]'); await p.fill("#rep-q", "zzzz");
   verifier("répertoire : aucune correspondance, un message", (await p.evaluate(() => document.getElementById("rep-liste").textContent)).includes("Aucun acte ne correspond"));
   verifier("répertoire : aucune erreur", erreurs.length === 0, erreurs);

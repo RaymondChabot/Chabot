@@ -127,7 +127,9 @@
     { g: "non", n: "Manœuvre d'Epley", c: [], t: null, p: 0, k: "vertige", note: "Comprise dans la visite (annexe I du préambule général)." },
     { g: "non", n: "Problème musculosquelettique : prise en charge, suivi, opinion", c: ["08775", "08776", "08777"], t: null, p: 0, k: "msk", note: "Payés au mixte en CLSC seulement : pas en GMF-U (Brochure no 1, annexe XXIII, section B-2)." },
   ];
-  const Repertoire = { GROUPES, ACTES, MED, TEMPS, PLEIN, source: "Manuel des médecins omnipraticiens (28 octobre 2026) et Brochure no 1 (5 novembre 2026)" };
+  // Les dix actes les plus fréquents (premier code de chaque acte), montrés au départ.
+  const FREQUENTS = ["42094", "42096", "15803", "15823", "15765", "15773", "15819", "15801", "15821", "09926"];
+  const Repertoire = { GROUPES, ACTES, FREQUENTS, MED, TEMPS, PLEIN, source: "Manuel des médecins omnipraticiens (28 octobre 2026) et Brochure no 1 (5 novembre 2026)" };
   if (typeof module !== "undefined" && module.exports) module.exports = Repertoire;
   else racine.Repertoire = Repertoire;
 })(typeof window !== "undefined" ? window : globalThis);
