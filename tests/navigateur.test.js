@@ -323,6 +323,36 @@ async function logo(b, base) {
   await p.waitForTimeout(900);
   const apres = await p.evaluate(() => ({ joue: document.querySelector(".ouverture").classList.contains("joue"), page: location.hash, motif: document.querySelector(".ouverture-centre").getAttribute("data-motif") }));
   verifier("logo : on termine sur le lion, puis l'accueil", !apres.joue && apres.page === "#apercu" && apres.motif === "#wm-g-lion", apres);
+  // Thème sombre : l'intérieur du sceau reste blanc, avec l'or du thème clair ; rien ne change en thème clair ni dans le rapport.
+  const fond = await p.evaluate(() => {
+    const r = document.documentElement, avant = r.getAttribute("data-theme");
+    const lire = () => [".nav-sceau", ".verrou-sceau", ".as-sceau", ".ouverture-sceau"].map(x => getComputedStyle(document.querySelector(x)).getPropertyValue("--sceau-fond").trim() || "aucun");
+    r.setAttribute("data-theme", "light"); const clair = lire();
+    r.setAttribute("data-theme", "dark"); const sombre = lire(), couleur = getComputedStyle(document.querySelector(".nav-sceau")).color;
+    if (avant === null) r.removeAttribute("data-theme"); else r.setAttribute("data-theme", avant);
+    return { clair, sombre, couleur, sceau: !!document.querySelector('#wm-sceau use[href="#wm-g-fond"]'), ouverture: !!document.querySelector('.ouverture-sceau use[href="#wm-g-fond"]'),
+      rapport: !document.querySelector('#wm-sceau-i use[href="#wm-g-fond"]') };
+  });
+  verifier("logo : en thème sombre, l'intérieur du sceau reste blanc, avec l'or du thème clair ; rien ne change en thème clair ni dans le rapport",
+    fond.clair.every(f => f === "aucun") && fond.sombre.every(f => f === "#fff") && fond.couleur === "rgb(180, 138, 74)" && fond.sceau && fond.ouverture && fond.rapport, fond);
+  // Ordinateur : les pixels du sceau de la colonne. Thème clair : l'intérieur comme avant (clair, pas noir) ; sombre : blanc, coins sombres.
+  const ordi = await b.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: "block" }), q = await ordi.newPage();
+  await ordi.addInitScript(() => { try { localStorage.setItem("wm.assistant", "1"); sessionStorage.setItem("wm.ouverture", "1"); } catch (e) { /* stockage indisponible */ } });
+  await q.goto(`${base}/index.html#apercu`); await pret(q);
+  const pixels = async theme => {
+    await q.evaluate(t => document.documentElement.setAttribute("data-theme", t), theme); await q.waitForTimeout(150);
+    const png = (await q.locator(".nav-sceau").screenshot()).toString("base64");
+    return q.evaluate(async src => {
+      const img = new Image(); img.src = "data:image/png;base64," + src; await img.decode();
+      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+      const moy = (x0, y0, w, h) => { const d = x.getImageData(x0, y0, w, h).data; let t = 0; for (let i = 0; i < d.length; i += 4) t += (d[i] + d[i + 1] + d[i + 2]) / 3; return Math.round(t / (d.length / 4)); };
+      return { centre: moy(img.width * 0.3, img.height * 0.3, img.width * 0.4, img.height * 0.4), coin: moy(0, 0, Math.ceil(img.width * 0.08), Math.ceil(img.height * 0.08)) };
+    }, png);
+  };
+  const clair = await pixels("light"), sombre = await pixels("dark");
+  verifier("logo (ordinateur) : intérieur clair en thème clair ; blanc en thème sombre, sans déborder du cercle", clair.centre > 150 && clair.coin > 200
+    && sombre.centre > 150 && sombre.coin < 60, { clair, sombre });
+  await ordi.close();
   verifier("logo : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }

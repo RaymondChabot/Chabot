@@ -1096,6 +1096,13 @@ a.tuile:hover { border-color: var(--trait); }
   :root:not([data-theme="light"]) .bouton.danger.plein, :root:not([data-theme="light"]) .conf[aria-pressed="true"], :root:not([data-theme="light"]) .puce-conf { color: #0e0e0d; }
 }
 :root[data-theme="dark"] .bouton.danger.plein, :root[data-theme="dark"] .conf[aria-pressed="true"], :root[data-theme="dark"] .puce-conf { color: #0e0e0d; }
+/* Logo, thème sombre : l'intérieur du sceau reste blanc (le disque seul, jusqu'au bord du cadre), avec l'or du thème
+   clair. Le disque prend la couleur de --sceau-fond, transparent sans elle (thème clair, rapport). */
+.sceau-fond { fill: var(--sceau-fond, none); }
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.nav-sceau, .verrou-sceau, .as-sceau, .ouverture-sceau) { --sceau-fond: #fff; color: #b48a4a; }
+}
+:root[data-theme="dark"] :is(.nav-sceau, .verrou-sceau, .as-sceau, .ouverture-sceau) { --sceau-fond: #fff; color: #b48a4a; }
 .tableau-defile[tabindex]:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
 
 /* ============================================================
