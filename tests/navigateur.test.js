@@ -285,12 +285,19 @@ async function budget(b, base) {
 
 /* 10. Logo : le lion à côté du nom (étoile) ; au clic, la séquence du sceau, puis l'accueil. */
 async function logo(b, base) {
+  // Icône : le médaillon d'or. Ronde (transparente autour) pour le navigateur et l'ordinateur ; plein cadre pour Android
+  // (masquable), le médaillon dans la zone sûre (cercle de rayon 204,8 sur 512) ; opaque pour l'iPhone.
   const icone = fs.readFileSync(path.join(RACINE, "icone.svg"), "utf8");
-  const vb = icone.match(/viewBox="([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+)"/);
-  const cote = vb ? +vb[3] : 0;
-  verifier("icône : le sceau remplit le carré", !!vb && cote > 440 && cote < 490 && +vb[1] > 10 && !/rx=/.test(icone) && !/translate\(28/.test(icone), vb && vb[0]);
+  verifier("icône : le médaillon d'or remplit le carré, transparent autour", /viewBox="0 0 512 512"/.test(icone) && !/plein-cadre/.test(icone)
+    && /scale\(1\.27/.test(icone) && /id="lion"/.test(icone) && /class="rebord"/.test(icone));
   const masque = fs.readFileSync(path.join(RACINE, "icones/icone-masquable.svg"), "utf8");
-  verifier("icône masquable : le sceau va jusqu'au bord utile", !/translate\(70/.test(masque) && !/scale\(0\.72/.test(masque) && /viewBox="-/.test(masque));
+  const rebord = masque.match(/class="rebord"[^>]*\sr="([\d.]+)"[^>]*stroke-width="([\d.]+)"/);
+  verifier("icône masquable : l'or jusqu'aux bords ; le médaillon dans la zone sûre d'Android", /class="plein-cadre"/.test(masque) && !!rebord
+    && +rebord[1] + rebord[2] / 2 <= 204.8 && +rebord[1] + rebord[2] / 2 >= 190, rebord && rebord.slice(1));
+  const typePng = f => fs.readFileSync(path.join(RACINE, f))[25];   // type de couleur PNG : 6 = avec transparence, 2 = opaque
+  verifier("icônes PNG : rondes avec transparence ; Android (masquable) et iPhone opaques",
+    typePng("icones/icone-512.png") === 6 && typePng("icones/icone-192.png") === 6 && typePng("icones/favicon-32.png") === 6
+    && typePng("icones/icone-masquable-512.png") === 2 && typePng("icones/apple-touch-icon.png") === 2);
   const { ctx, p, erreurs } = await ouvrir(b, base, { page: "budget" });
   verifier("en-tête : le lion seul", await p.evaluate(() => document.querySelector(".barre-haut .marque-ico use").getAttribute("href") === "#wm-lion"));
   verifier("nom : une étoile entre Wealth et Morand", await p.evaluate(() => !!document.querySelector("#wm-nom .etoile")));

@@ -372,7 +372,7 @@ HORLOGE=2027-03-15 node tests/navigateur.test.js   # toute la suite, comme à un
 | `js/demarrage.js` | Thème, écran d'ouverture et écran du verrou, avant l'affichage |
 | `tests/` | Tests des calculs et du navigateur |
 | `package.json`, `eslint.config.js`, `.github/` | Outils de vérification (rien à installer pour utiliser l'app) |
-| `manifest.webmanifest`, `sw.js`, `icone.svg`, `icones/` | Application installable (PWA), hors ligne |
+| `manifest.webmanifest`, `sw.js`, `icone.svg`, `icones/` | Application installable (PWA), hors ligne ; icône : le médaillon d'or (ronde et transparente autour ; plein cadre pour Android, le médaillon dans la zone sûre ; opaque pour l'iPhone) |
 | `polices/` | Inter et Newsreader (SIL Open Font License), hébergées ici |
 
 Aucune étape de construction. Publication : GitHub Pages, branche `main`,
