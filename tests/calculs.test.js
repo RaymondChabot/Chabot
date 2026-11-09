@@ -468,12 +468,14 @@ verifier("CNESST et IVAC : les 42 codes de l'annexe II à l'annexe XXIII, dont l
     proche(plan.parVuln, 0.2 * 8.25 + 0.05 * 13.35 + 0.05 * (8.95 + 35.60 / 10), 1e-9) && proche(plan.supervision, plan.acte + plan.nbVisites * plan.parVuln, 1e-9), plan.parVuln);
 }
 // Annexe II à l'annexe XXIII (Brochure no 1, 5 novembre 2026) : chaque code payé à 100 % au mixte est dans le répertoire ou
-// dans la liste CNESST de l'app, ou calculé par le moteur. Pas encore ajoutés : horaires défavorables (19100, 19101, 19893,
-// 19894), supervision de stages d'IPS (19923, 19924, 19926, 19927) et d'étudiantes sages-femmes (19907, 19908).
+// dans la liste CNESST de l'app, y compris ceux que le moteur calcule aussi (forfait GMF, suppléments à la prise en charge d'un
+// patient sans médecin de famille, forfait de formation des apprenants). Pas encore ajoutés : horaires défavorables (19100,
+// 19101, 19893, 19894), supervision de stages d'IPS (19923, 19924, 19926, 19927) et d'étudiantes sages-femmes (19907, 19908).
 {
   const Rep = require("../js/repertoire.js");
   const presents = new Set([...Rep.ACTES.flatMap(a => a.c), ...C.CNESST.map(f => f.code)]);
-  const annexe = ["15189", "19074", "15158", "00013", "00016", "15265", "15889", "15890", "09800", "09801", "09825", "09826", "00828", "00829",
+  const annexe = ["08875", "19911", "19912", "19914", "19915", "19917", "19918", "19920", "19921", "19957", "19958", "19959", "19960",
+    "15189", "19074", "15158", "00013", "00016", "15265", "15889", "15890", "09800", "09801", "09825", "09826", "00828", "00829",
     "09063", "09101", "09817", "08877", "15145", "15159", "15169", "15170",
     "09901", "09902", "09907", "09908", "09909", "09910", "09911", "09912", "09913", "09914", "09915", "09916", "09919", "09922", "09924", "09925",
     "09926", "09927", "09928", "09929", "09930", "09931", "09936", "09937", "09938", "09939", "09942", "09944", "09946", "09947", "09948", "09949",
@@ -572,6 +574,13 @@ verifier("supervision A/B : avec deux résidents et 10 visites, les visites l'em
     visites.every(([c, k]) => pareil(par(c).t, E[k])) && Rp.MED === C.RAMQ.pctMixte && Rp.TEMPS === C.RAMQ.pctSupervision
     && proche(par("42094").t, C.RAMQ.forfaitHoraireMixte, 1e-9) && proche(par("42096").t * 4, C.RAMQ.acteSupervision, 1e-9)
     && new Set(codes).size === codes.length && !C.CNESST.some(x => codes.includes(x.code)), visites.filter(([c, k]) => !pareil(par(c).t, E[k])));
+  // Forfait GMF, suppléments à la prise en charge d'un patient sans médecin de famille et demi-per diem : les montants du moteur
+  // (établissement, liste 1), payés à 100 % au mixte.
+  const M = C.MONTANTS_LIEU.etablissement, cent = [["08875", C.RAMQ.forfaitGmf], ["19957", M.suppNonVulnerable], ["19958", M.suppVulnerableHorsGuichet],
+    ["19959", M.suppVulnerableGuichet], ["19960", M.suppTresVulnerable]];
+  verifier("répertoire : le forfait GMF (08875), les suppléments 19957 à 19960 et le demi-per diem ont les montants du moteur, à 100 %",
+    cent.every(([c, v]) => proche(par(c).t, v, 1e-9) && par(c).p === 100) && pareil(par("19911").t, M.perDiem[1]) && par("19911").p === 100,
+    cent.filter(([c, v]) => !proche(par(c).t, v, 1e-9)));
 }
 const div40 = C.impotDividendes(40000);
 verifier("dividendes : le FSS de la première bande, 150 $, entre dans le total", proche(div40.fss, 150, 0.01) && proche(div40.total, div40.fed + div40.qc + 150, 1e-6) && proche(div40.total, 2363.52, 0.05), div40);

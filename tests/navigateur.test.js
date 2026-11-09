@@ -1541,7 +1541,16 @@ async function repertoireActes(b, base) {
   const code = await etat();
   verifier("répertoire : un code trouve son acte, avec le tarif et la part au mixte", code.compte === "1 acte" && code.titres[0].startsWith("Suivi, patient non vulnérable")
     && code.valeurs[0].replace(/\s/g, " ").includes("32,25 / 36,95 $") && code.valeurs[0].replace(/\s/g, " ").includes("au mixte 20,50 / 23,49 $"), code);
+  await p.fill("#rep-q", "08875");
+  const gmf = await etat();
+  verifier("répertoire : le forfait GMF (08875) : 9,35 $, payé à 100 %", gmf.compte === "1 acte" && gmf.titres[0].startsWith("Forfait de prise en charge et de suivi de la clientèle en GMF")
+    && gmf.valeurs[0].replace(/\s/g, " ").includes("9,35 $") && gmf.valeurs[0].includes("payé à 100 %"), gmf);
   await p.fill("#rep-q", "");
+  await p.click('#rep-groupes button[data-v="formulaires"]');
+  const form = await etat(), premierCnesst = form.titres.findIndex(t => t.startsWith("CNESST"));
+  verifier("répertoire : « Formulaires et suppléments » commence par le forfait GMF et les suppléments ; les 42 formulaires de la CNESST à la fin",
+    form.titres[0].startsWith("Forfait de prise en charge et de suivi") && form.titres.slice(1, 5).every(t => t.startsWith("Patient sans médecin de famille"))
+    && premierCnesst > 0 && form.titres.slice(premierCnesst).length === 42 && form.titres.slice(premierCnesst).every(t => t.startsWith("CNESST")), form.titres.slice(0, 6));
   await p.click('#rep-groupes button[data-v="non"]');
   const non = await etat();
   verifier("répertoire : le filtre « Non facturables à part » : la cryothérapie simple, compris dans la visite", non.titres.some(t => t.startsWith("Cryothérapie d'une lésion"))

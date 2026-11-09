@@ -26,7 +26,8 @@
     { g: "base", n: "Intervention de supervision, par période complète de 15 minutes", c: ["42096", "42097", "42098"], t: 24.87, p: TEMPS,
       k: "resident externe enseignement superviseur apprenant", note: "Au plus 3,5 h l'avant-midi (42096) et le soir (42098), 5 h l'après-midi (42097) ; un seul acte quel que soit le nombre d'apprenants." },
     { g: "base", n: "Activité académique, par période complète de 15 minutes", c: ["42099"], t: 24.87, p: TEMPS, k: "enseignement formation" },
-    { g: "base", n: "Demi-per diem du médecin enseignant (liste 1)", c: [], t: [41.45, 49.85], d: ["par résident", "par externe"], p: PLEIN, k: "ep 42 resident externe formation", note: "EP 42 ; liste 2 : 65,20 $ et 73,55 $." },
+    { g: "base", n: "Demi-per diem du médecin enseignant (liste 1)", c: ["19911", "19912", "19914", "19915", "19917", "19918", "19920", "19921"], t: [41.45, 49.85],
+      d: ["par résident", "par externe"], p: PLEIN, k: "ep 42 resident externe forfait de formation", note: "EP 42 ; liste 2 : 65,20 $ et 73,55 $." },
 
     // Visites (manuel, onglet B ; établissement).
     { g: "visites", n: "Suivi, patient non vulnérable de moins de 80 ans", c: ["15803", "15804"], t: [32.25, 36.95], p: MED, k: "visite rendez-vous" },
@@ -100,7 +101,19 @@
     { g: "techniques", n: "Incision et drainage d'un abcès sus-fascial", c: ["01005"], t: null, p: MED, k: "abces", note: "Montant absent du manuel imprimable du 28 octobre 2026." },
     { g: "techniques", n: "Excision d'une tumeur bénigne (naevus, lipome…), fermeture simple", c: ["01164", "01165"], t: null, p: MED, k: "kyste grain de beaute lipome", note: "Montant absent du manuel imprimable du 28 octobre 2026." },
 
-    // Formulaires et suppléments (les formulaires de la CNESST viennent du moteur : Calc.CNESST).
+    // Formulaires et suppléments (les formulaires de la CNESST viennent du moteur : Calc.CNESST ; à la fin du groupe).
+    // Forfait GMF et suppléments à la prise en charge d'un patient sans médecin de famille : payés à 100 % au mixte (annexe II
+    // à l'annexe XXIII) ; les montants du moteur (Calc.RAMQ.forfaitGmf ; Calc.MONTANTS_LIEU, établissement).
+    { g: "formulaires", n: "Forfait de prise en charge et de suivi de la clientèle en GMF", c: ["08875"], t: 9.35, p: PLEIN, k: "gmf forfait inscrit annuel",
+      note: "Une fois par année civile, à la première visite de l'année d'un patient inscrit ; médecin membre d'un GMF, GMF-U compris (EP 33, annexe V)." },
+    { g: "formulaires", n: "Patient sans médecin de famille : supplément, non vulnérable", c: ["19957"], t: 19.55, p: PLEIN, k: "inscription nouveau patient orphelin prise en charge guichet gamf",
+      note: "Au premier examen ou à la première visite de la prise en charge, guichet d'accès ou non (EP 40, par. 4.12)." },
+    { g: "formulaires", n: "Patient sans médecin de famille : supplément, vulnérable, hors guichet", c: ["19958"], t: 60.15, p: PLEIN, k: "inscription nouveau patient orphelin prise en charge",
+      note: "Au premier examen ou à la première visite de la prise en charge (EP 40, par. 4.12)." },
+    { g: "formulaires", n: "Patient sans médecin de famille : supplément, vulnérable, du guichet", c: ["19959"], t: 128.90, p: PLEIN, k: "inscription nouveau patient orphelin prise en charge guichet gamf transfert bloc",
+      note: "Patient attribué par le guichet d'accès ou par un transfert en bloc (EP 40, par. 4.12 ; lettre d'entente no 304)." },
+    { g: "formulaires", n: "Patient sans médecin de famille : supplément, très vulnérable, du guichet", c: ["19960"], t: 257.80, p: PLEIN, k: "inscription nouveau patient orphelin prise en charge guichet gamf transfert bloc",
+      note: "Patient attribué par le guichet d'accès ou par un transfert en bloc (EP 40, par. 13.01 ; lettre d'entente no 304)." },
     { g: "formulaires", n: "Forfait de responsabilité, patient vulnérable inscrit", c: ["15169", "15170"], t: 8.25, p: PLEIN, k: "vulnerable supplement",
       note: "Avec l'intervention de supervision, ou avec une intervention clinique ou une psychothérapie (annexe II à l'annexe XXIII)." },
     { g: "formulaires", n: "Supplément à l'examen périodique d'un enfant de 0 à 5 ans", c: ["08877"], t: 13.35, p: PLEIN, k: "enfant pediatrique", note: "Avec l'intervention de supervision, ou avec une intervention clinique." },

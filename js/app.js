@@ -1515,9 +1515,10 @@ window.Verrou.quandOuvert(function () {
   function actesRepertoire() {
     if (REP.actes) return REP.actes;
     const Rp = window.Repertoire, noms = Object.fromEntries(Rp.GROUPES);
-    // Les formulaires de la CNESST viennent du moteur (un seul endroit pour leurs tarifs) ; en tête de leur groupe.
+    /* Les formulaires de la CNESST viennent du moteur (un seul endroit pour leurs tarifs) ; à la fin de leur groupe :
+       ils sont 42, et le forfait GMF et les suppléments, facturés plus souvent, passent avant. */
     const cnesst = C.CNESST.map(x => ({ g: "formulaires", n: `CNESST : ${x.nom.charAt(0).toLowerCase()}${x.nom.slice(1)}`, c: [x.code], t: x.tarif, p: Rp.PLEIN, k: "cnesst travail accident ivac formulaire" }));
-    const i = Rp.ACTES.findIndex(a => a.g === "formulaires");
+    const i = Rp.ACTES.findIndex(a => a.g === "non");
     const liste = [...Rp.ACTES.slice(0, i), ...cnesst, ...Rp.ACTES.slice(i)];
     REP.actes = liste.map((a, rang) => ({ ...a, rang, texte: sansAccents([a.n, a.c.join(" "), a.k || "", noms[a.g], a.note || ""].join(" ")) }));
     return REP.actes;

@@ -200,8 +200,10 @@ côte à côte (ci-dessus). Les anciennes adresses `#revenu/actes` et
   apprenants. « Répertoire des actes » (Comparer, onglet Actes) : les actes d'un médecin
   en GMF-U au mixte, avec le tarif de la RAMQ et la part reçue au mixte, une recherche par
   code ou par mot et des filtres par groupe. Il couvre les suppléments payés à 100 % au mixte (annexe II à
-  l'annexe XXIII, Brochure no 1) : constatation et bulletin de décès, réanimation cardio-respiratoire, congé en
-  établissement, perte d'autonomie, sécurité du revenu, curateur public, CNESST et IVAC ; l'AH-509 (09817) et la
+  l'annexe XXIII, Brochure no 1) : forfait GMF (08875), suppléments à la prise en charge d'un patient sans médecin
+  de famille (19957 à 19960), forfait de formation des apprenants (demi-per diem, huit codes de 19911 à 19921), constatation
+  et bulletin de décès, réanimation cardio-respiratoire, congé en établissement, perte d'autonomie, sécurité du
+  revenu, curateur public, CNESST et IVAC (à la fin de leur groupe) ; l'AH-509 (09817) et la
   prise en charge temporaire d'une cliente enceinte (15189, 19074) y sont, montant « à confirmer » (absent des
   documents consultés). Pas encore : horaires défavorables (clinique réseau, GMF-réseau), supervision de stages
   d'IPS et d'étudiantes sages-femmes. « Comparaison demi-journée » (onglet de l'Aperçu, onglet
