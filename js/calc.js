@@ -415,10 +415,13 @@
       visites: (visitesMixte + visitesSrv + (visitesApprenants ? visitesAppr + visitesPendant : 0)) * maj * m("pctMixte") / 100,
       // Avec l'intervention : l'acte, plus, à 100 %, les suppléments de l'annexe II à l'annexe XXIII permis durant la période
       // visée (Brochure no 1, version en vigueur au 5 novembre 2026) : forfait de responsabilité des patients vulnérables
-      // inscrits (15169, 15170), supplément à l'examen périodique d'un enfant de 0 à 5 ans (08877) et au suivi de grossesse (15145).
+      // inscrits (15169, 15170), supplément à l'examen périodique d'un enfant de 0 à 5 ans (08877), au suivi de grossesse (15145)
+      // et au premier examen de grossesse au 1er trimestre (15159, une fois par grossesse). La prise en charge temporaire d'une
+      // cliente enceinte (15189, 19074) aussi, mais son montant n'est pas dans les documents consultés : elle n'est pas comptée.
       supervision: visitesApprenants ? 0 : W * T * heuresSup * m("acteSupervision") * maj * m("pctSupervision") / 100
         + W * T * (apprenants + pendant) * ((partVisite(r.mix, "suiviV") + partVisite(r.mix, "perioV")) * m("forfaitResponsabilite")
-          + partVisite(r.mix, "pedia") * m("suppExamenEnfant") + partVisite(r.mix, "gross") * m("suppSuiviGrossesse")) * maj,
+          + partVisite(r.mix, "pedia") * m("suppExamenEnfant")
+          + partVisite(r.mix, "gross") * (m("suppSuiviGrossesse") + m("suppGrossessePremierTrimestre") / VISITES_PAR_GROSSESSE)) * maj,
       ...base,
     };
     mixte.total = mixte.forfaitHoraire + mixte.visites + mixte.supervision + commun;
@@ -527,6 +530,36 @@
     { code: "15795", nom: "IVAC : évaluation médicale", tarif: 27.57 },
     { code: "15796", nom: "IVAC : rapport médical", tarif: 26.96 },
     { code: "15797", nom: "IVAC : rapport final", tarif: 31.86 },
+    // Les autres services médico-administratifs de l'annexe II à l'annexe XXIII (Brochure no 1, version en vigueur
+    // au 5 novembre 2026), payés à 100 % au mixte ; tarifs au 1er avril 2025 (manuel des médecins omnipraticiens,
+    // onglet B, version imprimable du 28 octobre 2026). Plus rares : médecin désigné, Bureau d'évaluation médicale.
+    { code: "09910", nom: "Rapport de consultation motivé, à la demande du médecin qui a charge", tarif: 183.82 },
+    { code: "09914", nom: "Bilan médical : considération pour complexité, niveau 1", tarif: 36.96 },
+    { code: "09915", nom: "Bilan médical : considération pour complexité, niveau 2", tarif: 73.53 },
+    { code: "09916", nom: "Bilan médical : considération pour complexité, niveau 3", tarif: 110.29 },
+    { code: "09901", nom: "Supplément en neurologie, neurochirurgie ou toxicologie (rapport d'évaluation médicale)", tarif: 140.93 },
+    { code: "09978", nom: "Médecin désigné : examen et rapport d'évaluation médicale", tarif: 1003.44 },
+    { code: "09902", nom: "Supplément en neurologie, neurochirurgie ou toxicologie (médecin désigné)", tarif: 140.93 },
+    { code: "09946", nom: "Médecin désigné, en urgence (un à cinq jours) : examen et rapport d'évaluation médicale", tarif: 1223.37 },
+    { code: "09980", nom: "Supplément en neurologie, neurochirurgie ou toxicologie (évaluation en urgence)", tarif: 140.93 },
+    { code: "09977", nom: "Supplément : avis rendu en cabinet privé", tarif: 122.54 },
+    { code: "09947", nom: "Évaluation médicale : considération pour complexité, niveau 1", tarif: 116.42 },
+    { code: "09948", nom: "Évaluation médicale : considération pour complexité, niveau 2", tarif: 177.69 },
+    { code: "09949", nom: "Évaluation médicale : considération pour complexité, niveau 3", tarif: 208.32 },
+    { code: "09938", nom: "Bureau d'évaluation médicale : avis au vu du dossier", tarif: 549.83 },
+    { code: "09939", nom: "Bureau d'évaluation médicale : avis après examen du travailleur", tarif: 1003.44 },
+    { code: "09936", nom: "Bureau d'évaluation médicale : participation à l'avis commun", tarif: 804.13 },
+    { code: "09937", nom: "Bureau d'évaluation médicale : rédaction de l'avis commun (en plus)", tarif: 103.09 },
+    { code: "09919", nom: "Supplément : tests audiologiques en cabinet privé", tarif: 104.16 },
+    { code: "09973", nom: "Certificat en cas d'exposition à un contaminant", tarif: 85.78 },
+    { code: "09942", nom: "Étude de dossier et rapport à la Commission, par médecin", tarif: 549.83 },
+    { code: "09911", nom: "Étude de dossier : considération pour complexité, niveau 1", tarif: 73.53 },
+    { code: "09912", nom: "Étude de dossier : considération pour complexité, niveau 2", tarif: 104.16 },
+    { code: "09913", nom: "Étude de dossier : considération pour complexité, niveau 3", tarif: 134.80 },
+    { code: "09954", nom: "Certificat médical du plongeur professionnel", tarif: 134.80 },
+    { code: "09924", nom: "Avis supplémentaire à la Commission", tarif: 158.08 },
+    { code: "09925", nom: "Avis supplémentaire : plus de 15 pages de nouveaux documents, ou relecture du dossier", tarif: 295.53 },
+    { code: "09931", nom: "Considération de très grande complexité", tarif: 336.99 },
   ];
   // Montants d'un lieu, avec ceux que la personne a changés (o.montants), et la majoration du territoire.
   const baseActes = o => {
@@ -554,10 +587,16 @@
     const resid = Math.max(0, +o.residents || 0), ext = Math.max(0, +o.externes || 0);
     const nbVisites = resid * Math.max(0, o.patientsParResident ?? 4.5) + ext * Math.max(0, o.patientsParExterne ?? 2.5) + Math.max(0, +o.pendant || 0);
     const parVisite = Math.max(0, +o.tarifMoyen || 0) * maj * D.pctMixte / 100;
-    // Avec l'intervention : le forfait de responsabilité des patients vulnérables examinés (part des visites, pctVuln).
-    const parVuln = borne((+o.pctVuln || 0) / 100, 0, 1) * D.forfaitResponsabilite * maj;
-    const acte = heures * D.acteSupervision * maj * D.pctSupervision / 100, responsabilite = nbVisites * parVuln, supervision = acte + responsabilite, visites = nbVisites * parVisite;
-    return { heures, nbVisites, parVisite, acte, responsabilite, supervision, visites, ecart: visites - supervision, meilleur: visites > supervision + 0.005 ? "visites" : "acte",
+    // Avec l'intervention, à 100 % (annexe II à l'annexe XXIII) : le forfait de responsabilité des patients vulnérables examinés
+    // (part des visites, pctVuln), et les suppléments à l'examen périodique d'un enfant de 0 à 5 ans et au suivi de grossesse
+    // (part des visites, partEnfants et partGrossesse), avec celui du premier examen au 1er trimestre, une fois par grossesse.
+    const pE = borne(+o.partEnfants || 0, 0, 1), pG = borne(+o.partGrossesse || 0, 0, 1);
+    const parResp = borne((+o.pctVuln || 0) / 100, 0, 1) * D.forfaitResponsabilite * maj;
+    const parSupp = (pE * D.suppExamenEnfant + pG * (D.suppSuiviGrossesse + D.suppGrossessePremierTrimestre / VISITES_PAR_GROSSESSE)) * maj;
+    const parVuln = parResp + parSupp;
+    const acte = heures * D.acteSupervision * maj * D.pctSupervision / 100, responsabilite = nbVisites * parResp, supplements = nbVisites * parSupp;
+    const supervision = acte + responsabilite + supplements, visites = nbVisites * parVisite;
+    return { heures, nbVisites, parVisite, acte, responsabilite, supplements, supervision, visites, ecart: visites - supervision, meilleur: visites > supervision + 0.005 ? "visites" : "acte",
       parVuln, seuil: parVisite > parVuln ? acte / (parVisite - parVuln) : null, forfait: H * D.forfaitHoraireMixte * maj, perDiem: (resid * D.perDiemResident + ext * D.perDiemExterne) * maj };
   }
   /* Une demi-journée de supervision au mixte, en GMF-U, à comparer à une autre : forfait horaire, demi-per diem des
@@ -569,6 +608,10 @@
     const { palier, T, D, maj } = baseActes(o), n = (x, max) => Math.min(max, Math.max(0, Math.round(+x || 0)));
     const H = Math.min(12, Math.max(0, +o.heuresParDJ || 0)), heures = Math.min(H, o.apresMidi ? SUPERVISION_MAX_APRES_MIDI : D.supervisionMaxH);
     const resid = n(o.residents, 20), ext = n(o.externes, 20), pec = n(o.pec, 60), suivi = n(o.suivi, 60), v = borne((+o.pctVuln || 0) / 100, 0, 1);
+    // Parmi les suivis : examens périodiques d'enfants de 0 à 5 ans, suivis de grossesse, et, parmi ceux-ci, premières visites
+    // au 1er trimestre. Au mixte, leurs suppléments sont compris dans le tarif des visites ; avec l'intervention, ils se
+    // facturent à 100 % (annexe II à l'annexe XXIII : 08877, 15145, 15159).
+    const enfants = Math.min(n(o.enfants, 60), suivi), grossesse = Math.min(n(o.grossesse, 60), suivi - enfants), trimestre = Math.min(n(o.trimestre, 60), grossesse);
     const tarif = (a, b) => ((1 - v) * (+T[a][palier] || 0) + v * (+T[b][palier] || 0)) * maj;
     const tarifPec = tarif("pecNonVuln", "pecVuln"), tarifSuivi = tarif("suivi", "suiviV"), pct = D.pctMixte / 100;
     const forfait = H * D.forfaitHoraireMixte * maj, perDiem = (resid * D.perDiemResident + ext * D.perDiemExterne) * maj;
@@ -577,12 +620,15 @@
     // qu'elle couvre se facture en plus, à 100 % (annexe II à l'annexe XXIII, Brochure no 1 en vigueur au 5 novembre 2026 ;
     // EP 40, par. 6.02) ; avec les visites, il est compris dans le tarif des visites de patients vulnérables.
     const vulnerables = (pec + suivi) * v, responsabilite = vulnerables * D.forfaitResponsabilite * maj;
-    const visitesPec = pec * tarifPec * pct, visitesSuivi = suivi * tarifSuivi * pct, visites = visitesPec + visitesSuivi;
-    const avecIntervention = intervention + responsabilite;
+    const tarifEnfant = (+T.pedia[palier] || 0) * maj, tarifGrossesse = (+T.gross[palier] || 0) * maj;
+    const visitesPec = pec * tarifPec * pct, visitesSuivi = ((suivi - enfants - grossesse) * tarifSuivi + enfants * tarifEnfant + grossesse * tarifGrossesse) * pct;
+    const visites = visitesPec + visitesSuivi;
+    const supplements = (enfants * D.suppExamenEnfant + grossesse * D.suppSuiviGrossesse + trimestre * D.suppGrossessePremierTrimestre) * maj;
+    const avecIntervention = intervention + responsabilite + supplements;
     const meilleur = visites > avecIntervention + 0.005 ? "visites" : "acte";
     const choisi = o.facturation === "acte" || o.facturation === "visites" ? o.facturation : meilleur;
     const facture = choisi === "visites" ? visites : avecIntervention, total = forfait + perDiem + facture;
-    return { H, heures, residents: resid, externes: ext, pec, suivi, tarifPec, tarifSuivi, forfait, perDiem, intervention, vulnerables, responsabilite,
+    return { H, heures, residents: resid, externes: ext, pec, suivi, enfants, grossesse, trimestre, tarifPec, tarifSuivi, tarifEnfant, tarifGrossesse, forfait, perDiem, intervention, vulnerables, responsabilite, supplements,
       visitesPec, visitesSuivi, visites, meilleur, choisi, facture, total, parHeure: H > 0 ? total / H : null };
   }
   // Une demi-journée de votre choix : les actes et les formulaires comptés, au taux horaire, au mixte et à l'acte,

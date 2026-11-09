@@ -1483,6 +1483,15 @@ async function superviseurAB(b, base) {
   await p.click("#sab-plan"); await p.waitForTimeout(250);
   const v3 = await lire();
   verifier("supervision : « Selon mon plan » repart du plan", v3.garde === null && v3.valeurs["sab-suivi"] === "6" && !v3.plan, v3.garde);
+  // Parmi les suivis : des enfants de 0 à 5 ans et des grossesses, dont une première visite au 1er trimestre. Avec
+  // l'intervention, leurs suppléments s'ajoutent à 100 % (annexe II à l'annexe XXIII) : 2 × 13,35 $ + 8,95 $ + 35,60 $.
+  const tri0 = await p.evaluate(() => document.getElementById("sab-trimestre-plus").disabled);
+  for (const id of ["sab-enfants-plus", "sab-enfants-plus", "sab-grossesse-plus", "sab-trimestre-plus"]) { await p.click("#" + id); await p.waitForTimeout(120); }
+  const v5 = await lire(), supp = await p.evaluate(() => [...document.querySelectorAll("#sab-table tr")].filter(tr => /Supplément/.test(tr.textContent)).map(tr => tr.children[1].textContent.replace(/\s/g, "")));
+  const montant = t => +t.replace(/[^\d]/g, "");
+  verifier("supervision : enfants et grossesses parmi les suivis, leurs suppléments ajoutés à l'intervention ; pas de 1re visite sans grossesse",
+    tri0 && v5.valeurs["sab-enfants"] === "2" && v5.valeurs["sab-grossesse"] === "1" && v5.valeurs["sab-trimestre"] === "1"
+    && supp.join() === "26,70$,8,95$,35,60$" && Math.abs(montant(v5.totaux[0]) - montant(v3.totaux[0]) - 71) <= 1 && !v5.debord, { tri0, supp, v5: v5.totaux, v3: v3.totaux });
   await remplacer(p, { "revenu.supervisionDJ": { heures: 99, residents: 999, externes: -4, pec: "x", suivi: 3, vuln: 250, moment: "nuit" } });
   await allerA(p, "comparer/demijournee");
   const v4 = await lire();

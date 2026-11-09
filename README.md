@@ -179,7 +179,7 @@ plan) au taux horaire, au mixte et à l'acte. **Actes** : le répertoire ;
 repliés, ce que rapporte chaque acte à l'acte et au mixte, et à l'heure
 selon la durée que vous choisissez (cabinet ou établissement, moins de 500
 ou 500 inscrits et plus), et les formulaires de la CNESST et de l'IVAC
-(annexe XIII), payés à 100 % dans tous les modes. **Offres** : deux offres
+(annexe XIII : les 42 codes de l'annexe II à l'annexe XXIII), payés à 100 % dans tous les modes. **Offres** : deux offres
 côte à côte (ci-dessus). Les anciennes adresses `#revenu/actes` et
 `#revenu/supervision` mènent aux onglets Actes et Demi-journée.
 
@@ -199,13 +199,20 @@ côte à côte (ci-dessus). Les anciennes adresses `#revenu/actes` et
   supervision ou visites des apprenants ; à l'acte, visites des
   apprenants. « Répertoire des actes » (Comparer, onglet Actes) : les actes d'un médecin
   en GMF-U au mixte, avec le tarif de la RAMQ et la part reçue au mixte, une recherche par
-  code ou par mot et des filtres par groupe. « Comparaison demi-journée » (onglet de l'Aperçu, onglet
+  code ou par mot et des filtres par groupe. Il couvre les suppléments payés à 100 % au mixte (annexe II à
+  l'annexe XXIII, Brochure no 1) : constatation et bulletin de décès, réanimation cardio-respiratoire, congé en
+  établissement, perte d'autonomie, sécurité du revenu, curateur public, CNESST et IVAC ; l'AH-509 (09817) et la
+  prise en charge temporaire d'une cliente enceinte (15189, 19074) y sont, montant « à confirmer » (absent des
+  documents consultés). Pas encore : horaires défavorables (clinique réseau, GMF-réseau), supervision de stages
+  d'IPS et d'étudiantes sages-femmes. « Comparaison demi-journée » (onglet de l'Aperçu, onglet
   Demi-journée de Comparer, et carte du résumé de Comparer, pour toute pratique : hors GMF-U, aux tarifs
   d'établissement du GMF-U) : une demi-journée à régler (résidents,
-  externes, visites de prise en charge et de suivi, part de patients
-  vulnérables, moment et durée), et côte à côte ce qu'elle rapporte au
-  mixte avec l'intervention de supervision (plus le forfait de responsabilité
-  de chaque patient vulnérable examiné, EP 40, par. 6.02) et avec les visites. Taux horaire plafonné à 1 540 heures par année à 100 %
+  externes, visites de prise en charge et de suivi, dont examens d'enfants de 0 à 5 ans, suivis de grossesse
+  et premières visites au 1er trimestre, part de patients vulnérables, moment et durée), et côte à côte ce
+  qu'elle rapporte au mixte avec l'intervention de supervision (plus, à 100 %, le forfait de responsabilité
+  de chaque patient vulnérable examiné et les suppléments 08877, 15145 et 15159 : annexe II à l'annexe XXIII)
+  et avec les visites. Le calcul de l'année et le seuil « visites plutôt que la supervision » comptent les
+  mêmes suppléments, selon la répartition des visites du plan. Taux horaire plafonné à 1 540 heures par année à 100 %
   (dépassement autorisé modifiable). Montants liés au volume de patients
   et majoration de la pratique polyvalente sur les activités en
   établissement. Tous les tarifs, forfaits et suppléments se modifient ;

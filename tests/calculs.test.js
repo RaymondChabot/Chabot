@@ -178,9 +178,10 @@ verifier("très vulnérables : forfait annuel propre", proche(gtv.acte.forfaitVu
 const gsup = C.revenuGmfu({ ...rev, supervisionFacturation: "visites", residents: 1, externes: 1 });
 verifier("apprenants : 4,5 + 2,5 visites par demi-journée d'enseignement", proche(gsup.visitesApprenants, 46 * 3 * 7, 1e-9) && gsup.mixte.supervision === 0 && gsup.mixte.visites > g.mixte.visites);
 // Avec l'intervention, le forfait de responsabilité (8,25 $ en établissement) de chaque patient vulnérable examiné : 20 % des visites ici.
-// Plus, à 100 % (annexe II à l'annexe XXIII) : 13,35 $ par examen périodique d'un enfant (5 %) et 8,95 $ par suivi de grossesse (5 %).
+// Plus, à 100 % (annexe II à l'annexe XXIII) : 13,35 $ par examen périodique d'un enfant (5 %), 8,95 $ par suivi de grossesse (5 %)
+// et 35,60 $ au premier examen de grossesse au 1er trimestre, une fois par grossesse (10 visites).
 verifier("apprenants : au mixte, intervention de supervision par défaut, avec les suppléments de l'annexe II (vulnérables, enfants, grossesse)",
-  proche(g.mixte.visites, g0.mixte.visites, 1e-6) && proche(g.mixte.supervision, 46 * 3 * 3.5 * 99.48 * 0.6215 + 46 * 3 * 4.5 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95), 0.01));
+  proche(g.mixte.visites, g0.mixte.visites, 1e-6) && proche(g.mixte.supervision, 46 * 3 * 3.5 * 99.48 * 0.6215 + 46 * 3 * 4.5 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95 + 0.05 * 35.60 / 10), 0.01));
 const gsrv = C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 12, pctSrvComplexe: 50 });
 verifier("SRV : patient payé moins qu'une visite de rendez-vous", gsrv.tarifMoyenSrv < gsrv.tarifMoyenRdv && gsrv.tarifMoyenSrv > 0);
 verifier("SRV : visites ponctuelles à l'acte, sans supplément", proche(gsrv.acte.total - C.revenuGmfu({ ...rev, demiJourneesSRV: 1, patientsSRV: 0 }).acte.total, 46 * 12 * (0.5 * 17.70 + 0.5 * 35.40), 0.5) && gsrv.acte.supplementsSRV === undefined);
@@ -418,8 +419,8 @@ verifier("supervision : les patients vus pendant le bloc ne se facturent pas ave
   && sup({ patientsPendantSupervision: 3, supervisionFacturation: "visites" }).mixte.visites > sup({ supervisionFacturation: "visites" }).mixte.visites
   && sup({ patientsPendantSupervision: 3 }).acte.visites > sup().acte.visites);
 verifier("supervision : 3,5 h l'avant-midi, jusqu'à 5 h l'après-midi (2 473,07 $ de plus pour 80 demi-journées de 4 h)",
-  proche(sup().mixte.supervision, 40 * 2 * 3.5 * 99.48 * 0.6215 + 40 * 2 * 4.5 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95), 1e-6) && proche(sup({ enseignementApresMidi: 2 }).mixte.supervision - sup().mixte.supervision, 2473.07, 0.01)
-  && proche(sup({ enseignementApresMidi: 1 }).mixte.supervision, 40 * (3.5 + 4) * 99.48 * 0.6215 + 40 * 2 * 4.5 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95), 1e-6));
+  proche(sup().mixte.supervision, 40 * 2 * 3.5 * 99.48 * 0.6215 + 40 * 2 * 4.5 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95 + 0.05 * 35.60 / 10), 1e-6) && proche(sup({ enseignementApresMidi: 2 }).mixte.supervision - sup().mixte.supervision, 2473.07, 0.01)
+  && proche(sup({ enseignementApresMidi: 1 }).mixte.supervision, 40 * (3.5 + 4) * 99.48 * 0.6215 + 40 * 2 * 4.5 * (0.20 * 8.25 + 0.05 * 13.35 + 0.05 * 8.95 + 0.05 * 35.60 / 10), 1e-6));
 const dme = o => C.compensationCabinet({ patientsParDJ: 0, membreGmf: false, annee: "type", ...o }, 40, 8, 600).dme;
 verifier("DMÉ : hors GMF, licences et équipements ; le lien Internet et le commutateur (19977) seulement si réclamé", proche(dme({}), 4 * (459.90 + 287.45), 1e-6)
   && proche(dme({ dmeInternet: true }), 4 * (459.90 + 287.45 + 700.35), 1e-6) && proche(dme({ dmeInternet: true, membreGmf: true }), 4 * 459.90, 1e-6));
@@ -447,7 +448,42 @@ const dj28f = C.demiJourneeActes({ lieu: "cabinet", palier: 1, heuresParDJ: 4, n
 verifier("ma demi-journée : les frais de cabinet à l'acte seulement, sauf si la clinique les exige partout", proche(dj28f.acte.net, 8 * 49.15 * 0.7, 1e-9)
   && dj28f.mixte.net === dj28f.mixte.brut && proche(C.demiJourneeActes({ lieu: "cabinet", heuresParDJ: 4, nombres: { suivi: 8 }, fraisCabinetPct: 30, fraisTousModes: true }).mixte.net,
     C.demiJourneeActes({ lieu: "cabinet", heuresParDJ: 4, nombres: { suivi: 8 } }).mixte.brut * 0.7, 1e-9));
-verifier("CNESST : 15 formulaires, dont l'attestation (27,57 $) et le REM (520,81 $)", C.CNESST.length === 15 && C.CNESST[0].tarif === 27.57 && C.CNESST.find(f => f.code === "09944").tarif === 520.81);
+verifier("CNESST et IVAC : les 42 codes de l'annexe II à l'annexe XXIII, dont l'attestation (27,57 $) et le REM (520,81 $)", C.CNESST.length === 42 && new Set(C.CNESST.map(f => f.code)).size === 42 && C.CNESST[0].tarif === 27.57 && C.CNESST.find(f => f.code === "09944").tarif === 520.81);
+
+// Supervision au mixte (GMF-U, établissement, 500 inscrits et plus) : parmi les suivis des apprenants, des examens d'enfants
+// de 0 à 5 ans, des suivis de grossesse et des premières visites au 1er trimestre. Avec l'intervention, leurs suppléments
+// à 100 % (annexe II à l'annexe XXIII) : 13,35 $, 8,95 $ et 35,60 $ ; avec les visites, leur tarif (57,00 $ et 42,85 $) à 63,58 %.
+{
+  const o = { lieu: "etablissement", palier: 1, heuresParDJ: 3.5, residents: 1, pec: 0, suivi: 6, pctVuln: 0 };
+  const sans = C.demiJourneeSupervision(o), avec = C.demiJourneeSupervision({ ...o, enfants: 2, grossesse: 1, trimestre: 1 });
+  verifier("supervision : enfants et grossesses, leurs suppléments avec l'intervention (2 × 13,35 + 8,95 + 35,60 = 71,25 $)",
+    proche(avec.supplements, 71.25, 1e-9) && proche(avec.facture - sans.facture, 71.25, 1e-9) && avec.choisi === "acte", { supplements: avec.supplements });
+  verifier("supervision : avec les visites, chaque visite à son tarif (3 suivis, 2 enfants à 57,00 $, 1 grossesse à 42,85 $)",
+    proche(avec.visitesSuivi, (3 * 36.95 + 2 * 57.00 + 42.85) * 0.6358, 1e-9), avec.visitesSuivi);
+  const borne = C.demiJourneeSupervision({ ...o, enfants: 9, grossesse: 9, trimestre: 9 });
+  verifier("supervision : enfants et grossesses ramenés au nombre de suivis ; premières visites, au nombre de grossesses",
+    borne.enfants === 6 && borne.grossesse === 0 && borne.trimestre === 0, { e: borne.enfants, g: borne.grossesse, t: borne.trimestre });
+  const plan = C.supervisionOuVisites({ lieu: "etablissement", palier: 1, heuresParDJ: 3.5, residents: 1, tarifMoyen: 40, pctVuln: 20, partEnfants: 0.05, partGrossesse: 0.05 });
+  verifier("seuil de la supervision : selon le plan, les suppléments d'enfants et de grossesse comptent aussi",
+    proche(plan.parVuln, 0.2 * 8.25 + 0.05 * 13.35 + 0.05 * (8.95 + 35.60 / 10), 1e-9) && proche(plan.supervision, plan.acte + plan.nbVisites * plan.parVuln, 1e-9), plan.parVuln);
+}
+// Annexe II à l'annexe XXIII (Brochure no 1, 5 novembre 2026) : chaque code payé à 100 % au mixte est dans le répertoire ou
+// dans la liste CNESST de l'app, ou calculé par le moteur. Pas encore ajoutés : horaires défavorables (19100, 19101, 19893,
+// 19894), supervision de stages d'IPS (19923, 19924, 19926, 19927) et d'étudiantes sages-femmes (19907, 19908).
+{
+  const Rep = require("../js/repertoire.js");
+  const presents = new Set([...Rep.ACTES.flatMap(a => a.c), ...C.CNESST.map(f => f.code)]);
+  const annexe = ["15189", "19074", "15158", "00013", "00016", "15265", "15889", "15890", "09800", "09801", "09825", "09826", "00828", "00829",
+    "09063", "09101", "09817", "08877", "15145", "15159", "15169", "15170",
+    "09901", "09902", "09907", "09908", "09909", "09910", "09911", "09912", "09913", "09914", "09915", "09916", "09919", "09922", "09924", "09925",
+    "09926", "09927", "09928", "09929", "09930", "09931", "09936", "09937", "09938", "09939", "09942", "09944", "09946", "09947", "09948", "09949",
+    "09954", "09970", "09971", "09973", "09977", "09978", "09980", "15795", "15796", "15797"];
+  const manquants = annexe.filter(c => !presents.has(c));
+  verifier("annexe II à l'annexe XXIII : chaque code est dans le répertoire ou la liste CNESST", manquants.length === 0, manquants);
+  const sansMontant = Rep.ACTES.filter(a => a.t == null && a.p === 100).map(a => a.c.join("/"));
+  verifier("annexe II : sans montant dans les documents consultés, seulement l'AH-509 et la grossesse prise en charge temporairement",
+    sansMontant.join() === "09817,15189/19074", sansMontant);
+}
 
 /* 25. CELIAPP (ARC, « Cotiser à un CELIAPP », 31 octobre 2026) : droits de 8 000 $ par année, plus le report des droits
    inutilisés de l'année d'avant (au plus 8 000 $), et 40 000 $ à vie. Versements par mois dans la projection. */

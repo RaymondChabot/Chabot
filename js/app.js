@@ -1380,13 +1380,16 @@ window.Verrou.quandOuvert(function () {
      supervision et avec les visites facturées. Au départ, la demi-journée d'enseignement du plan ; les valeurs restent
      dès qu'on en change une, et « Selon mon plan » repart du plan. */
   const SDJ_CHAMPS = [["residents", "Résidents", 0, 6, 1], ["externes", "Externes", 0, 6, 1], ["pec", "Visites de prise en charge", 0, 30, 1],
-    ["suivi", "Visites de suivi", 0, 40, 1], ["vuln", "Patients vulnérables", 0, 100, 5]];
+    ["suivi", "Visites de suivi", 0, 40, 1], ["enfants", "Dont examens d'enfants de 0 à 5 ans", 0, 40, 1], ["grossesse", "Dont suivis de grossesse", 0, 40, 1],
+    ["trimestre", "Dont 1res visites de grossesse, 1er trimestre", 0, 40, 1], ["vuln", "Patients vulnérables", 0, 100, 5]];
   function supervisionDepart() {
     const r = S.revenu, T = Math.min(+r.enseignement || 0, +r.demiJournees || 0), pm = T > 0 && (+r.enseignementApresMidi || 0) >= T;
     const resid = Math.max(1, Math.round(+r.residents || 0)), ext = Math.max(0, Math.round(+r.externes || 0));
     const visites = Math.round(resid * (+(r.patientsParResident ?? 4.5) || 0) + ext * (+(r.patientsParExterne ?? 2.5) || 0) + Math.max(0, +r.patientsPendantSupervision || 0));
+    const suivi = Math.min(40, Math.max(0, visites - 1)), P = partsPlan();
+    const enfants = Math.min(suivi, Math.round(suivi * P.enfants)), grossesse = Math.min(suivi - enfants, Math.round(suivi * P.grossesse));
     return { heures: Math.min(8, Math.max(1, +r.heuresParDJ || 3.5)), residents: Math.min(6, resid), externes: Math.min(6, ext), pec: visites > 0 ? 1 : 0,
-      suivi: Math.min(40, Math.max(0, visites - 1)), vuln: Math.min(100, Math.round((+r.partVulnerable || 0) / 5) * 5), moment: pm ? "pm" : "am" };
+      suivi, enfants, grossesse, trimestre: Math.min(grossesse, Math.round(grossesse / 10)), vuln: Math.min(100, Math.round((+r.partVulnerable || 0) / 5) * 5), moment: pm ? "pm" : "am" };
   }
   // Les valeurs gardées, bornées (elles peuvent venir d'un fichier importé).
   function supervisionDJ() {
@@ -1396,6 +1399,8 @@ window.Verrou.quandOuvert(function () {
     for (const [k, , min, max] of SDJ_CHAMPS) y[k] = Number.isFinite(+x[k]) ? Math.min(max, Math.max(min, Math.round(+x[k]))) : d[k];
     y.heures = Number.isFinite(+x.heures) ? Math.min(8, Math.max(1, +x.heures)) : d.heures;
     y.moment = x.moment === "pm" ? "pm" : "am";
+    // Des « dont » : les enfants et les grossesses parmi les suivis ; les premières visites parmi les grossesses.
+    y.enfants = Math.min(y.enfants, y.suivi); y.grossesse = Math.min(y.grossesse, y.suivi - y.enfants); y.trimestre = Math.min(y.trimestre, y.grossesse);
     return y;
   }
   function changerSupervision(f, focus) {
@@ -1406,8 +1411,9 @@ window.Verrou.quandOuvert(function () {
   function calculSupervision(R) {
     // Hors GMF-U, la demi-journée d'enseignement se prépare aux tarifs d'établissement (ceux du GMF-U, par défaut).
     const o = optionsActes(R, R.milieu === "gmfu" ? null : "etablissement"), r = S.revenu, v = supervisionDJ(), M = { ...C.RAMQ, ...C.montantsLieu(o.lieu, o.liste), ...o.montants };
-    const x = C.demiJourneeSupervision({ ...o, heuresParDJ: v.heures, apresMidi: v.moment === "pm", residents: v.residents, externes: v.externes, pec: v.pec, suivi: v.suivi, pctVuln: v.vuln });
-    const base = x.forfait + x.perDiem, avecIntervention = base + x.intervention + x.responsabilite, avecVisites = base + x.visites, ecart = avecVisites - avecIntervention;
+    const x = C.demiJourneeSupervision({ ...o, heuresParDJ: v.heures, apresMidi: v.moment === "pm", residents: v.residents, externes: v.externes, pec: v.pec, suivi: v.suivi,
+      enfants: v.enfants, grossesse: v.grossesse, trimestre: v.trimestre, pctVuln: v.vuln });
+    const base = x.forfait + x.perDiem, avecIntervention = base + x.intervention + x.responsabilite + x.supplements, avecVisites = base + x.visites, ecart = avecVisites - avecIntervention;
     const anDJ = Math.min(+r.enseignement || 0, +r.demiJournees || 0) * Math.max(0, +r.semaines || 0);
     const parSuivi = x.tarifSuivi * M.pctMixte / 100, manque = ecart < -0.005 && parSuivi > 0 ? Math.floor(-ecart / parSuivi + 1e-9) + 1 : 0;
     return { o, v, M, x, avecIntervention, avecVisites, ecart, egal: Math.abs(ecart) < 0.5, anDJ, manque };
@@ -1468,8 +1474,12 @@ window.Verrou.quandOuvert(function () {
       b.setAttribute("aria-checked", v.moment === m ? "true" : "false"); b.addEventListener("click", () => changerSupervision(y => { y.moment = m; }, b.id)); moment.appendChild(b); });
     ligne("Moment", moment);
     ligne("Durée", reglage("heures", "Durée de la demi-journée", `${nb(v.heures, 2)} h`, v.heures > 1, v.heures < 8, (y, d) => { y.heures = Math.min(8, Math.max(1, y.heures + d * 0.25)); }));
-    for (const [cle, nom, min, max, pasV] of SDJ_CHAMPS)
-      ligne(nom, reglage(cle, nom, nb(v[cle], 0) + (cle === "vuln" ? " %" : ""), v[cle] > min, v[cle] < max, (y, d) => { y[cle] = Math.min(max, Math.max(min, y[cle] + d * pasV)); }));
+    // Les « dont » ne dépassent pas leur total : enfants et grossesses, les suivis ; premières visites, les grossesses.
+    const plafond = { enfants: v.suivi - v.grossesse, grossesse: v.suivi - v.enfants, trimestre: v.grossesse };
+    for (const [cle, nom, min, max, pasV] of SDJ_CHAMPS) {
+      const haut = Math.min(max, plafond[cle] ?? max);
+      ligne(nom, reglage(cle, nom, nb(v[cle], 0) + (cle === "vuln" ? " %" : ""), v[cle] > min, v[cle] < haut, (y, d) => { y[cle] = Math.min(haut, Math.max(min, y[cle] + d * pasV)); }));
+    }
     z.appendChild(grille);
     // Le calcul, ligne par ligne.
     lignes(document.getElementById("sab-table"), ["", "Intervention", "Visites"], [
@@ -1477,6 +1487,9 @@ window.Verrou.quandOuvert(function () {
       { cellules: ["Demi-per diem des apprenants", $2(x.perDiem), $2(x.perDiem)] },
       { cellules: [`Intervention de supervision, ${nb(x.heures, 2)} h`, $2(x.intervention), "—"] },
       { cellules: [`Forfait de responsabilité, ${nb(x.vulnerables, 1)} patient${x.vulnerables > 1 ? "s" : ""} vulnérable${x.vulnerables > 1 ? "s" : ""}`, $2(x.responsabilite), "compris"] },
+      ...(x.enfants > 0 ? [{ cellules: [`Supplément, examen d'un enfant de 0 à 5 ans (${nb(x.enfants, 0)})`, $2(x.enfants * M.suppExamenEnfant * maj), "compris"] }] : []),
+      ...(x.grossesse > 0 ? [{ cellules: [`Supplément, suivi de grossesse (${nb(x.grossesse, 0)})`, $2(x.grossesse * M.suppSuiviGrossesse * maj), "compris"] }] : []),
+      ...(x.trimestre > 0 ? [{ cellules: [`Supplément, 1re visite de grossesse au 1er trimestre (${nb(x.trimestre, 0)})`, $2(x.trimestre * M.suppGrossessePremierTrimestre * maj), "compris"] }] : []),
       { cellules: [`Visites de prise en charge (${nb(x.pec, 0)})`, "—", $2(x.visitesPec)] },
       { cellules: [`Visites de suivi (${nb(x.suivi, 0)})`, "—", $2(x.visitesSuivi)] },
       { cls: "total", cellules: ["Total de la demi-journée", $2(avecIntervention), $2(avecVisites)] },
@@ -1484,10 +1497,14 @@ window.Verrou.quandOuvert(function () {
     document.getElementById("sab-note").textContent = `Forfait horaire : ${$2(M.forfaitHoraireMixte * maj)} l'heure, dans les deux cas. Demi-per diem (EP 42) : par résident et par externe, dans les deux cas. `
       + `Intervention de supervision : ${$2(M.acteSupervision * maj)} l'heure payée à ${nb(M.pctSupervision, 2)} %, au plus ${nb(M.supervisionMaxH, 1)} h (5 h l'après-midi), un seul acte quel que soit le nombre d'apprenants ; `
       + `les visites faites pendant le bloc ne se facturent alors pas, mais le forfait de responsabilité (${$2(M.forfaitResponsabilite * maj)}) de chaque patient vulnérable inscrit examiné, oui, à 100 % (annexe II à l'annexe XXIII). `
-      + `Les suppléments à l'examen périodique d'un enfant de 0 à 5 ans (${$2(M.suppExamenEnfant * maj)}) et au suivi de grossesse (${$2(M.suppSuiviGrossesse * maj)}) aussi : ils ne sont pas comptés ici. `
+      + `Les suppléments à l'examen périodique d'un enfant de 0 à 5 ans (${$2(M.suppExamenEnfant * maj)}), au suivi de grossesse (${$2(M.suppSuiviGrossesse * maj)}) et à la première visite de grossesse au 1er trimestre (${$2(M.suppGrossessePremierTrimestre * maj)}) aussi, `
+      + "selon les visites indiquées ; la prise en charge temporaire d'une cliente enceinte (15189, 19074) aussi, mais son montant reste à confirmer : elle n'est pas comptée. "
       + `Visites : ${nb(M.pctMixte, 2)} % du tarif, les vôtres et celles des apprenants ; prise en charge ${$2(x.tarifPec)} et suivi ${$2(x.tarifSuivi)}, selon la part de patients vulnérables (le forfait de responsabilité est compris dans le tarif des visites de patients vulnérables). Montants avant les frais et l'impôt.`;
     if (U.sdjFocus) { const f = document.getElementById(U.sdjFocus); U.sdjFocus = null; if (f && !f.disabled) f.focus(); }
   }
+  // Part des visites du plan : examens périodiques d'enfants de 0 à 5 ans et suivis de grossesse (de 0 à 1).
+  const partsPlan = () => { const m = S.revenu.mix || {}, cles = ["suivi", "suiviV", "perioV", "pedia", "gross"], t = cles.reduce((a, k) => a + Math.max(0, +m[k] || 0), 0);
+    return { enfants: t > 0 ? Math.max(0, +m.pedia || 0) / t : 0, grossesse: t > 0 ? Math.max(0, +m.gross || 0) / t : 0 }; };
   // Part des visites du plan faites à des patients vulnérables (suivis et périodiques de patients vulnérables), en %.
   const pctVulnPlan = () => { const m = S.revenu.mix || {}, cles = ["suivi", "suiviV", "perioV", "pedia", "gross"], t = cles.reduce((a, k) => a + Math.max(0, +m[k] || 0), 0);
     return t > 0 ? (Math.max(0, +m.suiviV || 0) + Math.max(0, +m.perioV || 0)) / t * 100 : 0; };
@@ -1580,10 +1597,12 @@ window.Verrou.quandOuvert(function () {
       { p: "revenu.heuresParDJ", l: "Heures par demi-journée", u: "h", s: 0.25 },
     ]);
     const so = C.supervisionOuVisites({ ...o, heuresParDJ: r.heuresParDJ, apresMidi: pm, residents: r.residents, externes: r.externes,
-      patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision, pctVuln: pctVulnPlan() });
+      patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision, pctVuln: pctVulnPlan(),
+      partEnfants: partsPlan().enfants, partGrossesse: partsPlan().grossesse });
     rangees("rv-sup-resultat", [
       { titre: "Intervention de supervision", sous: `${nb(so.heures, 2)} h × ${$2(D.acteSupervision * maj)} × ${nb(D.pctSupervision, 2)} %${pm ? " (jusqu'à 5 h l'après-midi)" : " (au plus 3,5 h)"}`
-        + (so.responsabilite > 0.005 ? `, plus ${$2(so.responsabilite)} de forfaits de responsabilité (patients vulnérables)` : ""), valeur: $2(so.supervision), cls: so.meilleur === "acte" ? "choisi" : null },
+        + (so.responsabilite > 0.005 ? `, plus ${$2(so.responsabilite)} de forfaits de responsabilité (patients vulnérables)` : "")
+        + (so.supplements > 0.005 ? `, plus ${$2(so.supplements)} de suppléments (enfants de 0 à 5 ans, grossesses)` : ""), valeur: $2(so.supervision), cls: so.meilleur === "acte" ? "choisi" : null },
       { titre: "Visites des apprenants", sous: `${nb(so.nbVisites, 1)} visites × ${$2(so.parVisite)} (${nb(D.pctMixte, 2)} % d'une visite moyenne de ${$2(o.tarifMoyen * maj)})`, valeur: $2(so.visites), cls: so.meilleur === "visites" ? "choisi" : null },
       { titre: "En plus, dans les deux cas", sous: `Forfait horaire ${$2(so.forfait)}${so.perDiem > 0 ? ` ; demi-per diem ${$2(so.perDiem)}` : ""}`, valeur: $2(so.forfait + so.perDiem) },
     ]);
@@ -1685,7 +1704,8 @@ window.Verrou.quandOuvert(function () {
       const o = optionsActes(R), T = Math.min(+r.enseignement || 0, +r.demiJournees || 0);
       const pm = U.supMoment ? U.supMoment === "pm" : T > 0 && (+r.enseignementApresMidi || 0) >= T;
       const so = C.supervisionOuVisites({ ...o, heuresParDJ: r.heuresParDJ, apresMidi: pm, residents: r.residents, externes: r.externes,
-        patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision, pctVuln: pctVulnPlan() });
+        patientsParResident: r.patientsParResident, patientsParExterne: r.patientsParExterne, pendant: r.patientsPendantSupervision, pctVuln: pctVulnPlan(),
+      partEnfants: partsPlan().enfants, partGrossesse: partsPlan().grossesse });
       const n = des(so.seuil);
       const morceau = (q, un, plusieurs) => {
         const p = Math.max(0, +q || 0);
