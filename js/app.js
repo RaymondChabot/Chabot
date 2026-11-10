@@ -1630,10 +1630,16 @@ window.Verrou.quandOuvert(function () {
     listeRepertoire();
   }
   function listeRepertoire() {
-    const z = document.getElementById("rep-liste"), trouves = filtrerRepertoire(), noms = Object.fromEntries(window.Repertoire.GROUPES);
+    const z = document.getElementById("rep-liste"), noms = Object.fromEntries(window.Repertoire.GROUPES);
+    let trouves = filtrerRepertoire(), ailleurs = false;
+    // Rien dans le groupe choisi : la recherche porte sur tous les actes, et on le dit.
+    if (!trouves.length && REP.q.trim() && !["tous", "frequents"].includes(REP.groupe)) {
+      const g = REP.groupe; REP.groupe = "tous"; trouves = filtrerRepertoire(); REP.groupe = g; ailleurs = trouves.length > 0;
+    }
     z.textContent = "";
     document.getElementById("rep-compte").textContent = `${nb(trouves.length, 0)} acte${trouves.length > 1 ? "s" : ""}`;
     if (!trouves.length) { z.appendChild(el("p", "aide", "Aucun acte ne correspond. Essayez un code (15804) ou un mot (suivi, stérilet, cryochirurgie).")); return; }
+    if (ailleurs) { const n = el("p", "aide", `Rien dans « ${noms[REP.groupe]} » : voici les résultats des autres groupes.`); n.id = "rep-ailleurs"; z.appendChild(n); }
     // Les plus fréquents : une seule liste, puis « Voir les N actes ». Sans recherche : par groupe, dans l'ordre de
     // fréquence ; avec une recherche : les résultats, avec leur groupe.
     const recherche = !!REP.q.trim(), frequents = REP.groupe === "frequents" && !recherche;
@@ -2270,7 +2276,7 @@ window.Verrou.quandOuvert(function () {
     lignes(document.getElementById("rv-sens-dj"), ["Demi-journées", ...cols], R.sensDJ.map(x => ligneSens(x, x.v === dj, `${x.v}${x.v === dj ? " (vous)" : ""}`)));
     lignes(document.getElementById("rv-sens-pat"), ["Patients", ...cols], R.sensPat.map(x => ligneSens(x, x.v === pat, `${nb(x.v)}${x.v === pat ? " (vous)" : ""}`)));
     const notePrefixe = net ? (R.societeActive ? "Net pour vous : dividendes après impôt ; le reste demeure dans la société." : "Après impôt et cotisations, avec vos déductions.") : "Avant impôt.";
-    document.getElementById("rv-sens-note").textContent = `${notePrefixe} Demi-journées de rendez-vous${ens ? `, dont ${nb(ens)} d'enseignement` : ""}, à ${nb(pat)} patients chacune ; le sans rendez-vous et les activités restent les mêmes.${R.modes.includes("horaire") ? " Au taux horaire, le nombre de patients ne change pas le revenu." : ""}`;
+    document.getElementById("rv-sens-note").textContent = `${notePrefixe} Demi-journées de rendez-vous${ens ? `, dont ${nb(ens)} d'enseignement` : ""}, à ${nb(pat)} patients chacune ; le sans rendez-vous et les activités restent les mêmes.${R.modes.includes("horaire") ? " Au taux horaire, le nombre de patients change peu le revenu : seuls les forfaits liés aux patients examinés s'ajoutent." : ""}`;
   }
 
   // Sur chaque 100 $ gagnés : où va le revenu brut (morceaux : nom, montant de l'année, couleur).

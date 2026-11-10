@@ -1687,6 +1687,17 @@ async function repertoireActes(b, base) {
   const freq = await etat();
   verifier("répertoire : au départ, les 10 actes les plus fréquents, puis « Voir les N actes »", freq.compte === "10 actes" && freq.titres.length === 10
     && freq.titres[0].startsWith("Forfait horaire") && (await p.textContent("#rep-voir-tous")).replace(/\s/g, " ") === `Voir les ${total} actes`, freq);
+  // Une recherche qui ne trouve rien dans le groupe choisi montre les autres groupes, et le dit.
+  await p.click('#rep-groupes button[data-v="formulaires"]'); await p.fill("#rep-q", "19914"); await p.waitForTimeout(150);
+  const ailleurs = await p.evaluate(() => ({ note: (document.getElementById("rep-ailleurs") || {}).textContent || "", titres: [...document.querySelectorAll("#rep-liste .rangee-titre")].map(x => x.textContent) }));
+  verifier("répertoire : 19914 cherché dans « Formulaires » mène au demi-per diem, avec une note", ailleurs.note.includes("autres groupes") && ailleurs.titres.some(t => t.startsWith("Demi-per diem")), ailleurs);
+  await p.fill("#rep-q", ""); await p.click('#rep-groupes button[data-v="frequents"]'); await p.waitForTimeout(150);
+  // En GMF-U, l'essentiel du panneau Revenu ne montre ni les catégories de vulnérabilité ni les frais de cabinet.
+  await p.click("#v-comparer .bouton-modifier"); await p.waitForTimeout(250);
+  const champs = await p.evaluate(() => ["revenu-partGroupe2", "revenu-partGroupe34", "revenu-partTresVulnerable", "revenu-fraisCabinetPct"]
+    .map(id => { const x = document.getElementById("c-" + id); return x ? !!x.offsetParent : null; }));
+  verifier("GMF-U : catégories de vulnérabilité et frais de cabinet dans le détail, pas dans l'essentiel", champs.every(v => v === false), champs);
+  await p.keyboard.press("Escape"); await p.waitForTimeout(200);
   await p.click("#rep-voir-tous");
   const tous = await etat();
   verifier("répertoire : tous les actes, groupés, rien ne déborde à 320 px", tous.compte === `${total} actes` && tous.titres.length === total && tous.titres[0].startsWith("Forfait horaire") && !tous.debord, { compte: tous.compte, n: tous.titres.length, premier: tous.titres[0], debord: tous.debord });
