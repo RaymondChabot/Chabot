@@ -592,7 +592,7 @@ a.tuile:hover { border-color: var(--trait); }
   -webkit-appearance: none; appearance: none;
 }
 .saisie select { padding-right: 24px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b8981' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right 2px center / 16px no-repeat; }
-.saisie input[type="number"] { text-align: right; }
+.saisie input[type="number"], .saisie input[data-num] { text-align: right; }
 .saisie input:focus-visible, .saisie select:focus-visible { outline: none; }
 .saisie .unite { font-size: 0.8rem; color: var(--discret); white-space: nowrap; }
 .champ.large { grid-template-columns: minmax(0, 1fr) 32px; }

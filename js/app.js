@@ -136,6 +136,27 @@ window.Verrou.quandOuvert(function () {
   // Un champ : libellé, puis saisie (nombre, liste, mois, date) ou interrupteur.
   // Les choix d'une liste : fixes, ou calculés à l'ouverture (les années autour d'aujourd'hui).
   const optionsDe = c => typeof c.o === "function" ? c.o() : c.o;
+  /* Bornes plausibles des champs numériques : par chemin, sinon par unité. Une valeur plus grande est ramenée à la
+     borne (saisie et sauvegardes importées). */
+  const BORNES = {
+    "revenu.semaines": 52, "revenu.semainesArrivee": 52, "revenu.demiJournees": 14, "revenu.demiJourneesSRV": 14, "revenu.enseignement": 14,
+    "revenu.enseignementApresMidi": 14, "revenu.heuresParDJ": 12, "revenu.patientsParDJ": 60, "revenu.patientsSRV": 60, "revenu.residents": 6, "revenu.externes": 6,
+    "revenu.patientsParResident": 20, "revenu.patientsParExterne": 20, "revenu.patientsPendantSupervision": 30, "revenu.inscritsDebut": 5000,
+    "revenu.nouveauxGuichet": 3000, "revenu.nouveauxSansMedecin": 3000, "revenu.nouveauxTransferes": 3000, "revenu.nouveauxAnGuichet": 3000,
+    "revenu.nouveauxAnSansMedecin": 3000, "revenu.inscriptionsEnDouble": 3000, "revenu.grossessesAn": 500, "revenu.heuresMax100": 3000,
+    "revenu.heuresGardeSurPlace": 3000, "actifs.voiture.remplacementAns": 30,
+  };
+  const BORNES_UNITE = { "%": 100, "% des vuln.": 100, "sem.": 52, "d.-j.": 14, "h": 12, "h/d.-j.": 12, "rés.": 6, "résidents": 6 };
+  const borneDe = (p, u) => BORNES[p] ?? BORNES_UNITE[u];
+  // Un champ numérique : du texte au clavier décimal, pour accepter la virgule (« 3,5 ») comme le point.
+  function champNombre(inp, { max, neg = false } = {}) {
+    inp.type = "text"; inp.inputMode = neg ? "text" : "decimal"; inp.dataset.num = "1"; inp.autocomplete = "off"; inp.spellcheck = false;
+    if (neg) inp.dataset.neg = "1";
+    if (max !== undefined) inp.dataset.max = String(max);
+    return inp;
+  }
+  // Un nombre affiché dans un champ : la virgule décimale.
+  const affNombre = v => typeof v === "number" ? String(Math.round(v * 1e6) / 1e6).replace(".", ",") : v ?? "";
   function creerChamp(c, id, lier, confirmable) {
     const ligne = el("div", "champ" + (c.t === "check" ? " case" : c.t === "select" || c.t === "month" || c.t === "date" || c.t === "paire" ? " large" : ""));
     if (c.si) ligne.dataset.si = c.si;
@@ -148,7 +169,7 @@ window.Verrou.quandOuvert(function () {
       // Deux nombres sous un même libellé (p et p2), chacun avec son unité : résidents et externes.
       const paire = el("div", "saisie-paire");
       const nombre = (u, aria) => {
-        const boite = el("div", "saisie"), x = el("input"); x.type = "number"; x.step = c.s || 1; x.inputMode = "decimal"; x.min = "0";
+        const boite = el("div", "saisie"), x = champNombre(el("input"), { max: borneDe(u === c.u ? c.p : c.p2, "résidents") });
         x.setAttribute("aria-label", aria); boite.append(x, el("span", "unite", u)); paire.appendChild(boite); return x;
       };
       inp = nombre(c.u, `${texteDe(c.l)} : ${c.u}`);
@@ -161,8 +182,9 @@ window.Verrou.quandOuvert(function () {
         for (const [v, t] of optionsDe(c)) { const o = el("option", null, texteDe(t)); o.value = v; inp.appendChild(o); }
         if (c.nombre) inp.dataset.nombre = "1";   // une liste d'années : la valeur reste un nombre
       } else {
-        inp = el("input"); inp.type = c.t === "month" || c.t === "date" ? c.t : "number";
-        if (inp.type === "number") { inp.step = c.s || 1; inp.inputMode = "decimal"; if (c.neg) { inp.dataset.neg = "1"; inp.inputMode = "text"; } else inp.min = "0"; }
+        inp = el("input");
+        if (c.t === "month" || c.t === "date") inp.type = c.t;
+        else champNombre(inp, { max: c.max ?? borneDe(c.p, c.u), neg: !!c.neg });
       }
       boite.appendChild(inp);
       if (c.u) boite.appendChild(el("span", "unite", c.u));
@@ -194,7 +216,7 @@ window.Verrou.quandOuvert(function () {
   function remplirChamps() {
     document.querySelectorAll("[data-p]").forEach(inp => {
       const v = lire(inp.dataset.p);
-      if (inp.type === "checkbox") inp.checked = !!v; else inp.value = v ?? "";
+      if (inp.type === "checkbox") inp.checked = !!v; else inp.value = inp.dataset.num ? affNombre(v) : v ?? "";
     });
     document.querySelectorAll("[data-conf]").forEach(b => b.setAttribute("aria-pressed", S.confirmes[b.dataset.conf] ? "true" : "false"));
     majVisibilite();
@@ -341,7 +363,7 @@ window.Verrou.quandOuvert(function () {
     if (b.k) { nom = el("label", null, nomDepense(b)); nom.htmlFor = `bu-${b.id}-montant`; }
     else { nom = el("input"); nom.type = "text"; nom.value = b.nom; nom.setAttribute("aria-label", "Nom de la dépense"); lierListe("budget", i, "nom")(nom); }
     const boiteM = el("div", "saisie");
-    const mnt = el("input"); mnt.type = "number"; mnt.step = "1"; mnt.min = "0"; mnt.inputMode = "decimal"; mnt.value = b.montant || ""; mnt.placeholder = "0";
+    const mnt = champNombre(el("input")); mnt.value = b.montant ? affNombre(b.montant) : ""; mnt.placeholder = "0";
     mnt.id = `bu-${b.id}-montant`; lierListe("budget", i, "montant")(mnt);
     if (!b.k) mnt.setAttribute("aria-label", "Montant : " + b.nom);
     boiteM.append(mnt, el("span", "unite", "$"));
@@ -392,7 +414,7 @@ window.Verrou.quandOuvert(function () {
         if (ch.sauf && ch.sauf(d)) continue;
         const ligne = creerChamp(ch, `d-${d.id}-${ch.k}`, lierListe("dettes", i, ch.k), false);
         const inp = ligne.querySelector("input, select");
-        if (inp.type === "checkbox") inp.checked = !!d[ch.k]; else inp.value = d[ch.k] ?? "";
+        if (inp.type === "checkbox") inp.checked = !!d[ch.k]; else inp.value = inp.dataset.num ? affNombre(d[ch.k]) : d[ch.k] ?? "";
         c.appendChild(ligne);
       }
       const a = el("div", "feuille-actions");
@@ -1405,7 +1427,7 @@ window.Verrou.quandOuvert(function () {
       if (inp && inp !== document.activeElement) {
         const v = valeurDe(d);
         if (inp.type === "checkbox") inp.checked = !!v;
-        else inp.value = v === null || v === undefined ? "" : typeof v === "number" ? String(Math.round(v * 100) / 100) : String(v);
+        else inp.value = v === null || v === undefined ? "" : typeof v === "number" ? affNombre(Math.round(v * 100) / 100) : String(v);
       }
     });
   }
@@ -2118,7 +2140,7 @@ window.Verrou.quandOuvert(function () {
     S.impot.depensesProDetail.forEach((x, i) => {
       const it = ITEMS_PRO.get(x.k), l = el("div", "ligne-depense ligne-revenu" + (x.montant > 0 ? " remplie" : ""));
       const nom = el("label", null, it.nom); nom.htmlFor = `dp-${x.k}`;
-      const bm = el("div", "saisie"), m = el("input"); m.type = "number"; m.step = "1"; m.min = "0"; m.inputMode = "decimal"; m.value = x.montant || ""; m.placeholder = "0"; m.id = `dp-${x.k}`;
+      const bm = el("div", "saisie"), m = champNombre(el("input")); m.value = x.montant ? affNombre(x.montant) : ""; m.placeholder = "0"; m.id = `dp-${x.k}`;
       lierListe("depensesPro", i, "montant")(m); bm.append(m, el("span", "unite", "$"));
       const bp = el("div", "saisie"), per = el("select"); [["an", "/ an"], ["mois", "/ mois"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; per.appendChild(o); });
       per.value = x.periode; per.setAttribute("aria-label", "Période : " + it.nom); lierListe("depensesPro", i, "periode")(per); bp.appendChild(per);
@@ -2148,7 +2170,7 @@ window.Verrou.quandOuvert(function () {
       let nom;
       if (x.k) { nom = el("label", null, nomLigne(x)); nom.htmlFor = `rl-${x.id}`; nom.title = ITEMS_REVENUS.get(x.k).aide; }
       else { nom = el("input"); nom.type = "text"; nom.value = x.nom; nom.setAttribute("aria-label", "Nom du revenu"); lierListe("lignes", i, "nom")(nom); }
-      const bm = el("div", "saisie"), m = el("input"); m.type = "number"; m.step = "1"; m.min = "0"; m.inputMode = "decimal"; m.value = x.montant || ""; m.placeholder = "0"; m.id = `rl-${x.id}`;
+      const bm = el("div", "saisie"), m = champNombre(el("input")); m.value = x.montant ? affNombre(x.montant) : ""; m.placeholder = "0"; m.id = `rl-${x.id}`;
       lierListe("lignes", i, "montant")(m); if (!x.k) m.setAttribute("aria-label", "Montant : " + x.nom); bm.append(m, el("span", "unite", "$"));
       const bp = el("div", "saisie"), per = el("select"); [["an", "/ an"], ["mois", "/ mois"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; per.appendChild(o); });
       per.value = x.periode; per.setAttribute("aria-label", "Période : " + nomLigne(x)); lierListe("lignes", i, "periode")(per); bp.appendChild(per);
@@ -2220,7 +2242,7 @@ window.Verrou.quandOuvert(function () {
         lierListe("activites", i, "nom")(inp); boite.appendChild(inp); ligne.append(lab, boite, el("span"));
       } else {
         ligne = creerChamp(ch, `ac-${a.id}-${ch.k}`, lierListe("activites", i, ch.k), false);
-        const inp = ligne.querySelector("input, select"); inp.value = a[ch.k] ?? "";
+        const inp = ligne.querySelector("input, select"); inp.value = inp.dataset.num ? affNombre(a[ch.k]) : a[ch.k] ?? "";
       }
       c.appendChild(ligne);
     }
@@ -3677,7 +3699,7 @@ window.Verrou.quandOuvert(function () {
       } else {
         ligne = creerChamp(ch, id, lierListe(nomListe, i, ch.k), false);
         const inp = ligne.querySelector("input, select");
-        if (inp.type === "checkbox") inp.checked = !!x[ch.k]; else inp.value = x[ch.k] ?? "";
+        if (inp.type === "checkbox") inp.checked = !!x[ch.k]; else inp.value = inp.dataset.num ? affNombre(x[ch.k]) : x[ch.k] ?? "";
       }
       c.appendChild(ligne);
     }
@@ -4001,7 +4023,14 @@ window.Verrou.quandOuvert(function () {
   function valeur(inp) {
     if (inp.type === "checkbox") return inp.checked;
     if (inp.dataset.nombre) return +inp.value || 0;
-    if (inp.type === "number") { const v = parseFloat(String(inp.value).replace(",", ".")); return isFinite(v) ? (inp.dataset.neg ? v : Math.max(0, v)) : null; }
+    if (inp.dataset.num || inp.type === "number") {
+      // « 3,5 » comme « 3.5 » ; les espaces (milliers) sont ignorées ; un texte qui n'est pas un nombre ne change rien.
+      const t = String(inp.value).replace(/[\s\u00a0]/g, "").replace(",", ".");
+      const v = t === "" || t === "-" ? NaN : Number(t);
+      if (!isFinite(v)) return null;
+      const x = inp.dataset.neg ? v : Math.max(0, v);
+      return inp.dataset.max !== undefined ? Math.min(+inp.dataset.max, x) : x;
+    }
     return inp.value;
   }
   document.addEventListener("input", e => {
@@ -4043,12 +4072,16 @@ window.Verrou.quandOuvert(function () {
       plusTard();
     }
   });
-  document.addEventListener("change", e => { if (e.target.type === "checkbox" || e.target.tagName === "SELECT") e.target.dispatchEvent(new Event("input", { bubbles: true })); });
+  document.addEventListener("change", e => {
+    const inp = e.target;
+    if (inp.type === "checkbox" || inp.tagName === "SELECT") inp.dispatchEvent(new Event("input", { bubbles: true }));
+    else if (inp.dataset && inp.dataset.num && inp.value !== "") { const v = valeur(inp); if (v !== null) inp.value = affNombre(v); }
+  });
   // Un champ à 0 s'efface au toucher : on tape par-dessus (sinon « 2 » devient « 20 » ou « 02 »).
   // Laissé vide, il revient à 0 ; la valeur gardée ne change pas tant qu'on n'a rien tapé.
   document.addEventListener("focusin", e => {
     const inp = e.target;
-    if (inp.tagName !== "INPUT" || inp.type !== "number" || inp.value !== "0") return;
+    if (inp.tagName !== "INPUT" || !(inp.dataset.num || inp.type === "number") || inp.value !== "0") return;
     inp.dataset.zero = "1"; inp.value = "";
     if (!inp.placeholder) inp.placeholder = "0";
   });
@@ -4297,18 +4330,41 @@ window.Verrou.quandOuvert(function () {
   });
   /* Données reçues (fichier ou lien) : la forme attendue, des nombres finis et bornés là où une valeur folle
      bloquerait le calcul, puis un calcul à blanc. Rien n'est écrit si l'une de ces étapes échoue. */
+  /* Restaurer une sauvegarde : le fichier est vérifié avant de remplacer quoi que ce soit. Les clés inconnues du premier
+     niveau sont ignorées ; chaque champ numérique des panneaux doit être un nombre (« 3,5 » accepté), puis il est
+     ramené dans ses bornes ; le revenu et le net doivent se calculer. Sinon, le fichier est refusé avec la raison. */
+  const refus = texte => Object.assign(new Error("refus"), { texte });
+  const CHAMPS_NUMERIQUES = [...new Map(Object.values(CHAMPS).flat().filter(c => c.p).flatMap(c => c.p2 ? [[c.p, c], [c.p2, { ...c, p: c.p2, l: `${texteDe(c.l)} : ${c.u2}` }]] : [[c.p, c]])).values()]
+    .filter(c => typeof c.p.split(".").reduce((o, k) => (o == null ? o : o[k]), EXEMPLE) === "number");
+  function validerNombres(s) {
+    for (const c of CHAMPS_NUMERIQUES) {
+      const k = c.p.split("."), parent = k.slice(0, -1).reduce((o, x) => (o == null ? o : o[x]), s), cle = k[k.length - 1];
+      if (!parent || typeof parent !== "object") continue;
+      let v = parent[cle];
+      if (v === null || v === undefined) continue;
+      if (typeof v === "string") { const t = v.replace(/[\s\u00a0]/g, "").replace(",", "."); v = t === "" ? NaN : Number(t); }
+      if (typeof v !== "number" || !Number.isFinite(v))
+        throw refus(`Cette sauvegarde contient une valeur qui n'est pas un nombre (« ${texteDe(c.l)} » : « ${String(parent[cle]).slice(0, 40)} »). Rien n'a été changé.`);
+      const max = c.max ?? borneDe(c.p, c.u);
+      parent[cle] = Math.min(max ?? Infinity, c.neg ? v : Math.max(0, v));
+    }
+  }
   function preparerImport(d) {
     if (!d || typeof d !== "object" || d.version !== 1 || !d.revenu || typeof d.revenu !== "object" || !Array.isArray(d.dettes)) throw new Error("format");
     for (const l of [d.budget, d.objectifs, (d.revenu || {}).activites, ((d.epargne || {}).reee || {}).enfants]) if (l !== undefined && !Array.isArray(l)) throw new Error("format");
     if (JSON.stringify(d).length > 5000000) throw new Error("format");
-    const s = normaliser(fusion(clone(EXEMPLE), migrer(clone(d))));
+    const m = migrer(clone(d));
+    for (const k of Object.keys(m)) if (!Object.prototype.hasOwnProperty.call(EXEMPLE, k)) delete m[k];   // clés inconnues : ignorées
+    const s = normaliser(fusion(clone(EXEMPLE), m));
+    validerNombres(s);
     s.epargne.reee.enfants.forEach(e => { e.age = Math.min(30, Math.max(0, Number.isFinite(+e.age) ? Math.round(+e.age) : 0)); });
-    for (const k of ["demiJournees", "demiJourneesSRV", "enseignement"]) s.revenu[k] = Math.min(14, Math.max(0, Number.isFinite(+s.revenu[k]) ? +s.revenu[k] : 0));
-    s.revenu.semaines = Math.min(52, Math.max(0, Number.isFinite(+s.revenu.semaines) ? +s.revenu.semaines : 0));
     s.meta.exemple = false;
-    calculerAvec(s);   // lève une erreur si les données ne se calculent pas
+    const r = calculerAvec(s);   // lève une erreur si les données ne se calculent pas
+    if (!r || !Number.isFinite(r.brut) || !Number.isFinite(r.netMoi))
+      throw refus("Avec cette sauvegarde, le revenu ou le net ne se calcule pas. Rien n'a été changé.");
     return s;
   }
+  const messageRefus = err => err && err.texte ? err.texte : "Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé.";
   function restaurer(d, chiffree) {
     const pret = preparerImport(d);
     sortirPlan(true); S = pret; sauver();
@@ -4330,7 +4386,7 @@ window.Verrou.quandOuvert(function () {
         const d = JSON.parse(lecteur.result);
         if (window.Verrou.estChiffre(d)) { fichierChiffre = d; formFichier.hidden = false; phraseFichier.focus(); message(""); return; }
         fermerFichier(); preparerImport(d); confirmerFichier(d, false);
-      } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
+      } catch (err) { message(messageRefus(err)); }
     };
     lecteur.readAsText(f); e.target.value = "";
   });
@@ -4340,13 +4396,13 @@ window.Verrou.quandOuvert(function () {
     let d;
     try { d = JSON.parse(await window.Verrou.ouvrirFichier(fichierChiffre, phraseFichier.value)); } catch (err) { message("Phrase de passe incorrecte pour cette sauvegarde."); phraseFichier.select(); return; }
     fermerFichier();
-    try { preparerImport(d); confirmerFichier(d, true); } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); }
+    try { preparerImport(d); confirmerFichier(d, true); } catch (err) { message(messageRefus(err)); }
   });
   // Restaurer une sauvegarde : ce qui arrive est décrit, et rien n'est remplacé sans le bouton.
   function confirmerFichier(d, chiffree) {
     ouvrirFeuille("Restaurer une sauvegarde", c => confirmerTransfert(c, { donnees: d, cree: (d.meta || {}).misAJour }, () => {
       let av;
-      try { av = restaurer(d, chiffree); } catch (err) { message("Ce fichier n'est pas une sauvegarde WealthMorand. Rien n'a été changé."); return; }
+      try { av = restaurer(d, chiffree); } catch (err) { message(messageRefus(err)); return; }
       feuille.close();
       if (av) annoncerAvance(av);
     }));
@@ -4717,7 +4773,7 @@ window.Verrou.quandOuvert(function () {
   }
   const asGroupe = (...champs) => { const g = el("div", "as-groupe"); champs.filter(Boolean).forEach(x => g.appendChild(x)); return g; };
   const asNombre = (l, cle, u, s, h, vide = false) => creerChamp({ l, u, s, h }, "as-" + cle, inp => {
-    inp.value = A[cle] || (vide && A[cle] === 0 ? "0" : ""); inp.placeholder = vide ? "" : "0";
+    inp.value = A[cle] ? affNombre(A[cle]) : vide && A[cle] === 0 ? "0" : ""; inp.placeholder = vide ? "" : "0";
     inp.addEventListener("input", () => { A[cle] = vide ? valeur(inp) : valeur(inp) ?? 0; });
   }, false);
   const asCase = (l, cle, h, refaire) => creerChamp({ l, t: "check", h }, "as-" + cle, inp => {
@@ -4746,7 +4802,7 @@ window.Verrou.quandOuvert(function () {
     } },
     { titre: "Vos enfants", rendre: c => {
       const nb$ = creerChamp({ l: "Nombre d'enfants à charge", u: "enfants" }, "as-nbEnfants", inp => {
-        inp.value = A.enfants.length; inp.max = 10;
+        inp.value = A.enfants.length; inp.dataset.max = "10";
         inp.addEventListener("change", () => {
           const n = Math.min(10, Math.round(valeur(inp) || 0));
           A.enfants = Array.from({ length: n }, (_, i) => A.enfants[i] ?? 0);
@@ -4754,7 +4810,7 @@ window.Verrou.quandOuvert(function () {
         });
       }, false);
       const ages = A.enfants.map((age, i) => creerChamp({ l: `Âge de l'enfant ${i + 1}`, u: "ans" }, "as-age-" + i, inp => {
-        inp.value = age; inp.max = 25;
+        inp.value = age; inp.dataset.max = "25";
         inp.addEventListener("input", () => { A.enfants[i] = Math.min(25, valeur(inp) ?? 0); });
       }, false));
       c.appendChild(asGroupe(nb$, ...ages));

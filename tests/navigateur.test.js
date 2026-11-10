@@ -1395,6 +1395,38 @@ async function importSur(b, base) {
   await ctx.close();
 }
 
+/* 36 b. Saisie et sauvegardes solides : une sauvegarde dont un champ numérique est du texte est refusée et rien ne
+   change ; des valeurs négatives et géantes sont ramenées dans leurs bornes ; une clé inconnue est ignorée ; dans les
+   panneaux, « 3,5 » donne 3,5 (jamais 35) et 80 semaines deviennent 52, affichées. */
+async function saisieSolide(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "donnees" });
+  const etat = await p.evaluate(() => JSON.parse(JSON.stringify(window.Wealthnord.etat())));
+  const avant = JSON.stringify(etat.revenu);
+  const texte = { ...etat, revenu: { ...etat.revenu, semaines: "beaucoup" } };
+  await p.setInputFiles("#importer", { name: "texte.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(texte)) });
+  await p.waitForTimeout(300);
+  const refus = await p.evaluate(() => ({ msg: document.getElementById("donnees-message").textContent, ouvert: document.getElementById("feuille").open,
+    revenu: JSON.stringify(window.Wealthnord.etat().revenu) }));
+  verifier("sauvegarde : un champ numérique en texte est refusé, avec la raison, et rien ne change",
+    refus.msg.includes("n'est pas un nombre") && refus.msg.includes("Rien n'a été changé") && !refus.ouvert && refus.revenu === avant, refus.msg);
+  const bornes = { ...etat, inconnue: { x: 1 }, revenu: { ...etat.revenu, semaines: 80, patientsParDJ: -5, inscritsDebut: 1e9, heuresParDJ: "3,5" } };
+  await p.setInputFiles("#importer", { name: "bornes.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(bornes)) });
+  await p.waitForSelector("#feuille-corps .bouton.danger", { timeout: 10000 }); await p.click("#feuille-corps .bouton.danger"); await p.waitForTimeout(400);
+  const apres = await p.evaluate(() => { const S = window.Wealthnord.etat(), R = window.Wealthnord.resultats();
+    return { sem: S.revenu.semaines, pat: S.revenu.patientsParDJ, ins: S.revenu.inscritsDebut, h: S.revenu.heuresParDJ, inconnue: "inconnue" in S, brut: Number.isFinite(R.brut) }; });
+  verifier("sauvegarde : valeurs négatives et géantes bornées, « 3,5 » lu 3,5, clé inconnue ignorée",
+    apres.sem === 52 && apres.pat === 0 && apres.ins === 5000 && apres.h === 3.5 && !apres.inconnue && apres.brut, apres);
+  // Dans le panneau Revenu : la virgule et les bornes.
+  await allerA(p, "revenu"); await p.click("#v-revenu .bouton-modifier"); await p.waitForTimeout(250);
+  await p.fill("#c-revenu-patientsParDJ", "8,5"); await p.dispatchEvent("#c-revenu-patientsParDJ", "change");
+  await p.fill("#c-revenu-semaines", "80"); await p.dispatchEvent("#c-revenu-semaines", "change");
+  const champ = await p.evaluate(() => ({ pat: window.Wealthnord.etat().revenu.patientsParDJ, sem: window.Wealthnord.etat().revenu.semaines,
+    affPat: document.getElementById("c-revenu-patientsParDJ").value, affSem: document.getElementById("c-revenu-semaines").value }));
+  verifier("saisie : « 8,5 » donne 8,5 patients (jamais 85) ; 80 semaines deviennent 52, et le champ affiche 52", champ.pat === 8.5 && champ.affPat === "8,5" && champ.sem === 52 && champ.affSem === "52", champ);
+  verifier("saisie solide : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 37. Accessibilité (lot 8) : restaurer au clavier ; le focus reste dans un dialogue ; contrastes du thème sombre ;
    les liens « Détail » nommés par leur carte. */
 async function accessibiliteLot8(b, base) {
@@ -1784,7 +1816,7 @@ async function ciblesTactiles(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, reerDroits, premiereAnneeApres, hypotheseProjection, repertoireActes, revenuEtImpot, ciblesTactiles]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, saisieSolide, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, reerDroits, premiereAnneeApres, hypotheseProjection, repertoireActes, revenuEtImpot, ciblesTactiles]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
