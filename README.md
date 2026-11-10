@@ -407,7 +407,7 @@ dossier racine.
   consulté le 28 octobre 2026). Fédéral : 2,6 % (Canada, ensemble ;
   montants au dollar). Québec : 3,15 % (Québec, ensemble ; la même formule
   redonne 2,85 % pour 2025 et 2,05 % pour 2026 ; paliers et montants de
-  garde au multiple de 5 $). Assurance-emploi 2027 : maximum assurable de
+  garde, et les deux seuils du Fonds des services de santé, au multiple de 5 $). Assurance-emploi 2027 : maximum assurable de
   70 800 $ et taux du Québec de 1,29 % (Commission de l'assurance-emploi
   du Canada, taux de 2027, consulté le 31 octobre 2026). Prime d'assurance
   médicaments : 789 $ au plus par adulte (tarif du 1er juillet 2026 ; celui de

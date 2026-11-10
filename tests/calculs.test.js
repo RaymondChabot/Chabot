@@ -273,6 +273,7 @@ verifier("DMÉ : la première année du permis, sans égard au nombre d'inscrits
 const fssDe = rev => C.impotParticulier({ revenu: rev }).fss;
 verifier("FSS 2026 : rien jusqu'à 18 500 $, 1 % ensuite", fssDe(18500) === 0 && proche(fssDe(25000), 65, 1e-9));
 verifier("FSS 2026 : 150 $ de 33 500 $ à 64 355 $", proche(fssDe(40000), 150, 1e-9) && proche(fssDe(64355), 150, 1e-9));
+verifier("FSS 2027 provisoire : les deux seuils indexés de 3,15 % (au multiple de 5 $)", C.P2027.fss.seuil1 === 19085 && C.P2027.fss.seuil2 === 66380, [C.P2027.fss.seuil1, C.P2027.fss.seuil2]);
 verifier("FSS 2026 : 1 % au-delà de 64 355 $, au plus 1 000 $", proche(fssDe(100000), 150 + 356.45, 1e-6) && fssDe(149355) === 1000 && fssDe(300000) === 1000);
 
 /* 17. Dividendes non déterminés : crédit québécois de 3,42 % en 2026, de 2,69 % dès 2027 (bulletin 2026-3). */

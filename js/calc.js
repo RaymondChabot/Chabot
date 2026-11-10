@@ -84,7 +84,7 @@
     p.quebec.tranches = p.quebec.tranches.map(([seuil, taux]) => [cinq(seuil, q), taux]);
     p.quebec.montantBase = dollar(p.quebec.montantBase, q);
     p.deductionTravailleur.max = cinq(p.deductionTravailleur.max, q);
-    p.fss.seuil2 = cinq(p.fss.seuil2, q);
+    p.fss.seuil1 = cinq(p.fss.seuil1, q); p.fss.seuil2 = cinq(p.fss.seuil2, q);   // les deux seuils du Fonds des services de santé
     for (const k of ["max", "min", "seuilCouple", "seuilMono", "monoMax", "monoMin", "fournitures"]) p.allocationFamille[k] = dollar(p.allocationFamille[k], q);
     for (const k of Object.keys(p.medicaments.deductions)) p.medicaments.deductions[k] = dollar(p.medicaments.deductions[k], q);
     p.garde.quebec.moins7 = cinq(p.garde.quebec.moins7, q); p.garde.quebec.autres = cinq(p.garde.quebec.autres, q);
