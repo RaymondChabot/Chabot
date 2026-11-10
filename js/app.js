@@ -758,8 +758,8 @@ window.Verrou.quandOuvert(function () {
     const cacheAnnee = new Map();
     /* Parcours avec la résidence : la période a (12 mois depuis le début de la simulation) compte d'abord ses mois de
        résidence (salaire de l'échelle au niveau et à la date de chaque mois ; après la fin de l'entente, la hausse des
-       revenus du scénario), puis ceux de la pratique : la période où elle commence suit l'année de la page Revenu
-       (première année, s'il y a lieu), les suivantes l'année type. Impôt sur le salaire et le revenu de pratique
+       revenus du scénario), puis ceux de la pratique : les douze premiers mois de pratique suivent l'année de la page
+       Revenu (première année, s'il y a lieu), même à cheval sur deux périodes ; les suivants, l'année type. Impôt sur le salaire et le revenu de pratique
        réunis (impotMixte) ; en société, le salaire et les dividendes de la transition sont une seule déclaration. */
     const finEntente = C.FMRQ.finEntente.slice(0, 7);
     const salaireMois = (m, h) => {
@@ -772,8 +772,12 @@ window.Verrou.quandOuvert(function () {
       let brutRes = 0;
       for (let m = 12 * a; m < 12 * a + moisRes; m++) brutRes += salaireMois(m, h);
       brutRes /= I;   // en dollars d'aujourd'hui, comme le reste du calcul de l'impôt
-      const rev = fP > 0 ? (a === Math.floor(R.moisAvantPratique / 12) ? R.rev : R.revType) : null;
-      const totalP = rev ? rev[mode].total * reel * fP : 0, fraisP = rev ? fraisCabinet(rev[mode].total * reel, mode, reel) * fP : 0;
+      // Mois de pratique de la période : ceux de la première année de pratique (l'année de la page Revenu), puis l'année
+      // type. La première année se répartit ainsi sur les deux périodes qu'elle touche ; rien n'en est perdu.
+      const debutP = 12 * a - R.moisAvantPratique, m1 = debutP + 12, m0 = Math.max(0, debutP);
+      const parts = [[R.rev, Math.max(0, Math.min(12, m1) - m0)], [R.revType, Math.max(0, m1 - Math.max(12, m0))]].filter(([, n]) => n > 0);
+      const totalP = parts.reduce((t, [rv, n]) => t + rv[mode].total * reel * n / 12, 0);
+      const fraisP = parts.reduce((t, [rv, n]) => t + fraisCabinet(rv[mode].total * reel, mode, reel) * n / 12, 0);
       const proPerso = R.societeActive ? 0 : R.depensesPro * fP + fraisP;
       const scol = (+rs.scolarite || 0) * moisRes / 12, synd = (+rs.syndicat || 0) * moisRes / 12;
       const reer = R.reerAnnee(a) + R.celiappAnnee(a), autresImp = R.autresNonPro * reel;

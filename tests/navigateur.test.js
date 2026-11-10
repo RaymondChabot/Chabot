@@ -1562,6 +1562,24 @@ async function superviseurAB(b, base) {
   await ctx.close();
 }
 
+/* 41 d. Première année après la résidence (profil 4 du méga-audit : R2, pratique en juillet 2027, plan de novembre 2026,
+   sans inflation ni hausse) : les douze premiers mois de pratique suivent la première année, même à cheval sur deux
+   périodes. Période 0 : 4 mois de première année ; période 1 : 8 mois de première année et 4 d'année type. */
+async function premiereAnneeApres(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "apercu", horloge: "2026-11-10T10:00:00" });
+  await remplacer(p, { "residence.active": true, "residence.niveau": 2, "residence.debutPratique": "2027-07", "residence.primeGarde": true, "residence.primeEnseignement": false,
+    "residence.scolarite": 1100, "residence.vue": "residence", "revenu.milieu": "gmfu", "revenu.annee": "premiere", "revenu.modeBudget": "mixte", "revenu.demiJournees": 8,
+    "revenu.enseignement": 2, "revenu.heuresParDJ": 3.5, "revenu.semaines": 44, "revenu.patientsParDJ": 8, "revenu.demiJourneesSRV": 0, "revenu.patientsSRV": 0, "revenu.residents": 2,
+    "revenu.externes": 0, "revenu.inscritsDebut": 0, "revenu.nouveauxGuichet": 300, "revenu.nouveauxSansMedecin": 0, "revenu.nouveauxTransferes": 0, "revenu.semainesArrivee": 44,
+    "revenu.partVulnerable": 25, "revenu.membreGmf": true, "revenu.activites": [], "revenu.fraisCabinetPct": 0, "impot.depensesPro": 6000, "strategie.debut": "2026-11" });
+  const r = await p.evaluate(() => { const R = window.Wealthnord.resultats(), h = { ...R.hyp, inflation: 0, hausseRevenus: 0 };
+    return [0, 1, 2, 3].map(a => Math.round(R.annee(h, a).brutPratique * 100) / 100); });
+  verifier("première année après la résidence : 59 547,28 $, puis 172 397,71 $ (8 mois de première année et 4 d'année type), puis 159 909,45 $",
+    r[0] === 59547.28 && r[1] === 172397.71 && r[2] === 159909.45 && r[3] === 159909.45, r);
+  verifier("première année après la résidence : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 41 c. REER borné aux droits (profil 2 du méga-audit, 60 000 $ cotisés pour 5 000 $ de droits) : l'impôt est celui
    d'une cotisation de 5 000 $ et « À faire » le signale ; l'an prochain, 18 % du revenu gagné, jusqu'au plafond de 2027
    (35 390 $, ARC) ; sans droits inscrits, rien n'est borné et une ligne invite à les inscrire. */
@@ -1750,7 +1768,7 @@ async function ciblesTactiles(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, reerDroits, repertoireActes, revenuEtImpot, ciblesTactiles]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, reerDroits, premiereAnneeApres, repertoireActes, revenuEtImpot, ciblesTactiles]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }
