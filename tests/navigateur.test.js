@@ -1501,13 +1501,16 @@ async function superviseurAB(b, base) {
     debord: document.documentElement.scrollWidth > document.documentElement.clientWidth, focus: document.activeElement.id }));
   const v0 = await lire();
   const x = await p.evaluate(() => window.Calc.demiJourneeSupervision({ lieu: "etablissement", palier: 1, heuresParDJ: 3.5, residents: 1, externes: 1, pec: 1, suivi: 6, pctVuln: 20 }));
-  const base0 = x.forfait + x.perDiem, interv0 = x.intervention + x.responsabilite, ecart0 = interv0 - x.visites;
-  verifier("supervision : la demi-journée du plan (1 résident, 1 externe, 1 PEC, 6 suivis) ; l'intervention et les visites côte à côte ; rien ne déborde à 320 px",
+  const base0 = x.forfait + x.perDiem, interv0 = x.intervention + x.responsabilite;
+  // Selon le plan : les montants de l'année (onglet Modes), ramenés à une demi-journée d'enseignement.
+  const an = await p.evaluate(() => window.Wealthnord.resultats().supervisionAn);
+  const i0 = base0 + an.intervention / 80, w0 = i0 + (an.visites - an.acte) / 80;
+  verifier("supervision : la demi-journée du plan (1 résident, 1 externe, 1 PEC, 6 suivis) ; l'intervention et les visites côte à côte, selon l'année ; rien ne déborde à 320 px",
     v0.valeurs["sab-residents"] === "1" && v0.valeurs["sab-externes"] === "1" && v0.valeurs["sab-pec"] === "1" && v0.valeurs["sab-suivi"] === "6" && v0.valeurs["sab-vuln"].startsWith("20")
     && v0.valeurs["sab-heures"].startsWith("3,5") && v0.garde === null && !v0.plan && !v0.debord
-    && x.responsabilite > 0 && v0.totaux[0].replace(/\s/g, "") === `${Math.round(base0 + interv0)}$` && v0.totaux[1].replace(/\s/g, "") === `${Math.round(base0 + x.visites)}$`
-    && v0.choisi === (ecart0 > 0 ? "sab-total-intervention" : "sab-total-visites")
-    && v0.ecart.replace(/\s/g, "").includes(`${Math.round(Math.abs(ecart0))}$`) && v0.ecart.replace(/\s/g, " ").includes("80 demi-journées"), { v0, x });
+    && x.responsabilite > 0 && v0.totaux[0].replace(/\s/g, "") === `${Math.round(i0)}$` && v0.totaux[1].replace(/\s/g, "") === `${Math.round(w0)}$`
+    && v0.choisi === (an.acte > an.visites ? "sab-total-intervention" : "sab-total-visites")
+    && v0.ecart.replace(/\s/g, "").includes(`${Math.round(Math.abs(an.visites - an.acte)).toLocaleString("fr-CA").replace(/\s/g, "")}$`) && v0.ecart.replace(/\s/g, " ").includes("80 demi-journées"), { v0, an });
   // Des suivis de plus : les visites finissent par l'emporter.
   for (let i = 0; i < 8; i++) { await p.click("#sab-suivi-plus"); await p.waitForTimeout(120); }
   const v1 = await lire();
@@ -1533,7 +1536,7 @@ async function superviseurAB(b, base) {
   const montant = t => +t.replace(/[^\d]/g, "");
   verifier("supervision : enfants et grossesses parmi les suivis, leurs suppléments ajoutés à l'intervention ; pas de 1re visite sans grossesse",
     tri0 && v5.valeurs["sab-enfants"] === "2" && v5.valeurs["sab-grossesse"] === "1" && v5.valeurs["sab-trimestre"] === "1"
-    && supp.join() === "26,70$,8,95$,35,60$" && Math.abs(montant(v5.totaux[0]) - montant(v3.totaux[0]) - 71) <= 1 && !v5.debord, { tri0, supp, v5: v5.totaux, v3: v3.totaux });
+    && supp.join() === "26,70$,8,95$,35,60$" && Math.abs(montant(v5.totaux[0]) - Math.round(base0 + interv0) - 71) <= 1 && !v5.debord, { tri0, supp, v5: v5.totaux, v3: v3.totaux });
   await remplacer(p, { "revenu.supervisionDJ": { heures: 99, residents: 999, externes: -4, pec: "x", suivi: 3, vuln: 250, moment: "nuit" } });
   await allerA(p, "comparer/demijournee");
   const v4 = await lire();
@@ -1556,6 +1559,27 @@ async function superviseurAB(b, base) {
   await p.click("#ap-demijournee"); await p.waitForTimeout(300);
   verifier("aperçu : l'onglet mène au comparatif", await p.evaluate(() => location.hash === "#comparer/demijournee" && !!document.getElementById("rv-carte-supervision").offsetParent));
   verifier("supervision : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
+/* 41 b. Profil 2 du méga-audit (GMF-U établi, 1 000 inscrits, 30 % de vulnérables, 2 résidents) : selon le plan, la carte
+   de supervision donne le verdict du calcul de l'année, et le montant annuel égale, à 1 $ près, l'écart entre les deux
+   totaux (supervision facturée en intervention, puis en visites) : l'intervention rapporte 285,95 $ de plus. */
+async function supervisionPlan(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "comparer" });
+  await remplacer(p, { "revenu.milieu": "gmfu", "revenu.annee": "type", "revenu.modeBudget": "mixte", "revenu.demiJournees": 8, "revenu.enseignement": 2, "revenu.heuresParDJ": 3.5,
+    "revenu.semaines": 44, "revenu.patientsParDJ": 10, "revenu.demiJourneesSRV": 0, "revenu.patientsSRV": 0, "revenu.residents": 2, "revenu.externes": 0, "revenu.inscritsDebut": 1000,
+    "revenu.nouveauxGuichet": 0, "revenu.nouveauxSansMedecin": 0, "revenu.nouveauxTransferes": 0, "revenu.partVulnerable": 30, "revenu.membreGmf": true, "revenu.activites": [],
+    "revenu.fraisCabinetPct": 0, "impot.depensesPro": 8000, "revenu.supervisionDJ": null, "revenu.supervisionFacturation": "acte" });
+  await allerA(p, "comparer");
+  const r = await p.evaluate(() => ({ an: window.Wealthnord.resultats().supervisionAn, carte: document.getElementById("rv-r-supervision").textContent,
+    brut: window.Wealthnord.resultats().rev.mixte.total }));
+  const ecart = r.an.acte - r.an.visites;
+  verifier("supervision selon le plan (profil 2) : l'intervention rapporte 285,95 $ de plus sur l'année, comme le calcul de l'année",
+    Math.abs(ecart - 285.95) < 0.01 && Math.abs(r.brut - 222461.86) < 0.01, { ecart, brut: r.brut });
+  verifier("supervision selon le plan (profil 2) : la carte donne le même verdict et le même montant annuel (à 1 $ près)",
+    r.carte.includes("L'intervention de supervision rapporte") && r.carte.replace(/\s/g, "").includes("286$sur") && r.carte.includes("selon votre plan"), r.carte);
+  verifier("supervision selon le plan : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
 
@@ -1701,7 +1725,7 @@ async function ciblesTactiles(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, repertoireActes, revenuEtImpot, ciblesTactiles]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, repertoireActes, revenuEtImpot, ciblesTactiles]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

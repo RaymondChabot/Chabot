@@ -488,6 +488,12 @@ window.Verrou.quandOuvert(function () {
       : { ...S.revenu, autresRevenus: autresRev, enseignement: 0, residents: 0, externes: 0, patientsPendantSupervision: 0, ...x };
     const revenuDe = x => C.revenuGmfu(entree(x));
     R.rev = revenuDe();
+    // Supervision au mixte, sur l'année : l'intervention ou les visites des apprenants, avec tout le reste du plan.
+    // La carte « Supervision : intervention ou visites ? » s'y fie tant qu'on n'a pas réglé sa demi-journée.
+    if (R.milieu === "gmfu") {
+      const a = revenuDe({ supervisionFacturation: "acte" }).mixte, b = revenuDe({ supervisionFacturation: "visites" }).mixte;
+      R.supervisionAn = { acte: a.total, visites: b.total, intervention: a.supervision, visitesApprenants: b.visites - a.visites };
+    } else R.supervisionAn = null;
     const mode = !R.plusieursModes ? R.modes[0] : MODES.includes(S.revenu.modeBudget) ? S.revenu.modeBudget : "horaire";
     R.mode = mode;
     R.brut = R.rev[mode].total;
@@ -1420,15 +1426,19 @@ window.Verrou.quandOuvert(function () {
     const o = optionsActes(R, R.milieu === "gmfu" ? null : "etablissement"), r = S.revenu, v = supervisionDJ(), M = { ...C.RAMQ, ...C.montantsLieu(o.lieu, o.liste), ...o.montants };
     const x = C.demiJourneeSupervision({ ...o, heuresParDJ: v.heures, apresMidi: v.moment === "pm", residents: v.residents, externes: v.externes, pec: v.pec, suivi: v.suivi,
       enfants: v.enfants, grossesse: v.grossesse, trimestre: v.trimestre, pctVuln: v.vuln });
-    const base = x.forfait + x.perDiem, avecIntervention = base + x.intervention + x.responsabilite + x.supplements, avecVisites = base + x.visites, ecart = avecVisites - avecIntervention;
-    const anDJ = Math.min(+r.enseignement || 0, +r.demiJournees || 0) * Math.max(0, +r.semaines || 0);
+    const base = x.forfait + x.perDiem, anDJ = Math.min(+r.enseignement || 0, +r.demiJournees || 0) * Math.max(0, +r.semaines || 0);
+    // Selon votre plan : le verdict et les montants viennent du calcul de l'année (onglet Modes), ramenés à une
+    // demi-journée d'enseignement ; dès qu'on règle la demi-journée, ses valeurs priment.
+    const an = v.plan && R.supervisionAn && anDJ > 0 ? R.supervisionAn : null;
+    const avecIntervention = an ? base + an.intervention / anDJ : base + x.intervention + x.responsabilite + x.supplements;
+    const avecVisites = an ? avecIntervention + (an.visites - an.acte) / anDJ : base + x.visites, ecart = avecVisites - avecIntervention;
     const parSuivi = x.tarifSuivi * M.pctMixte / 100, manque = ecart < -0.005 && parSuivi > 0 ? Math.floor(-ecart / parSuivi + 1e-9) + 1 : 0;
-    return { o, v, M, x, avecIntervention, avecVisites, ecart, egal: Math.abs(ecart) < 0.5, anDJ, manque };
+    return { o, v, M, x, avecIntervention, avecVisites, ecart, egal: Math.abs(ecart) < 0.5, anDJ, manque, an, ecartAn: an ? an.visites - an.acte : ecart * anDJ };
   }
   function phraseSupervision(c) {
     return c.egal ? "Les deux façons de facturer rapportent autant."
       : `${c.ecart > 0 ? "Les visites rapportent" : "L'intervention de supervision rapporte"} ${$(Math.abs(c.ecart))} de plus par demi-journée`
-        + `${c.anDJ > 0 ? `, environ ${$(Math.abs(c.ecart) * c.anDJ)} sur vos ${nb(c.anDJ, 0)} demi-journées d'enseignement de l'année` : ""}.`
+        + `${c.anDJ > 0 ? `, ${c.an ? "" : "environ "}${$(Math.abs(c.ecartAn))} sur vos ${nb(c.anDJ, 0)} demi-journées d'enseignement de l'année` : ""}.`
         + (c.manque > 0 ? ` Les visites l'emporteraient avec ${nb(c.manque, 0)} suivi${c.manque > 1 ? "s" : ""} de plus.` : "");
   }
   // Comparer, résumé : la demi-journée de supervision en bref, et le lien vers son onglet. Pour toute pratique :
@@ -1450,6 +1460,7 @@ window.Verrou.quandOuvert(function () {
     const c = calculSupervision(R), { o, v, M, x, avecIntervention, avecVisites, ecart } = c, r = S.revenu, maj = 1 + (+r.majorationPct || 0) / 100;
     document.getElementById("sab-plan").hidden = v.plan;
     document.getElementById("sab-intro").textContent = (R.milieu === "gmfu" ? "" : "Votre pratique principale n'est pas en GMF-U : la comparaison sert à préparer une demi-journée d'enseignement en GMF-U. ")
+      + (c.an ? "Selon votre plan : les montants viennent du calcul de l'année (onglet Modes), par demi-journée d'enseignement ; réglez la demi-journée pour en essayer une autre. " : "")
       + "Au mixte, en GMF-U, vous facturez pour la demi-journée soit l'intervention de supervision, soit les visites. "
       + `Réglez votre demi-journée (AM comprend le soir) : les deux montants se comparent en haut. Tarifs ${o.lieu === "cabinet" ? "en cabinet" : "en établissement"}, `
       + `${o.palier ? "500 inscrits et plus" : "moins de 500 inscrits"}${maj !== 1 ? `, majoration de ${nb(+r.majorationPct, 1)} %` : ""}.`;
@@ -1488,8 +1499,15 @@ window.Verrou.quandOuvert(function () {
       ligne(nom, reglage(cle, nom, nb(v[cle], 0) + (cle === "vuln" ? " %" : ""), v[cle] > min, v[cle] < haut, (y, d) => { y[cle] = Math.min(haut, Math.max(min, y[cle] + d * pasV)); }));
     }
     z.appendChild(grille);
-    // Le calcul, ligne par ligne.
-    lignes(document.getElementById("sab-table"), ["", "Intervention", "Visites"], [
+    // Le calcul, ligne par ligne. Selon votre plan : les montants de l'année, par demi-journée d'enseignement.
+    if (c.an) lignes(document.getElementById("sab-table"), ["", "Intervention", "Visites"], [
+      { cellules: ["Forfait horaire", $2(x.forfait), $2(x.forfait)] },
+      { cellules: ["Demi-per diem des apprenants", $2(x.perDiem), $2(x.perDiem)] },
+      { cellules: ["Intervention de supervision, forfaits de responsabilité et suppléments", $2(c.an.intervention / c.anDJ), "—"] },
+      { cellules: ["Visites des apprenants", "—", $2(avecVisites - x.forfait - x.perDiem)] },
+      { cls: "total", cellules: ["Total de la demi-journée", $2(avecIntervention), $2(avecVisites)] },
+    ]);
+    else lignes(document.getElementById("sab-table"), ["", "Intervention", "Visites"], [
       { cellules: ["Forfait horaire", $2(x.forfait), $2(x.forfait)] },
       { cellules: ["Demi-per diem des apprenants", $2(x.perDiem), $2(x.perDiem)] },
       { cellules: [`Intervention de supervision, ${nb(x.heures, 2)} h`, $2(x.intervention), "—"] },
