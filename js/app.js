@@ -1134,9 +1134,9 @@ window.Verrou.quandOuvert(function () {
       action("info", `Votre première année de pratique (${S.revenu.anneePremiere}) est terminée : quand votre clientèle sera bâtie, choisissez « Année type » (Revenu, Modifier).`);
     if (R.couple && S.conjointe.statut !== "sans" && !(S.conjointe.statut === "autonome" ? S.conjointe.revenuAutonome : S.conjointe.salaire)) action("important", `Inscrivez le revenu de ${votreP()} (Budget, bouton Famille) : son impôt, les transferts de crédits, les allocations et la prime d'assurance médicaments en dépendent.`);
     // En résidence, le régime d'assurance collective de l'entente de la FMRQ couvre les médicaments (art. 28.10).
-    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si cette assurance collective vous couvre, décochez le régime public (Budget, bouton Famille) ; la prime, jusqu'à 789 $, ne s'applique pas.");
+    if (R.vueResidence && S.famille.medicamentsPublicMoi) action("info", "En résidence, l'assurance collective de l'entente de la FMRQ couvre les médicaments : si cette assurance collective vous couvre, décochez le régime public (Budget, bouton Famille) ; la prime, jusqu'à 777,50 $ pour 2026, ne s'applique pas.");
     else if (!S.confirmes["famille.medicamentsPublicMoi"] || (R.couple && !S.confirmes["conjointe.medicamentsPublic"]))
-      action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à 789 $ par adulte du 1er juillet 2026 au 30 juin 2027, est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
+      action("info", `Confirmez l'assurance médicaments de chaque adulte : pour le régime public, la prime, jusqu'à ${$2(C.parametresActifs().medicaments.max)} par adulte pour l'année (766 $ par année jusqu'au 30 juin 2026, 789 $ ensuite), est comptée ${R.primeMoi + R.primeConjointe > 0 ? `(${$(R.primeMoi + R.primeConjointe)} cette année)` : "seulement pour une personne sans assurance collective"}.`);
     const auj = new Date(S.strategie.debut + "-01T00:00:00");
     S.dettes.filter(d => d.type === "hypotheque" && d.finTerme).forEach(d => {
       const f = new Date(d.finTerme + "T00:00:00"); const mois = (f - auj) / 2.63e9;
@@ -1498,7 +1498,7 @@ window.Verrou.quandOuvert(function () {
       + `Intervention de supervision : ${$2(M.acteSupervision * maj)} l'heure payée à ${nb(M.pctSupervision, 2)} %, au plus ${nb(M.supervisionMaxH, 1)} h (5 h l'après-midi), un seul acte quel que soit le nombre d'apprenants ; `
       + `les visites faites pendant le bloc ne se facturent alors pas, mais le forfait de responsabilité (${$2(M.forfaitResponsabilite * maj)}) de chaque patient vulnérable inscrit examiné, oui, à 100 % (annexe II à l'annexe XXIII). `
       + `Les suppléments à l'examen périodique d'un enfant de 0 à 5 ans (${$2(M.suppExamenEnfant * maj)}), au suivi de grossesse (${$2(M.suppSuiviGrossesse * maj)}) et à la première visite de grossesse au 1er trimestre (${$2(M.suppGrossessePremierTrimestre * maj)}) aussi, `
-      + "selon les visites indiquées ; la prise en charge temporaire d'une cliente enceinte (15189, 19074) aussi, mais son montant reste à confirmer : elle n'est pas comptée. "
+      + "selon les visites indiquées ; la prise en charge temporaire d'une cliente enceinte (15189, 8,95 $ ; 19074 en GMF, 9,35 $) aussi, mais elle dépend de vos patientes : elle est au répertoire, pas dans ce calcul. "
       + `Visites : ${nb(M.pctMixte, 2)} % du tarif, les vôtres et celles des apprenants ; prise en charge ${$2(x.tarifPec)} et suivi ${$2(x.tarifSuivi)}, selon la part de patients vulnérables (le forfait de responsabilité est compris dans le tarif des visites de patients vulnérables). Montants avant les frais et l'impôt.`;
     if (U.sdjFocus) { const f = document.getElementById(U.sdjFocus); U.sdjFocus = null; if (f && !f.disabled) f.focus(); }
   }
@@ -2414,8 +2414,8 @@ window.Verrou.quandOuvert(function () {
   // Refait les cas de l'outil officiel avec le calcul de WealthMorand et montre les écarts.
   const CHAMPS_VERIF = [["qc", "Impôt du Québec"], ["fed", "Impôt fédéral"], ["rrq", "RRQ"], ["rqap", "RQAP"], ["ae", "Assurance-emploi"],
     ["af", "Allocation famille"], ["fournitures", "Fournitures scolaires"], ["ace", "Allocation canadienne pour enfants"], ["prime", "Prime d'assurance médicaments"]];
-  // L'outil de mai 2026 plafonnait la prime à 766 $. Du 1er juillet 2026 au 30 juin 2027, la RAMQ publie 789 $.
-  const primeAttendue = off => off === 766 ? 789 : off === 1532 ? 1578 : off;
+  // L'outil de mai 2026 plafonnait la prime à 766 $. La RAMQ publie 789 $ dès le 1er juillet 2026 : 777,50 $ pour l'année 2026.
+  const primeAttendue = off => off === 766 ? 777.5 : off === 1532 ? 1555 : off;
   const ecartVerif = (k, nous, off) => Math.round(nous) - (k === "prime" ? primeAttendue(off) : off);
   function casCalcul(v) { return C.avecAnnee(2026, () => casCalcul2026(v)); }   // l'outil officiel porte sur 2026
   function casCalcul2026(v) {
@@ -2458,7 +2458,7 @@ window.Verrou.quandOuvert(function () {
       tableauSimple(d, ["", "Officiel", "WealthMorand", "Écart"], ecarts.map(x => ({ cellules: [x.n, $(x.off), $(x.nous), x.plafond ? "plafond" : x.e ? signe(x.e) : "—"] })));
     });
     z.appendChild(d);
-    z.appendChild(el("p", "aide", "Outil de calcul du revenu disponible des familles (version de mai 2026, année 2026), consulté le 25 octobre 2026. L'outil ne traite que des revenus d'emploi : il valide les barèmes, les crédits, les transferts entre conjoints, les allocations et la prime d'assurance médicaments. Votre revenu de travailleur autonome (RRQ des deux parts, Fonds des services de santé) suit les mêmes barèmes, mais ne peut pas y être vérifié. La prime de ces cas est plafonnée à 766 $ dans l'outil de mai ; du 1er juillet 2026 au 30 juin 2027, le plafond publié par la RAMQ est 789 $ par adulte : ces lignes indiquent « plafond »."));
+    z.appendChild(el("p", "aide", "Outil de calcul du revenu disponible des familles (version de mai 2026, année 2026), consulté le 25 octobre 2026. L'outil ne traite que des revenus d'emploi : il valide les barèmes, les crédits, les transferts entre conjoints, les allocations et la prime d'assurance médicaments. Votre revenu de travailleur autonome (RRQ des deux parts, Fonds des services de santé) suit les mêmes barèmes, mais ne peut pas y être vérifié. La prime de ces cas est plafonnée à 766 $ dans l'outil de mai ; la RAMQ publie 789 $ par adulte dès le 1er juillet 2026, soit 777,50 $ pour l'année 2026 : ces lignes indiquent « plafond »."));
   }
 
   function rendreBudget(R) {

@@ -203,9 +203,10 @@ côte à côte (ci-dessus). Les anciennes adresses `#revenu/actes` et
   l'annexe XXIII, Brochure no 1) : forfait GMF (08875), suppléments à la prise en charge d'un patient sans médecin
   de famille (19957 à 19960), forfait de formation des apprenants (demi-per diem, huit codes de 19911 à 19921), constatation
   et bulletin de décès, réanimation cardio-respiratoire, congé en établissement, perte d'autonomie, sécurité du
-  revenu, curateur public, CNESST et IVAC (à la fin de leur groupe) ; l'AH-509 (09817) et la
-  prise en charge temporaire d'une cliente enceinte (15189, 19074) y sont, montant « à confirmer » (absent des
-  documents consultés). Pas encore : horaires défavorables (clinique réseau, GMF-réseau), supervision de stages
+  revenu, curateur public, CNESST et IVAC (à la fin de leur groupe), l'AH-509 (09817, 29,65 $) et la
+  prise en charge temporaire d'une cliente enceinte (15189, 8,95 $ ; 19074, 9,35 $ de plus en GMF : Brochure no 1,
+  version Web du 25 octobre 2026). Les actes chirurgicaux ont leurs montants au cent près (version Web du manuel ; la
+  version imprimable coupe les cents). Pas encore : horaires défavorables (clinique réseau, GMF-réseau), supervision de stages
   d'IPS et d'étudiantes sages-femmes. « Comparaison demi-journée » (onglet de l'Aperçu, onglet
   Demi-journée de Comparer, et carte du résumé de Comparer, pour toute pratique : hors GMF-U, aux tarifs
   d'établissement du GMF-U) : une demi-journée à régler (résidents,
@@ -399,9 +400,11 @@ dossier racine.
   redonne 2,85 % pour 2025 et 2,05 % pour 2026 ; paliers et montants de
   garde au multiple de 5 $). Assurance-emploi 2027 : maximum assurable de
   70 800 $ et taux du Québec de 1,29 % (Commission de l'assurance-emploi
-  du Canada, taux de 2027, consulté le 31 octobre 2026). RRQ,
-  RQAP, prime d'assurance médicaments et Allocation canadienne pour enfants :
-  ceux de 2026, en attendant. La page Impôt et le rapport l'indiquent
+  du Canada, taux de 2027, consulté le 31 octobre 2026). Prime d'assurance
+  médicaments : 789 $ au plus par adulte (tarif du 1er juillet 2026 ; celui de
+  juillet 2027 n'est pas publié) ; en 2026, 777,50 $ (six mois à 766 $, six mois
+  à 789 $ ; RAMQ, tarifs en vigueur, consulté le 31 octobre 2026). RRQ, RQAP et
+  Allocation canadienne pour enfants : ceux de 2026, en attendant. La page Impôt et le rapport l'indiquent
   (« Montants 2027 provisoires ») ; la vérification officielle reste faite
   avec 2026, l'année de l'outil du ministère des Finances.
 - Résidence : Entente relative aux conditions de travail des médecins

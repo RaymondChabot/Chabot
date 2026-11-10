@@ -37,11 +37,11 @@
       taux1: [0, 0.07, 0.135, 0.19, 0.23], base2: [0, 3123, 6022, 8476, 10260], taux2: [0, 0.032, 0.057, 0.08, 0.095] },
     allocationFamille: { max: 3068, min: 1221, seuilCouple: 60398, seuilMono: 44032, taux: 0.04,
       monoMax: 1077, monoMin: 430, fournitures: 127 },
-    /* Cotisation au régime public d'assurance médicaments : maximum de 789 $ par adulte du 1er juillet 2026
-       au 30 juin 2027 (RAMQ, tarifs en vigueur, consulté le 31 octobre 2026,
-       https://www.ramq.gouv.qc.ca/fr/citoyens/assurance-medicaments/tarifs-vigueur). L'année d'avant, 766 $.
-       Déductions de 2025 indexées de 2,05 %. */
-    medicaments: { max: 789, deductions: { seul: 20298, mono1: 32901, mono2: 37207, couple0: 32901, couple1: 37207, couple2: 41187 },
+    /* Cotisation au régime public d'assurance médicaments : maximum de 766 $ par adulte jusqu'au 30 juin 2026, puis de
+       789 $ du 1er juillet 2026 au 30 juin 2027 (RAMQ, tarifs en vigueur, consulté le 31 octobre 2026,
+       https://www.ramq.gouv.qc.ca/fr/citoyens/assurance-medicaments/tarifs-vigueur). La déclaration de 2026 couvre six
+       mois de chaque tarif : 777,50 $ au plus par adulte. Déductions de 2025 indexées de 2,05 %. */
+    medicaments: { max: 777.50, deductions: { seul: 20298, mono1: 32901, mono2: 37207, couple0: 32901, couple1: 37207, couple2: 41187 },
       seuil: 5000, tauxCouple: [0.0393, 0.0589], tauxSeul: [0.0784, 0.1176] },
     /* Cotisation des particuliers au Fonds des services de santé, sur les revenus autres que d'emploi : 1 % au-delà
        de 18 500 $, jusqu'à 150 $ ; 150 $ jusqu'à 64 355 $ ; puis 1 % de plus, au plus 1 000 $ (Paramètres du régime
@@ -89,6 +89,8 @@
     for (const k of Object.keys(p.medicaments.deductions)) p.medicaments.deductions[k] = dollar(p.medicaments.deductions[k], q);
     p.garde.quebec.moins7 = cinq(p.garde.quebec.moins7, q); p.garde.quebec.autres = cinq(p.garde.quebec.autres, q);
     p.garde.quebec.taux = p.garde.quebec.taux.map(([seuil, taux]) => [cinq(seuil, q), taux]);
+    // Prime d'assurance médicaments : 789 $ jusqu'au 30 juin 2027 ; le tarif de juillet 2027 n'est pas publié, on garde 789 $.
+    p.medicaments.max = 789;
     p.ae = { max: 70800, taux: 0.0129 };
     p.dividendes.creditQuebec = p.dividendes.creditQuebecDes2027;
     return Object.assign(p, { annee: 2027, provisoire: true, index: INDEX_2027 });
@@ -417,7 +419,8 @@
       // visée (Brochure no 1, version en vigueur au 5 novembre 2026) : forfait de responsabilité des patients vulnérables
       // inscrits (15169, 15170), supplément à l'examen périodique d'un enfant de 0 à 5 ans (08877), au suivi de grossesse (15145)
       // et au premier examen de grossesse au 1er trimestre (15159, une fois par grossesse). La prise en charge temporaire d'une
-      // cliente enceinte (15189, 19074) aussi, mais son montant n'est pas dans les documents consultés : elle n'est pas comptée.
+      // cliente enceinte (15189 ; 19074 en GMF) aussi, mais l'app ne sait pas combien de patientes la personne prend ainsi en
+      // charge : elle reste au répertoire et n'est pas comptée dans l'année.
       supervision: visitesApprenants ? 0 : W * T * heuresSup * m("acteSupervision") * maj * m("pctSupervision") / 100
         + W * T * (apprenants + pendant) * ((partVisite(r.mix, "suiviV") + partVisite(r.mix, "perioV")) * m("forfaitResponsabilite")
           + partVisite(r.mix, "pedia") * m("suppExamenEnfant")

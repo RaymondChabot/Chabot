@@ -2,14 +2,16 @@
    Sources :
    - Manuel des médecins omnipraticiens, rémunération à l'acte, version imprimable du 28 octobre 2026 (RAMQ,
      https://www.ramq.gouv.qc.ca/fr/professionnels/media/32651, consulté le 6 novembre 2026) : tarifs de l'onglet B
-     (colonne « En CLSC ou en GMF-U en établissement ») et des onglets C, F et Q. Les actes chirurgicaux y sont publiés
-     en dollars entiers.
+     (colonne « En CLSC ou en GMF-U en établissement ») et des onglets C, F et Q. La version imprimable coupe les cents
+     des actes chirurgicaux : leurs montants viennent de la version Web du manuel (consultée le 25 octobre 2026).
    - Brochure no 1, Entente générale, version en vigueur au 5 novembre 2026 (RAMQ, consultée le 6 novembre 2026) :
      forfait horaire, intervention de supervision, pourcentages payés au mixte en GMF-U (63,58 % des services médicaux,
      62,15 % des services sur base de temps), suppléments payés à 100 % (annexe II à l'annexe XXIII).
    - EP 40 et EP 42 (Brochure no 1) : forfait de responsabilité, suppléments, demi-per diem (liste 1, établissement).
+   - Brochure no 1, version Web consultée le 25 octobre 2026 : AH-509 (09817, protocole d'accord du programme de dépistage
+     du cancer du sein) et prise en charge temporaire d'une cliente enceinte (15189 ; 19074, EP 40, par. 7.03).
    Ordre : fréquence estimée pour une pratique en GMF-U, validée avec la personne le 6 novembre 2026.
-   Champs : g groupe, n nom, c codes, t tarif (nombre, [palier 1, palier 2] ou null si absent du manuel), p part payée
+   Champs : g groupe, n nom, c codes, t tarif (nombre, [palier 1, palier 2] ou null si non facturable à part), p part payée
    au mixte en % (0 : non facturable à part), d libellés des deux montants, k mots de recherche, note. */
 (function (racine) {
   "use strict";
@@ -81,25 +83,27 @@
     { g: "techniques", n: "Extraction de stérilet, acte compliqué", c: ["20025"], t: 58.75, p: MED, k: "diu contraception gynecologie retrait" },
     { g: "techniques", n: "Implant contraceptif sous-cutané", c: ["06980", "06981"], t: [109.05, 139.60], d: ["un implant", "plus d'un"], p: MED, k: "contraception nexplanon" },
     { g: "techniques", n: "Exérèse d'implant contraceptif", c: ["06982", "06983"], t: [125.40, 169.80], d: ["un implant", "plus d'un"], p: MED, k: "contraception retrait" },
-    { g: "techniques", n: "Cryochirurgie, lésion précancéreuse : tronc, bras, jambes", c: ["01240", "01241"], t: [26, 46], d: CM, p: MED, k: "keratose actinique azote", note: "Biopsies comprises ; au plus 4 lésions payées." },
-    { g: "techniques", n: "Cryochirurgie, lésion précancéreuse : face, cuir chevelu, oreilles, cou, mains, pieds, organes génitaux", c: ["01238", "01239"], t: [41, 63], d: CM, p: MED, k: "keratose actinique azote", note: "Biopsies comprises ; au plus 4 lésions payées." },
-    { g: "techniques", n: "Cryochirurgie, lésion précancéreuse : paupière, nez, lèvres, muqueuses", c: ["01236", "01237"], t: [54, 86], d: CM, p: MED, k: "keratose actinique azote", note: "Biopsies comprises ; au plus 4 lésions payées." },
-    { g: "techniques", n: "Cryochirurgie, lésion cancéreuse : tronc, bras, jambes", c: ["01246", "01247"], t: [54, 68], d: CM, p: MED, k: "cancer peau azote" },
-    { g: "techniques", n: "Cryochirurgie, lésion cancéreuse : face, cuir chevelu, oreilles, cou, mains, pieds, organes génitaux", c: ["01244", "01245"], t: [71, 98], d: CM, p: MED, k: "cancer peau azote" },
-    { g: "techniques", n: "Cryochirurgie, lésion cancéreuse : paupières, nez, lèvres, muqueuses", c: ["01242", "01243"], t: [92, 135], d: CM, p: MED, k: "cancer peau azote" },
-    { g: "techniques", n: "Excision, lésion précancéreuse : tronc, bras, jambes", c: ["01184", "01185"], t: [30, 50], d: CM, p: MED, k: "exerese peau", note: "Biopsies comprises ; au plus 4 lésions payées." },
-    { g: "techniques", n: "Excision, lésion précancéreuse : face, cuir chevelu, oreilles, cou, mains, pieds, organes génitaux", c: ["01182", "01183"], t: [46, 70], d: CM, p: MED, k: "exerese peau" },
-    { g: "techniques", n: "Excision, lésion précancéreuse : paupière, nez, lèvres, muqueuses", c: ["01180", "01181"], t: [60, 100], d: CM, p: MED, k: "exerese peau" },
-    { g: "techniques", n: "Réparation d'une lacération simple, face et cou (moins de 1 cm)", c: ["01320"], t: 27, p: MED, k: "suture plaie points", note: "10 $ par cm de plus, au plus 236 $." },
-    { g: "techniques", n: "Réparation d'une lacération simple, autres sites (moins de 1 cm)", c: ["01323"], t: 17, p: MED, k: "suture plaie points", note: "4 $ par cm de plus, au plus 141 $." },
-    { g: "techniques", n: "Onycectomie simple, doigt ou orteil", c: ["01215"], t: 19, p: MED, k: "ongle incarne" },
-    { g: "techniques", n: "Onycectomie radicale, exérèse de la matrice", c: ["01216"], t: 52, p: MED, k: "ongle incarne" },
-    { g: "techniques", n: "Excision chirurgicale d'une verrue non faciale, la première", c: ["01222"], t: 16, p: MED, k: "verrue", note: "4 $ par verrue de plus, au plus 16 de plus." },
-    { g: "techniques", n: "Excision chirurgicale d'une verrue faciale, la première", c: ["01223"], t: 29, p: MED, k: "verrue", note: "9 $ par verrue de plus, au plus 10 de plus." },
-    { g: "techniques", n: "Électrocoagulation, première lésion", c: ["01300"], t: 7, p: MED, k: "cauterisation", note: "2 $ par lésion de plus, au plus 19 $ par séance." },
-    { g: "techniques", n: "Exérèse d'un corps étranger, simple", c: ["01196"], t: 26, p: MED, k: "echarde" },
-    { g: "techniques", n: "Incision et drainage d'un abcès sus-fascial", c: ["01005"], t: null, p: MED, k: "abces", note: "Montant absent du manuel imprimable du 28 octobre 2026." },
-    { g: "techniques", n: "Excision d'une tumeur bénigne (naevus, lipome…), fermeture simple", c: ["01164", "01165"], t: null, p: MED, k: "kyste grain de beaute lipome", note: "Montant absent du manuel imprimable du 28 octobre 2026." },
+    { g: "techniques", n: "Cryochirurgie, lésion précancéreuse : tronc, bras, jambes", c: ["01240", "01241"], t: [26.95, 46.30], d: CM, p: MED, k: "keratose actinique azote", note: "Biopsies comprises ; au plus 4 lésions payées." },
+    { g: "techniques", n: "Cryochirurgie, lésion précancéreuse : face, cuir chevelu, oreilles, cou, mains, pieds, organes génitaux", c: ["01238", "01239"], t: [41.45, 63.70], d: CM, p: MED, k: "keratose actinique azote", note: "Biopsies comprises ; au plus 4 lésions payées." },
+    { g: "techniques", n: "Cryochirurgie, lésion précancéreuse : paupière, nez, lèvres, muqueuses", c: ["01236", "01237"], t: [54.00, 86.45], d: CM, p: MED, k: "keratose actinique azote", note: "Biopsies comprises ; au plus 4 lésions payées." },
+    { g: "techniques", n: "Cryochirurgie, lésion cancéreuse : tronc, bras, jambes", c: ["01246", "01247"], t: [54.00, 68.05], d: CM, p: MED, k: "cancer peau azote" },
+    { g: "techniques", n: "Cryochirurgie, lésion cancéreuse : face, cuir chevelu, oreilles, cou, mains, pieds, organes génitaux", c: ["01244", "01245"], t: [71.10, 98.95], d: CM, p: MED, k: "cancer peau azote" },
+    { g: "techniques", n: "Cryochirurgie, lésion cancéreuse : paupières, nez, lèvres, muqueuses", c: ["01242", "01243"], t: [92.55, 135.75], d: CM, p: MED, k: "cancer peau azote" },
+    { g: "techniques", n: "Excision, lésion précancéreuse : tronc, bras, jambes", c: ["01184", "01185"], t: [30.00, 50.85], d: CM, p: MED, k: "exerese peau", note: "Biopsies comprises ; au plus 4 lésions payées." },
+    { g: "techniques", n: "Excision, lésion précancéreuse : face, cuir chevelu, oreilles, cou, mains, pieds, organes génitaux", c: ["01182", "01183"], t: [46.15, 70.75], d: CM, p: MED, k: "exerese peau" },
+    { g: "techniques", n: "Excision, lésion précancéreuse : paupière, nez, lèvres, muqueuses", c: ["01180", "01181"], t: [60.05, 100.00], d: CM, p: MED, k: "exerese peau" },
+    { g: "techniques", n: "Réparation d'une lacération simple, face et cou (moins de 1 cm)", c: ["01320"], t: 27.50, p: MED, k: "suture plaie points", note: "10,45 $ par cm de plus, au plus 236,50 $." },
+    { g: "techniques", n: "Réparation d'une lacération simple, autres sites (moins de 1 cm)", c: ["01323"], t: 17.75, p: MED, k: "suture plaie points", note: "4,60 $ par cm de plus, au plus 141,95 $." },
+    { g: "techniques", n: "Onycectomie simple, doigt ou orteil", c: ["01215"], t: 19.15, p: MED, k: "ongle incarne" },
+    { g: "techniques", n: "Onycectomie radicale, exérèse de la matrice", c: ["01216"], t: 52.20, p: MED, k: "ongle incarne" },
+    { g: "techniques", n: "Excision chirurgicale d'une verrue non faciale, la première", c: ["01222"], t: 16.65, p: MED, k: "verrue", note: "4,05 $ par verrue de plus, au plus 16 de plus." },
+    { g: "techniques", n: "Excision chirurgicale d'une verrue faciale, la première", c: ["01223"], t: 29.40, p: MED, k: "verrue", note: "9,80 $ par verrue de plus, au plus 10 de plus." },
+    { g: "techniques", n: "Électrocoagulation, première lésion", c: ["01300"], t: 7.30, p: MED, k: "cauterisation", note: "2,05 $ par lésion de plus, au plus 19,60 $ par séance." },
+    { g: "techniques", n: "Exérèse d'un corps étranger, simple", c: ["01196"], t: 26.25, p: MED, k: "echarde" },
+    { g: "techniques", n: "Incision et drainage d'un abcès sus-fascial", c: ["01005"], t: 17.00, p: MED, k: "abces", note: "Unique ou multiple ; 24,65 $ en cabinet." },
+    { g: "techniques", n: "Excision chirurgicale, fermeture simple, 3 cm ou moins : face, oreilles, paupières, nez, lèvres, muqueuses", c: ["01164"], t: 18.55, p: MED, k: "kyste grain de beaute naevus lipome tumeur benigne exerese" },
+    { g: "techniques", n: "Excision chirurgicale, fermeture simple, 3 cm ou moins : cuir chevelu, cou, mains, pieds, organes génitaux", c: ["01165"], t: 15.35, p: MED, k: "kyste grain de beaute naevus lipome tumeur benigne exerese" },
+    { g: "techniques", n: "Excision chirurgicale, fermeture simple, 3 cm ou moins : tronc, bras, jambes", c: ["01166"], t: 12.20, p: MED, k: "kyste grain de beaute naevus lipome tumeur benigne exerese" },
 
     // Formulaires et suppléments (les formulaires de la CNESST viennent du moteur : Calc.CNESST ; à la fin du groupe).
     // Forfait GMF et suppléments à la prise en charge d'un patient sans médecin de famille : payés à 100 % au mixte (annexe II
@@ -148,10 +152,10 @@
     { g: "formulaires", n: "Sécurité du revenu : information médicale complémentaire, verbale", c: ["09801"], t: 20.00, p: PLEIN, k: "aide sociale" },
     { g: "formulaires", n: "Curateur public : évaluation médicale (rapport du directeur général)", c: ["09825"], t: 26.15, p: PLEIN, k: "inaptitude regime protection" },
     { g: "formulaires", n: "Curateur public : réévaluation médicale", c: ["09826"], t: 26.15, p: PLEIN, k: "inaptitude regime protection" },
-    { g: "formulaires", n: "Dépistage du cancer du sein : rapport de confirmation diagnostique (AH-509)", c: ["09817"], t: null, p: PLEIN, k: "pqdcs mammographie",
-      note: "Payé à 100 % au mixte. Montant absent du manuel du 28 octobre 2026 et de la Brochure no 1 : à confirmer auprès de la RAMQ." },
-    { g: "formulaires", n: "Prise en charge temporaire d'une cliente enceinte, sans devenir son médecin de famille", c: ["15189", "19074"], t: null, p: PLEIN,
-      k: "grossesse obstetrique temporaire", note: "Payé à 100 % au mixte, aussi pendant l'intervention de supervision. Montant absent du manuel du 28 octobre 2026 et de la Brochure no 1 : à confirmer auprès de la RAMQ." },
+    { g: "formulaires", n: "Dépistage du cancer du sein : rapport de confirmation diagnostique (AH-509)", c: ["09817"], t: 29.65, p: PLEIN, k: "pqdcs mammographie",
+      note: "Protocole d'accord du programme de dépistage du cancer du sein (Brochure no 1)." },
+    { g: "formulaires", n: "Prise en charge temporaire d'une cliente enceinte, sans devenir son médecin de famille", c: ["15189", "19074"], t: [8.95, 9.35], d: ["15189", "19074 en plus, membre d'un GMF"], p: PLEIN,
+      k: "grossesse obstetrique temporaire", note: "Médecin qui a des privilèges en obstétrique ; 11,85 $ en cabinet. 19074 : patiente inscrite auprès d'un autre médecin du même GMF (EP 40, par. 7.03). Payé à 100 % au mixte, aussi pendant l'intervention de supervision." },
 
     // Non facturables à part (annexe I du préambule général : compris dans la visite) ou hors GMF-U.
     { g: "non", n: "Cryothérapie d'une lésion (verrue, lésion bénigne)", c: [], t: null, p: 0, k: "azote verrue", note: "Comprise dans la visite (annexe I du préambule général)." },

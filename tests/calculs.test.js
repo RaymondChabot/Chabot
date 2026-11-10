@@ -18,10 +18,10 @@ const proche = (a, b, tol) => Math.abs(a - b) <= tol;
 const catalogues = fs.readFileSync(path.join(__dirname, "../js/catalogues.js"), "utf8");
 const VERIFICATION = JSON.parse(catalogues.match(/const VERIFICATION = (\[.*?\]);\n/s)[1]);
 let maxEcart = 0;
-// Prime : l'outil de mai 2026 plafonnait à 766 $ par adulte. Du 1er juillet 2026 au 30 juin 2027,
-// la RAMQ publie 789 $ (tarifs en vigueur, consultés le 31 octobre 2026). On compare à ce plafond,
-// sans réécrire les montants conservés de l'outil.
-const primeAttendue = off => off === 766 ? 789 : off === 1532 ? 1578 : off;
+// Prime : l'outil de mai 2026 plafonnait à 766 $ par adulte. La RAMQ publie 789 $ dès le 1er juillet 2026
+// (tarifs en vigueur, consultés le 31 octobre 2026) : six mois de chaque tarif, 777,50 $ pour l'année 2026.
+// On compare à ce plafond, sans réécrire les montants conservés de l'outil.
+const primeAttendue = off => off === 766 ? 777.5 : off === 1532 ? 1555 : off;
 for (const v of VERIFICATION) {
   let a = C.impotSalarie({ salaire: v.salaires[0] }), b = v.couple ? C.impotSalarie({ salaire: v.salaires[1] }) : null;
   if (v.couple) [a, b] = C.transfertsConjoints(a, b);
@@ -482,9 +482,23 @@ verifier("CNESST et IVAC : les 42 codes de l'annexe II à l'annexe XXIII, dont l
     "09954", "09970", "09971", "09973", "09977", "09978", "09980", "15795", "15796", "15797"];
   const manquants = annexe.filter(c => !presents.has(c));
   verifier("annexe II à l'annexe XXIII : chaque code est dans le répertoire ou la liste CNESST", manquants.length === 0, manquants);
-  const sansMontant = Rep.ACTES.filter(a => a.t == null && a.p === 100).map(a => a.c.join("/"));
-  verifier("annexe II : sans montant dans les documents consultés, seulement l'AH-509 et la grossesse prise en charge temporairement",
-    sansMontant.join() === "09817,15189/19074", sansMontant);
+  const sansMontant = Rep.ACTES.filter(a => a.t == null && a.p > 0).map(a => a.c.join("/"));
+  verifier("répertoire : chaque acte facturable a son montant (aucun « à confirmer »)", sansMontant.length === 0, sansMontant);
+  const tarif = c => Rep.ACTES.find(a => a.c.includes(c)).t;
+  verifier("AH-509 : 29,65 $ ; grossesse prise en charge temporairement : 8,95 $ (15189) et 9,35 $ de plus en GMF (19074)",
+    tarif("09817") === 29.65 && tarif("15189").join() === "8.95,9.35", [tarif("09817"), tarif("15189")]);
+  /* Actes techniques : manuel des médecins omnipraticiens, version Web consultée le 25 octobre 2026 (la version imprimable
+     coupe les cents), colonne en établissement. */
+  const TECHNIQUES = { "01240": [26.95, 46.30], "01238": [41.45, 63.70], "01236": [54.00, 86.45], "01246": [54.00, 68.05], "01244": [71.10, 98.95],
+    "01242": [92.55, 135.75], "01184": [30.00, 50.85], "01182": [46.15, 70.75], "01180": [60.05, 100.00], "01320": 27.50, "01323": 17.75,
+    "01215": 19.15, "01216": 52.20, "01222": 16.65, "01223": 29.40, "01300": 7.30, "01196": 26.25, "01005": 17.00, "01164": 18.55, "01165": 15.35,
+    "01166": 12.20, "00431": 16.50, "00430": 16.65, "00205": 55.95, "20025": 58.75, "06980": [109.05, 139.60], "06982": [125.40, 169.80] };
+  const ecartsTech = Object.entries(TECHNIQUES).filter(([c, t]) => String(tarif(c)) !== String(t)).map(([c]) => c);
+  const techniques = Rep.ACTES.filter(a => a.g === "techniques").map(a => a.c[0]);
+  verifier("actes techniques : chaque tarif égale la version Web du manuel, cents compris",
+    ecartsTech.length === 0 && techniques.every(c => c in TECHNIQUES), [ecartsTech, techniques.filter(c => !(c in TECHNIQUES))]);
+  verifier("prime d'assurance médicaments : 777,50 $ au plus par adulte en 2026 (six mois à 766 $, six mois à 789 $), 789 $ en 2027",
+    C.P2026.medicaments.max === 777.5 && C.P2027.medicaments.max === 789);
 }
 
 /* 25. CELIAPP (ARC, « Cotiser à un CELIAPP », 31 octobre 2026) : droits de 8 000 $ par année, plus le report des droits
