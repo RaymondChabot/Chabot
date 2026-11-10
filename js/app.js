@@ -544,7 +544,36 @@ window.Verrou.quandOuvert(function () {
     R.celiappVoulu = Math.max(0, +(S.epargne.celiapp || {}).cotisationAnnuelle || 0);
     // Personne à charge admissible : vous seul, sans conjoint au sens de l'impôt, avec un enfant de moins de 18 ans.
     const enfantACharge = a => S.epargne.reee.enfants.some(x => +x.age + a < 18);
-    const base = { depensesPro: R.depensesPro, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(0), interetsEtudes: R.interetsEtudes, autresImposables: R.autresNonPro,
+    /* REER : la déduction d'une année ne dépasse pas les droits. L'an 0, ceux inscrits (avis de cotisation fédéral) ;
+       ensuite, ce qui en reste, plus 18 % du revenu gagné de l'année d'avant, jusqu'au plafond de l'année (ARC,
+       « Plafonds des REER », page modifiée le 28 octobre 2026 : 33 810 $ en 2026, 35 390 $ en 2027 ; après 2027, le
+       dernier plafond publié). Revenu gagné : la pratique moins les dépenses professionnelles, ou le salaire de
+       résident ; en société, les dividendes n'en donnent pas. Sans droits inscrits, rien n'est borné. */
+    const PLAFONDS_REER = { 2026: 33810, 2027: 35390 };
+    const plafondReer = an => PLAFONDS_REER[Math.min(2027, Math.max(2026, an))];
+    R.reerVoulu = Math.max(0, +S.epargne.reer.cotisationAnnuelle || 0);
+    R.reerDroits = Math.max(0, +S.epargne.reer.droits || 0);
+    R.reerBorne = R.reerDroits > 0;
+    const reerAns = [], anReer0 = +String(S.strategie.debut).slice(0, 4) || new Date().getFullYear();
+    let reerDispo = R.reerDroits;
+    const gagneAvant = a => {   // revenu gagné de la période a (dollars d'aujourd'hui)
+      if (R.societeActive) return 0;
+      const enResidence = R.residenceActive && R.moisAvantPratique >= 12 * a + 6;
+      if (enResidence) return R.res ? R.res.brut : 0;
+      const rev = a === 0 ? R.rev : R.revType || R.rev;
+      return Math.max(0, rev[R.mode].total - R.depensesPro);
+    };
+    R.reerAnnee = a => {
+      a = Math.max(0, a);
+      if (!R.reerBorne) return R.reerVoulu;
+      while (reerAns.length <= a) {
+        const k = reerAns.length;
+        if (k > 0) reerDispo += Math.min(0.18 * gagneAvant(k - 1), plafondReer(anReer0 + k));
+        const d = Math.min(R.reerVoulu, reerDispo); reerAns.push(d); reerDispo -= d;
+      }
+      return reerAns[a];
+    };
+    const base = { depensesPro: R.depensesPro, reer: R.reerAnnee(0) + R.celiappAnnee(0), interetsEtudes: R.interetsEtudes, autresImposables: R.autresNonPro,
       personneACharge: !R.coupleFiscal && enfantACharge(0) };
     // Partenaire : salarié, ou à son compte (même calcul que le médecin travailleur autonome).
     // reel : facteur de revenu en dollars d'aujourd'hui (années futures).
@@ -747,7 +776,7 @@ window.Verrou.quandOuvert(function () {
       const totalP = rev ? rev[mode].total * reel * fP : 0, fraisP = rev ? fraisCabinet(rev[mode].total * reel, mode, reel) * fP : 0;
       const proPerso = R.societeActive ? 0 : R.depensesPro * fP + fraisP;
       const scol = (+rs.scolarite || 0) * moisRes / 12, synd = (+rs.syndicat || 0) * moisRes / 12;
-      const reer = S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImp = R.autresNonPro * reel;
+      const reer = R.reerAnnee(a) + R.celiappAnnee(a), autresImp = R.autresNonPro * reel;
       const anneeProj = (an0 || new Date().getFullYear()) + a;
       const creditDividendesQc = anneeProj >= 2027 ? C.P2026.dividendes.creditQuebecDes2027 : undefined;
       const fisc = R.couple && (R.coupleFiscal || a >= 1);
@@ -801,7 +830,7 @@ window.Verrou.quandOuvert(function () {
         const creditDividendesQc = anneeProj >= 2027 ? C.P2026.dividendes.creditQuebecDes2027 : undefined;
         // L'an prochain, des conjoints de fait auront 12 mois de vie commune : couple pour l'impôt.
         const fisc = R.couple && (R.coupleFiscal || a >= 1);
-        let moi = impotDe({ ...base, personneACharge: !fisc && enfantACharge(a), interetsEtudes: R.interetsPeriodes[a] || 0, reer: S.epargne.reer.cotisationAnnuelle + R.celiappAnnee(a), autresImposables: R.autresNonPro * reel, depensesPro: R.depensesPro + fraisA, revenu: R.revType[mode].total * reel, creditDividendesQc, deductionGarde: R.garde.parPartenaire ? 0 : R.garde.deductionAn(a, reel) }, 1 / I);
+        let moi = impotDe({ ...base, personneACharge: !fisc && enfantACharge(a), interetsEtudes: R.interetsPeriodes[a] || 0, reer: R.reerAnnee(a) + R.celiappAnnee(a), autresImposables: R.autresNonPro * reel, depensesPro: R.depensesPro + fraisA, revenu: R.revType[mode].total * reel, creditDividendesQc, deductionGarde: R.garde.parPartenaire ? 0 : R.garde.deductionAn(a, reel) }, 1 / I);
         if (fisc) moi = C.transfertsConjoints(moi, conj)[0];
         const ages = S.epargne.reee.enfants.map(x => +x.age + a).filter(x => x < 18);
         const nf = moi.revenuNetFed + (fisc ? conj.revenuNetFed : 0), nq = moi.revenuNetQc + (fisc ? conj.revenuNetQc : 0);
@@ -1117,6 +1146,11 @@ window.Verrou.quandOuvert(function () {
         action("info", "Vérifiez le revenu par jour de vos activités en établissement (page Revenu) : les valeurs de départ sont indicatives.");
       if (!S.epargne.encaisse && !S.epargne.reer.solde && !S.epargne.celi.solde && !S.epargne.reer.droits) action("info", "Ajoutez votre épargne et vos droits REER (page Patrimoine, bouton Modifier).");
     }
+    // REER : une cotisation plus grande que les droits n'est déduite que jusqu'aux droits ; sans droits inscrits, rien n'est vérifié.
+    if (R.reerBorne && R.reerVoulu > R.reerAnnee(0) + 0.5)
+      action("important", `Votre cotisation REER (${$(R.reerVoulu)}) dépasse vos droits (${$(R.reerDroits)}) : seuls ${$(R.reerAnnee(0))} sont déduits cette année. L'excédent n'est pas déductible et peut entraîner une pénalité de l'ARC.`);
+    else if (!R.reerBorne && R.reerVoulu > 0)
+      action("info", "Inscrivez vos droits REER (avis de cotisation fédéral, page Patrimoine) : sans eux, toute la cotisation est déduite, sans vérifier vos droits.");
     if (!S.meta.exemple) {
       const notes = (S.suivi || {}).instantanes || [], derniere = notes.length ? Math.floor((Date.now() - new Date(notes[notes.length - 1].date + "T00:00:00")) / 864e5) : null;
       if (derniere === null) action("info", "Notez votre valeur nette d'aujourd'hui (page Patrimoine) : vous pourrez ensuite comparer le réel au plan.");

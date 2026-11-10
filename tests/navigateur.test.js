@@ -1562,6 +1562,31 @@ async function superviseurAB(b, base) {
   await ctx.close();
 }
 
+/* 41 c. REER borné aux droits (profil 2 du méga-audit, 60 000 $ cotisés pour 5 000 $ de droits) : l'impôt est celui
+   d'une cotisation de 5 000 $ et « À faire » le signale ; l'an prochain, 18 % du revenu gagné, jusqu'au plafond de 2027
+   (35 390 $, ARC) ; sans droits inscrits, rien n'est borné et une ligne invite à les inscrire. */
+async function reerDroits(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "apercu" });
+  const P2 = { "revenu.milieu": "gmfu", "revenu.annee": "type", "revenu.modeBudget": "mixte", "revenu.demiJournees": 8, "revenu.enseignement": 2, "revenu.heuresParDJ": 3.5,
+    "revenu.semaines": 44, "revenu.patientsParDJ": 10, "revenu.demiJourneesSRV": 0, "revenu.patientsSRV": 0, "revenu.residents": 2, "revenu.externes": 0, "revenu.inscritsDebut": 1000,
+    "revenu.nouveauxGuichet": 0, "revenu.nouveauxSansMedecin": 0, "revenu.nouveauxTransferes": 0, "revenu.partVulnerable": 30, "revenu.membreGmf": true, "revenu.activites": [],
+    "revenu.fraisCabinetPct": 0, "impot.depensesPro": 8000, "impot.structure": "particulier", "residence.active": false, "epargne.celiapp.cotisationAnnuelle": 0 };
+  const lire = () => p.evaluate(() => { const R = window.Wealthnord.resultats(); window.Wealthnord.rendreTout();
+    return { impot: R.impot.total, an1: R.reerAnnee(1), texte: document.getElementById("v-apercu").textContent }; });
+  await remplacer(p, { ...P2, "epargne.reer.cotisationAnnuelle": 5000, "epargne.reer.droits": 5000 });
+  const cinq = await lire();
+  await remplacer(p, { ...P2, "epargne.reer.cotisationAnnuelle": 60000, "epargne.reer.droits": 5000 });
+  const trop = await lire();
+  verifier("REER : 60 000 $ cotisés pour 5 000 $ de droits, l'impôt d'une cotisation de 5 000 $", Math.abs(trop.impot - cinq.impot) < 0.01, { trop: trop.impot, cinq: cinq.impot });
+  verifier("REER : « À faire » signale la cotisation au-delà des droits", trop.texte.includes("dépasse vos droits"));
+  verifier("REER : l'an prochain, 18 % du revenu gagné, au plus 35 390 $ (plafond de 2027)", Math.abs(trop.an1 - 35390) < 0.01, trop.an1);
+  await remplacer(p, { ...P2, "epargne.reer.cotisationAnnuelle": 60000, "epargne.reer.droits": 0 });
+  const sans = await lire();
+  verifier("REER : sans droits inscrits, rien n'est borné et une ligne invite à les inscrire", sans.impot < cinq.impot - 10000 && sans.texte.includes("Inscrivez vos droits REER"), sans.impot);
+  verifier("REER : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
 /* 41 b. Profil 2 du méga-audit (GMF-U établi, 1 000 inscrits, 30 % de vulnérables, 2 résidents) : selon le plan, la carte
    de supervision donne le verdict du calcul de l'année, et le montant annuel égale, à 1 $ près, l'écart entre les deux
    totaux (supervision facturée en intervention, puis en visites) : l'intervention rapporte 285,95 $ de plus. */
@@ -1725,7 +1750,7 @@ async function ciblesTactiles(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, repertoireActes, revenuEtImpot, ciblesTactiles]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, reerDroits, repertoireActes, revenuEtImpot, ciblesTactiles]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

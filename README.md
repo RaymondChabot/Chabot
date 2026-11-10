@@ -234,6 +234,11 @@ côte à côte (ci-dessus). Les anciennes adresses `#revenu/actes` et
   santé ; société et dividendes ; partenaire salarié ou à son compte et
   transferts de crédits ; allocations
   familiales, prime d'assurance médicaments, REER, CELIAPP, société ;
+  REER déduit jusqu'aux droits inscrits seulement (l'excédent est signalé
+  dans « À faire ») ; les années suivantes, 18 % du revenu gagné de l'année
+  d'avant, jusqu'au plafond (ARC, « Plafonds des REER », page modifiée le
+  28 octobre 2026 : 33 810 $ en 2026, 35 390 $ en 2027), plus les droits
+  inutilisés ; sans droits inscrits, rien n'est borné ;
   frais de garde (garderie ou CPE, camps de jour, gardiennage du budget) :
   crédit remboursable du Québec selon le revenu familial (78 % à 67 %,
   plafonds de 12 525 $ et 6 305 $ par enfant ; sans la contribution
