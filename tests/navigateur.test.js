@@ -1362,6 +1362,12 @@ async function demarrageGmfu(b, base) {
   verifier("GMF-U : rien ne déborde à 320 px", !deborde);
   await allerA(p, "apercu");
   verifier("GMF-U : avec des inscrits, pas de ligne « aucun patient inscrit »", await p.evaluate(() => !document.querySelector("#ap-hero .hero-inscrits")));
+  // Sans dépenses entrées : ni valeur nette projetée ni « Indépendance financière » (le surplus serait tout le revenu net).
+  await p.evaluate(() => window.Wealthnord.rendreTout());
+  const sansDep = await p.evaluate(() => ({ apercu: document.getElementById("v-apercu").textContent, pat: document.getElementById("v-avenir").textContent }));
+  verifier("projection : sans dépenses, l'Aperçu n'affiche ni « Indépendance financière » ni une valeur nette dans dix ans",
+    !sansDep.apercu.includes("Indépendance financière") && !/20\d\d : [\d\s\u00a0]+\$, si tout le surplus/.test(sansDep.apercu) && sansDep.apercu.includes("Entrez vos dépenses pour la projeter"));
+  verifier("projection : sans dépenses, Patrimoine invite à entrer les dépenses au lieu de projeter", sansDep.pat.includes("Entrez vos dépenses du mois") && !sansDep.pat.includes("tout le surplus est placé"));
   verifier("GMF-U : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
@@ -1559,6 +1565,16 @@ async function superviseurAB(b, base) {
   await p.click("#ap-demijournee"); await p.waitForTimeout(300);
   verifier("aperçu : l'onglet mène au comparatif", await p.evaluate(() => location.hash === "#comparer/demijournee" && !!document.getElementById("rv-carte-supervision").offsetParent));
   verifier("supervision : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
+/* 41 e. Projection : l'hypothèse dite sous la valeur nette projetée (exemple, avec ses dépenses). */
+async function hypotheseProjection(b, base) {
+  const { ctx, p, erreurs } = await ouvrir(b, base, { page: "avenir" });
+  const t = await p.evaluate(() => ({ pat: document.getElementById("v-avenir").textContent, ap: document.getElementById("v-apercu").textContent }));
+  verifier("projection : « tout le surplus est placé, une fois les dettes payées » sous la valeur nette projetée (Patrimoine et Aperçu)",
+    t.pat.includes("Projection : tout le surplus est placé, une fois les dettes payées.") && t.ap.includes("si tout le surplus est placé"));
+  verifier("projection : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
 
@@ -1768,7 +1784,7 @@ async function ciblesTactiles(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, reerDroits, premiereAnneeApres, repertoireActes, revenuEtImpot, ciblesTactiles]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, reerDroits, premiereAnneeApres, hypotheseProjection, repertoireActes, revenuEtImpot, ciblesTactiles]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

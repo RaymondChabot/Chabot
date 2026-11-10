@@ -1123,14 +1123,16 @@ window.Verrou.quandOuvert(function () {
       return a;
     };
     const p = R.projection, dix = p[Math.min(10, p.length - 1)];
-    // Sans aucune dépense entrée, le « surplus » serait le revenu net en entier : la tuile montre le revenu disponible.
-    const sansDepenses = !S.meta.exemple && !categoriesBudget().some(categorieRemplie);
+    // Sans aucune dépense entrée, le « surplus » serait le revenu net en entier : la tuile montre le revenu disponible,
+    // et la valeur nette n'est pas projetée.
+    const sansDepenses = sansDepensesEntrees();
     t.append(
       sansDepenses ? tuileLien("budget/mois", "Revenu disponible, par mois", $(R.netMoi), "Entrez vos dépenses pour voir votre surplus")
         : tuileLien("budget/mois", "Surplus mensuel", $(R.surplusMoi), R.surplusMoi >= 0 ? `Sur ${$(R.netMoi)} disponibles par mois` : "Vos sorties dépassent vos revenus"),
       tuileLien("impot", "Impôt et cotisations", $(R.impot.totalGlobal ?? R.impot.total), `Taux moyen ${pct(R.impot.tauxMoyen, 0)}${R.vueResidence ? ", retenu sur la paie" : ""}`),
       tuileLien("budget/dettes", "Solde des dettes", $(R.detteTotale), R.sim.libre ? `Sans dettes en ${moisAn(R.sim.libre)}` : "Jamais remboursées à ce rythme"),
-      tuileLien("avenir", "Valeur nette", $(p[0].moi), `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}`),
+      tuileLien("avenir", "Valeur nette", $(p[0].moi), sansDepenses ? "Entrez vos dépenses pour la projeter"
+        : `${dix.annee} : ${$(dix.moi / R.deflateur(dix.annee - p[0].annee))}, si tout le surplus est placé`),
     );
 
     // À faire : toute la liste dans le détail ; les deux plus importantes dans le résumé, en version courte
@@ -1265,14 +1267,14 @@ window.Verrou.quandOuvert(function () {
     if (R.residenceActive) { const [a, m] = R.debutPratique.split("-").map(Number), d = new Date(a, m - 1, 1);
       l.push({ t: d, jalon: { mois: mois(d), annee: a }, titre: "Début de la pratique", sous: "Fin de la résidence", cls: "fort" }); }
     if (R.sim.libre && S.dettes.length > 1) l.push({ t: R.sim.libre, jalon: { mois: mois(R.sim.libre), annee: R.sim.libre.getFullYear() }, titre: "Plus aucune dette", sous: `${$(R.detteTotale)} remboursés ; le budget des dettes est ensuite placé`, cls: "fort" });
-    const p = R.projection, debut = p[0].moi;
-    for (const seuil of [0, 250000, 500000, 1000000, 2000000]) {
+    const p = R.projection, debut = p[0].moi, projeter = !sansDepensesEntrees();
+    for (const seuil of projeter ? [0, 250000, 500000, 1000000, 2000000] : []) {
       if (debut >= seuil) continue;
       const i = p.findIndex(x => x.moi >= seuil);
       if (i > 0) l.push({ t: new Date(p[i].annee, 0, 1), jalon: { annee: p[i].annee }, titre: seuil === 0 ? "Valeur nette positive" : `Valeur nette de ${seuil >= 1e6 ? nb(seuil / 1e6, 0) + " M$" : nb(seuil / 1000, 0) + " k$"}`, sous: `Scénario ${SCENARIOS[R.scenario].toLowerCase()}` });
     }
     const F = independance(R, false);
-    if (F.annee) l.push({ t: new Date(F.annee, 0, 2), jalon: { annee: F.annee }, titre: "Indépendance financière", sous: `Placements de ${nb(F.mult)} fois vos dépenses de l'année${F.age ? ` · à ${F.age} ans` : ""}`, cls: "fort" });
+    if (F.annee && projeter) l.push({ t: new Date(F.annee, 0, 2), jalon: { annee: F.annee }, titre: "Indépendance financière", sous: `Placements de ${nb(F.mult)} fois vos dépenses de l'année${F.age ? ` · à ${F.age} ans` : ""}`, cls: "fort" });
     (S.jalonsPerso || []).filter(x => x.annee >= p[0].annee).forEach(x => {
       const k = Math.min(p.length - 1, x.annee - p[0].annee);
       l.push({ t: new Date(x.annee, 0, 3), jalon: { annee: x.annee }, titre: x.nom || "Jalon", sous: `Valeur nette projetée : ${$(p[k].moi / R.deflateur(k))}` });
@@ -2732,14 +2734,18 @@ window.Verrou.quandOuvert(function () {
   // Patrimoine : la valeur nette projetée ; ce que vous possédez en tuiles ; où mettre le prochain 1 000 $.
   function resumePatrimoine(R) {
     const p = R.projection, x = p[0], F = independance(R, false);
-    const c = carteResume("pa-r-graph", "Valeur nette projetée", ["Projection", "#avenir/projection"]), g = el("div", "graphique");
-    c.appendChild(g);
-    graphiqueLignes(g, null, [{ nom: "Valeur nette", couleur: SERIES[0], valeurs: p.map((y, i) => y.moi / R.deflateur(i)) }], p.map(y => String(y.annee)),
-      { titre: "Valeur nette projetée", aire: true, hauteur: 170 });
+    const c = carteResume("pa-r-graph", "Valeur nette projetée", ["Projection", "#avenir/projection"]), g = el("div", "graphique"), projeter = !sansDepensesEntrees();
+    if (projeter) {
+      c.appendChild(g);
+      graphiqueLignes(g, null, [{ nom: "Valeur nette", couleur: SERIES[0], valeurs: p.map((y, i) => y.moi / R.deflateur(i)) }], p.map(y => String(y.annee)),
+        { titre: "Valeur nette projetée", aire: true, hauteur: 170 });
+      c.appendChild(el("p", "aide", HYPOTHESE_PROJECTION));
+    } else c.appendChild(el("p", "aide", "Entrez vos dépenses du mois (page Budget) : sans elles, tout le revenu net semblerait placé, et la projection serait trompeuse."));
     tuilesResume("pa-r-tuiles", [{ titre: "Placements", valeur: $(x.placements), sous: "REER, CELI, comptes" },
       R.locataire ? { titre: "Logement", valeur: "Locataire", sous: "Aucune maison" } : { titre: "Équité de la maison", valeur: $(x.equiteMoi), sous: "Votre part" },
       { titre: "Solde des dettes", valeur: $(R.detteTotale), sous: R.sim.libre ? `Remboursées en ${moisAn(R.sim.libre)}` : "Jamais remboursées" },
-      { titre: "Indépendance", valeur: F.annee ? String(F.annee) : "—", sous: F.annee ? `${nb(F.mult)} fois vos dépenses` : "Pas sur l'horizon" }]);
+      projeter ? { titre: "Indépendance", valeur: F.annee ? String(F.annee) : "—", sous: F.annee ? `${nb(F.mult)} fois vos dépenses` : "Pas sur l'horizon" }
+        : { titre: "Indépendance", valeur: "—", sous: "Entrez vos dépenses" }]);
     const o = optionsProchain(R)[0];
     carteResume("pa-r-prochain", "Le prochain 1 000 $", ["Détail", "#avenir/aujourdhui"], rangees(el("div"), [
       { titre: o.titre, sous: o.sous, ico: "ok", cls: "choisi", valeur: $(o.v), valeurSous: "dans 10 ans" }]));
@@ -2766,8 +2772,10 @@ window.Verrou.quandOuvert(function () {
     const montrer = i => {
       const d = val[i] - val[0];
       hero("vn-hero", i === 0 ? `${qui} aujourd'hui` : `${qui} en ${p[i].annee}${unite}`, $(val[i]), [
-        i === 0 ? puce(`${p[10].annee} : ${$(val[10])} (${signe(val[10] - val[0])})`, val[10] >= val[0] ? "haut" : "bas", val[10] >= val[0]) : puce(`${signe(d)} par rapport à aujourd'hui`, d >= 0 ? "haut" : "bas", d >= 0),
-        i === 0 ? null : `Entre ${$(bas[i])} et ${$(haut[i])} selon le scénario`,
+        sansDepensesEntrees() ? "Entrez vos dépenses du mois (page Budget) : sans elles, la valeur nette n'est pas projetée."
+          : i === 0 ? puce(`${p[10].annee} : ${$(val[10])} (${signe(val[10] - val[0])})`, val[10] >= val[0] ? "haut" : "bas", val[10] >= val[0]) : puce(`${signe(d)} par rapport à aujourd'hui`, d >= 0 ? "haut" : "bas", d >= 0),
+        i === 0 || sansDepensesEntrees() ? null : `Entre ${$(bas[i])} et ${$(haut[i])} selon le scénario`,
+        sansDepensesEntrees() ? null : HYPOTHESE_PROJECTION,
       ], i === 0 ? val[0] : undefined);
     };
     montrer(0);
@@ -3471,6 +3479,18 @@ window.Verrou.quandOuvert(function () {
     const z = document.getElementById("pa-independance"); z.textContent = "";
     const F = independance(R, couple), age = a => F.naissance ? ` (à ${a - F.naissance} ans)` : "";
     const res = el("p", "resume");
+    if (sansDepensesEntrees()) z.appendChild(el("p", "resume", "Entrez vos dépenses du mois (page Budget) : l'indépendance financière se calcule sur elles."));
+    else independanceResume(z, res, F, age, R);
+    z.appendChild(el("h3", "sous-titre", "Vos jalons personnels"));
+    const p = R.projection, cle = couple ? "menage" : "moi";
+    z.appendChild(rangees(el("div"), [
+      ...(S.jalonsPerso || []).map((x, i) => { const k = Math.max(0, Math.min(p.length - 1, (+x.annee || 0) - p[0].annee));
+        return { titre: x.nom || "Jalon sans nom", sous: `En ${x.annee}${age(+x.annee)}`, valeur: $(p[k][cle] / R.deflateur(k)), valeurSous: "valeur nette projetée", action: () => feuilleJalon(i) }; }),
+      { titre: "Ajouter un jalon", sous: "Chalet, passer à 3 jours, sabbatique, retraite…", ico: "plus", cls: "ajout", action: ajouterJalon },
+    ]));
+  }
+  // L'indépendance financière : l'année, la jauge, la cible et les placements d'aujourd'hui.
+  function independanceResume(z, res, F, age, R) {
     res.append(document.createTextNode(F.annee ? "Indépendance financière vers " : "Pas d'indépendance financière avant "), el("strong", null, F.annee ? `${F.annee}${age(F.annee)}` : String(F.fin)),
       document.createTextNode(F.annee ? ` : vos placements atteindraient ${nb(F.mult)} fois vos dépenses de l'année, assez pour vivre de leurs rendements (scénario ${SCENARIOS[R.scenario].toLowerCase()}).` : ` au rythme actuel (scénario ${SCENARIOS[R.scenario].toLowerCase()}).`));
     z.appendChild(res);
@@ -3478,13 +3498,6 @@ window.Verrou.quandOuvert(function () {
     z.appendChild(rangees(el("div"), [
       { titre: "Cible aujourd'hui", sous: `${nb(F.mult)} fois ${$(F.depenses)} de dépenses par année`, valeur: $(F.cible0), action: feuilleIndependance },
       { titre: "Vos placements aujourd'hui", sous: "REER, CELI, CELIAPP, comptes" + (R.societeActive ? ", société" : ""), valeur: $(F.placements0), valeurSous: `${pct(F.progression, 0)} de la cible` },
-    ]));
-    z.appendChild(el("h3", "sous-titre", "Vos jalons personnels"));
-    const p = R.projection, cle = couple ? "menage" : "moi";
-    z.appendChild(rangees(el("div"), [
-      ...(S.jalonsPerso || []).map((x, i) => { const k = Math.max(0, Math.min(p.length - 1, (+x.annee || 0) - p[0].annee));
-        return { titre: x.nom || "Jalon sans nom", sous: `En ${x.annee}${age(+x.annee)}`, valeur: $(p[k][cle] / R.deflateur(k)), valeurSous: "valeur nette projetée", action: () => feuilleJalon(i) }; }),
-      { titre: "Ajouter un jalon", sous: "Chalet, passer à 3 jours, sabbatique, retraite…", ico: "plus", cls: "ajout", action: ajouterJalon },
     ]));
   }
 
@@ -3928,6 +3941,10 @@ window.Verrou.quandOuvert(function () {
   // Catégories du budget à remplir : « Enfants » seulement s'il y a des enfants (ou déjà des montants).
   const categoriesBudget = () => CATALOGUE.map(x => x.cat).filter(g => g !== "Enfants" || S.epargne.reee.enfants.length || S.budget.some(b => categorie(b) === g && b.montant > 0));
   const categorieRemplie = g => totalActif(g) || S.budget.some(b => categorie(b) === g && b.montant > 0);
+  // Aucune dépense entrée (hors exemple) : le surplus serait tout le revenu net ; pas de projection ni d'indépendance.
+  const sansDepensesEntrees = () => !S.meta.exemple && !categoriesBudget().some(categorieRemplie);
+  // L'hypothèse de la projection, dite en une ligne sous la valeur nette projetée.
+  const HYPOTHESE_PROJECTION = "Projection : tout le surplus est placé, une fois les dettes payées.";
   const ancienParcours = nom => (((S.meta.parcours || {})[nom]) || []).length > 0;
 
   // Carte « Votre portrait » de l'aperçu : ce qui est rempli, et la suite proposée.
