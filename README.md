@@ -124,9 +124,13 @@ mettre les soldes à jour et de faire partir le plan du mois courant. Le
 sommaire pour le comptable décrit l'année en résidence, même en vue
 Pratique.
 
-Au premier lancement, **Comparer mes modes en 30 secondes** demande le
-milieu, les demi-journées et les patients, puis ouvre vos trois modes côte
-à côte ; le portrait complet se fait ensuite, quand vous voulez. Sinon, un
+Au premier lancement, **Comparer mes modes en 30 secondes** demande en deux
+questions le milieu, les demi-journées, les patients et, environ, les patients
+inscrits ; en GMF-U, aussi les demi-journées d'enseignement et le nombre de
+résidents supervisés en même temps (rien n'est supposé), et le GMF-U compte
+comme membre d'un GMF. Puis il ouvre vos trois modes côte à côte ; tant
+qu'aucun patient n'est inscrit, une ligne sous le revenu le dit et mène au
+réglage ; le portrait complet se fait ensuite, quand vous voulez. Sinon, un
 **assistant de départ** pose quelques questions
 (famille, enfants, pratique, semaine, clientèle, activités, logement,
 dettes) et bâtit le point de départ à partir des réponses : patients par

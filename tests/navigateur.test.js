@@ -1287,7 +1287,7 @@ async function deuxOffres(b, base) {
   await ctx.close();
 }
 
-/* 35. Démarrage en trois questions : le milieu, les demi-journées, les patients ; puis vos trois modes. Le portrait
+/* 35. Démarrage en deux questions : la pratique, puis la semaine ; puis vos trois modes. Le portrait
    complet reste à faire (carte de l'aperçu), et le retour ramène à l'accueil. */
 async function demarrageRapide(b, base) {
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
@@ -1306,10 +1306,15 @@ async function demarrageRapide(b, base) {
   await p.fill("#as-patientsParDJ", "8"); await p.click("#as-suivant"); await p.waitForTimeout(400);
   const fin = await p.evaluate(() => ({ hash: location.hash, modes: !!document.getElementById("rv-r-modes").offsetParent, S: window.Wealthnord.etat(),
     toast: document.getElementById("toast-texte").textContent }));
-  verifier("rapide : trois questions, puis vos trois modes (page Comparer)", q1.etape === "Question 1 sur 2" && q1.titre === "Votre pratique" && q1.retour && accueil === "Bienvenue dans WealthMorand"
+  verifier("rapide : deux questions, puis vos trois modes (page Comparer)", q1.etape === "Question 1 sur 2" && q1.titre === "Votre pratique" && q1.retour && accueil === "Bienvenue dans WealthMorand"
     && q2.etape === "Question 2 sur 2" && q2.bouton === "Voir mes modes" && fin.hash === "#comparer" && fin.modes && fin.S.revenu.milieu === "gmfu" && fin.S.revenu.patientsParDJ === 8
     && fin.toast.includes("Complétez votre portrait"), { q1, accueil, q2, hash: fin.hash, toast: fin.toast });
   await allerA(p, "apercu");
+  const sans = await p.evaluate(() => { const b = document.querySelector("#ap-hero .hero-inscrits"); return b && b.textContent; });
+  verifier("rapide : sans patient inscrit, une ligne discrète sous le revenu le dit", !!sans && sans.startsWith("Aucun patient inscrit"), sans);
+  await p.click("#ap-hero .hero-inscrits"); await p.waitForTimeout(300);
+  verifier("rapide : la ligne ouvre le réglage du revenu", await p.evaluate(() => document.getElementById("feuille").open && !!document.querySelector("#feuille [id$='inscritsDebut']")));
+  await p.keyboard.press("Escape"); await p.waitForTimeout(200);
   const ligne = await p.evaluate(() => { const b = document.querySelector("#ap-r-portrait .portrait-ligne");
     return b && { texte: b.textContent, hauteur: b.getBoundingClientRect().height, carte: document.getElementById("ap-r-portrait").classList.contains("carte"), etiquette: b.getAttribute("aria-label") }; });
   verifier("rapide : dans l'Aperçu, le portrait en une rangée discrète (pas une carte), qui mène à la suite", ligne && /^Portrait à \d+ %Continuer : /.test(ligne.texte) && ligne.hauteur <= 64
@@ -1321,6 +1326,43 @@ async function demarrageRapide(b, base) {
   verifier("rapide : le portrait complet reste à faire", fin.S.meta.portraitRapide === true && await p.evaluate(() => !document.getElementById("ap-portrait").hidden
     && document.getElementById("ap-portrait-titre").textContent !== "Votre portrait : 100 % complété"));
   verifier("rapide : aucune erreur", erreurs.length === 0, erreurs);
+  await ctx.close();
+}
+
+/* 35 b. Premier lancement en GMF-U : l'enseignement et les résidents sont demandés (pas supposés), les inscrits aussi ;
+   hors GMF-U, ces questions n'apparaissent pas ; le GMF-U compte comme membre d'un GMF ; le message final décrit la semaine. */
+async function demarrageGmfu(b, base) {
+  const ctx = await b.newContext({ viewport: { width: 320, height: 700 }, serviceWorkers: "block" });
+  const p = await ctx.newPage(), erreurs = [];
+  p.on("pageerror", e => erreurs.push(String(e)));
+  await ctx.addInitScript(() => { try { sessionStorage.setItem("wm.ouverture", "1"); } catch (e) { /* stockage indisponible */ } });
+  await p.goto(`${base}/index.html`); await pret(p);
+  await p.waitForSelector("#assistant[open]", { timeout: 5000 });
+  const intro = await p.textContent("#as-corps .as-intro");
+  await p.click("#as-rapide");
+  await p.check('input[name="as-milieu"][value="clsc"]'); await p.click("#as-suivant");
+  const horsGmfu = await p.evaluate(() => !document.getElementById("as-enseignement") && !document.getElementById("as-residents"));
+  await p.click("#as-retour");
+  await p.check('input[name="as-milieu"][value="gmfu"]'); await p.click("#as-suivant");
+  const defauts = await p.evaluate(() => [document.getElementById("as-enseignement").value, document.getElementById("as-residents").value]);
+  await p.fill("#as-demiJournees", "8"); await p.fill("#as-patientsParDJ", "8"); await p.fill("#as-enseignement", "9");
+  await p.click("#as-suivant"); await p.waitForTimeout(150);
+  const refus = await p.textContent("#as-message");
+  await p.fill("#as-enseignement", "3"); await p.fill("#as-residents", "2"); await p.fill("#as-inscrits", "900");
+  const deborde = await p.evaluate(() => document.querySelector("#assistant").scrollWidth > document.querySelector("#assistant").clientWidth + 1);
+  await p.click("#as-suivant"); await p.waitForTimeout(400);
+  const fin = await p.evaluate(() => ({ r: window.Wealthnord.etat().revenu, toast: document.getElementById("toast-texte").textContent }));
+  verifier("GMF-U : l'accueil annonce deux questions, comme l'écran", intro.includes("deux questions"), intro);
+  verifier("GMF-U : hors GMF-U, ni enseignement ni résidents", horsGmfu);
+  verifier("GMF-U : 2 demi-journées d'enseignement et 1 résident proposés, visibles", defauts.join() === "2,1", defauts);
+  verifier("GMF-U : plus d'enseignement que de demi-journées est refusé", refus.includes("enseignement"), refus);
+  verifier("GMF-U : les réponses se retrouvent exactement dans l'état", fin.r.demiJournees === 8 && fin.r.patientsParDJ === 8 && fin.r.enseignement === 3
+    && fin.r.residents === 2 && fin.r.inscritsDebut === 900 && fin.r.membreGmf === true, { dj: fin.r.demiJournees, ens: fin.r.enseignement, res: fin.r.residents, ins: fin.r.inscritsDebut, gmf: fin.r.membreGmf });
+  verifier("GMF-U : le message final décrit ce qui est calculé", fin.toast.includes("5 demi-journées de clinique à 8 patients, 3 d'enseignement (2 résidents)"), fin.toast);
+  verifier("GMF-U : rien ne déborde à 320 px", !deborde);
+  await allerA(p, "apercu");
+  verifier("GMF-U : avec des inscrits, pas de ligne « aucun patient inscrit »", await p.evaluate(() => !document.querySelector("#ap-hero .hero-inscrits")));
+  verifier("GMF-U : aucune erreur", erreurs.length === 0, erreurs);
   await ctx.close();
 }
 
@@ -1659,7 +1701,7 @@ async function ciblesTactiles(b, base) {
   const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
   const b = await chromium.launch();
   try {
-    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, repertoireActes, revenuEtImpot, ciblesTactiles]) {
+    for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, accessibiliteLot8, prochainPaiement, superviseurAB, repertoireActes, revenuEtImpot, ciblesTactiles]) {
       if (process.env.SCENARIOS && !process.env.SCENARIOS.split(",").includes(scenario.name)) continue;
       try { await scenario(b, base); } catch (e) { verifier(`${scenario.name} : déroulement`, false, String(e).split("\n")[0]); }
     }

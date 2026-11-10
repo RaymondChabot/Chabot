@@ -1057,7 +1057,7 @@ window.Verrou.quandOuvert(function () {
     hero("ap-hero", "Votre revenu brut de l'année" + enVue, $(R.brutVue), [
       `${R.vueResidence ? "Net après impôt et retenues" : R.libelleNet(R.mode)} : ${$(R.netVue)}`,
       R.vueResidence ? `Salaire de résident, R${R.res.niveau}` : libelleRevenu(),
-      meilleurAutre ? puce(`${signe(ecart)} net par rapport ${AU_MODE[meilleurAutre]}`, ecart >= 0 ? "haut" : "bas", ecart >= 0) : null, quand,
+      meilleurAutre ? puce(`${signe(ecart)} net par rapport ${AU_MODE[meilleurAutre]}`, ecart >= 0 ? "haut" : "bas", ecart >= 0) : null, quand, sansInscrits(R),
     ], R.brutVue);
     modesApercu(R);
 
@@ -1285,6 +1285,13 @@ window.Verrou.quandOuvert(function () {
     ["Autres revenus", x => x.autres],
   ];
   // Revenu : le net en tuiles ; d'où vient le revenu ; ce que change une demi-journée ou un patient de plus.
+  // Aucun patient inscrit, ni au départ ni en cours d'année : une ligne discrète sous le revenu mène au réglage.
+  function sansInscrits(R) {
+    if (R.vueResidence || !R.rev || R.rev.inscritsFin > 0.5) return null;
+    const b = el("button", "lien-carte hero-inscrits", "Aucun patient inscrit : forfaits annuels non comptés. Inscrire vos patients");
+    b.type = "button"; b.dataset.feuille = "revenu";
+    return b;
+  }
   function resumeRevenu(R) {
     if (R.vueResidence) {
       const x = R.res;
@@ -1975,7 +1982,7 @@ window.Verrou.quandOuvert(function () {
       `${R.libelleNet(R.mode)} : ${$(R.nets[R.mode])}`,
       meilleur ? puce(`${signe(diff)} net par rapport ${AU_MODE[meilleur]}`, diff >= 0 ? "haut" : "bas", diff >= 0)
         : g.activites ? puce(`Dont ${$(g.activites)} d'activités en établissement`) : null,
-      R.residenceActive ? puce(`Dès ${moisLong(R.debutPratique)}`) : null,
+      R.residenceActive ? puce(`Dès ${moisLong(R.debutPratique)}`) : null, sansInscrits(R),
     ], g[R.mode].total);
 
     const parts = PARTS_REVENU;
@@ -4613,7 +4620,7 @@ window.Verrou.quandOuvert(function () {
   let A = null, etape = 0;
   const reponsesVides = () => ({ famille: null, depuis12mois: true, enfantCommun: false, partenaire: "salarie", revenuPartenaire: 0,
     enfants: [], milieu: null, mode: "horaire", demiJournees: 8, srv: 0, premiere: true, incorporee: false,
-    patientsParDJ: null, patientsSRV: null, heuresParDJ: 4, vacances: 6, inscrits: 0, nouveaux: 0, vulnerables: 0, membreGmf: null, fraisPct: 0,
+    patientsParDJ: null, patientsSRV: null, heuresParDJ: 4, vacances: 6, enseignement: 2, residents: 1, inscrits: 0, nouveaux: 0, vulnerables: 0, membreGmf: null, fraisPct: 0,
     statut: "pratique", niveau: "1", debutPratique: (() => { const d = new Date(); return `${d.getMonth() >= 6 ? d.getFullYear() + 1 : d.getFullYear()}-07`; })(),
     ...Object.fromEntries(TYPES_ASSISTANT.flatMap(k => [["act_" + k, false], ["actN_" + k, 4]])),
     logement: null, loyer: 0, maison: 0, hypotheque: 0, tauxHyp: 4.5, paiementHyp: 0, partMaison: 50,
@@ -4647,7 +4654,7 @@ window.Verrou.quandOuvert(function () {
 
   const ETAPES = [
     { titre: "Bienvenue dans WealthMorand", bouton: "Portrait complet", rendre: c => {
-      c.appendChild(el("p", "as-intro", "Comparez vos modes de rémunération en trois questions : votre milieu, vos demi-journées, vos patients. Ou faites votre portrait complet (famille, pratique, logement, dettes), en deux minutes. Tout reste sur cet appareil, et tout se modifie ensuite."));
+      c.appendChild(el("p", "as-intro", "Comparez vos modes de rémunération en deux questions : votre pratique, puis votre semaine. Ou faites votre portrait complet (famille, pratique, logement, dettes), en deux minutes. Tout reste sur cet appareil, et tout se modifie ensuite."));
       const r = el("div", "actions"), vite = el("button", "bouton", "Comparer mes modes en 30 secondes"); vite.type = "button"; vite.id = "as-rapide";
       vite.addEventListener("click", () => { A.rapide = true; etape = 0; points(); rendreEtape(); document.getElementById("as-titre").focus(); });
       r.appendChild(vite); c.appendChild(r);
@@ -4698,11 +4705,15 @@ window.Verrou.quandOuvert(function () {
         ["acte", "À l'acte", "Chaque visite payée selon son tarif"]]));
     } },
     { titre: "Votre semaine", valide: () => A.demiJournees > 0 && !(A.patientsParDJ > 0) ? "Inscrivez le nombre de patients que vous voyez par demi-journée de rendez-vous."
-      : A.srv > 0 && !(A.patientsSRV > 0) ? "Inscrivez le nombre de patients par demi-journée de sans rendez-vous." : "", rendre: c => {
-      const residence = A.statut === "residence", heures = A.milieu && MILIEUX[A.milieu].modes.length > 1;
+      : A.srv > 0 && !(A.patientsSRV > 0) ? "Inscrivez le nombre de patients par demi-journée de sans rendez-vous."
+      : A.milieu === "gmfu" && (+A.enseignement || 0) > (+A.demiJournees || 0) ? "Les demi-journées d'enseignement font partie de vos demi-journées de rendez-vous : il n'y en a pas plus." : "", rendre: c => {
+      const residence = A.statut === "residence", heures = A.milieu && MILIEUX[A.milieu].modes.length > 1, gmfu = A.milieu === "gmfu";
       if (residence) c.appendChild(el("p", "as-intro", "Votre pratique à venir, telle que vous la prévoyez."));
       c.appendChild(asGroupe(asNombre("Demi-journées de rendez-vous par semaine", "demiJournees", "d.-j.", 1),
         asNombre("Patients par demi-journée de rendez-vous", "patientsParDJ", "pat.", 0.5, "Vos propres patients, en moyenne.", true),
+        gmfu && asNombre("Dont demi-journées d'enseignement", "enseignement", "d.-j.", 1, "Celles où vous supervisez des résidents ; 0 si vous n'enseignez pas.", true),
+        gmfu && A.enseignement > 0 && asNombre("Résidents supervisés en même temps", "residents", "rés.", 1, "Pendant une demi-journée d'enseignement, en moyenne.", true),
+        A.rapide && asNombre("Patients inscrits, environ", "inscrits", "pat.", 50, "Facultatif : les forfaits annuels en dépendent (forfait GMF, patients vulnérables)."),
         asNombre("Demi-journées de sans rendez-vous (SRV)", "srv", "d.-j.", 1, null),
         A.srv > 0 && asNombre("Patients par demi-journée de SRV", "patientsSRV", "pat.", 0.5, null, true),
         heures && asNombre("Heures par demi-journée", "heuresParDJ", "h", 0.25, "Pour le taux horaire et le forfait horaire du mixte."),
@@ -4758,7 +4769,7 @@ window.Verrou.quandOuvert(function () {
       c.appendChild(rangees(el("div"), [
         { titre: "Famille", sous: !couple ? "Sans partenaire" : `En couple, ${A.famille === "fait" ? "union de fait" : "mariage ou union civile"} · partenaire ${A.partenaire === "sans" ? "sans revenu de travail" : `${A.partenaire === "salarie" ? "en emploi salarié" : "à son compte"}, ${$(A.revenuPartenaire)} par année`}` },
         { titre: "Enfants", sous: n ? `${n} enfant${n > 1 ? "s" : ""} : ${A.enfants.map(a => `${nb(a, 0)} an${a >= 2 ? "s" : ""}`).join(", ")}` : "Aucun" },
-        { titre: "Pratique", sous: `${MILIEUX[A.milieu].nom}${MILIEUX[A.milieu].modes.length > 1 ? ` · ${NOM_MODE[A.mode].toLowerCase()}` : ""} · ${nb(A.demiJournees)} demi-journées de ${nb(A.patientsParDJ || 0)} patients${A.srv ? ` et ${nb(A.srv)} de SRV` : ""} par semaine · ${nb(semainesClinique(A))} semaines en clinique${A.premiere || A.statut === "residence" ? " · première année" : ""}${A.incorporee ? " · incorporée" : ""}` },
+        { titre: "Pratique", sous: `${MILIEUX[A.milieu].nom}${MILIEUX[A.milieu].modes.length > 1 ? ` · ${NOM_MODE[A.mode].toLowerCase()}` : ""} · ${resumeSemaine(A)}${A.srv ? ` et ${nb(A.srv)} de SRV` : ""} par semaine · ${nb(semainesClinique(A))} semaines en clinique${A.premiere || A.statut === "residence" ? " · première année" : ""}${A.incorporee ? " · incorporée" : ""}` },
         { titre: "Clientèle", sous: `${nb(A.inscrits || 0)} inscrits${A.premiere || A.statut === "residence" ? `, ${nb(A.nouveaux || 0)} nouveaux attendus` : ""} · ${nb(A.vulnerables || 0)} % vulnérables${A.membreGmf ? " · GMF" : ""}${A.milieu === "clinique" ? ` · ${nb(A.fraisPct || 0)} % remis à la clinique` : ""}` },
         { titre: "Activités en établissement", sous: TYPES_ASSISTANT.filter(k => A["act_" + k] && A["actN_" + k] > 0).map(k => `${ACTIVITES[k].nom} : ${nb(A["actN_" + k])} par mois`).join(" · ") || "Aucune" },
         { titre: "Logement", sous: A.logement === "locataire" ? `Locataire · ${$(A.loyer)} par mois` : `Propriétaire · maison de ${$(A.maison)}${A.hypotheque ? `, hypothèque de ${$(A.hypotheque)}` : ""}` },
@@ -4810,6 +4821,12 @@ window.Verrou.quandOuvert(function () {
   document.getElementById("ap-assistant").addEventListener("click", ouvrirAssistant);
   document.getElementById("reprendre-assistant").addEventListener("click", ouvrirAssistant);
 
+  // La semaine en mots : « 6 demi-journées de clinique à 8 patients, 2 d'enseignement (1 résident) ».
+  function resumeSemaine(A) {
+    const dj = Math.max(0, +A.demiJournees || 0), ens = A.milieu === "gmfu" ? Math.min(dj, Math.max(0, +A.enseignement || 0)) : 0, res = Math.max(0, +A.residents || 0);
+    const clinique = `${nb(dj - ens)} demi-journée${dj - ens > 1 ? "s" : ""} de clinique à ${nb(A.patientsParDJ || 0)} patients`;
+    return ens > 0 ? `${clinique}, ${nb(ens)} d'enseignement (${nb(res)} résident${res > 1 ? "s" : ""})` : clinique;
+  }
   // Semaines en clinique : 52 moins les vacances.
   const semainesClinique = A => Math.max(0, Math.min(52, 52 - Math.max(0, +A.vacances || 0)));
   /* Portrait de départ à partir des réponses : rien d'autre ne vient de l'exemple que les tarifs,
@@ -4829,11 +4846,12 @@ window.Verrou.quandOuvert(function () {
     s.residence = { ...s.residence, active: residence, niveau: String(A.niveau || 1), debutPratique: residence ? A.debutPratique || "" : "", vue: "residence" };
     Object.assign(s.revenu, { milieu: A.milieu, annee: A.premiere || residence ? "premiere" : "type",
       anneePremiere: residence ? +String(A.debutPratique || "").slice(0, 4) || 0 : A.premiere ? auj.getFullYear() : 0, modeBudget: MILIEUX[A.milieu].modes.includes(A.mode) ? A.mode : MILIEUX[A.milieu].modes[0],
-      demiJournees: dj, enseignement: gmfu ? Math.min(2, dj) : 0, residents: gmfu ? 1 : 0, demiJourneesSRV: A.srv || 0, patientsSRV: A.srv ? A.patientsSRV || 0 : 0,
+      demiJournees: dj, enseignement: gmfu ? Math.min(dj, Math.max(0, Math.round(+A.enseignement || 0))) : 0,
+      residents: gmfu && A.enseignement > 0 ? Math.min(6, Math.max(0, Math.round(+A.residents || 0))) : 0, demiJourneesSRV: A.srv || 0, patientsSRV: A.srv ? A.patientsSRV || 0 : 0,
       patientsParDJ: A.patientsParDJ || 0, heuresParDJ: A.heuresParDJ || 4, semaines: semainesClinique(A), semainesArrivee: semainesClinique(A), autresRevenus: 0,
       inscritsDebut: Math.max(0, A.inscrits || 0), nouveauxGuichet: A.premiere || residence ? Math.max(0, A.nouveaux || 0) : 0, nouveauxSansMedecin: 0, nouveauxTransferes: 0,
       nouveauxAnGuichet: 0, nouveauxAnSansMedecin: 0, partVulnerable: Math.min(100, Math.max(0, A.vulnerables || 0)), partTresVulnerable: 0, partGroupe2: 0, partGroupe34: 0,
-      membreGmf: !!A.membreGmf, primeInscription: 0, fraisCabinetPct: A.milieu === "clinique" ? Math.min(100, Math.max(0, A.fraisPct || 0)) : 0, fraisCabinetMois: 0, lignes: [],
+      membreGmf: A.membreGmf == null ? gmfu : !!A.membreGmf, primeInscription: 0, fraisCabinetPct: A.milieu === "clinique" ? Math.min(100, Math.max(0, A.fraisPct || 0)) : 0, fraisCabinetMois: 0, lignes: [],
       activites: TYPES_ASSISTANT.filter(k => A["act_" + k] && A["actN_" + k] > 0).map(k => ({ id: nouvelId("a"), type: k, nom: "", nombre: A["actN_" + k], frequence: "mois", cycle: 6,
         calcul: "jour", parJour: ACTIVITES[k].parJour, patients: ACTIVITES[k].patients, parPatient: ACTIVITES[k].parPatient })) });
     s.confirmes["revenu.membreGmf"] = true;   // demandé dans l'assistant
@@ -4883,7 +4901,7 @@ window.Verrou.quandOuvert(function () {
     // Le chemin rapide mène aux modes côte à côte (Comparer) ; avec un seul mode, au revenu.
     const modes = rapide && !unSeulMode();
     ouvrir(rapide ? (modes ? "comparer" : "revenu") : "apercu"); tout();
-    toast(rapide ? `${modes ? "Vos modes, côte à côte." : "Votre revenu estimé."} Complétez votre portrait quand vous voulez : famille, logement, dettes (Aperçu).`
+    toast(rapide ? `${modes ? "Vos modes, côte à côte" : "Votre revenu estimé"} : ${resumeSemaine(A)} par semaine. Complétez votre portrait quand vous voulez : famille, logement, dettes (Aperçu).`
       : "Votre portrait est prêt. Précisez maintenant vos revenus et vos dépenses du mois.");
   }
 

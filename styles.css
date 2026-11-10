@@ -267,6 +267,9 @@ main {
 }
 /* Zone tactile d'au moins 44 px de haut autour du lien, sans changer la mise en page. */
 .lien-carte::after { content: ""; position: absolute; inset: -14px -10px; }
+/* Sous le revenu, tant qu'aucun patient n'est inscrit : une ligne discrète qui mène au réglage. */
+.hero-inscrits { font: 400 0.84rem var(--police); color: var(--discret); text-align: left; text-decoration: underline;
+  text-decoration-thickness: 1px; text-underline-offset: 3px; min-height: 0; }
 /* Lexique : un sigle de la RAMQ, souligné en pointillé ; sa définition dans une bulle. */
 .terme { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: help; text-align: inherit;
   text-decoration: underline dotted var(--discret); text-decoration-thickness: 1px; text-underline-offset: 3px; }
