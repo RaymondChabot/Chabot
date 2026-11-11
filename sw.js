@@ -1,7 +1,7 @@
 /* WealthMorand : fonctionne hors ligne. Réseau d'abord, pour recevoir les mises
    à jour ; copie en cache en secours. Les données personnelles ne passent
    jamais ici : elles restent dans le stockage local du navigateur. */
-const CACHE = "wealthmorand-v104";
+const CACHE = "wealthmorand-v105";
 const FICHIERS = [
   "./", "index.html", "styles.css", "js/demarrage.js", "js/calc.js", "js/repertoire.js", "js/verrou.js", "js/catalogues.js", "js/interface.js", "js/app.js", "js/rapport.js", "manifest.webmanifest",
   "polices/inter.woff2", "polices/newsreader.woff2",
@@ -12,7 +12,9 @@ self.addEventListener("install", e => {
 });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys()
-    .then(cles => Promise.all(cles.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    // Seulement les anciens caches de WealthMorand : sous une adresse partagée avec d'autres sections
+    // (accueil, guides, carte), leurs caches restent.
+    .then(cles => Promise.all(cles.filter(k => k.startsWith("wealthmorand-") && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 self.addEventListener("fetch", e => {

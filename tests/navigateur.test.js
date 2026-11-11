@@ -13,10 +13,13 @@ const { chromium } = require("playwright");
 const RACINE = path.join(__dirname, "..");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml",
   ".png": "image/png", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json", ".json": "application/json" };
+const PREFIXE = (process.env.PREFIXE || "").replace(/\/$/, "");
 function serveur() {
   return new Promise(res => {
     const s = http.createServer((req, rep) => {
-      const chemin = decodeURIComponent(req.url.split("?")[0]);
+      // PREFIXE=/wealth : l'app servie dans un sous-dossier, comme sur un site partagé ; ailleurs, rien (404).
+      let chemin = decodeURIComponent(req.url.split("?")[0]);
+      if (PREFIXE) { if (!chemin.startsWith(PREFIXE + "/")) { rep.writeHead(404); rep.end(); return; } chemin = chemin.slice(PREFIXE.length); }
       const f = path.join(RACINE, chemin === "/" ? "index.html" : chemin);
       if (!f.startsWith(RACINE) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rep.writeHead(404); rep.end(); return; }
       rep.writeHead(200, { "Content-Type": TYPES[path.extname(f)] || "application/octet-stream", "Cache-Control": "no-store" });
@@ -890,7 +893,7 @@ async function transfert(b, base) {
   const code = await p.textContent("#transfert-code-affiche");
   await p.click("#feuille-corps .actions .bouton:last-child"); await p.waitForTimeout(150);
   const lien = await p.evaluate(() => navigator.clipboard.readText());
-  verifier("transfert : code de 16 caractères, lien avec la charge après #", /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/.test(code) && /^http:\/\/127\.0\.0\.1:\d+\/index\.html#transfert=[A-Za-z0-9_-]{60,}$/.test(lien), { code, taille: lien.length });
+  verifier("transfert : code de 16 caractères, lien avec la charge après #", /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/.test(code) && new RegExp(`^http://127\\.0\\.0\\.1:\\d+${PREFIXE}/index\\.html#transfert=[A-Za-z0-9_-]{60,}$`).test(lien), { code, lien: lien.slice(0, 60), taille: lien.length });
   verifier("transfert : les données ne sont pas lisibles dans le lien", !/semaines|revenu|dettes/.test(lien));
   const autre = await ouvrir(b, base, { page: "apercu" });
   await autre.p.goto(lien); await pret(autre.p); await autre.p.waitForSelector("#transfert-code");
@@ -1824,7 +1827,7 @@ async function ciblesTactiles(b, base) {
 }
 
 (async () => {
-  const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}`;
+  const srv = await serveur(), base = `http://127.0.0.1:${srv.address().port}${PREFIXE}`;
   const b = await chromium.launch();
   try {
     for (const scenario of [exemple, brochure, alertes, sauvegarde, robustesse, injection, rapport, nouvelleVersion, budget, logo, sousOnglets, repartition, verrou, verrouDelai, verrouOnglets, sommaireComptable, monteCarlo, apercuCoherent, assistantVide, assistantMode, rendementProfil, lexiqueRamq, fraisGardeMenage, acomptesCeliapp, finitions, enteteEtChamps, transfert, residence, resumeDetail, tempsQuiPasse, planCalendrier, comparerActes, outilsAvances, etSi, deuxOffres, demarrageRapide, demarrageGmfu, importSur, saisieSolide, accessibiliteLot8, prochainPaiement, superviseurAB, supervisionPlan, reerDroits, premiereAnneeApres, hypotheseProjection, repertoireActes, revenuEtImpot, ciblesTactiles]) {

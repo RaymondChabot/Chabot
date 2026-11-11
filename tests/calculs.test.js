@@ -610,5 +610,18 @@ verifier("transition incorporée : une seule déclaration paie davantage, et gar
   && proche(uneDec.societe.dividendes, 127200, 0.01) && proche(uneDec.totalGlobal, uneDec.total + uneDec.societe.impotSociete, 1e-6) && uneDec.rrq > 0,
   { fed: uneDec.fed, qc: uneDec.qc });
 
-console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
-process.exit(echecs ? 1 : 0);
+/* Service worker : à l'activation, il ne supprime que les anciens caches de WealthMorand ; ceux des autres sections
+   d'une même adresse (accueil, guides, carte) restent. Exécuté avec un faux navigateur. */
+(async () => {
+  const ecouteurs = {}, restants = new Set(["wealthmorand-v1", "guides-v3", "accueil-v1", "carte-v2"]);
+  const vm = require("vm");
+  const faux = { self: { addEventListener: (n, f) => { ecouteurs[n] = f; }, location: { origin: "https://exemple.invalid" }, clients: { claim: () => Promise.resolve() }, skipWaiting: () => Promise.resolve() },
+    caches: { keys: async () => [...restants], delete: async k => restants.delete(k), open: async () => ({ addAll: async () => {}, put: async () => {} }), match: async () => undefined } };
+  const code = fs.readFileSync(path.join(__dirname, "../sw.js"), "utf8");
+  vm.runInNewContext(code, faux);
+  const cache = /const CACHE = "([^"]+)"/.exec(code)[1]; restants.add(cache);
+  let attente; ecouteurs.activate({ waitUntil: p => { attente = p; } }); await attente;
+  verifier("service worker : seuls les anciens caches de WealthMorand sont supprimés", [...restants].sort().join() === ["accueil-v1", "carte-v2", "guides-v3", cache].sort().join(), [...restants]);
+  console.log(`${reussis} vérifications réussies, ${echecs} échec(s). Écart maximal avec l'outil officiel : ${maxEcart} $.`);
+  process.exit(echecs ? 1 : 0);
+})();

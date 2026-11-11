@@ -356,7 +356,13 @@ node tests/calculs.test.js      # calculs
 node tests/navigateur.test.js   # parcours dans Chromium (Playwright)
 SCENARIOS=transfert,residence node tests/navigateur.test.js   # quelques parcours seulement
 HORLOGE=2027-03-15 node tests/navigateur.test.js   # toute la suite, comme à une autre date
+PREFIXE=/wealth node tests/navigateur.test.js   # l'app servie dans un sous-dossier, comme sur un site partagé
 ```
+
+L'app fonctionne dans un sous-dossier (chemins relatifs, manifeste en `./`).
+Sur une adresse partagée avec d'autres sections, son service worker ne
+supprime que ses propres caches (`wealthmorand-…`) et elle n'efface que ses
+propres clés de stockage (`boussole.v1`, `wm.*`, `wealthnord.theme`).
 
 - `calculs.test.js` vérifie l'impôt contre l'outil officiel du ministère des
   Finances du Québec, les montants de la RAMQ, les formules hypothécaires, la
